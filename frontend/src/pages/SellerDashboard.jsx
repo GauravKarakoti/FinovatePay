@@ -17,6 +17,7 @@ import EscrowTimeline from '../components/Escrow/EscrowTimeline';
 import KYCStatus from '../components/KYC/KYCStatus';
 import KYCVerification from '../components/KYC/KYCVerification';
 import { generateTimelineEvents } from '../utils/timeline';
+import {toast} from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 
 const uuidToBytes32 = (uuid) => {
@@ -89,7 +90,7 @@ const SellerDashboard = ({ activeTab }) => {
           if (!event) throw new Error("InvoiceCreated event not found.");
           
           const newContractAddress = event.args.invoiceContractAddress;
-          alert(`Invoice contract deployed at ${newContractAddress}! Saving to DB...`);
+          (`Invoice contract deployed at ${newContractAddress}! Saving to DB...`);
           
           const finalInvoiceData = {
               ...invoiceData,
@@ -101,13 +102,13 @@ const SellerDashboard = ({ activeTab }) => {
           
           await createInvoice(finalInvoiceData);
           
-          alert('Invoice created successfully!');
+          toast.success('Invoice created successfully!');
           setShowCreateForm(false);
           loadData();
 
       } catch (error) {
           console.error('Failed to create invoice:', error);
-          alert('Invoice creation failed: ' + (error.reason || error.message));
+          toast.error('Invoice creation failed: ' + (error.reason || error.message));
       } finally {
           setIsSubmitting(false);
       }
@@ -119,7 +120,7 @@ const SellerDashboard = ({ activeTab }) => {
 
   const submitShipmentProof = async () => {
       if (!proofFile || !confirmingShipment) {
-          alert("Please select a proof of shipment file.");
+          toast.error("Please select a proof of shipment file.");
           return;
       }
       setIsSubmitting(true);
@@ -129,7 +130,7 @@ const SellerDashboard = ({ activeTab }) => {
           // For this example, we'll simulate the upload and generate a fake hash.
           console.log("Uploading proof to decentralized storage...");
           const proofHash = `bafybeigdyrzt5s6dfx7sidefusha4u62piu7k26k5e4szm3oogv5s2d2bu-${Date.now()}`;
-          alert(`Proof "uploaded" successfully!\nIPFS CID: ${proofHash}`);
+          toast.success(`Proof "uploaded" successfully!\nIPFS CID: ${proofHash}`);
 
           // Step 2: Prepare a message and ask the seller to sign it
           const { signer } = await connectWallet();
@@ -143,7 +144,7 @@ const SellerDashboard = ({ activeTab }) => {
           // We pass the proofHash in place of the tx_hash
           await updateInvoiceStatus(confirmingShipment.invoice_id, 'shipped', proofHash);
           
-          alert('Shipment confirmed and buyer notified!');
+          toast.success('Shipment confirmed and buyer notified!');
           
           // Step 4: Clean up state and refresh data
           setConfirmingShipment(null);
@@ -152,7 +153,7 @@ const SellerDashboard = ({ activeTab }) => {
 
       } catch (error) {
           console.error('Failed to confirm shipment:', error);
-          alert('Shipment confirmation failed: ' + (error.reason || error.message));
+          toast.error('Shipment confirmation failed: ' + (error.reason || error.message));
       } finally {
           setIsSubmitting(false);
       }
@@ -168,7 +169,7 @@ const SellerDashboard = ({ activeTab }) => {
     setShowKYCVerification(false);
     setKycStatus(result.verified ? 'verified' : 'failed');
     setKycRiskLevel(result.riskLevel);
-    alert(`KYC verification ${result.verified ? 'completed successfully' : 'failed'}`);
+    result.verified ? toast.success('KYC Verification completed successfully') : toast.error("KYC Verification failed.")
   };
   
   const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
@@ -271,7 +272,7 @@ const SellerDashboard = ({ activeTab }) => {
                   <EscrowStatus
                       status={selectedInvoice}
                       onConfirm={handleConfirmShipment}
-                      onDispute={(invoiceId, reason) => alert(`Dispute raised for invoice ${invoiceId}: ${reason}`)}
+                      onDispute={(invoiceId, reason) => toast.success(`Dispute raised for invoice ${invoiceId}: ${reason}`)}
                   />
                   <EscrowTimeline events={timelineEvents} />
               </div>

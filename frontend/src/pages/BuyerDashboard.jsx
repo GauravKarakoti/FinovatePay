@@ -9,6 +9,7 @@ import EscrowTimeline from '../components/Escrow/EscrowTimeline';
 import KYCStatus from '../components/KYC/KYCStatus';
 import InvoiceContractABI from '../../../deployed/Invoice.json';
 import { generateTimelineEvents } from '../utils/timeline';
+import {toast} from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 
 const BuyerDashboard = ({ activeTab }) => {
@@ -40,7 +41,7 @@ const BuyerDashboard = ({ activeTab }) => {
         // ADD THIS BLOCK FOR DEBUGGING
         console.log("Attempting to pay invoice with this data:", invoice);
         if (!invoice || !ethers.utils.isAddress(invoice.contract_address)) {
-            alert(`Error: Invalid or missing contract address for this invoice. Address found: ${invoice.contract_address}`);
+            toast.error(`Error: Invalid or missing contract address for this invoice. Address found: ${invoice.contract_address}`);
             return;
         }
         // END ADDED BLOCK
@@ -82,18 +83,18 @@ const BuyerDashboard = ({ activeTab }) => {
                 const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
                 const approveTx = await tokenContract.approve(contract_address, amountWei);
                 await approveTx.wait();
-                alert('Approval successful! Confirming deposit...');
+                toast.success('Approval successful! Confirming deposit...');
                 tx = await invoiceContract.depositToken();
             }
             
             await tx.wait();
-            alert(`Payment deposited to escrow! Tx: ${tx.hash}`);
+            toast.success(`Payment deposited to escrow! Tx: ${tx.hash}`);
             
             await updateInvoiceStatus(invoice_id, 'deposited', tx.hash);
             loadData();
         } catch (error) {
             console.error('Failed to deposit:', error);
-            alert(`Deposit failed: ${error.reason || error.message}`);
+            toast.error(`Deposit failed: ${error.reason || error.message}`);
         } finally {
             setLoadingInvoice(null);
         }
@@ -111,13 +112,13 @@ const BuyerDashboard = ({ activeTab }) => {
 
             const tx = await invoiceContract.releaseFunds();
             await tx.wait();
-            alert(`Funds released! Tx: ${tx.hash}`);
+            toast.success(`Funds released! Tx: ${tx.hash}`);
             
             await updateInvoiceStatus(invoice.invoice_id, 'released', tx.hash);
             loadData();
         } catch (error) {
             console.error('Failed to release funds:', error);
-            alert(`Release failed: ${error.reason || error.message}`);
+            toast.error(`Release failed: ${error.reason || error.message}`);
         } finally {
             setLoadingInvoice(null);
         }
@@ -133,13 +134,13 @@ const BuyerDashboard = ({ activeTab }) => {
             const invoiceContract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
             const tx = await invoiceContract.raiseDispute();
             await tx.wait();
-            alert(`Dispute raised! Tx: ${tx.hash}`);
+            toast.success(`Dispute raised! Tx: ${tx.hash}`);
 
             await updateInvoiceStatus(invoice.invoice_id, 'disputed', tx.hash, reason);
             loadData();
         } catch (error) {
             console.error('Failed to raise dispute:', error);
-            alert(`Dispute failed: ${error.reason || error.message}`);
+            toast.error(`Dispute failed: ${error.reason || error.message}`);
         } finally {
             setLoadingInvoice(null);
         }

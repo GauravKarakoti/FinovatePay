@@ -78,7 +78,7 @@ function App() {
 
   const renderDashboard = (dashboardComponent) => {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9]">
           <div className="md:w-64 flex-shrink-0 hidden md:block">
               {/* 2. Pass the stats state down to the Sidebar */}
               <Sidebar 
