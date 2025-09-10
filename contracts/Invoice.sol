@@ -58,7 +58,7 @@ contract Invoice is ReentrancyGuard {
     function depositToken() external onlyBuyer inStatus(Status.Unpaid) nonReentrant {
         require(tokenAddress != address(0), "Invoice is for native currency");
         IERC20 token = IERC20(tokenAddress);
-        token.safeTransferFrom(msg.sender, address(this), amount);
+        token.safeTransferFrom(msg.sender, address(seller), amount);
         currentStatus = Status.Deposited;
         emit InvoiceDeposited(amount);
         emit StatusChanged(Status.Deposited);

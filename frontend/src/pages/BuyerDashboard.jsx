@@ -10,6 +10,7 @@ import KYCStatus from '../components/KYC/KYCStatus';
 import InvoiceContractABI from '../../../deployed/Invoice.json';
 import { generateTimelineEvents } from '../utils/timeline';
 import {toast} from 'sonner';
+import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 
 const BuyerDashboard = ({ activeTab }) => {
     const [invoices, setInvoices] = useState([]);
@@ -107,6 +108,7 @@ const BuyerDashboard = ({ activeTab }) => {
         try {
             const { signer } = await connectWallet();
             const invoiceContract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
+            console.log("Contract recieved:", invoiceContract)
 
             const tx = await invoiceContract.releaseFunds();
             await tx.wait();
@@ -149,7 +151,8 @@ const BuyerDashboard = ({ activeTab }) => {
         setTimelineEvents(generateTimelineEvents(invoice));
     };
 
-    const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed'].includes(inv.escrow_status));
+    const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
+    const completedInvoices = invoices.filter(inv => inv.escrow_status === 'released');
 
     const stats = [
         { title: 'Pending Invoices', value: invoices.filter(i => i.escrow_status === 'created').length, change: 0, icon: '📝', color: 'blue' },
@@ -220,12 +223,11 @@ const BuyerDashboard = ({ activeTab }) => {
       
       case 'payments':
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Payment History</h2>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <p className="text-gray-600">Your payment history will appear here once you have completed transactions.</p>
+            <div>
+                <h2 className="text-2xl font-bold mb-6">Payment History</h2>
+                {/* 3. Use the new component here */}
+                <PaymentHistoryList invoices={completedInvoices} userRole="buyer" />
             </div>
-          </div>
         );
       
       case 'escrow':
