@@ -1,23 +1,31 @@
 import React from 'react';
 
-// The component now receives the full invoice object
 const EscrowStatus = ({ invoice, onConfirm, onDispute }) => {
     // Gracefully handle the case where no invoice is selected
     if (!invoice) {
         return (
-             <div className="bg-white rounded-lg shadow-md p-4 h-full flex items-center justify-center">
-                <p className="text-gray-500 text-center">Select an invoice from the list below to see its escrow details.</p>
-             </div>
+            <div className="bg-white rounded-lg shadow-md p-4 h-full flex items-center justify-center">
+                <p className="text-gray-500 text-center">Select an invoice to see its escrow details.</p>
+            </div>
         );
     }
     
     const status = invoice.escrow_status;
     
+    // Updated status configurations
     const statusConfig = {
         deposited: {
             label: 'Funds in Escrow',
             color: 'text-blue-600 bg-blue-100',
-            action: 'Funds are held securely. Release them to the seller upon satisfaction.'
+            // Inform the buyer they are waiting for the seller
+            action: 'Funds are held securely. Waiting for the seller to confirm shipment.'
+        },
+        // NEW configuration for the 'shipped' status
+        shipped: {
+            label: 'Shipped',
+            color: 'text-purple-600 bg-purple-100',
+            // Prompt the buyer to take the next action
+            action: 'The seller has confirmed shipment. Please review and release the funds upon satisfaction.'
         },
         released: {
             label: 'Released',
@@ -45,7 +53,9 @@ const EscrowStatus = ({ invoice, onConfirm, onDispute }) => {
             <p className="text-gray-600 mb-4 min-h-[40px]">{config.action}</p>
 
             <div className="flex space-x-2">
-                {status === 'deposited' && onConfirm && (
+                {/* CHANGE: The 'Confirm & Release' button now only appears when status is 'shipped' 
+                */}
+                {status === 'shipped' && onConfirm && (
                     <button
                         onClick={() => onConfirm(invoice)}
                         className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
@@ -54,7 +64,9 @@ const EscrowStatus = ({ invoice, onConfirm, onDispute }) => {
                     </button>
                 )}
                 
-                {status === 'deposited' && onDispute && (
+                {/* CHANGE: Allow dispute during 'deposited' and 'shipped' states
+                */}
+                {(status === 'deposited' || status === 'shipped') && onDispute && (
                     <button
                         onClick={() => {
                             const reason = prompt('Please enter the reason for the dispute:');

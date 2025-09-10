@@ -15,6 +15,11 @@ function App() {
   const [user, setUser] = useState(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [dashboardStats, setDashboardStats] = useState({
+      totalInvoices: 0,
+      activeEscrows: 0,
+      completed: 0,
+  });
 
   useEffect(() => {
     // Check if user is logged in from a previous session
@@ -74,12 +79,19 @@ function App() {
   const renderDashboard = (dashboardComponent) => {
     return (
       <div className="flex min-h-screen bg-gray-50">
-        <div className="md:w-64 flex-shrink-0 hidden md:block">
-          <Sidebar activeTab={activeTab} onTabChange={handleTabChange} user={user} />
-        </div>
-        <div className="flex-1 overflow-auto">
-          {dashboardComponent}
-        </div>
+          <div className="md:w-64 flex-shrink-0 hidden md:block">
+              {/* 2. Pass the stats state down to the Sidebar */}
+              <Sidebar 
+                  activeTab={activeTab} 
+                  onTabChange={handleTabChange} 
+                  user={user} 
+                  stats={dashboardStats} 
+              />
+          </div>
+          <div className="flex-1 overflow-auto">
+              {/* 3. Pass the state setter down to the active dashboard */}
+              {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
+          </div>
       </div>
     );
   };
@@ -97,29 +109,28 @@ function App() {
         <main>
           <Routes>
             <Route 
-              path="/" 
-              element={
-                user ? (
-                  user.role === 'admin' ? (
-                    // FIX: Pass activeTab to AdminDashboard
-                    renderDashboard(<AdminDashboard activeTab={activeTab} />)
-                  ) : user.role === 'buyer' ? (
-                    <Navigate to="/buyer" />
-                  ) : (
-                    renderDashboard(<SellerDashboard activeTab={activeTab} />)
-                  )
-                ) : (
-                  <Navigate to="/login" />
-                )
-              } 
+                path="/" 
+                element={
+                    user ? (
+                        user.role === 'admin' ? (
+                            renderDashboard(<AdminDashboard />)
+                        ) : user.role === 'buyer' ? (
+                            <Navigate to="/buyer" />
+                        ) : (
+                            renderDashboard(<SellerDashboard activeTab={activeTab} />)
+                        )
+                    ) : (
+                        <Navigate to="/login" />
+                    )
+                } 
             />
             <Route 
-              path="/buyer" 
-              element={
-                user && user.role === 'buyer' 
-                  ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
-                  : <Navigate to="/" />
-              }
+                path="/buyer" 
+                element={
+                    user && user.role === 'buyer' 
+                        ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
+                        : <Navigate to="/" />
+                }
             />
             <Route 
               path="/admin" 

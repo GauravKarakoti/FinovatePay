@@ -17,6 +17,7 @@ import EscrowTimeline from '../components/Escrow/EscrowTimeline';
 import KYCStatus from '../components/KYC/KYCStatus';
 import KYCVerification from '../components/KYC/KYCVerification';
 import { generateTimelineEvents } from '../utils/timeline';
+import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 
 const uuidToBytes32 = (uuid) => {
     return ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
@@ -169,16 +170,16 @@ const SellerDashboard = ({ activeTab }) => {
     setKycRiskLevel(result.riskLevel);
     alert(`KYC verification ${result.verified ? 'completed successfully' : 'failed'}`);
   };
-
-  // Mock data for stats cards
-  const stats = [
-    { title: 'Total Invoices', value: '24', change: 12, icon: '📝', color: 'blue' },
-    { title: 'Active Escrows', value: '3', change: -5, icon: '🔒', color: 'green' },
-    { title: 'Completed', value: '18', change: 8, icon: '✅', color: 'purple' },
-    { title: 'Total Revenue', value: '$42,500', change: 15, icon: '💰', color: 'orange' },
-  ];
-
+  
   const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
+  const completedInvoices = invoices.filter(inv => inv.escrow_status === 'released');
+  
+  const stats = [
+      { title: 'Pending Invoices', value: invoices.filter(i => i.escrow_status === 'created').length, change: 0, icon: '📝', color: 'blue' },
+      { title: 'Active Escrows', value: escrowInvoices.length, change: 0, icon: '🔒', color: 'green' },
+      { title: 'Completed', value: invoices.filter(i => i.escrow_status === 'released').length, change: 0, icon: '✅', color: 'purple' },
+      { title: 'Disputed', value: invoices.filter(i => i.escrow_status === 'disputed').length, change: 0, icon: '⚖️', color: 'red' },
+  ];
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -254,13 +255,11 @@ const SellerDashboard = ({ activeTab }) => {
       
       case 'payments':
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Payments</h2>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="text-xl font-semibold mb-4">Payment History</h3>
-              <p className="text-gray-600">Your payment history will appear here once you have completed transactions.</p>
+            <div>
+                <h2 className="text-2xl font-bold mb-6">Payment History</h2>
+                {/* 3. Use the new component here */}
+                <PaymentHistoryList invoices={completedInvoices} userRole="seller" />
             </div>
-          </div>
         );
       
       case 'escrow':
