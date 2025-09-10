@@ -9,6 +9,7 @@ import {
 } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
+import {toast} from 'sonner';
 
 // FIX: Accept activeTab as a prop
 const AdminDashboard = ({ activeTab }) => {
@@ -36,7 +37,7 @@ const AdminDashboard = ({ activeTab }) => {
   const handleFreezeAccount = async (userId) => {
     try {
       await freezeAccount(userId);
-      alert('Account frozen successfully');
+      toast.success('Account frozen successfully');
       loadData();
     } catch (error) {
       console.error('Failed to freeze account:', error);
@@ -46,7 +47,7 @@ const AdminDashboard = ({ activeTab }) => {
   const handleUnfreezeAccount = async (userId) => {
     try {
       await unfreezeAccount(userId);
-      alert('Account unfrozen successfully');
+      toast.success('Account unfrozen successfully');
       loadData();
     } catch (error) {
       console.error('Failed to unfreeze account:', error);
@@ -65,7 +66,7 @@ const AdminDashboard = ({ activeTab }) => {
   const handleUpdateUserRole = async (userId, role) => {
     try {
       await updateUserRole(userId, role);
-      alert('User role updated successfully');
+      toast.success('User role updated successfully');
       loadData();
     } catch (error) {
       console.error('Failed to update user role:', error);
