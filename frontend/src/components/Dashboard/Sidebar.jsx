@@ -1,12 +1,13 @@
 import React from 'react';
 
-const Sidebar = ({ activeTab, onTabChange, user }) => {
+const Sidebar = ({ activeTab, onTabChange, user, stats }) => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'invoices', label: 'Invoices', icon: '📝' },
     { id: 'payments', label: 'Payments', icon: '💳' },
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
   ];
+  const displayStats = stats || { totalInvoices: 0, activeEscrows: 0, completed: 0 };
 
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
@@ -34,21 +35,22 @@ const Sidebar = ({ activeTab, onTabChange, user }) => {
       </ul>
 
       <div className="mt-8 p-4 bg-finovate-blue-50 rounded-md">
-        <h3 className="font-medium text-finovate-blue-800">Quick Stats</h3>
-        <div className="mt-2 space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span>Total Invoices:</span>
-            <span className="font-medium">24</span>
+          <h3 className="font-medium text-finovate-blue-800">Quick Stats</h3>
+          <div className="mt-2 space-y-2 text-sm">
+              {/* Use dynamic data from props */}
+              <div className="flex justify-between">
+                  <span>Total Invoices:</span>
+                  <span className="font-medium">{displayStats.totalInvoices}</span>
+              </div>
+              <div className="flex justify-between">
+                  <span>Active Escrows:</span>
+                  <span className="font-medium">{displayStats.activeEscrows}</span>
+              </div>
+              <div className="flex justify-between">
+                  <span>Completed:</span>
+                  <span className="font-medium">{displayStats.completed}</span>
+              </div>
           </div>
-          <div className="flex justify-between">
-            <span>Active Escrows:</span>
-            <span className="font-medium">3</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Completed:</span>
-            <span className="font-medium">18</span>
-          </div>
-        </div>
       </div>
     </div>
   );

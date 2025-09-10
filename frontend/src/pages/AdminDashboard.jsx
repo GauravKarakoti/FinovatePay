@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
-  getUsers,
-  getInvoices,
-  freezeAccount,
-  unfreezeAccount,
-  updateUserRole,
-  checkCompliance
+    getUsers,
+    getInvoices,
+    freezeAccount,
+    unfreezeAccount,
+    updateUserRole,
+    checkCompliance
 } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
-import {toast} from 'sonner';
+import { toast } from 'sonner';
 
-// FIX: Accept activeTab as a prop
 const AdminDashboard = ({ activeTab }) => {
   const [users, setUsers] = useState([]);
   const [invoices, setInvoices] = useState([]);
@@ -20,18 +19,19 @@ const AdminDashboard = ({ activeTab }) => {
   const [complianceResult, setComplianceResult] = useState(null);
 
   useEffect(() => {
-    loadData();
+      loadData();
   }, []);
 
   const loadData = async () => {
-    try {
-      const usersData = await getUsers();
-      const invoicesData = await getInvoices();
-      setUsers(usersData.data);
-      setInvoices(invoicesData.data);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    }
+      try {
+          const usersData = await getUsers();
+          const invoicesData = await getInvoices();
+          setUsers(usersData.data);
+          setInvoices(invoicesData.data);
+      } catch (error) {
+          console.error('Failed to load data:', error);
+          toast.error("Failed to load admin data.");
+      }
   };
 
   const handleFreezeAccount = async (userId) => {
@@ -73,11 +73,21 @@ const AdminDashboard = ({ activeTab }) => {
     }
   };
 
+  const activeEscrowsCount = invoices.filter(
+      inv => ['deposited', 'shipped'].includes(inv.escrow_status)
+  ).length;
+
+  // 2. Calculate the number of disputed invoices
+  const disputedInvoicesCount = invoices.filter(
+      inv => inv.escrow_status === 'disputed'
+  ).length;
+
+  // 3. Update the stats array to use the dynamic values
   const stats = [
-    { title: 'Total Users', value: users.length.toString(), change: 5, icon: '👥', color: 'blue' },
-    { title: 'Total Invoices', value: invoices.length.toString(), change: 12, icon: '📝', color: 'green' },
-    { title: 'Active Escrows', value: '8', change: -3, icon: '🔒', color: 'purple' },
-    { title: 'Disputes', value: '2', change: 0, icon: '⚖️', color: 'orange' },
+      { title: 'Total Users', value: users.length.toString(), change: 5, icon: '👥', color: 'blue' },
+      { title: 'Total Invoices', value: invoices.length.toString(), change: 12, icon: '📝', color: 'green' },
+      { title: 'Active Escrows', value: activeEscrowsCount.toString(), change: -3, icon: '🔒', color: 'purple' },
+      { title: 'Disputes', value: disputedInvoicesCount.toString(), change: 0, icon: '⚖️', color: 'orange' },
   ];
 
   // FIX: Create a function to render content based on the active tab
@@ -85,21 +95,21 @@ const AdminDashboard = ({ activeTab }) => {
     switch (activeTab) {
       case 'overview':
         return (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => (
-                <StatsCard key={index} {...stat} />
-              ))}
+            <div>
+                <h2 className="text-2xl font-bold mb-6">Overview</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {stats.map((stat, index) => (
+                        <StatsCard key={index} {...stat} />
+                    ))}
+                </div>
+                <div className="bg-white p-4 rounded shadow">
+                    <h3 className="text-xl font-semibold mb-4">Recent Invoices</h3>
+                    <InvoiceList
+                        invoices={invoices.slice(0, 10)}
+                        onSelectInvoice={(invoice) => setSelectedUser(invoice)}
+                    />
+                </div>
             </div>
-            <div className="bg-white p-4 rounded shadow">
-              <h3 className="text-xl font-semibold mb-4">Recent Invoices</h3>
-              <InvoiceList
-                invoices={invoices.slice(0, 10)}
-                onSelectInvoice={(invoice) => setSelectedUser(invoice)}
-              />
-            </div>
-          </div>
         );
 
       case 'invoices':

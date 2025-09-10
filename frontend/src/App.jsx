@@ -10,6 +10,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import { connectWallet } from './utils/web3';
 import Web3Modal from 'web3modal'; // Import Web3Modal to check cache
 import './App.css';
+import { Toaster } from 'sonner';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -98,6 +99,7 @@ function App() {
 
   return (
     <Router>
+      <Toaster position="top" richColors />
       <div className="App">
         <Header 
             user={user} 
@@ -113,7 +115,7 @@ function App() {
                 element={
                     user ? (
                         user.role === 'admin' ? (
-                            renderDashboard(<AdminDashboard />)
+                            renderDashboard(<AdminDashboard activeTab={activeTab} />)
                         ) : user.role === 'buyer' ? (
                             <Navigate to="/buyer" />
                         ) : (
