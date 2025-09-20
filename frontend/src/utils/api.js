@@ -55,6 +55,58 @@ export const getInvoice = (invoiceId) => {
   return api.get(`/invoices/${invoiceId}`);
 };
 
+export const createProduceLot = (produceData) => {
+  return api.post('/produce/lots', produceData);
+};
+
+export const getProduceLot = (lotId) => {
+  return api.get(`/produce/lots/${lotId}`);
+};
+
+export const transferProduce = (transferData) => {
+  return api.post('/produce/transfer', transferData);
+};
+
+export const getProducerLots = () => {
+  return api.get('/produce/lots/producer');
+};
+
+export const getAvailableLots = () => {
+  return api.get('/produce/lots/available');
+};
+
+export const createQuotation = (quotationData) => {
+  return api.post('/quotations', quotationData);
+};
+
+export const getQuotations = () => {
+    return api.get('/quotations');
+};
+
+export const getPendingBuyerApprovals = () => {
+    return api.get('/quotations/pending-for-buyer');
+};
+
+export const sellerApproveQuotation = (quotationId) => {
+    return api.post(`/quotations/${quotationId}/seller-approve`);
+};
+
+export const buyerApproveQuotation = (quotationId) => {
+    return api.post(`/quotations/${quotationId}/buyer-approve`);
+};
+
+export const rejectQuotation = (quotationId) => {
+    return api.post(`/quotations/${quotationId}/reject`);
+};
+
+export const getSellerLots = () => {
+  return api.get('/produce/lots/seller');
+};
+
+export const getProduceTransactions = (lotId) => {
+  return api.get(`/produce/lots/${lotId}/transactions`);
+};
+
 // Payment API
 export const depositToEscrow = (invoiceId, amount, seller_address) => {
   console.log('API call to deposit to escrow:', { invoiceId, amount, seller_address });

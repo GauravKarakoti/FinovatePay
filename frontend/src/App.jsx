@@ -7,8 +7,9 @@ import Register from './components/Register';
 import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import ProduceHistory from './pages/ProduceHistory'; // Add this import
 import { connectWallet } from './utils/web3';
-import Web3Modal from 'web3modal'; // Import Web3Modal to check cache
+import Web3Modal from 'web3modal';
 import './App.css';
 import { Toaster } from 'sonner';
 
@@ -20,6 +21,7 @@ function App() {
       totalInvoices: 0,
       activeEscrows: 0,
       completed: 0,
+      produceLots: 0, // Add produce lots to stats
   });
 
   useEffect(() => {
@@ -137,9 +139,13 @@ function App() {
             <Route 
               path="/admin" 
               element={
-                // FIX: Pass activeTab to AdminDashboard here as well
                 user && user.role === 'admin' ? renderDashboard(<AdminDashboard activeTab={activeTab} />) : <Navigate to="/" />
               } 
+            />
+            {/* Add produce history route */}
+            <Route 
+              path="/produce/:lotId" 
+              element={<ProduceHistory />}
             />
             <Route 
               path="/login" 

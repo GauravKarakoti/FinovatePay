@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers'; // Import ethers
+import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
 import { 
-  getSellerInvoices, 
-  createInvoice,  
-  confirmRelease,
-  updateInvoiceStatus
+    getSellerInvoices, createInvoice, updateInvoiceStatus,
+    getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation
 } from '../utils/api';
 import { connectWallet, getInvoiceFactoryContract } from '../utils/web3';
-import { TOKEN_ADDRESSES, NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
+import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
-import InvoiceForm from '../components/Invoice/InvoiceForm';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import EscrowStatus from '../components/Escrow/EscrowStatus';
 import EscrowTimeline from '../components/Escrow/EscrowTimeline';
@@ -19,6 +16,10 @@ import KYCVerification from '../components/KYC/KYCVerification';
 import { generateTimelineEvents } from '../utils/timeline';
 import {toast} from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
+import CreateProduceLot from '../components/Produce/CreateProduceLot';
+import ProduceQRCode from '../components/Produce/ProduceQRCode';
+import QuotationList from '../components/Dashboard/QuotationList';
+import CreateQuotation from '../components/Quotation/CreateQuotation';
 
 const uuidToBytes32 = (uuid) => {
     return ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
@@ -27,7 +28,6 @@ const uuidToBytes32 = (uuid) => {
 const SellerDashboard = ({ activeTab }) => {
   const [invoices, setInvoices] = useState([]);
   const [walletAddress, setWalletAddress] = useState('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [kycStatus, setKycStatus] = useState('pending');
   const [kycRiskLevel, setKycRiskLevel] = useState('medium');
@@ -36,10 +36,136 @@ const SellerDashboard = ({ activeTab }) => {
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [confirmingShipment, setConfirmingShipment] = useState(null); // Will hold the invoice object
   const [proofFile, setProofFile] = useState(null);
+  const [showCreateProduceForm, setShowCreateProduceForm] = useState(false);
+  const [selectedProduceLot, setSelectedProduceLot] = useState(null);
+  const [produceLots, setProduceLots] = useState([]);
+  const [quotations, setQuotations] = useState([]);
+  const [showCreateQuotation, setShowCreateQuotation] = useState(false);
+
+  const loadProduceLots = async () => {
+    try {
+      const response = await getSellerLots(); // Changed from getProducerLots
+      setProduceLots(response.data);
+    } catch (error) {
+      console.error('Failed to load produce lots:', error);
+      toast.error("Could not load produce lots.");
+    }
+  };
 
   useEffect(() => {
-    loadData();
+    loadInitialData();
   }, []);
+
+  const loadInitialData = async () => {
+    const { address } = await connectWallet();
+    setWalletAddress(address);
+    await loadData(address); // invoices
+    await loadProduceLots();
+    await loadQuotations(address);
+  };
+
+  const loadQuotations = async (currentAddress) => {
+      try {
+          const response = await getQuotations();
+          // Filter quotations where the current user is the seller
+          const sellerQuotations = response.data.filter(q => q.seller_address.toLowerCase() === currentAddress.toLowerCase());
+          setQuotations(sellerQuotations);
+      } catch (error) {
+          console.error('Failed to load quotations:', error);
+          toast.error("Could not load quotations.");
+      }
+  };
+
+  const handleApproveQuotation = async (quotationId) => {
+      try {
+          await sellerApproveQuotation(quotationId);
+          toast.success("Quotation approved and sent to buyer for final confirmation!");
+          loadQuotations(walletAddress);
+      } catch (error) {
+          toast.error("Failed to approve quotation.");
+      }
+  };
+
+  const handleRejectQuotation = async (quotationId) => {
+      try {
+          await rejectQuotation(quotationId);
+          toast.info("Quotation rejected.");
+          loadQuotations(walletAddress); // Refresh list
+      } catch (error) {
+          toast.error("Failed to reject quotation.");
+      }
+  };
+
+  const handleCreateQuotation = async (quotationData) => {
+      try {
+          await createQuotation(quotationData);
+          toast.success('Quotation sent to buyer for approval!');
+          setShowCreateQuotation(false);
+          loadQuotations(walletAddress);
+      } catch (error) {
+          toast.error('Failed to create quotation: ' + (error.response?.data?.error || error.message));
+      }
+  };
+
+  const handleCreateProduceLot = async (quotation) => {
+    setIsSubmitting(true);
+    const creationPromise = async () => {
+        const invoiceId = uuidv4();
+        const bytes32InvoiceId = uuidToBytes32(invoiceId);
+        const { address: sellerAddress } = await connectWallet();
+
+        const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
+        const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
+        
+        const tokenAddress = NATIVE_CURRENCY_ADDRESS; // Assuming MATIC
+        
+        const contract = await getInvoiceFactoryContract();
+        const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
+        const dueDateTimestamp = Math.floor(new Date().getTime() / 1000) + 86400 * 30; // 30 days from now
+
+        toast.info("Please confirm invoice creation in your wallet...");
+        const tx = await contract.createInvoice(
+            bytes32InvoiceId, invoiceHash, quotation.buyer_address,
+            amountInWei, dueDateTimestamp, tokenAddress
+        );
+
+        const receipt = await tx.wait();
+        const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
+        if (!event) throw new Error("InvoiceCreated event not found.");
+        
+        const newContractAddress = event.args.invoiceContractAddress;
+
+        const finalInvoiceData = {
+            quotation_id: quotation.id, // This is the crucial link
+            invoice_id: invoiceId,
+            invoice_hash: invoiceHash,
+            contract_address: newContractAddress,
+            token_address: tokenAddress,
+            due_date: new Date(dueDateTimestamp * 1000).toISOString(),
+        };
+        
+        await createInvoice(finalInvoiceData); // Call the modified backend endpoint
+    };
+
+    try {
+        await toast.promise(creationPromise(), {
+            loading: "Deploying invoice contract...",
+            success: () => {
+                loadInitialData(); // Refresh all data
+                return 'Invoice created successfully from quotation!';
+            },
+            error: (err) => `Invoice creation failed: ${err.reason || err.message}`
+        });
+    } catch (error) {
+        console.error('Failed to create invoice from quotation:', error);
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const handleSelectProduceLot = (lot) => {
+    setSelectedProduceLot(lot);
+  };
 
   const loadData = async () => {
     try {
@@ -57,61 +183,61 @@ const SellerDashboard = ({ activeTab }) => {
     }
   };
 
-  const handleCreateInvoice = async (invoiceData) => {
-      setIsSubmitting(true);
-      try {
-          const invoiceId = uuidv4();
-          const bytes32InvoiceId = uuidToBytes32(invoiceId);
-          const { address: sellerAddress } = await connectWallet();
-          const dataToHash = `${sellerAddress}-${invoiceData.buyer_address}-${invoiceData.amount}-${Date.now()}`;
-          const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
-
-          // Determine the token address based on currency
-          const tokenAddress = invoiceData.currency === 'MATIC' 
-              ? NATIVE_CURRENCY_ADDRESS 
-              : TOKEN_ADDRESSES[invoiceData.currency];
-
-          if (!tokenAddress) {
-              throw new Error(`Currency '${invoiceData.currency}' is not supported.`);
-          }
-
-          const contract = await getInvoiceFactoryContract();
-          const amountInWei = ethers.utils.parseUnits(invoiceData.amount.toString(), 18);
-          const dueDateTimestamp = Math.floor(new Date(invoiceData.due_date).getTime() / 1000);
-
-          console.log("Creating invoice contract via factory...");
-          const tx = await contract.createInvoice(
-              bytes32InvoiceId, invoiceHash, invoiceData.buyer_address,
-              amountInWei, dueDateTimestamp, tokenAddress
-          );
-
-          const receipt = await tx.wait();
-          const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
-          if (!event) throw new Error("InvoiceCreated event not found.");
-          
-          const newContractAddress = event.args.invoiceContractAddress;
-          (`Invoice contract deployed at ${newContractAddress}! Saving to DB...`);
-          
-          const finalInvoiceData = {
-              ...invoiceData,
-              invoice_id: invoiceId,
-              invoice_hash: invoiceHash,
-              contract_address: newContractAddress,
-              token_address: tokenAddress,
-          };
-          
-          await createInvoice(finalInvoiceData);
-          
-          toast.success('Invoice created successfully!');
-          setShowCreateForm(false);
-          loadData();
-
-      } catch (error) {
-          console.error('Failed to create invoice:', error);
-          toast.error('Invoice creation failed: ' + (error.reason || error.message));
-      } finally {
-          setIsSubmitting(false);
-      }
+  const handleCreateInvoiceFromQuotation = async (quotation) => {
+    setIsSubmitting(true);
+  
+    const creationPromise = async () => {
+      const invoiceId = uuidv4();
+      const bytes32InvoiceId = uuidToBytes32(invoiceId);
+      const { address: sellerAddress } = await connectWallet();
+      
+      const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
+      const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
+      
+      const tokenAddress = NATIVE_CURRENCY_ADDRESS; // Assuming MATIC for produce sales
+      
+      const contract = await getInvoiceFactoryContract();
+      const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
+      const dueDateTimestamp = Math.floor(new Date().getTime() / 1000) + 86400 * 30; // Due in 30 days
+  
+      toast.info("Please confirm invoice creation in your wallet...");
+      const tx = await contract.createInvoice(
+        bytes32InvoiceId, invoiceHash, quotation.buyer_address,
+        amountInWei, dueDateTimestamp, tokenAddress
+      );
+  
+      const receipt = await tx.wait();
+      const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
+      if (!event) throw new Error("InvoiceCreated event not found.");
+      
+      const newContractAddress = event.args.invoiceContractAddress;
+  
+      const finalInvoiceData = {
+        quotation_id: quotation.id,
+        invoice_id: invoiceId,
+        invoice_hash: invoiceHash,
+        contract_address: newContractAddress,
+        token_address: tokenAddress,
+        due_date: new Date(dueDateTimestamp * 1000).toISOString(),
+      };
+      
+      await createInvoice(finalInvoiceData);
+    };
+  
+    try {
+      await toast.promise(creationPromise(), {
+        loading: "Deploying invoice contract...",
+        success: () => {
+          loadInitialData(); // Refresh all data
+          return 'Invoice created successfully from quotation!';
+        },
+        error: (err) => `Invoice creation failed: ${err.reason || err.message}`
+      });
+    } catch (error) {
+      console.error('Failed to create invoice:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleConfirmShipment = (invoice) => {
@@ -125,28 +251,18 @@ const SellerDashboard = ({ activeTab }) => {
       }
       setIsSubmitting(true);
       try {
-          // Step 1: Upload the proof to a storage service (e.g., IPFS)
-          // In a real app, you would use a library like ipfs-http-client.
-          // For this example, we'll simulate the upload and generate a fake hash.
-          console.log("Uploading proof to decentralized storage...");
+          // In a real app, this would upload to IPFS. We simulate it.
           const proofHash = `bafybeigdyrzt5s6dfx7sidefusha4u62piu7k26k5e4szm3oogv5s2d2bu-${Date.now()}`;
-          toast.success(`Proof "uploaded" successfully!\nIPFS CID: ${proofHash}`);
-
-          // Step 2: Prepare a message and ask the seller to sign it
+          
           const { signer } = await connectWallet();
           const message = `I confirm the shipment for invoice ${confirmingShipment.invoice_id}.\nProof Hash: ${proofHash}`;
           
-          console.log("Requesting seller signature for the following message:\n", message);
-          const signature = await signer.signMessage(message);
-          console.log("Signature received:", signature);
+          await signer.signMessage(message);
 
-          // Step 3: Send the proof hash to the backend to update the status
-          // We pass the proofHash in place of the tx_hash
           await updateInvoiceStatus(confirmingShipment.invoice_id, 'shipped', proofHash);
           
           toast.success('Shipment confirmed and buyer notified!');
           
-          // Step 4: Clean up state and refresh data
           setConfirmingShipment(null);
           setProofFile(null);
           loadData();
@@ -161,7 +277,6 @@ const SellerDashboard = ({ activeTab }) => {
 
   const handleSelectInvoice = (invoice) => {
       setSelectedInvoice(invoice);
-      // Generate and set the timeline events whenever an invoice is selected
       setTimelineEvents(generateTimelineEvents(invoice));
   };
 
@@ -228,29 +343,13 @@ const SellerDashboard = ({ activeTab }) => {
       case 'invoices':
         return (
           <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Invoices</h2>
-              <button
-                onClick={() => setShowCreateForm(true)}
-                className="btn-primary"
-              >
-                Create New Invoice
-              </button>
-            </div>
-            
-            {showCreateForm ? (
-              <InvoiceForm
-                onSubmit={handleCreateInvoice}
-                onCancel={() => setShowCreateForm(false)}
-              />
-            ) : (
-              <InvoiceList
-                invoices={invoices}
-                onSelectInvoice={handleSelectInvoice}
-                onConfirmShipment={handleConfirmShipment}
-                userRole="seller"
-              />
-            )}
+            <h2 className="text-2xl font-bold mb-6">Invoices</h2>
+            <InvoiceList
+              invoices={invoices}
+              onSelectInvoice={handleSelectInvoice}
+              onConfirmShipment={handleConfirmShipment}
+              userRole="seller"
+            />
           </div>
         );
       
@@ -258,7 +357,6 @@ const SellerDashboard = ({ activeTab }) => {
         return (
             <div>
                 <h2 className="text-2xl font-bold mb-6">Payment History</h2>
-                {/* 3. Use the new component here */}
                 <PaymentHistoryList invoices={completedInvoices} userRole="seller" />
             </div>
         );
@@ -268,7 +366,6 @@ const SellerDashboard = ({ activeTab }) => {
           <div>
               <h2 className="text-2xl font-bold mb-6">Escrow Management</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Pass the full selectedInvoice object */}
                   <EscrowStatus
                       status={selectedInvoice}
                       onConfirm={handleConfirmShipment}
@@ -277,8 +374,8 @@ const SellerDashboard = ({ activeTab }) => {
                   <EscrowTimeline events={timelineEvents} />
               </div>
               <div className="mt-6">
-                    <h3 className="text-xl font-semibold mb-4">Invoices in Escrow</h3>
-                    <InvoiceList
+                  <h3 className="text-xl font-semibold mb-4">Invoices in Escrow</h3>
+                  <InvoiceList
                       invoices={escrowInvoices}
                       onSelectInvoice={handleSelectInvoice}
                       onConfirmShipment={handleConfirmShipment}
@@ -286,7 +383,140 @@ const SellerDashboard = ({ activeTab }) => {
                   />
               </div>
           </div>
-      );
+        );
+
+      case 'produce':
+        return (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Produce Management</h2>
+              <button
+                onClick={() => setShowCreateProduceForm(true)}
+                className="btn-primary"
+              >
+                Register New Produce Lot
+              </button>
+            </div>
+            
+            {showCreateProduceForm ? (
+              <CreateProduceLot
+                onSubmit={handleCreateProduceLot}
+                onCancel={() => setShowCreateProduceForm(false)}
+                isSubmitting={isSubmitting}
+              />
+            ) : selectedProduceLot ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h3 className="text-lg font-semibold mb-4">Produce Details</h3>
+                  <p><strong>Lot ID:</strong> {selectedProduceLot.lot_id}</p>
+                  <p><strong>Type:</strong> {selectedProduceLot.produce_type}</p>
+                  <p><strong>Origin:</strong> {selectedProduceLot.origin}</p>
+                  <p><strong>Harvest Date:</strong> {new Date(selectedProduceLot.harvest_date).toLocaleDateString()}</p>
+                  <p><strong>Quantity:</strong> {selectedProduceLot.quantity} kg</p>
+                  <p><strong>Quality Metrics:</strong> {selectedProduceLot.quality_metrics}</p>
+                  <button
+                    onClick={() => setSelectedProduceLot(null)}
+                    className="mt-4 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                  >
+                    Back to List
+                  </button>
+                </div>
+                <ProduceQRCode
+                  lotId={selectedProduceLot.lot_id}
+                  produceType={selectedProduceLot.produce_type}
+                  origin={selectedProduceLot.origin}
+                />
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h3 className="text-lg font-semibold">Your Produce Lots</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Lot ID
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Produce Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Quantity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {produceLots.map((lot) => (
+                        <tr key={lot.lot_id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {lot.lot_id}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {lot.produce_type}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {lot.current_quantity} kg
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button
+                              onClick={() => handleSelectProduceLot(lot)}
+                              className="text-blue-600 hover:text-blue-900 mr-3"
+                            >
+                              View Details
+                            </button>
+                            <a
+                              href={`/produce/${lot.lot_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              View History
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'quotations':
+        return (
+            <div>
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold">Quotations</h2>
+                    <button
+                        onClick={() => setShowCreateQuotation(true)}
+                        className="btn-primary"
+                    >
+                        Create Off-Platform Quotation
+                    </button>
+                </div>
+                
+                {showCreateQuotation ? (
+                    <CreateQuotation
+                        onSubmit={handleCreateQuotation}
+                        onCancel={() => setShowCreateQuotation(false)}
+                    />
+                ) : (
+                    <QuotationList
+                        quotations={quotations}
+                        userRole="seller"
+                        onApprove={handleApproveQuotation}
+                        onReject={handleRejectQuotation}
+                        onCreateInvoice={handleCreateInvoiceFromQuotation}
+                    />
+                )}
+            </div>
+        );
       
       default:
         return (
@@ -304,7 +534,7 @@ const SellerDashboard = ({ activeTab }) => {
     <div className="container mx-auto p-4">
       {showKYCVerification ? (
         <KYCVerification 
-          user={user} 
+          user={{}} // Pass user object here if available
           onVerificationComplete={handleKYCVerificationComplete} 
         />
       ) : (
@@ -325,7 +555,7 @@ const SellerDashboard = ({ activeTab }) => {
                         type="file"
                         accept="image/*"
                         onChange={(e) => setProofFile(e.target.files[0])}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-finovate-blue-50 file:text-finovate-blue-700 hover:file:bg-finovate-blue-100"
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                     />
                 </div>
 

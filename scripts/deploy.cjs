@@ -37,6 +37,11 @@ async function main() {
   await fractionToken.deployed();
   console.log("FractionToken deployed to:", fractionToken.address);
 
+  const ProduceTracking = await ethers.getContractFactory("ProduceTracking");
+  const produceTracking = await ProduceTracking.deploy();
+  await produceTracking.deployed();
+  console.log("ProduceTracking deployed to:", produceTracking.address);
+
   // Save deployed addresses to a file for frontend/backend use
   const contractsDir = __dirname + "/../deployed";
 
@@ -52,6 +57,7 @@ async function main() {
       // **UPDATE**: Save InvoiceFactory address
       InvoiceFactory: invoiceFactory.address,
       FractionToken: fractionToken.address,
+      ProduceTracking: produceTracking.address,
     }, undefined, 2)
   );
 
@@ -62,6 +68,7 @@ async function main() {
   const invoiceFactoryArtifact = await artifacts.readArtifact("InvoiceFactory");
   const fractionTokenArtifact = await artifacts.readArtifact("FractionToken");
   const invoiceArtifact = await artifacts.readArtifact("Invoice");
+  const produceTrackingArtifact = await artifacts.readArtifact("ProduceTracking");
 
   fs.writeFileSync(
     contractsDir + "/ComplianceManager.json",
@@ -83,6 +90,10 @@ async function main() {
   fs.writeFileSync(
     contractsDir + "/Invoice.json",
     JSON.stringify(invoiceArtifact, null, 2)
+  );
+  fs.writeFileSync(
+    contractsDir + "/ProduceTracking.json",
+    JSON.stringify(produceTrackingArtifact, null, 2)
   );
 
   console.log("\nDeployment completed and artifacts saved!");

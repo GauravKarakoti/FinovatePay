@@ -3,6 +3,7 @@ import Web3Modal from 'web3modal';
 // Import contract ABIs and addresses
 import EscrowContractArtifact from '../../../deployed/EscrowContract.json';
 import InvoiceFactoryArtifact from '../../../deployed/InvoiceFactory.json'; 
+import ProduceTrackingArtifact from '../../../deployed/ProduceTracking.json';
 import contractAddresses from '../../../deployed/contract-addresses.json';
 
 let web3Modal;
@@ -45,6 +46,14 @@ export async function getInvoiceFactoryContract() {
     );
 }
 
+export async function getProduceTrackingContract() {
+    const { signer } = await connectWallet();
+    return new ethers.Contract(
+        contractAddresses.ProduceTracking, // Ensure this name matches your JSON
+        ProduceTrackingArtifact.abi,
+        signer
+    );
+}
 
 // Mock ERC20 Token ABI (only need 'approve' function for this)
 export const erc20ABI = [

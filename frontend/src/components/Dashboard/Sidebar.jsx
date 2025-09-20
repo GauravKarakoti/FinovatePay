@@ -3,7 +3,9 @@ import React from 'react';
 const Sidebar = ({ activeTab, onTabChange, user, stats }) => {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
+    { id: 'quotations', label: 'Quotations', icon: '💬' },
     { id: 'invoices', label: 'Invoices', icon: '📝' },
+    { id: 'produce', label: 'Produce', icon: '🌱' }, // Add this tab
     { id: 'payments', label: 'Payments', icon: '💳' },
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
   ];

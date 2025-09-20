@@ -35,6 +35,8 @@ app.use('/api/invoices', require('./routes/invoice'));
 app.use('/api/payments', require('./routes/payment'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/kyc', require('./routes/kyc'));
+app.use('/api/produce', require('./routes/produce'));
+app.use('/api/quotations', require('./routes/quotation'));
 
 // Socket.io for real-time notifications
 io.on('connection', (socket) => {
