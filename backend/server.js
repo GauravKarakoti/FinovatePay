@@ -15,41 +15,52 @@ const io = socketIo(server, {
 
 const allowedOrigins = [
     'https://finovate-pay.vercel.app', 
-    'http://localhost:5173' // For local development
+    'http://localhost:5173'
 ];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-    return callback(null, true);
   },
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true, // Allows cookies to be sent
-  optionsSuccessStatus: 204 // For legacy browser support
+  credentials: true,
+  optionsSuccessStatus: 204
 };
 
-// Middleware
+// --- MIDDLEWARE SETUP ---
+
+// 1. Use CORS for all incoming requests
 app.use(cors(corsOptions));
+
+// 2. ✅ ADD THIS LINE: Explicitly handle preflight requests
+// This ensures the browser's permission check passes before it sends the actual request.
+app.options('*', cors(corsOptions));
+
+// 3. Then, use other middleware
 app.use(express.json());
 
-// Database connection
-const pool = require('./config/database');
+// --- DATABASE CONNECTION ---
+// Destructure the import to get the actual pool instance
+const { pool } = require('./config/database');
 
-// Test database connection
-pool.connect((err) => {
-  if (err) {
-    console.error('Database connection error:', err.stack);
-  } else {
-    console.log('Connected to database');
+// Asynchronous startup check
+const testDbConnection = async () => {
+  try {
+    const client = await pool.connect();
+    console.log('✅ Connected to database successfully.');
+    client.release();
+  } catch (err) {
+    console.error('❌ Database connection error:', err.stack);
+    process.exit(1);
   }
-});
+};
+testDbConnection();
 
-// Routes
+// --- ROUTES ---
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/invoices', require('./routes/invoice'));
 app.use('/api/payments', require('./routes/payment'));
