@@ -20,7 +20,7 @@ import { generateTimelineEvents } from '../utils/timeline';
 import { toast } from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import BuyerApprovalList from '../components/Quotation/BuyerApprovalList'; // <-- Use the new specific component
-import BuyerAmountDisplay from '../components/common/BuyerAmountDisplay';
+import AmountDisplay from '../components/common/AmountDisplay';
 
 const BuyerDashboard = ({ activeTab }) => {
     const [invoices, setInvoices] = useState([]);
@@ -118,7 +118,7 @@ const BuyerDashboard = ({ activeTab }) => {
                 lot_id: lot.lot_id,
                 seller_address: lot.farmer_address,
                 quantity: parseFloat(quantity),
-                price_per_unit: lot.price,
+                price_per_unit: lot.price / 50.75,
                 description: `${quantity}kg of ${lot.produce_type} from lot #${lot.lot_id}`
             };
             await createQuotation(quotationData);
@@ -353,7 +353,7 @@ const BuyerDashboard = ({ activeTab }) => {
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.current_quantity} kg</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                     {/* ✅ UPDATED HERE */}
-                                                    <BuyerAmountDisplay InrAmount={lot.price} />
+                                                    <AmountDisplay maticAmount={lot.price / 50.75} />
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <button

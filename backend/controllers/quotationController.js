@@ -167,12 +167,18 @@ exports.getPendingBuyerApprovals = async (req, res) => {
     try {
         const buyer_address = req.user.wallet_address;
         const query = `
-            SELECT q.*, u.email as seller_name
+            SELECT 
+                q.*, 
+                u.email as seller_name,
+                -- Also select produce_type for on-platform quotes
+                p.produce_type 
             FROM quotations q
             JOIN users u ON q.seller_address = u.wallet_address
+            -- Use LEFT JOIN in case it's an off-platform quote with no lot
+            LEFT JOIN produce_lots p ON q.lot_id = p.lot_id
             WHERE q.buyer_address = $1 
               AND q.status = 'pending_buyer_approval'
-              AND q.lot_id IS NULL -- Ensures we only get off-platform quotations
+              -- REMOVED: AND q.lot_id IS NULL 
             ORDER BY q.created_at DESC
         `;
         const result = await pool.query(query, [buyer_address]);

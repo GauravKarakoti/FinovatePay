@@ -26,7 +26,7 @@ router.get('/lots/available', authenticateToken, async (req, res) => {
                 ...lot,
                 // Override the 'price' field with the live market price.
                 // If fetching fails, fallback to the original price stored in the DB, or 0.
-                price: marketPrice !== null ? marketPrice : (lot.price || 0),
+                price: marketPrice !== null ? marketPrice : (lot.price / 50.75 || 0),
             };
         }));
         

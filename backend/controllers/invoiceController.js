@@ -66,7 +66,7 @@ exports.createInvoice = async (req, res) => {
             JSON.stringify([{
                 description: quotation.description,
                 quantity: quotation.quantity,
-                price_per_unit: quotation.price_per_unit
+                price_per_unit: quotation.price_per_unit / 50.75
             }]),
             quotation.currency, contract_address, token_address,
             quotation.lot_id, quotation_id
