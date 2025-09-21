@@ -1,15 +1,32 @@
 const { Pool } = require('pg');
 
 const pool = new Pool({
+    // --- Your Database Credentials from .env ---
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    // Add this SSL configuration for services like Heroku, Render, etc.
+    
+    // --- SSL Configuration for Cloud Providers (Render, Heroku, etc.) ---
     ssl: {
       rejectUnauthorized: false
-    }
+    },
+    
+    // --- Pool Settings for Resilience ---
+    // Closes clients that have been idle for 30 seconds
+    idleTimeoutMillis: 30000, 
+    // Wait up to 5 seconds to establish a connection
+    connectionTimeoutMillis: 5000, 
+});
+
+/**
+ * 🛡️ CRASH PREVENTION: Graceful Error Handling
+ * It is still highly recommended to keep this listener. It catches errors on
+ * idle clients in the pool, preventing your entire application from crashing.
+ */
+pool.on('error', (err, client) => {
+  console.error('❌ Unexpected error on idle database client', err);
 });
 
 // const initializeDbQuery = `
