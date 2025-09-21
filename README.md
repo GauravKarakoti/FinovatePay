@@ -31,6 +31,7 @@ It enables instant stablecoin payments, automated escrow, and tokenized invoice 
 - ⚖️ Dispute Resolution via arbitrator/multisig with audit logs
 - 🛡️ KYC/AML Compliance via wallet address mapping
 - 💰 *(v2)* Invoice Financing using ERC-1155 fractional tokens
+![Flowchart](Flowchart.png)
 
 ---
 
