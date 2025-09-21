@@ -33,21 +33,13 @@ const corsOptions = {
 
 // --- MIDDLEWARE SETUP ---
 
-// 1. Use CORS for all incoming requests
+// This single middleware at the top will handle all CORS and preflight requests
 app.use(cors(corsOptions));
-
-// 2. ✅ ADD THIS LINE: Explicitly handle preflight requests
-// This ensures the browser's permission check passes before it sends the actual request.
-app.options('*', cors(corsOptions));
-
-// 3. Then, use other middleware
 app.use(express.json());
 
 // --- DATABASE CONNECTION ---
-// Destructure the import to get the actual pool instance
-const { pool } = require('./config/database');
+const pool = require('./config/database');
 
-// Asynchronous startup check
 const testDbConnection = async () => {
   try {
     const client = await pool.connect();
@@ -60,6 +52,7 @@ const testDbConnection = async () => {
 };
 testDbConnection();
 
+
 // --- ROUTES ---
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/invoices', require('./routes/invoice'));
@@ -70,7 +63,7 @@ app.use('/api/produce', require('./routes/produce'));
 app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 
-// Socket.io for real-time notifications
+// Socket.io, error handlers, and server.listen call
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
   
@@ -83,22 +76,21 @@ io.on('connection', (socket) => {
   });
 });
 
-// Make io accessible to our routes
 app.set('io', io);
 
-// Error handling middleware
 app.use((err, req, res, next) => {
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'Access denied by CORS policy.' });
+  }
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
