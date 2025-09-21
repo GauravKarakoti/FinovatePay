@@ -99,6 +99,10 @@ export const rejectQuotation = (quotationId) => {
     return api.post(`/quotations/${quotationId}/reject`);
 };
 
+export const getMarketPrices = (crop, state) => {
+    return api.get('/market/prices', { params: { crop, state } });
+};
+
 export const getSellerLots = () => {
   return api.get('/produce/lots/seller');
 };

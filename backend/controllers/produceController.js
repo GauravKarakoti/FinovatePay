@@ -14,8 +14,8 @@ exports.createProduceLot = async (req, res) => {
     }
 
     const query = `
-      INSERT INTO produce_lots (lot_id, farmer_address, produce_type, harvest_date, quality_metrics, origin, quantity)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO produce_lots (lot_id, farmer_address, produce_type, harvest_date, quality_metrics, origin, quantity, current_quantity)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
     
@@ -26,6 +26,7 @@ exports.createProduceLot = async (req, res) => {
         new Date(harvestDate * 1000),
         qualityMetrics,
         origin,
+        quantity,
         quantity
     ];
     

@@ -3,30 +3,38 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const pool = require('../config/database');
 const produceController = require('../controllers/produceController');
+const marketService = require('../services/marketService');
 
 router.get('/lots/available', authenticateToken, async (req, res) => {
-  try {
-    const query = `
-      SELECT 
-        pl.lot_id,
-        pl.produce_type,
-        pl.origin,
-        pl.quantity AS initial_quantity,
-        pl.current_quantity,
-        pl.price,
-        pl.quality_metrics,
-        pl.farmer_address
-      FROM produce_lots pl
-      JOIN users u ON pl.farmer_address = u.wallet_address
-      WHERE pl.current_quantity > 0 
-      ORDER BY pl.created_at DESC
-    `;
-    const result = await pool.query(query);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error getting available lots:', error);
-    res.status(500).json({ error: error.message });
-  }
+    try {
+        const query = `
+          SELECT 
+            pl.lot_id, pl.produce_type, pl.origin, pl.quantity AS initial_quantity,
+            pl.current_quantity, pl.price, pl.quality_metrics, pl.farmer_address,
+            u.email AS farmer_name
+          FROM produce_lots pl
+          JOIN users u ON pl.farmer_address = u.wallet_address
+          WHERE pl.current_quantity > 0 
+          ORDER BY pl.created_at DESC
+        `;
+        const result = await pool.query(query);
+
+        // Enhance lots with live market data
+        const lotsWithMarketPrice = await Promise.all(result.rows.map(async (lot) => {
+            const marketPrice = await marketService.getPricePerKg(lot.produce_type);
+            return {
+                ...lot,
+                // Override the 'price' field with the live market price.
+                // If fetching fails, fallback to the original price stored in the DB, or 0.
+                price: marketPrice !== null ? marketPrice : (lot.price || 0),
+            };
+        }));
+        
+        res.json(lotsWithMarketPrice);
+    } catch (error) {
+        console.error('Error getting available lots:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Get producer's own lots

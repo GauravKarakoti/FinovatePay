@@ -1,6 +1,6 @@
 const pool = require('../config/database');
+const marketService = require('../services/marketService');
 
-// Handles BOTH seller-initiated (off-platform) and buyer-initiated (produce) quotations
 exports.createQuotation = async (req, res) => {
     try {
         const { lot_id, seller_address, buyer_address, quantity, price_per_unit, description } = req.body;
@@ -8,26 +8,49 @@ exports.createQuotation = async (req, res) => {
 
         let final_seller_address = seller_address;
         let final_buyer_address = buyer_address;
+        let final_price_per_unit = price_per_unit;
         let status;
+        let final_description = description;
 
-        // Flow 1: Buyer is creating a quotation for a produce lot
+        // Flow 1: Buyer creates a quotation for an on-platform produce lot
         if (lot_id) {
             if (!seller_address) return res.status(400).json({ error: 'Seller address is required for produce quotations.' });
-            final_buyer_address = creator_address; // The creator is the buyer
+            
+            const lotQuery = 'SELECT produce_type, current_quantity FROM produce_lots WHERE lot_id = $1';
+            const lotResult = await pool.query(lotQuery, [lot_id]);
+            if (lotResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Produce lot not found.' });
+            }
+            const lot = lotResult.rows[0];
+
+            if (parseFloat(quantity) > parseFloat(lot.current_quantity)) {
+                return res.status(400).json({ error: `Requested quantity exceeds available stock of ${lot.current_quantity}kg.` });
+            }
+
+            // Fetch live market price and override any client-side price
+            const marketPrice = await marketService.getPricePerKg(lot.produce_type);
+            if (marketPrice === null) {
+                return res.status(503).json({ error: `Could not retrieve a valid market price for ${lot.produce_type}. Please try again later.` });
+            }
+            final_price_per_unit = marketPrice;
+            
+            final_description = `${quantity}kg of ${lot.produce_type} from lot #${lot_id}`;
+            final_buyer_address = creator_address;
             status = 'pending_seller_approval';
         } 
-        // Flow 2: Seller is creating a quotation for an off-platform deal
+        // Flow 2: Seller creates a quotation for an off-platform deal
         else {
             if (!buyer_address) return res.status(400).json({ error: 'Buyer address is required for off-platform quotations.' });
-            final_seller_address = creator_address; // The creator is the seller
+            if (!price_per_unit) return res.status(400).json({ error: 'Price must be specified for off-platform quotations.' });
+            final_seller_address = creator_address;
             status = 'pending_buyer_approval';
         }
 
-        if (!final_seller_address || !final_buyer_address || !quantity || !price_per_unit) {
+        if (!final_seller_address || !final_buyer_address || !quantity || !final_price_per_unit) {
             return res.status(400).json({ error: 'Missing required fields for quotation.' });
         }
 
-        const total_amount = parseFloat(quantity) * parseFloat(price_per_unit);
+        const total_amount = parseFloat(quantity) * parseFloat(final_price_per_unit);
 
         const query = `
             INSERT INTO quotations 
@@ -36,7 +59,7 @@ exports.createQuotation = async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
         `;
-        const values = [lot_id || null, creator_address, final_seller_address, final_buyer_address, quantity, price_per_unit, total_amount, 'MATIC', description, status];
+        const values = [lot_id || null, creator_address, final_seller_address, final_buyer_address, quantity, final_price_per_unit, total_amount, 'MATIC', final_description, status];
 
         const result = await pool.query(query, values);
         res.status(201).json(result.rows[0]);

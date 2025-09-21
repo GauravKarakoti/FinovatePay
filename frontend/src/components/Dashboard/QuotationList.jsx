@@ -1,4 +1,4 @@
-import React from 'react';
+import AmountDisplay from '../common/AmountDisplay'; // <-- IMPORT the reusable component
 
 const QuotationList = ({ quotations, userRole, onApprove, onReject, onCreateInvoice }) => {
     const formatAddress = (address) => {
@@ -39,7 +39,9 @@ const QuotationList = ({ quotations, userRole, onApprove, onReject, onCreateInvo
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" title={userRole === 'seller' ? q.buyer_address : q.seller_address}>
                                     {formatAddress(userRole === 'seller' ? q.buyer_address : q.seller_address)}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${parseFloat(q.total_amount).toFixed(2)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    <AmountDisplay maticAmount={q.total_amount} />
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(q.status)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                                     {/* SELLER ACTIONS */}

@@ -3,9 +3,10 @@ import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
 import { 
     getSellerInvoices, createInvoice, updateInvoiceStatus,
-    getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation
+    getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
+    createProduceLot as syncProduceLot // Renamed for clarity
 } from '../utils/api';
-import { connectWallet, getInvoiceFactoryContract } from '../utils/web3';
+import { connectWallet, getInvoiceFactoryContract, getProduceTrackingContract } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
@@ -32,9 +33,9 @@ const SellerDashboard = ({ activeTab }) => {
   const [kycStatus, setKycStatus] = useState('pending');
   const [kycRiskLevel, setKycRiskLevel] = useState('medium');
   const [showKYCVerification, setShowKYCVerification] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // Add loading state
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState([]);
-  const [confirmingShipment, setConfirmingShipment] = useState(null); // Will hold the invoice object
+  const [confirmingShipment, setConfirmingShipment] = useState(null);
   const [proofFile, setProofFile] = useState(null);
   const [showCreateProduceForm, setShowCreateProduceForm] = useState(false);
   const [selectedProduceLot, setSelectedProduceLot] = useState(null);
@@ -44,7 +45,7 @@ const SellerDashboard = ({ activeTab }) => {
 
   const loadProduceLots = async () => {
     try {
-      const response = await getSellerLots(); // Changed from getProducerLots
+      const response = await getSellerLots();
       setProduceLots(response.data);
     } catch (error) {
       console.error('Failed to load produce lots:', error);
@@ -59,7 +60,7 @@ const SellerDashboard = ({ activeTab }) => {
   const loadInitialData = async () => {
     const { address } = await connectWallet();
     setWalletAddress(address);
-    await loadData(address); // invoices
+    await loadData(address);
     await loadProduceLots();
     await loadQuotations(address);
   };
@@ -67,7 +68,6 @@ const SellerDashboard = ({ activeTab }) => {
   const loadQuotations = async (currentAddress) => {
       try {
           const response = await getQuotations();
-          // Filter quotations where the current user is the seller
           const sellerQuotations = response.data.filter(q => q.seller_address.toLowerCase() === currentAddress.toLowerCase());
           setQuotations(sellerQuotations);
       } catch (error) {
@@ -90,7 +90,7 @@ const SellerDashboard = ({ activeTab }) => {
       try {
           await rejectQuotation(quotationId);
           toast.info("Quotation rejected.");
-          loadQuotations(walletAddress); // Refresh list
+          loadQuotations(walletAddress);
       } catch (error) {
           toast.error("Failed to reject quotation.");
       }
@@ -107,62 +107,6 @@ const SellerDashboard = ({ activeTab }) => {
       }
   };
 
-  const handleCreateProduceLot = async (quotation) => {
-    setIsSubmitting(true);
-    const creationPromise = async () => {
-        const invoiceId = uuidv4();
-        const bytes32InvoiceId = uuidToBytes32(invoiceId);
-        const { address: sellerAddress } = await connectWallet();
-
-        const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
-        const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
-        
-        const tokenAddress = NATIVE_CURRENCY_ADDRESS; // Assuming MATIC
-        
-        const contract = await getInvoiceFactoryContract();
-        const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
-        const dueDateTimestamp = Math.floor(new Date().getTime() / 1000) + 86400 * 30; // 30 days from now
-
-        toast.info("Please confirm invoice creation in your wallet...");
-        const tx = await contract.createInvoice(
-            bytes32InvoiceId, invoiceHash, quotation.buyer_address,
-            amountInWei, dueDateTimestamp, tokenAddress
-        );
-
-        const receipt = await tx.wait();
-        const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
-        if (!event) throw new Error("InvoiceCreated event not found.");
-        
-        const newContractAddress = event.args.invoiceContractAddress;
-
-        const finalInvoiceData = {
-            quotation_id: quotation.id, // This is the crucial link
-            invoice_id: invoiceId,
-            invoice_hash: invoiceHash,
-            contract_address: newContractAddress,
-            token_address: tokenAddress,
-            due_date: new Date(dueDateTimestamp * 1000).toISOString(),
-        };
-        
-        await createInvoice(finalInvoiceData); // Call the modified backend endpoint
-    };
-
-    try {
-        await toast.promise(creationPromise(), {
-            loading: "Deploying invoice contract...",
-            success: () => {
-                loadInitialData(); // Refresh all data
-                return 'Invoice created successfully from quotation!';
-            },
-            error: (err) => `Invoice creation failed: ${err.reason || err.message}`
-        });
-    } catch (error) {
-        console.error('Failed to create invoice from quotation:', error);
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
-
   const handleSelectProduceLot = (lot) => {
     setSelectedProduceLot(lot);
   };
@@ -175,7 +119,6 @@ const SellerDashboard = ({ activeTab }) => {
       const invoicesData = await getSellerInvoices();
       setInvoices(invoicesData.data);
       
-      // Mock KYC status - in a real app, this would come from the API
       setKycStatus('verified');
       setKycRiskLevel('low');
     } catch (error) {
@@ -194,11 +137,11 @@ const SellerDashboard = ({ activeTab }) => {
       const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
       const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
       
-      const tokenAddress = NATIVE_CURRENCY_ADDRESS; // Assuming MATIC for produce sales
+      const tokenAddress = NATIVE_CURRENCY_ADDRESS;
       
       const contract = await getInvoiceFactoryContract();
       const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
-      const dueDateTimestamp = Math.floor(new Date().getTime() / 1000) + 86400 * 30; // Due in 30 days
+      const dueDateTimestamp = Math.floor(new Date().getTime() / 1000) + 86400 * 30;
   
       toast.info("Please confirm invoice creation in your wallet...");
       const tx = await contract.createInvoice(
@@ -228,7 +171,7 @@ const SellerDashboard = ({ activeTab }) => {
       await toast.promise(creationPromise(), {
         loading: "Deploying invoice contract...",
         success: () => {
-          loadInitialData(); // Refresh all data
+          loadInitialData();
           return 'Invoice created successfully from quotation!';
         },
         error: (err) => `Invoice creation failed: ${err.reason || err.message}`
@@ -251,14 +194,12 @@ const SellerDashboard = ({ activeTab }) => {
       }
       setIsSubmitting(true);
       try {
-          // In a real app, this would upload to IPFS. We simulate it.
           const proofHash = `bafybeigdyrzt5s6dfx7sidefusha4u62piu7k26k5e4szm3oogv5s2d2bu-${Date.now()}`;
           
           const { signer } = await connectWallet();
           const message = `I confirm the shipment for invoice ${confirmingShipment.invoice_id}.\nProof Hash: ${proofHash}`;
           
           await signer.signMessage(message);
-
           await updateInvoiceStatus(confirmingShipment.invoice_id, 'shipped', proofHash);
           
           toast.success('Shipment confirmed and buyer notified!');
@@ -285,6 +226,64 @@ const SellerDashboard = ({ activeTab }) => {
     setKycStatus(result.verified ? 'verified' : 'failed');
     setKycRiskLevel(result.riskLevel);
     result.verified ? toast.success('KYC Verification completed successfully') : toast.error("KYC Verification failed.")
+  };
+
+  const handleCreateProduceLot = async (formData) => {
+      setIsSubmitting(true);
+      const creationPromise = async () => {
+          // 1. Get the smart contract instance
+          const contract = await getProduceTrackingContract();
+          console.log("ProduceTracking contract instance:", contract);
+
+          // 2. Call the smart contract function to create the lot on-chain
+          toast.info("Please confirm the transaction in your wallet to create the produce lot...");
+          const tx = await contract.createProduceLot(
+              formData.produceType,
+              formData.harvestDate, // Already in UNIX timestamp format from the form component
+              formData.qualityMetrics,
+              formData.origin,
+              ethers.utils.parseUnits(formData.quantity.toString(), 18) // Assuming quantity can have decimals
+          );
+          console.log("Transaction sent:", tx);
+
+          // 3. Wait for the transaction to be mined and get the receipt
+          const receipt = await tx.wait();
+          console.log("Transaction mined:", receipt);
+
+          // 4. Find the event log to get the new lot ID
+          const event = receipt.events?.find(e => e.event === 'ProduceLotCreated');
+          if (!event) {
+              throw new Error("ProduceLotCreated event not found in the transaction receipt.");
+          }
+          console.log("ProduceLotCreated event:", event);
+          const lotId = event.args.lotId.toNumber(); // Convert BigNumber to number
+
+          // 5. Sync the on-chain data with the backend database
+          const syncData = {
+              ...formData,
+              lotId,
+              txHash: tx.hash,
+              quantity: formData.quantity // Send the plain quantity number to backend
+          };
+          console.log("Syncing produce lot with backend:", syncData);
+          await syncProduceLot(syncData);
+      };
+
+      try {
+          await toast.promise(creationPromise(), {
+              loading: "Registering produce lot on the blockchain...",
+              success: () => {
+                  setShowCreateProduceForm(false);
+                  loadProduceLots(); // Refresh the list of produce lots
+                  return 'Produce lot registered successfully!';
+              },
+              error: (err) => `Registration failed: ${err.reason || err.message}`
+          });
+      } catch (error) {
+          console.error('Failed to create produce lot:', error);
+      } finally {
+          setIsSubmitting(false);
+      }
   };
   
   const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));

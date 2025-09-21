@@ -20,6 +20,7 @@ import { generateTimelineEvents } from '../utils/timeline';
 import { toast } from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import BuyerApprovalList from '../components/Quotation/BuyerApprovalList'; // <-- Use the new specific component
+import BuyerAmountDisplay from '../components/common/BuyerAmountDisplay';
 
 const BuyerDashboard = ({ activeTab }) => {
     const [invoices, setInvoices] = useState([]);
@@ -327,7 +328,7 @@ const BuyerDashboard = ({ activeTab }) => {
                     </div>
                 );
             case 'produce':
-                 return (
+                return (
                     <div>
                         <h2 className="text-2xl font-bold mb-6">Produce Marketplace</h2>
                         <div className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -350,7 +351,10 @@ const BuyerDashboard = ({ activeTab }) => {
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" title={lot.farmer_address}>{lot.farmer_name || ethers.utils.getAddress(lot.farmer_address).slice(0,6)}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.origin}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.current_quantity} kg</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${parseFloat(lot.price).toFixed(2)}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                    {/* ✅ UPDATED HERE */}
+                                                    <BuyerAmountDisplay InrAmount={lot.price} />
+                                                </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <button
                                                         onClick={() => handleRequestToBuy(lot)}
@@ -364,7 +368,7 @@ const BuyerDashboard = ({ activeTab }) => {
                                     </tbody>
                                 </table>
                             </div>
-                             {availableLots.length === 0 && (
+                            {availableLots.length === 0 && (
                                 <div className="text-center py-12 text-gray-500">
                                     <p>No produce is currently available in the marketplace.</p>
                                 </div>

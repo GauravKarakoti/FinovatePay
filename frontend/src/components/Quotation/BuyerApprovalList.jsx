@@ -1,7 +1,6 @@
-import React from 'react';
+import AmountDisplay from '../common/AmountDisplay'; // <-- IMPORT the reusable component
 
 const BuyerApprovalList = ({ quotations, onApprove, onReject }) => {
-
     const formatAddress = (address) => {
         if (!address) return 'N/A';
         return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
@@ -26,7 +25,10 @@ const BuyerApprovalList = ({ quotations, onApprove, onReject }) => {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" title={q.seller_address}>
                                     {q.seller_name || formatAddress(q.seller_address)}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${parseFloat(q.total_amount).toFixed(2)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                    {/* ✅ UPDATED HERE */}
+                                    <AmountDisplay maticAmount={q.total_amount} />
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
                                     <button onClick={() => onApprove(q.id)} className="text-green-600 hover:text-green-900 font-semibold">Approve</button>
                                     <button onClick={() => onReject(q.id)} className="text-red-600 hover:text-red-900 font-semibold">Reject</button>
