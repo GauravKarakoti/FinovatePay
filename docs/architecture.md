@@ -9,7 +9,7 @@ FinovatePay is a hybrid payment rail for B2B payments that combines off-chain UX
 1. **Frontend**: React application with wallet integration
 2. **Backend**: Node.js/Express API server with Socket.IO for real-time updates
 3. **Database**: PostgreSQL for storing application data
-4. **Blockchain**: Ethereum L2 (Polygon/Optimism) for smart contracts
+4. **Blockchain**: Ethereum L2 (Polygon) for smart contracts
 5. **Storage**: IPFS/S3 for document storage
 
 ### Smart Contracts

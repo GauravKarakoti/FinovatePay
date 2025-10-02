@@ -18,7 +18,7 @@ It enables instant stablecoin payments, automated escrow, and tokenized invoice 
 |---------------------|--------------------------------------------------
 | 🖥️ Frontend         | React, Tailwind CSS                             |
 | 🔙 Backend          | Node.js, Express.js                             |
-| 📜 Smart Contracts  | Solidity (Hardhat on Polygon / Optimism)        |
+| 📜 Smart Contracts  | Solidity (Hardhat on Polygon)        |
 
 
 
