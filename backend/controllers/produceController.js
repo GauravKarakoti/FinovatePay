@@ -64,14 +64,25 @@ exports.transferProduce = async (req, res) => {
     await tx.wait();
 
     // Store in database
-    const query = `
+    const transactionQuery = `
       INSERT INTO produce_transactions (lot_id, from_address, to_address, quantity, price, transaction_hash)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
     
-    const values = [lotId, req.user.wallet_address, toAddress, quantity, price, transactionHash];
-    await pool.query(query, values);
+    const transactionValues = [lotId, req.user.wallet_address, toAddress, quantity, price, transactionHash];
+    await pool.query(transactionQuery, transactionValues);
+
+    // Update produce lot in the database
+    const updateQuery = `
+      UPDATE produce_lots 
+      SET current_quantity = current_quantity - $1,
+          current_owner = $2
+      WHERE lot_id = $3
+    `;
+    const updateValues = [quantity, toAddress, lotId];
+    await pool.query(updateQuery, updateValues);
+
 
     res.json({ success: true, txHash: tx.hash });
   } catch (error) {

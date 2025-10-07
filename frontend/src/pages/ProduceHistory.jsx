@@ -1,100 +1,101 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { getProduceLot } from '../utils/api';
+import { ethers } from 'ethers';
 
 const ProduceHistory = () => {
   const { lotId } = useParams();
-  const [produceLot, setProduceLot] = useState(null);
+  const [lot, setLot] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const loadProduceData = async () => {
+    const fetchProduceHistory = async () => {
       try {
+        setLoading(true);
         const response = await getProduceLot(lotId);
-        setProduceLot(response.data.lot);
-        setTransactions(response.data.transactions || []);
-      } catch (error) {
-        console.error('Error loading produce data:', error);
+        if (response.data.success) {
+          setLot(response.data.lot);
+          const decodedTransactions = response.data.transactions.map(tx => ({
+            transactionId: tx.id,
+            lotId: tx.lot_id,
+            from: tx.from_address,
+            to: tx.to_address,
+            quantity: tx.quantity,
+            price: tx.price,
+            timestamp: new Date(tx.created_at).toLocaleString(),
+            transactionHash: tx.transaction_hash,
+          }));
+          setTransactions(decodedTransactions);
+        } else {
+          setError('Produce lot not found.');
+        }
+      } catch (err) {
+        setError('Failed to fetch produce history.');
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    
-    loadProduceData();
+
+    if (lotId) {
+      fetchProduceHistory();
+    }
   }, [lotId]);
 
   if (loading) {
-    return <div className="container mx-auto p-4 text-center">Loading produce history...</div>;
+    return <div className="text-center p-8">Loading...</div>;
   }
 
-  if (!produceLot) {
-    return <div className="container mx-auto p-4 text-center">Produce lot not found.</div>;
+  if (error) {
+    return <div className="text-center p-8 text-red-500">{error}</div>;
+  }
+
+  if (!lot) {
+    return <div className="text-center p-8">No produce lot data found.</div>;
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h1 className="text-2xl font-bold mb-4">Produce Traceability for Lot #{produceLot.lot_id}</h1>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div className="container mx-auto p-4 md:p-8">
+      <div className="bg-white rounded-lg shadow-xl p-6 mb-8">
+        <h1 className="text-3xl font-bold mb-4">Produce History for Lot #{lot.lot_id}</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <h2 className="text-xl font-semibold mb-3">Product Information</h2>
-            <div className="space-y-2">
-              {/* FIX: Use snake_case properties from the database */}
-              <p><strong>Produce Type:</strong> {produceLot.produce_type}</p>
-              <p><strong>Origin:</strong> {produceLot.origin}</p>
-              <p><strong>Harvest Date:</strong> {new Date(produceLot.harvest_date).toLocaleDateString()}</p>
-              <p><strong>Registered Quantity:</strong> {produceLot.quantity} kg</p>
-              <p><strong>Quality Metrics:</strong> {produceLot.quality_metrics}</p>
-            </div>
+            <p><strong>Produce Type:</strong> {lot.produce_type}</p>
+            <p><strong>Origin:</strong> {lot.origin}</p>
+            <p><strong>Harvest Date:</strong> {new Date(lot.harvest_date).toLocaleDateString()}</p>
           </div>
-          
           <div>
-            <h2 className="text-xl font-semibold mb-3">Original Farmer</h2>
-            <p className="text-sm bg-gray-100 p-3 rounded break-all">
-              {/* FIX: Use farmer_address from the database */}
-              {produceLot.farmer_address}
-            </p>
+            <p><strong>Initial Quantity:</strong> {lot.quantity} kg</p>
+            <p><strong>Current Quantity:</strong> {lot.current_quantity} kg</p>
+            <p><strong>Farmer:</strong> {lot.farmer_address}</p>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">Supply Chain History</h2>
-        
-        {transactions.length > 0 ? (
-          <div className="space-y-4">
-            {transactions.map((transaction, index) => (
-              <div key={transaction.id} className="border-l-4 border-blue-500 pl-4 py-2">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-medium">Transaction #{transactions.length - index}</p>
-                    <p className="text-sm text-gray-600 break-all">
-                      From: {transaction.from_address} → To: {transaction.to_address}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Quantity: {transaction.quantity} kg • Price: ${transaction.price} 
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(transaction.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <a 
-                    href={`https://amoy.polygonscan.com/tx/${transaction.transaction_hash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 text-sm ml-4"
-                  >
-                    View on Explorer
-                  </a>
-                </div>
-              </div>
-            ))}
+      <div>
+        <h2 className="text-2xl font-bold mb-6">Transaction Timeline</h2>
+        <div className="relative border-l-2 border-gray-200">
+          {transactions.map((tx, index) => (
+            <div key={tx.transactionId} className="mb-8 ml-4">
+              <div className="absolute w-3 h-3 bg-gray-200 rounded-full -left-1.5 border border-white"></div>
+              <p className="text-sm text-gray-500">{tx.timestamp}</p>
+              <h3 className="text-lg font-semibold text-gray-900">Transfer of {tx.quantity} kg</h3>
+              <p className="text-base font-normal text-gray-600">From: {tx.from}</p>
+              <p className="text-base font-normal text-gray-600">To: {tx.to}</p>
+              <a href={`https://sepolia.etherscan.io/tx/${tx.transactionHash}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                View on Etherscan
+              </a>
+            </div>
+          ))}
+          <div className="mb-8 ml-4">
+            <div className="absolute w-3 h-3 bg-gray-200 rounded-full -left-1.5 border border-white"></div>
+            <p className="text-sm text-gray-500">{new Date(lot.harvest_date).toLocaleDateString()}</p>
+            <h3 className="text-lg font-semibold text-gray-900">Harvested</h3>
+            <p className="text-base font-normal text-gray-600">The produce was harvested at {lot.origin}.</p>
           </div>
-        ) : (
-          <p className="text-gray-600">No transfer transactions recorded for this lot yet.</p>
-        )}
+        </div>
       </div>
     </div>
   );

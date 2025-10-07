@@ -52,7 +52,6 @@ contract ProduceTracking is Ownable {
     ) external returns (uint256) {
         // -- CHANGE: Manually increment the counter --
         uint256 newLotId = ++_lotIdCounter;
-        
         produceLots[newLotId] = ProduceLot({
             lotId: newLotId,
             farmer: msg.sender,
@@ -65,7 +64,6 @@ contract ProduceTracking is Ownable {
             currentOwner: msg.sender,
             isAvailable: true
         });
-        
         emit ProduceLotCreated(newLotId, msg.sender, _produceType);
         return newLotId;
     }
@@ -89,6 +87,8 @@ contract ProduceTracking is Ownable {
         
         // Update produce lot
         produceLots[_lotId].currentQuantity -= _quantity;
+        produceLots[_lotId].currentOwner = _to; // Change owner on transfer
+        
         if (produceLots[_lotId].currentQuantity == 0) {
             produceLots[_lotId].isAvailable = false;
         }
