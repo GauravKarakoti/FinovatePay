@@ -5,7 +5,8 @@ import {
     freezeAccount,
     unfreezeAccount,
     updateUserRole,
-    checkCompliance
+    checkCompliance,
+    resolveDispute // Import the new function
 } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
@@ -22,12 +23,27 @@ const AdminDashboard = ({ activeTab }) => {
       loadData();
   }, []);
 
+  const handleResolveDispute = async (invoiceId, sellerWins) => {
+    try {
+      await resolveDispute(invoiceId, sellerWins);
+      toast.success('Dispute resolved successfully');
+      loadData(); // Reload data to reflect the change
+    } catch (error) {
+      console.error('Failed to resolve dispute:', error);
+      toast.error('Failed to resolve dispute.');
+    }
+  };
+
+  const disputedInvoices = invoices.filter(
+    (inv) => inv.escrow_status === 'disputed'
+  );
+
   const loadData = async () => {
       try {
           const usersData = await getUsers();
           const invoicesData = await getInvoices();
-          setUsers(usersData.data);
-          setInvoices(invoicesData.data);
+          setUsers(Array.isArray(usersData.data) ? usersData.data : []);
+          setInvoices(Array.isArray(invoicesData.data) ? invoicesData.data : []);
       } catch (error) {
           console.error('Failed to load data:', error);
           toast.error("Failed to load admin data.");
@@ -84,10 +100,10 @@ const AdminDashboard = ({ activeTab }) => {
 
   // 3. Update the stats array to use the dynamic values
   const stats = [
-      { title: 'Total Users', value: users.length.toString(), change: 5, icon: '👥', color: 'blue' },
-      { title: 'Total Invoices', value: invoices.length.toString(), change: 12, icon: '📝', color: 'green' },
-      { title: 'Active Escrows', value: activeEscrowsCount.toString(), change: -3, icon: '🔒', color: 'purple' },
-      { title: 'Disputes', value: disputedInvoicesCount.toString(), change: 0, icon: '⚖️', color: 'orange' },
+      { title: 'Total Users', value: String(users.length), change: 5, icon: '👥', color: 'blue' },
+      { title: 'Total Invoices', value: String(invoices.length), change: 12, icon: '📝', color: 'green' },
+      { title: 'Active Escrows', value: String(activeEscrowsCount), change: -3, icon: '🔒', color: 'purple' },
+      { title: 'Disputes', value: String(disputedInvoicesCount), change: 0, icon: '⚖️', color: 'orange' },
   ];
 
   // FIX: Create a function to render content based on the active tab
@@ -182,6 +198,35 @@ const AdminDashboard = ({ activeTab }) => {
                     {!complianceResult.compliant && <p>Reason: {complianceResult.reason}</p>}
                   </div>
                 )}
+              </div>
+
+              <div className="bg-white p-4 rounded shadow">
+                <h3 className="text-xl font-semibold mb-4">Dispute Resolution</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full table-auto">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-2">Invoice ID</th>
+                        <th className="px-4 py-2">Amount</th>
+                        <th className="px-4 py-2">Dispute Reason</th>
+                        <th className="px-4 py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {disputedInvoices.map(invoice => (
+                        <tr key={invoice.invoice_id}>
+                          <td className="border px-4 py-2 truncate max-w-xs">{invoice.invoice_id}</td>
+                          <td className="border px-4 py-2">{invoice.amount}</td>
+                          <td className="border px-4 py-2">{invoice.dispute_reason}</td>
+                          <td className="border px-4 py-2">
+                            <button onClick={() => handleResolveDispute(invoice.invoice_id, true)} className="bg-green-500 text-white px-2 py-1 rounded mr-1">Seller Wins</button>
+                            <button onClick={() => handleResolveDispute(invoice.invoice_id, false)} className="bg-red-500 text-white px-2 py-1 rounded">Buyer Wins</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

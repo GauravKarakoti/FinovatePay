@@ -162,4 +162,9 @@ export const updateInvoiceStatus = (invoiceId, status, tx_hash) => {
     return api.post(`/invoices/${invoiceId}/status`, { status, tx_hash });
 };
 
+export const resolveDispute = async (invoiceId, sellerWins) => {
+  const response = await api.post('/admin/resolve-dispute', { invoiceId, sellerWins });
+  return response.data;
+};
+
 export default api;
