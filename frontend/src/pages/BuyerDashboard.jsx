@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import BuyerApprovalList from '../components/Quotation/BuyerApprovalList'; // <-- Use the new specific component
 import AmountDisplay from '../components/common/AmountDisplay';
+import ProduceQRCode from '../components/Produce/ProduceQRCode';
 
 const BuyerDashboard = ({ activeTab }) => {
     const [invoices, setInvoices] = useState([]);
@@ -32,6 +33,8 @@ const BuyerDashboard = ({ activeTab }) => {
     const [kycStatus, setKycStatus] = useState('verified');
     const [kycRiskLevel, setKycRiskLevel] = useState('low');
     const [loadingInvoice, setLoadingInvoice] = useState(null);
+    const [showQRCode, setShowQRCode] = useState(false);
+    const [selectedLot, setSelectedLot] = useState(null);
 
     useEffect(() => {
         const loadData = async () => {
@@ -225,6 +228,14 @@ const BuyerDashboard = ({ activeTab }) => {
         setTimelineEvents(generateTimelineEvents(invoice));
     };
 
+    const handleShowQRCode = (invoice) => {
+        setSelectedLot({
+            lotId: invoice.lot_id,
+            produceType: invoice.produce_type,
+            origin: invoice.origin,
+        });
+        setShowQRCode(true);
+    };
 
     const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
     const completedInvoices = invoices.filter(inv => inv.escrow_status === 'released');
@@ -249,7 +260,6 @@ const BuyerDashboard = ({ activeTab }) => {
                     </div>
                 );
 
-            // ... other cases remain the same ...
             case 'overview':
                 return (
                     <div>
@@ -269,6 +279,7 @@ const BuyerDashboard = ({ activeTab }) => {
                                     onPayInvoice={handlePayInvoice}
                                     onConfirmRelease={handleReleaseFunds}
                                     onRaiseDispute={handleRaiseDispute}
+                                    onShowQRCode={handleShowQRCode}
                                 />
                             </div>
                             <div>
@@ -293,6 +304,7 @@ const BuyerDashboard = ({ activeTab }) => {
                             onPayInvoice={handlePayInvoice}
                             onConfirmRelease={handleReleaseFunds}
                             onRaiseDispute={handleRaiseDispute}
+                            onShowQRCode={handleShowQRCode}
                         />
                     </div>
                 );
@@ -391,6 +403,24 @@ const BuyerDashboard = ({ activeTab }) => {
     return (
         <div className="container mx-auto p-4">
             {renderTabContent()}
+
+            {showQRCode && selectedLot && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl">
+                        <ProduceQRCode
+                            lotId={selectedLot.lotId}
+                            produceType={selectedLot.produceType}
+                            origin={selectedLot.origin}
+                        />
+                        <button
+                            onClick={() => setShowQRCode(false)}
+                            className="mt-4 w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        >
+                            Close
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

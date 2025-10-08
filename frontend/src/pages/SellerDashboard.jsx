@@ -42,6 +42,8 @@ const SellerDashboard = ({ activeTab }) => {
   const [produceLots, setProduceLots] = useState([]);
   const [quotations, setQuotations] = useState([]);
   const [showCreateQuotation, setShowCreateQuotation] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [selectedLot, setSelectedLot] = useState(null);
 
   const loadProduceLots = async () => {
     try {
@@ -74,6 +76,15 @@ const SellerDashboard = ({ activeTab }) => {
           console.error('Failed to load quotations:', error);
           toast.error("Could not load quotations.");
       }
+  };
+
+  const handleShowQRCode = (invoice) => {
+      setSelectedLot({
+          lotId: invoice.lot_id,
+          produceType: invoice.produce_type,
+          origin: invoice.origin,
+      });
+      setShowQRCode(true);
   };
 
   const handleApproveQuotation = async (quotationId) => {
@@ -322,6 +333,7 @@ const SellerDashboard = ({ activeTab }) => {
                   invoices={invoices.slice(0, 5)}
                   onSelectInvoice={handleSelectInvoice}
                   onConfirmShipment={handleConfirmShipment}
+                  onShowQRCode={handleShowQRCode}
                   userRole="seller"
                 />
               </div>
@@ -348,6 +360,7 @@ const SellerDashboard = ({ activeTab }) => {
               onSelectInvoice={handleSelectInvoice}
               onConfirmShipment={handleConfirmShipment}
               userRole="seller"
+              onShowQRCode={handleShowQRCode}
             />
           </div>
         );
@@ -379,6 +392,7 @@ const SellerDashboard = ({ activeTab }) => {
                       onSelectInvoice={handleSelectInvoice}
                       onConfirmShipment={handleConfirmShipment}
                       userRole="buyer"
+                      onShowQRCode={handleShowQRCode}
                   />
               </div>
           </div>
@@ -538,6 +552,24 @@ const SellerDashboard = ({ activeTab }) => {
         />
       ) : (
         renderTabContent()
+      )}
+
+      {showQRCode && selectedLot && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-lg shadow-xl">
+                  <ProduceQRCode
+                      lotId={selectedLot.lotId}
+                      produceType={selectedLot.produceType}
+                      origin={selectedLot.origin}
+                  />
+                  <button
+                      onClick={() => setShowQRCode(false)}
+                      className="mt-4 w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                      Close
+                  </button>
+              </div>
+          </div>
       )}
 
       {confirmingShipment && (

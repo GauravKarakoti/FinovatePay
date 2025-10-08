@@ -11,6 +11,7 @@ router.use(authenticateToken);
 
 // Create a new invoice
 router.post('/', requireKYC, async (req, res) => {
+  console.log("Creating invoice with data:", req.body);
   await createInvoice(req, res);
 });
 
