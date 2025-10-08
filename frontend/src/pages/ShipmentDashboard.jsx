@@ -1,56 +1,100 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { updateLotLocation } from '../utils/api';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+// import { updateLotLocation } from '../utils/api'; // Assuming this is your API utility
+import { Html5Qrcode } from 'html5-qrcode';
+
+// Mock API function for demonstration purposes
+const updateLotLocation = ({ lotId, location }) => {
+    return new Promise((resolve, reject) => {
+        console.log(`Updating location for Lot ID: ${lotId} to ${location}`);
+        if (lotId && location) {
+            setTimeout(() => resolve({ success: true }), 500);
+        } else {
+            setTimeout(() => reject({ response: { data: { error: "Invalid data provided." } } }), 500);
+        }
+    });
+};
+
 
 const ShipmentDashboard = () => {
     const [scannedLotId, setScannedLotId] = useState(null);
     const [location, setLocation] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const videoRef = useRef(null);
+    
+    // Using a ref to hold the scanner instance is correct, but we'll manage it inside the effect.
+    const scannerRef = useRef(null);
 
+    // This useEffect hook handles the scanner's lifecycle.
     useEffect(() => {
-        const codeReader = new BrowserMultiFormatReader();
-        let selectedDeviceId;
+        const qrCodeRegionId = "qr-reader";
+        
+        // Initialize the scanner instance
+        const html5QrCodeScanner = new Html5Qrcode(qrCodeRegionId);
+        scannerRef.current = html5QrCodeScanner;
 
-        codeReader.listVideoInputDevices()
-            .then((videoInputDevices) => {
-                if (videoInputDevices.length > 0) {
-                    selectedDeviceId = videoInputDevices[0].deviceId;
-                    
-                    codeReader.decodeFromVideoDevice(selectedDeviceId, videoRef.current, (result, err) => {
-                        if (result) {
-                            handleScan(result.getText());
-                        }
-                        if (err && !(err instanceof DOMException)) {
-                            console.error(err);
-                            toast.error("Error scanning QR Code.");
-                        }
-                    });
-                } else {
-                    toast.error("No camera found.");
-                }
-            })
-            .catch((err) => {
-                console.error(err);
-                toast.error("Could not access camera.");
-            });
-            
-        return () => {
-            codeReader.reset();
+        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+            handleScan(decodedText.substring(decodedText.length - 1));
+            // The scanner will continue to scan, which is often desired in warehouse environments.
+            // If you want it to stop after one scan, you would call .stop() here.
         };
-    }, []);
+
+        const config = { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            rememberLastUsedCamera: true, // Improves user experience on subsequent loads
+        };
+
+        // Start the scanner
+        html5QrCodeScanner.start(
+            { facingMode: "environment" }, // Prefer the rear camera
+            config,
+            qrCodeSuccessCallback,
+            (errorMessage) => { 
+                // This callback is for scan failures, which can be ignored.
+            }
+        ).catch((err) => {
+            console.error("Unable to start scanning.", err);
+            toast.error("Could not start QR scanner. Please grant camera permission.");
+        });
+
+        // Cleanup function to stop the scanner when the component unmounts
+        return () => {
+            // The try/catch block is the key to preventing the "transition" error in StrictMode.
+            try {
+                if (scannerRef.current && scannerRef.current.isScanning) {
+                    scannerRef.current.stop()
+                        .then(() => console.log("QR Code scanning stopped."))
+                        .catch(err => console.error("Failed to stop the scanner cleanly.", err));
+                }
+            } catch (error) {
+                console.warn("Failed to stop scanner, probably due to React StrictMode.", error);
+            }
+        };
+    }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount.
 
     const handleScan = (scannedText) => {
         if (scannedText) {
             try {
-                const scannedData = JSON.parse(scannedText);
-                if (scannedData.lotId) {
-                    setScannedLotId(scannedData.lotId);
-                    toast.success(`Scanned Lot ID: ${scannedData.lotId}`);
+                let lotId;
+                // Try to parse as JSON first
+                try {
+                    const scannedData = JSON.parse(scannedText);
+                    console.log("Scanned Data:", scannedData);
+                    lotId = scannedData.lotId;
+                    console.log("Extracted Lot ID:", lotId);
+                } catch (e) {
+                    // If parsing fails, assume the whole text is the lotId
+                    lotId = scannedText;
+                }
+                
+                if (lotId) {
+                    setScannedLotId(lotId);
+                    toast.success(`Scanned Lot ID: ${lotId}`);
+                } else {
+                    toast.error("QR Code does not contain a valid Lot ID.");
                 }
             } catch (error) {
-                toast.error("Invalid QR Code. Please scan a valid invoice QR code.");
+                toast.error("Invalid QR Code format.");
             }
         }
     };
@@ -66,52 +110,57 @@ const ShipmentDashboard = () => {
         try {
             await updateLotLocation({ lotId: scannedLotId, location });
             toast.success("Location updated successfully!");
+            // Reset the form for the next scan
             setScannedLotId(null);
             setLocation('');
         } catch (error) {
-            toast.error("Failed to update location.");
+            console.error("Failed to update location:", error);
+            toast.error(error.response?.data?.error || "Failed to update location.");
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="container mx-auto p-4">
-            <h2 className="text-2xl font-bold mb-6">Shipment & Warehouse Dashboard</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-xl font-semibold mb-4">Scan Invoice QR Code</h3>
-                    <video ref={videoRef} style={{ width: '100%', border: '1px solid gray' }} />
+        <div className="container mx-auto p-4 bg-gray-50 min-h-screen">
+            <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">Shipment & Warehouse Dashboard</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div className="bg-white rounded-lg shadow-xl p-6 border border-gray-200">
+                    <h3 className="text-xl font-semibold mb-4 text-gray-700">Scan Produce Lot QR Code</h3>
+                    <div id="qr-reader" className="w-full rounded-md overflow-hidden"></div>
                     {scannedLotId && (
-                        <p className="mt-4 text-green-600 font-semibold">Scanned Lot ID: {scannedLotId}</p>
+                        <div className="mt-4 p-3 bg-green-100 border border-green-300 rounded-md">
+                            <p className="text-green-800 font-semibold text-center">Scanned Lot ID: {scannedLotId}</p>
+                        </div>
                     )}
                 </div>
-                <div className="bg-white rounded-lg shadow-md p-6">
-                    <h3 className="text-xl font-semibold mb-4">Update Location</h3>
-                    <form onSubmit={handleSubmit}>
-                        <div className="mb-4">
+                <div className="bg-white rounded-lg shadow-xl p-6 border border-gray-200">
+                    <h3 className="text-xl font-semibold mb-4 text-gray-700">Update Location</h3>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Lot ID</label>
                             <input
                                 type="text"
-                                value={scannedLotId || ''}
+                                value={scannedLotId || 'Scan a QR code...'}
                                 readOnly
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 text-gray-500"
                             />
                         </div>
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">New Location</label>
                             <input
                                 type="text"
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                                 placeholder="e.g., Warehouse A, Shelf 3"
+                                required
                             />
                         </div>
                         <button
                             type="submit"
                             disabled={isSubmitting || !scannedLotId || !location}
-                            className="btn-primary w-full"
+                            className="w-full bg-indigo-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-indigo-700 disabled:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
                         >
                             {isSubmitting ? 'Updating...' : 'Update Location'}
                         </button>

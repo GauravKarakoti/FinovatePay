@@ -48,8 +48,15 @@ exports.unfreezeAccount = async (req, res) => {
 
 exports.updateUserRole = async (req, res) => {
     try {
-        const { userId } = req.params; // FIX: Get userId from req.params
-        const { role } = req.body;     // Role is still in the body
+        const { userId } = req.params;
+        const { role } = req.body;
+
+        // Add validation for allowed roles
+        const allowedRoles = ['admin', 'buyer', 'seller', 'shipment'];
+        if (!allowedRoles.includes(role)) {
+            return res.status(400).json({ error: 'Invalid role specified' });
+        }
+
         await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
         res.json({ success: true, message: 'User role updated successfully' });
     } catch (error) {

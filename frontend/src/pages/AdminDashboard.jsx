@@ -169,10 +169,10 @@ const AdminDashboard = ({ activeTab }) => {
                               <button onClick={() => handleFreezeAccount(user.id)} className="bg-red-500 text-white px-2 py-1 rounded mr-1">Freeze</button>
                             )}
                             <select onChange={(e) => handleUpdateUserRole(user.id, e.target.value)} defaultValue={user.role} className="border rounded px-2 py-1">
-                              <option value="seller">Seller</option>
-                              <option value="buyer">Buyer</option>
-                              <option value="admin">Admin</option>
-                              <option value="arbitrator">Arbitrator</option>
+                                <option value="seller">Seller</option>
+                                <option value="buyer">Buyer</option>
+                                <option value="admin">Admin</option>
+                                <option value="shipment">Shipment</option>
                             </select>
                           </td>
                         </tr>

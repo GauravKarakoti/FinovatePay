@@ -65,11 +65,10 @@ function App() {
     setActiveTab(tab);
   };
   
-  const handleToggleRole = () => {
+  const handleToggleRole = (role) => {
     if (!user || user.role === 'admin') return;
 
-    const newRole = user.role === 'buyer' ? 'seller' : 'buyer';
-    const updatedUser = { ...user, role: newRole };
+    const updatedUser = { ...user, role: role };
     
     setUser(updatedUser);
     localStorage.setItem('user', JSON.stringify(updatedUser));
