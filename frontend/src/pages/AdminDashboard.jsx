@@ -39,15 +39,16 @@ const AdminDashboard = ({ activeTab }) => {
   );
 
   const loadData = async () => {
-      try {
-          const usersData = await getUsers();
-          const invoicesData = await getInvoices();
-          setUsers(Array.isArray(usersData.data) ? usersData.data : []);
-          setInvoices(Array.isArray(invoicesData.data) ? invoicesData.data : []);
-      } catch (error) {
-          console.error('Failed to load data:', error);
-          toast.error("Failed to load admin data.");
-      }
+    try {
+        const usersData = await getUsers();
+        const invoicesData = await getInvoices();
+        // FIX: Access the nested .data property
+        setUsers(Array.isArray(usersData.data.data) ? usersData.data.data : []);
+        setInvoices(Array.isArray(invoicesData.data.data) ? invoicesData.data.data : []);
+    } catch (error) {
+        console.error('Failed to load data:', error);
+        toast.error("Failed to load admin data.");
+    }
   };
 
   const handleFreezeAccount = async (userId) => {

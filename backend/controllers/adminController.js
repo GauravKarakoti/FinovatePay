@@ -26,8 +26,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.freezeAccount = async (req, res) => {
     try {
-        const { userId } = req.body;
-        // Logic to freeze the account in your database
+        const { userId } = req.params; // FIX: Get userId from req.params
         await pool.query('UPDATE users SET is_frozen = TRUE WHERE id = $1', [userId]);
         res.json({ success: true, message: 'Account frozen successfully' });
     } catch (error) {
@@ -38,8 +37,7 @@ exports.freezeAccount = async (req, res) => {
 
 exports.unfreezeAccount = async (req, res) => {
     try {
-        const { userId } = req.body;
-        // Logic to unfreeze the account in your database
+        const { userId } = req.params; // FIX: Get userId from req.params
         await pool.query('UPDATE users SET is_frozen = FALSE WHERE id = $1', [userId]);
         res.json({ success: true, message: 'Account unfrozen successfully' });
     } catch (error) {
@@ -50,8 +48,8 @@ exports.unfreezeAccount = async (req, res) => {
 
 exports.updateUserRole = async (req, res) => {
     try {
-        const { userId, role } = req.body;
-        // Logic to update user role in your database
+        const { userId } = req.params; // FIX: Get userId from req.params
+        const { role } = req.body;     // Role is still in the body
         await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
         res.json({ success: true, message: 'User role updated successfully' });
     } catch (error) {
@@ -59,7 +57,6 @@ exports.updateUserRole = async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 };
-
 
 // --- INVOICE MANAGEMENT ---
 exports.getInvoices = async (req, res) => {

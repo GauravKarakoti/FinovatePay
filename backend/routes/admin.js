@@ -16,9 +16,9 @@ router.use(authenticateToken, requireRole('admin'));
 
 router.get('/users', getAllUsers);
 router.get('/invoices', getInvoices);
-router.post('/freeze', freezeAccount);
-router.post('/unfreeze', unfreezeAccount);
-router.post('/update-role', updateUserRole);
+router.post('/users/:userId/freeze', freezeAccount);
+router.post('/users/:userId/unfreeze', unfreezeAccount);
+router.put('/users/:userId/role', updateUserRole);
 router.post('/check-compliance', checkCompliance);
 router.post('/resolve-dispute', resolveDispute);
 
