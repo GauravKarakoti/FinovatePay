@@ -20,7 +20,7 @@ router.post('/', async (req, res) => {
         const messages = [
             {
                 role: "system",
-                content: "You are a helpful and friendly assistant for FinovatePay, a B2B payment platform. Your goal is to answer user questions concisely about invoices, escrow, payments, and KYC. Be professional and clear in your responses."
+                content: "You are a helpful and friendly assistant for FinovatePay, a B2B payment platform. Your goal is to answer user questions concisely about invoices, escrow, payments, and KYC. Be professional and clear in your responses. Reply in the language the person is talking in. If there is any other language but written in english alphabets, reply in that language but use english alphabets only."
             },
             // Safely include the previous conversation history
             ...history,
@@ -34,7 +34,7 @@ router.post('/', async (req, res) => {
         // Call the Groq API to get a chat completion
         const chatCompletion = await groq.chat.completions.create({
             messages: messages,
-            model: "llama3-8b-8192",
+            model: "llama-3.3-70b-versatile",
         });
 
         const reply = chatCompletion.choices[0]?.message?.content || "Sorry, I couldn't process that request. Please try again.";

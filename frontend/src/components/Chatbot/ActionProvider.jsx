@@ -1,18 +1,16 @@
 class ActionProvider {
-  constructor(createChatBotMessage, setStateFunc, state) {
+  constructor(createChatBotMessage, setStateFunc) {
     this.createChatBotMessage = createChatBotMessage;
     this.setState = setStateFunc;
-    // Pass the entire state to the constructor to access messages
-    this.state = state; 
   }
 
-  handleUserMessage = async (message) => {
+  handleUserMessage = async (message, state) => {
     // Map the current messages from the state to the format Groq expects
-    const history = this.state.messages.map(msg => ({
+    const history = state.messages.map(msg => ({
         role: msg.type === 'bot' ? 'assistant' : 'user',
         content: msg.message
     }));
-      
+
     const response = await fetch(`${import.meta.env.VITE_API_URL}/chatbot`, {
       method: 'POST',
       headers: {
