@@ -3,6 +3,7 @@ const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
+const chatbotRoutes = require('./routes/chatbot');
 
 const app = express();
 const server = http.createServer(app);
@@ -62,6 +63,7 @@ app.use('/api/kyc', require('./routes/kyc'));
 app.use('/api/produce', require('./routes/produce'));
 app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
+app.use('/api/chatbot', chatbotRoutes);
 
 // Socket.io, error handlers, and server.listen call
 io.on('connection', (socket) => {

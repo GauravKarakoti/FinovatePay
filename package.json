@@ -25,6 +25,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
     "dotenv": "^17.2.2",
+    "groq-sdk": "^0.33.0",
     "sonner": "^2.0.7"
   }
 }
