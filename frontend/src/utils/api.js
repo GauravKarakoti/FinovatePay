@@ -76,6 +76,8 @@ export const getAvailableLots = () => {
   return api.get('/produce/lots/available');
 };
 
+export const updateLotLocation = (data) => api.post('/shipment/location', data);
+
 export const createQuotation = (quotationData) => {
   return api.post('/quotations', quotationData);
 };

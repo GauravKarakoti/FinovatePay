@@ -14,6 +14,7 @@ import './App.css';
 import { Toaster } from 'sonner';
 // 1. Import the chatbot component
 import FinovateChatbot from './components/Chatbot/Chatbot';
+import ShipmentDashboard from './pages/ShipmentDashboard';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -118,6 +119,8 @@ function App() {
                             renderDashboard(<AdminDashboard activeTab={activeTab} />)
                         ) : user.role === 'buyer' ? (
                             <Navigate to="/buyer" />
+                        ) : user.role === 'shipment' || user.role === 'warehouse' ? (
+                            <Navigate to="/shipment" />
                         ) : (
                             renderDashboard(<SellerDashboard activeTab={activeTab} />)
                         )
@@ -138,6 +141,12 @@ function App() {
               path="/admin" 
               element={
                 user && user.role === 'admin' ? renderDashboard(<AdminDashboard activeTab={activeTab} />) : <Navigate to="/" />
+              } 
+            />
+            <Route 
+              path="/shipment" 
+              element={
+                user && (user.role === 'shipment' || user.role === 'warehouse') ? <ShipmentDashboard /> : <Navigate to="/" />
               } 
             />
             <Route 

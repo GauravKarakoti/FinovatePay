@@ -4,6 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
 const chatbotRoutes = require('./routes/chatbot');
+const shipmentRoutes = require('./routes/shipment');
 
 const app = express();
 const server = http.createServer(app);
@@ -64,6 +65,7 @@ app.use('/api/produce', require('./routes/produce'));
 app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/shipment', shipmentRoutes);
 
 // Socket.io, error handlers, and server.listen call
 io.on('connection', (socket) => {
