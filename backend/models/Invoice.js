@@ -11,15 +11,16 @@ class Invoice {
       currency,
       dueDate,
       description,
-      items
+      items,
+      lot_id // <-- Added lot_id
     } = invoiceData;
 
     const query = `
       INSERT INTO invoices (
         invoice_id, invoice_hash, seller_address, buyer_address, 
-        amount, currency, due_date, description, items
+        amount, currency, due_date, description, items, lot_id
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *
     `;
 
@@ -32,7 +33,8 @@ class Invoice {
       currency,
       dueDate,
       description,
-      JSON.stringify(items)
+      JSON.stringify(items),
+      lot_id // <-- Added lot_id
     ];
 
     const result = await pool.query(query, values);

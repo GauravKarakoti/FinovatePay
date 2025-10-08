@@ -229,6 +229,7 @@ const BuyerDashboard = ({ activeTab }) => {
     };
 
     const handleShowQRCode = (invoice) => {
+        console.log("Invoice:", invoice)
         setSelectedLot({
             lotId: invoice.lot_id,
             produceType: invoice.produce_type,
