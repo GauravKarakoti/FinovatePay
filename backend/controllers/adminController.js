@@ -101,11 +101,14 @@ exports.resolveDispute = async (req, res) => {
             EscrowContractArtifact.abi,
             signer
         );
+        console.log("Escrow contract instance created:", escrowContract.target);
 
         const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
         const tx = await escrowContract.resolveDispute(bytes32InvoiceId, sellerWins);
+        console.log(`Transaction sent to resolve dispute for invoice ${invoiceId}. Waiting for confirmation...`);
         await tx.wait();
+        console.log(`Dispute for invoice ${invoiceId} resolved. Transaction hash: ${tx.hash}`);
 
         const resolutionStatus = sellerWins ? 'resolved_seller_wins' : 'resolved_buyer_wins';
 

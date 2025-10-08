@@ -60,10 +60,9 @@ router.get('/:id', async (req, res) => {
 router.post('/:invoice_id/status', requireKYC, async (req, res) => {
     try {
         const { invoice_id } = req.params;
-        // For 'shipped' status, tx_hash will contain the proof hash (e.g., IPFS CID)
-        const { status, tx_hash } = req.body;
+        const { status, tx_hash, dispute_reason } = req.body; // <-- Added dispute_reason
+        console.log(`Updating status for invoice ${invoice_id} to ${status} with tx_hash ${tx_hash} and dispute_reason ${dispute_reason}`);
 
-        // 1. Add 'shipped' to the list of allowed statuses
         const allowedStatus = ['deposited', 'released', 'disputed', 'shipped'];
         if (!allowedStatus.includes(status)) {
             return res.status(400).json({ error: 'Invalid status provided.' });
@@ -71,15 +70,16 @@ router.post('/:invoice_id/status', requireKYC, async (req, res) => {
 
         let query, values;
 
-        // 2. Handle different DB updates based on the status
         if (status === 'released') {
             query = `UPDATE invoices SET escrow_status = $1, release_tx_hash = $2 WHERE invoice_id = $3 RETURNING *`;
             values = [status, tx_hash, invoice_id];
         } else if (status === 'shipped') {
-            // Store the proof hash in the new 'shipment_proof_hash' column
             query = `UPDATE invoices SET escrow_status = $1, shipment_proof_hash = $2 WHERE invoice_id = $3 RETURNING *`;
             values = [status, tx_hash, invoice_id];
-        } else { // 'deposited' or 'disputed'
+        } else if (status === 'disputed') { // <-- Handle disputed status
+            query = `UPDATE invoices SET escrow_status = $1, dispute_reason = $2 WHERE invoice_id = $3 RETURNING *`;
+            values = [status, dispute_reason, invoice_id];
+        } else { // 'deposited'
             query = `UPDATE invoices SET escrow_status = $1, escrow_tx_hash = $2 WHERE invoice_id = $3 RETURNING *`;
             values = [status, tx_hash, invoice_id];
         }
@@ -88,13 +88,13 @@ router.post('/:invoice_id/status', requireKYC, async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Invoice not found.' });
         }
-        
+        console.log("Query:",query,values)
         const io = req.app.get('io');
         const updatedInvoice = result.rows[0];
         
-        // Notify both parties about the update
         io.to(`user-${updatedInvoice.seller_id}`).emit('invoice-update', updatedInvoice);
         io.to(`user-${updatedInvoice.buyer_id}`).emit('invoice-update', updatedInvoice);
+        console.log(`Emitted invoice-update for invoice ${invoice_id}`);
 
         res.json({ success: true, invoice: updatedInvoice });
     } catch (error) {

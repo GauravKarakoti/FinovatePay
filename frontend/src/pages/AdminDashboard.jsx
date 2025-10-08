@@ -6,7 +6,7 @@ import {
     unfreezeAccount,
     updateUserRole,
     checkCompliance,
-    resolveDispute // Import the new function
+    resolveDispute
 } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
@@ -27,7 +27,7 @@ const AdminDashboard = ({ activeTab }) => {
     try {
       await resolveDispute(invoiceId, sellerWins);
       toast.success('Dispute resolved successfully');
-      loadData(); // Reload data to reflect the change
+      loadData(); 
     } catch (error) {
       console.error('Failed to resolve dispute:', error);
       toast.error('Failed to resolve dispute.');
@@ -42,7 +42,6 @@ const AdminDashboard = ({ activeTab }) => {
     try {
         const usersData = await getUsers();
         const invoicesData = await getInvoices();
-        // FIX: Access the nested .data property
         setUsers(Array.isArray(usersData.data.data) ? usersData.data.data : []);
         setInvoices(Array.isArray(invoicesData.data.data) ? invoicesData.data.data : []);
     } catch (error) {
@@ -94,12 +93,10 @@ const AdminDashboard = ({ activeTab }) => {
       inv => ['deposited', 'shipped'].includes(inv.escrow_status)
   ).length;
 
-  // 2. Calculate the number of disputed invoices
   const disputedInvoicesCount = invoices.filter(
       inv => inv.escrow_status === 'disputed'
   ).length;
 
-  // 3. Update the stats array to use the dynamic values
   const stats = [
       { title: 'Total Users', value: String(users.length), change: 5, icon: '👥', color: 'blue' },
       { title: 'Total Invoices', value: String(invoices.length), change: 12, icon: '📝', color: 'green' },
@@ -107,7 +104,6 @@ const AdminDashboard = ({ activeTab }) => {
       { title: 'Disputes', value: String(disputedInvoicesCount), change: 0, icon: '⚖️', color: 'orange' },
   ];
 
-  // FIX: Create a function to render content based on the active tab
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -220,8 +216,8 @@ const AdminDashboard = ({ activeTab }) => {
                           <td className="border px-4 py-2">{invoice.amount}</td>
                           <td className="border px-4 py-2">{invoice.dispute_reason}</td>
                           <td className="border px-4 py-2">
-                            <button onClick={() => handleResolveDispute(invoice.invoice_id, true)} className="bg-green-500 text-white px-2 py-1 rounded mr-1">Seller Wins</button>
-                            <button onClick={() => handleResolveDispute(invoice.invoice_id, false)} className="bg-red-500 text-white px-2 py-1 rounded">Buyer Wins</button>
+                            <button onClick={() => handleResolveDispute(invoice.invoice_id, true)} className="bg-green-500 text-white px-2 py-1 rounded mr-1">Legit Seller</button>
+                            <button onClick={() => handleResolveDispute(invoice.invoice_id, false)} className="bg-red-500 text-white px-2 py-1 rounded">Legit Buyer</button>
                           </td>
                         </tr>
                       ))}
@@ -233,7 +229,6 @@ const AdminDashboard = ({ activeTab }) => {
           </div>
         );
 
-      // Add placeholder cases for other tabs from the sidebar
       case 'payments':
       case 'escrow':
         return (
@@ -251,7 +246,6 @@ const AdminDashboard = ({ activeTab }) => {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
-      {/* FIX: Call the new render function */}
       {renderTabContent()}
     </div>
   );

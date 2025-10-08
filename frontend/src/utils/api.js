@@ -157,9 +157,9 @@ export const updateUserRole = (userId, role) => {
   return api.put(`/admin/users/${userId}/role`, { role });
 };
 
-export const updateInvoiceStatus = (invoiceId, status, tx_hash) => {
+export const updateInvoiceStatus = (invoiceId, status, tx_hash, dispute_reason = '') => {
     // Note: The second argument is the status, e.g., 'deposited' or 'released'
-    return api.post(`/invoices/${invoiceId}/status`, { status, tx_hash });
+    return api.post(`/invoices/${invoiceId}/status`, { status, tx_hash, dispute_reason });
 };
 
 export const resolveDispute = async (invoiceId, sellerWins) => {
