@@ -9,16 +9,17 @@ class User {
       companyName,
       taxId,
       firstName,
-      lastName
+      lastName,
+      role // <-- Added role
     } = userData;
 
     const query = `
       INSERT INTO users (
         email, password_hash, wallet_address, company_name, 
-        tax_id, first_name, last_name
+        tax_id, first_name, last_name, role
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, email, wallet_address, company_name, created_at
+      VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'seller'))
+      RETURNING id, email, wallet_address, company_name, role, created_at
     `;
 
     const values = [
@@ -28,7 +29,8 @@ class User {
       companyName,
       taxId,
       firstName,
-      lastName
+      lastName,
+      role // <-- Added role
     ];
 
     const result = await pool.query(query, values);

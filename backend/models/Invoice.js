@@ -15,12 +15,16 @@ class Invoice {
       lot_id // <-- Added lot_id
     } = invoiceData;
 
+    // Default financing status to 'none'
+    const financing_status = invoiceData.financing_status || 'none';
+
     const query = `
       INSERT INTO invoices (
         invoice_id, invoice_hash, seller_address, buyer_address, 
-        amount, currency, due_date, description, items, lot_id
+        amount, currency, due_date, description, items, lot_id,
+        financing_status
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
 
@@ -34,10 +38,27 @@ class Invoice {
       dueDate,
       description,
       JSON.stringify(items),
-      lot_id // <-- Added lot_id
+      lot_id, // <-- Added lot_id
+      financing_status // <-- Added financing_status
     ];
 
     const result = await pool.query(query, values);
+
+    return result.rows[0];
+  }
+  
+  // Method to update tokenization status
+  static async updateTokenizationStatus(invoiceId, tokenId, financingStatus) {
+    const query = `
+      UPDATE invoices 
+      SET 
+        is_tokenized = TRUE, 
+        token_id = $1, 
+        financing_status = $2
+      WHERE invoice_id = $3
+      RETURNING *
+    `;
+    const result = await pool.query(query, [tokenId, financingStatus, invoiceId]);
     return result.rows[0];
   }
 

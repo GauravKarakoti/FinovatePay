@@ -11,6 +11,11 @@ const Sidebar = ({ activeTab, onTabChange, user, stats }) => {
   ];
   const displayStats = stats || { totalInvoices: 0, activeEscrows: 0, completed: 0 };
 
+  // Add Financing tab for relevant roles
+  if (user?.role === 'seller' || user?.role === 'investor' || user?.role === 'admin') {
+    tabs.push({ id: 'financing', label: 'Financing', icon: '💸' });
+  }
+
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
   }

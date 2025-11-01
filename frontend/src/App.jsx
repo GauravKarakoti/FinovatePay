@@ -12,9 +12,10 @@ import { connectWallet } from './utils/web3';
 import Web3Modal from 'web3modal';
 import './App.css';
 import { Toaster } from 'sonner';
-// 1. Import the chatbot component
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
+// 1. Import the new InvestorDashboard
+import InvestorDashboard from './pages/InvestorDashboard';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -66,7 +67,9 @@ function App() {
   };
   
   const handleToggleRole = (role) => {
-    if (!user || user.role === 'admin') return;
+    // Allow admin to toggle to any role for testing, but not other users
+    if (!user) return;
+    if (user.role !== 'admin' && (role === 'admin' || user.role === 'admin')) return;
 
     const updatedUser = { ...user, role: role };
     
@@ -120,6 +123,9 @@ function App() {
                             <Navigate to="/buyer" />
                         ) : user.role === 'shipment' || user.role === 'warehouse' ? (
                             <Navigate to="/shipment" />
+                        // 2. Add redirect for 'investor' role
+                        ) : user.role === 'investor' ? (
+                            <Navigate to="/investor" />
                         ) : (
                             renderDashboard(<SellerDashboard activeTab={activeTab} />)
                         )
@@ -136,8 +142,17 @@ function App() {
                         : <Navigate to="/" />
                 }
             />
+            {/* 3. Add new route for Investor Dashboard */}
             <Route 
-              path="/admin" 
+                path="/investor" 
+                element={
+                    user && user.role === 'investor' 
+                        ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
+                        : <Navigate to="/" />
+                }
+            />
+            <Route 
+              path="/admin"
               element={
                 user && user.role === 'admin' ? renderDashboard(<AdminDashboard activeTab={activeTab} />) : <Navigate to="/" />
               } 

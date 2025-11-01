@@ -67,12 +67,23 @@ app.use('/api/market', require('./routes/market'));
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
 
+// --- V2 FINANCING ROUTES ---
+// NOTE: You will need to create 'routes/financing.js' and 'routes/investor.js'
+app.use('/api/financing', require('./routes/financing'));
+app.use('/api/investor', require('./routes/investor'));
+
+
 // Socket.io, error handlers, and server.listen call
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
   
   socket.on('join-invoice', (invoiceId) => {
     socket.join(`invoice-${invoiceId}`);
+  });
+
+  // Room for investors to receive marketplace updates
+  socket.on('join-marketplace', () => {
+    socket.join('marketplace');
   });
   
   socket.on('disconnect', () => {
