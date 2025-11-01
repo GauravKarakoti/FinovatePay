@@ -19,6 +19,12 @@ if (typeof window !== 'undefined') {
     });
 }
 
+export const stablecoinAddresses = {
+    "USDC": "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582",
+    "EURC": "0x1aBaEA1f7C830bD89Acc67Ec4af516284b1BC33c",
+    "BRLC": "0x6DEf515A0419D4613c7A3950796339A4405d4191" // Example for Latam
+};
+
 export async function connectWallet() {
     provider = await web3Modal.connect();
     const web3Provider = new ethers.providers.Web3Provider(provider);
@@ -57,7 +63,9 @@ export async function getProduceTrackingContract() {
 
 // Mock ERC20 Token ABI (only need 'approve' function for this)
 export const erc20ABI = [
-    "function approve(address spender, uint256 amount) public returns (bool)"
+    "function approve(address spender, uint256 amount) public returns (bool)",
+    "function symbol() view returns (string)",
+    "function decimals() view returns (uint8)"
 ];
 
 

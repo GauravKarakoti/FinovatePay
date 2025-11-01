@@ -49,3 +49,13 @@ FinovatePay is a hybrid payment rail for B2B payments that combines off-chain UX
 - Database: Managed PostgreSQL (AWS RDS, Google Cloud SQL)
 - Blockchain: Polygon/Mumbai testnet initially, then mainnet
 - Storage: IPFS cluster or S3-compatible storage
+
+---
+
+## Phase 2: Scaling with Polygon CDK
+
+To evolve from "Launch to Fundraising," our long-term architecture will leverage the full Polygon stack for mass adoption.
+
+-   **Polygon CDK:** FinovatePay will be migrated to its own purpose-built L2, created with the Polygon CDK. This provides granular control over gas fees (e.g., enabling gasless transactions for merchants) and allows for chain-level compliance features.
+-   **Polygon AggLayer:** Our CDK chain will be connected to the AggLayer, ensuring unified liquidity and composability with other chains in the Polygon ecosystem (including Polygon PoS, zkEVM, and other L1s/L2s).
+-   **Katana Liquidity:** We will integrate with Katana via the **WaltBridge**. This allows our RWA-backed invoice financing to tap into Katana's deep DeFi liquidity, providing instant, low-slippage financing for our users.

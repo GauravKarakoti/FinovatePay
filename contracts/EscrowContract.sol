@@ -10,13 +10,17 @@ contract EscrowContract is ReentrancyGuard {
         address seller;
         address buyer;
         uint256 amount;
-        address token;
+        address token; // The ERC20 payment token
         bool sellerConfirmed;
         bool buyerConfirmed;
         bool disputeRaised;
         address disputeResolver;
         uint256 createdAt;
         uint256 expiresAt;
+        
+        // --- NEW: RWA Collateral Link ---
+        address rwaNftContract; // Address of the ProduceTracking contract
+        uint256 rwaTokenId;     // The tokenId of the produce lot
     }
     
     mapping(bytes32 => Escrow) public escrows;
@@ -52,10 +56,14 @@ contract EscrowContract is ReentrancyGuard {
         address _buyer,
         uint256 _amount,
         address _token,
-        uint256 _duration
+        uint256 _duration,
+        // --- NEW: RWA Parameters ---
+        address _rwaNftContract,
+        uint256 _rwaTokenId
     ) external onlyAdmin returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
-        
+
+        // --- NEW: Add RWA fields to struct creation ---
         escrows[_invoiceId] = Escrow({
             seller: _seller,
             buyer: _buyer,
@@ -66,7 +74,9 @@ contract EscrowContract is ReentrancyGuard {
             disputeRaised: false,
             disputeResolver: address(0),
             createdAt: block.timestamp,
-            expiresAt: block.timestamp + _duration
+            expiresAt: block.timestamp + _duration,
+            rwaNftContract: _rwaNftContract,
+            rwaTokenId: _rwaTokenId
         });
         
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);

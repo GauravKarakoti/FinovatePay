@@ -1,4 +1,44 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
+import { erc20ABI } from '../../utils/web3'; // Import the updated ABI
+
+// A helper to get the symbol if it's an address
+const useTokenSymbol = (tokenAddress) => {
+    const [symbol, setSymbol] = useState(tokenAddress);
+
+    useEffect(() => {
+        if (ethers.utils.isAddress(tokenAddress)) {
+            const fetchSymbol = async () => {
+                try {
+                    // Use a generic provider for read-only calls
+                    const provider = new ethers.providers.JsonRpcProvider(process.env.REACT_APP_POLYGON_RPC_URL); 
+                    const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
+                    const tokenSymbol = await tokenContract.symbol();
+                    setSymbol(tokenSymbol);
+                } catch (err) {
+                    console.error("Error fetching token symbol:", err);
+                    setSymbol("UNKNOWN");
+                }
+            };
+            fetchSymbol();
+        } else {
+            setSymbol(tokenAddress); // It's already a symbol like 'MATIC'
+        }
+    }, [tokenAddress]);
+
+    return symbol;
+};
+
+// New component to display amount with symbol
+const TokenAmount = ({ amount, tokenAddress }) => {
+    const symbol = useTokenSymbol(tokenAddress);
+    return (
+        <span>
+            {parseFloat(amount).toFixed(2)} <strong>{symbol}</strong>
+        </span>
+    );
+};
+
 
 const BuyerQuotationApproval = ({ quotations, onApprove }) => {
     return (
@@ -7,7 +47,16 @@ const BuyerQuotationApproval = ({ quotations, onApprove }) => {
             {quotations.map(quotation => (
                 <div key={quotation.id} className="border-b border-gray-200 py-4">
                     <p><strong>Description:</strong> {quotation.description}</p>
-                    <p><strong>Amount:</strong> ${parseFloat(quotation.total_amount).toFixed(2)}</p>
+                    
+                    {/* --- UPDATED: Use the new TokenAmount component --- */}
+                    <p><strong>Amount:</strong> 
+                        <TokenAmount 
+                            amount={quotation.total_amount} 
+                            tokenAddress={quotation.token_address} // <-- Assumes your API now returns this
+                        />
+                    </p>
+                    {/* --- End of update --- */}
+
                     <p><strong>Seller:</strong> {quotation.seller_address}</p>
                     <button
                         onClick={() => onApprove(quotation.id)}

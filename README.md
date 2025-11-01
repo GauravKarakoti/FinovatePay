@@ -35,6 +35,22 @@ It enables instant stablecoin payments, automated escrow, and tokenized invoice 
 
 ---
 
+## 🚀 Polygon Buildathon: From Launch to Fundraising
+
+Our project is designed to evolve with Polygon's "Launch to Fundraising" theme.
+
+**Phase 1: Launch (Current Implementation)**
+We have built a robust B2B trade finance platform on **Polygon PoS**. It solves critical cash flow problems for merchants using RWA-backed invoice financing and secure escrow payments, demonstrating immediate product-market fit.
+
+**Phase 2: Scale (Our Vision)**
+To achieve mass adoption, FinovatePay will evolve into a dedicated L2 for global trade, built using the **Polygon CDK**.
+
+1.  **Dedicated Chain:** As a CDK chain, we can handle millions of invoices, offer gasless transactions for merchants, and build custom compliance modules directly into the chain logic.
+2.  **AggLayer Integration:** Our CDK chain will connect to the **AggLayer**, making our platform's assets (like tokenized invoices) composable across the entire Polygon ecosystem.
+3.  **Deep Liquidity with Katana:** We will connect our chain to **Katana** via the **WaltBridge**. This allows sellers on our platform to instantly finance their fractionalized RWA invoices by tapping into Katana's deep, productive liquidity pools. This solves the #1 problem for B2B merchants: **access to capital**.
+
+---
+
 ## 🔐 Smart Contracts
 
 - `🧾 InvoiceRegistry`: Registers invoice hash, metadata, and emits events
