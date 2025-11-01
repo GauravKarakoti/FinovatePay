@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Groq = require('groq-sdk');
+const Invoice = require('../models/Invoice'); // <-- ADDED
+const pool = require('../config/database');   // <-- ADDED
 
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
@@ -47,27 +49,44 @@ const tools = [
 
 // --- NEW: Tool-calling logic ---
 const availableTools = {
+    // --- UPDATED: Real implementation ---
     "get_invoice_status": async ({ invoiceId }) => {
-        // This is a mock. You'd call your actual controller/service.
-        // const status = await invoiceController.getStatus(invoiceId);
-        // For this example, we'll mock the data.
-        console.log(`[AI Tool] Called get_invoice_status for: ${invoiceId}`);
-        const mockStatus = {
-            "INV-001": "Deposited",
-            "INV-002": "Unpaid"
-        };
-        return JSON.stringify({ status: mockStatus[invoiceId] || "Not Found" });
+        try {
+            console.log(`[AI Tool] Called get_invoice_status for: ${invoiceId}`);
+            const invoice = await Invoice.findById(invoiceId); //
+            
+            if (!invoice) {
+                return JSON.stringify({ status: "Not Found" });
+            }
+            
+            // Return the actual escrow_status from the database
+            return JSON.stringify({ status: invoice.escrow_status });
+
+        } catch (error) {
+            console.error(`[AI Tool Error] get_invoice_status:`, error.message);
+            return JSON.stringify({ error: "Failed to retrieve invoice status." });
+        }
     },
+    // --- UPDATED: Real implementation ---
     "get_shipment_location": async ({ lotId }) => {
-        // This is a mock. You'd call your produceController.
-        // const history = await produceController.getLocationHistory(lotId);
-        // const latestLocation = history[history.length - 1];
-        console.log(`[AI Tool] Called get_shipment_location for: ${lotId}`);
-        const mockLocation = {
-            "LOT-100": "In Transit - Port of Singapore",
-            "LOT-101": "Delivered"
-        };
-        return JSON.stringify({ location: mockLocation[lotId] || "At Origin" });
+        try {
+            console.log(`[AI Tool] Called get_shipment_location for: ${lotId}`);
+            // Query the database for the produce lot's origin
+            // Based on produceController.js, 'origin' is a field.
+            const query = 'SELECT origin FROM produce_lots WHERE lot_id = $1';
+            const result = await pool.query(query, [lotId]);
+
+            if (result.rows.length === 0) {
+                return JSON.stringify({ location: "Lot Not Found" });
+            }
+
+            // Return the 'origin' as the location
+            return JSON.stringify({ location: result.rows[0].origin });
+            
+        } catch (error) {
+            console.error(`[AI Tool Error] get_shipment_location:`, error.message);
+            return JSON.stringify({ error: "Failed to retrieve shipment location." });
+        }
     },
 };
 
