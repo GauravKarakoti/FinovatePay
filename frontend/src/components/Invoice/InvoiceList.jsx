@@ -23,6 +23,18 @@ const InvoiceList = ({
         return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
     };
 
+    const copyToClipboard = (textToCopy, e) => {
+        e.stopPropagation(); // Prevent the row's onClick from firing
+        navigator.clipboard.writeText(textToCopy)
+            .then(() => {
+                alert(`Copied to clipboard: ${textToCopy}`);
+            })
+            .catch(err => {
+                console.error('Failed to copy text: ', err);
+                alert('Failed to copy.');
+            });
+    };
+
     const getStatusChip = (status) => {
         const baseClasses = "px-2 py-1 text-xs font-semibold rounded-full";
         switch (status) {
@@ -51,7 +63,13 @@ const InvoiceList = ({
                     <tbody className="bg-white divide-y divide-gray-200">
                         {invoices.map((invoice) => (
                             <tr key={invoice.invoice_id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onSelectInvoice(invoice)}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#{formatAddress(invoice.invoice_id)}</td>
+                                <td 
+                                    className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 hover:text-blue-600 hover:underline"
+                                    onClick={(e) => copyToClipboard(invoice.invoice_id, e)}
+                                    title="Click to copy full ID"
+                                >
+                                    #{formatAddress(invoice.invoice_id)}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{invoice.description}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                                     <AmountDisplay maticAmount={invoice.amount} />

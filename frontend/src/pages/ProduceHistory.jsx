@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { getProduceLot } from '../utils/api';
-import { ethers } from 'ethers';
 
 const ProduceHistory = () => {
   const { lotId } = useParams();
@@ -9,6 +8,17 @@ const ProduceHistory = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const copyToClipboard = (textToCopy) => {
+    navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+            alert(`Copied to clipboard: ${textToCopy}`);
+        })
+        .catch(err => {
+            console.error('Failed to copy text: ', err);
+            alert('Failed to copy.');
+        });
+  };
 
   useEffect(() => {
     const fetchProduceHistory = async () => {
@@ -59,7 +69,16 @@ const ProduceHistory = () => {
   return (
     <div className="container mx-auto p-4 md:p-8">
       <div className="bg-white rounded-lg shadow-xl p-6 mb-8">
-        <h1 className="text-3xl font-bold mb-4">Produce History for Lot #{lot.lot_id}</h1>
+        <h1 className="text-3xl font-bold mb-4">
+          Produce History for Lot 
+          <span
+            className="text-blue-600 cursor-pointer hover:underline ml-2"
+            onClick={() => copyToClipboard(lot.lot_id)}
+            title="Click to copy Lot ID"
+          >
+            #{lot.lot_id}
+          </span>
+        </h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <p><strong>Produce Type:</strong> {lot.produce_type}</p>
