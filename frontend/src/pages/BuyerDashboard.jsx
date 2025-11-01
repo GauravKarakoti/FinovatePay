@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import {
     getBuyerInvoices,
@@ -19,7 +19,7 @@ import InvoiceContractABI from '../../../deployed/Invoice.json';
 import { generateTimelineEvents } from '../utils/timeline';
 import { toast } from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
-import BuyerApprovalList from '../components/Quotation/BuyerApprovalList'; // <-- Use the new specific component
+import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApproval';
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 
@@ -253,7 +253,8 @@ const BuyerDashboard = ({ activeTab }) => {
                 return (
                     <div>
                         <h2 className="text-2xl font-bold mb-6">Pending Approvals</h2>
-                        <BuyerApprovalList 
+                        {/* Use the BuyerQuotationApproval component */}
+                        <BuyerQuotationApproval 
                             quotations={pendingApprovals} 
                             onApprove={handleApproveQuotation}
                             onReject={handleRejectQuotation}

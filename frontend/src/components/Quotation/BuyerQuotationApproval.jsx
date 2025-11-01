@@ -40,7 +40,7 @@ const TokenAmount = ({ amount, tokenAddress }) => {
 };
 
 
-const BuyerQuotationApproval = ({ quotations, onApprove }) => {
+const BuyerQuotationApproval = ({ quotations, onApprove, onReject }) => {
     return (
         <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="text-lg font-semibold mb-4">Pending Quotation Approvals</h3>
@@ -60,10 +60,11 @@ const BuyerQuotationApproval = ({ quotations, onApprove }) => {
                     <p><strong>Seller:</strong> {quotation.seller_address}</p>
                     <button
                         onClick={() => onApprove(quotation.id)}
-                        className="bg-blue-500 text-white px-4 py-2 rounded mt-2"
+                        className="bg-blue-500 hover:bg-blue-900 text-white px-4 py-2 rounded mt-2 font-semibold"
                     >
                         Approve Quotation
                     </button>
+                    <button onClick={() => onReject(quotation.id)} className="bg-red-600 hover:bg-red-900 text-white font-semibold ml-2 px-4 py-2 rounded mt-2">Reject Quotation</button>
                 </div>
             ))}
             {quotations.length === 0 && <p>No pending quotations to approve.</p>}
