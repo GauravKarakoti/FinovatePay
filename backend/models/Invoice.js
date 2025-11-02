@@ -62,6 +62,12 @@ class Invoice {
     return result.rows[0];
   }
 
+  static async findByPk(id) {
+    const query = 'SELECT * FROM invoices WHERE id = $1';
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
+  }
+
   static async findBySeller(sellerAddress) {
     const query = 'SELECT * FROM invoices WHERE seller_address = $1 ORDER BY created_at DESC';
     const result = await pool.query(query, [sellerAddress]);

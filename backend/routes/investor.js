@@ -163,8 +163,7 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
             // .toString() works for both.
             const balance = balances[i].toString(); 
             if (balance !== "0") {
-                // Find the original invoice details from the database
-                const invoice = await Invoice.findById(invoiceIdMap[tokenIds[i]]);
+                const invoice = await Invoice.findByPk(invoiceIdMap[tokenIds[i]]);
                 if (invoice) {
                     portfolio.push({
                         invoice: invoice, // Contains all invoice details (amount, maturity_date, etc.)
