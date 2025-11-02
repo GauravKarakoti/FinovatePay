@@ -38,7 +38,7 @@ router.post('/buy-tokens', authenticateToken, isInvestor, async (req, res) => {
 
     try {
         const invoice = await Invoice.findById(invoiceId);
-        if (!invoice || invoice.financing_status !== 'listed') {
+        if (!invoice || invoice.financing_status !== 'listed' || !invoice.is_tokenized) {
             return res.status(404).json({ msg: 'Invoice not available for investment' });
         }
 
@@ -85,7 +85,7 @@ router.post('/buy-tokens', authenticateToken, isInvestor, async (req, res) => {
         console.log(`Transaction sent. Waiting for confirmation... Tx Hash: ${tx.hash}`);
         const receipt = await tx.wait();
         
-        console.log(`On-chain transfer successful. Tx: ${tx.hash || tx.transactionHash}`);
+        console.log(`On-chain transfer confirmed. Block: ${receipt.blockNumber}`);
 
         // 2. Update database - Create a record in the 'investments' table.
         console.log(`Recording investment: Investor ${investorId} buying ${tokenAmount} tokens for invoice ${invoiceId} (Token ID: ${tokenId})`);
@@ -162,7 +162,7 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
             // Note: Balances from ethers.js are BigNumbers, web3.js returns strings.
             // .toString() works for both.
             const balance = balances[i].toString(); 
-            if (balance > 0) {
+            if (balance !== "0") {
                 // Find the original invoice details from the database
                 const invoice = await Invoice.findById(invoiceIdMap[tokenIds[i]]);
                 if (invoice) {
