@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const Invoice = require('../models/Invoice');
+const pool = require('../config/database'); // Added for portfolio query
+const { web3, fractionToken, fractionTokenAddress, FractionTokenABI } = require('../config/blockchain'); // Assumed imports for Web3 logic
 
 // Middleware to check for 'investor' role
 const isInvestor = (req, res, next) => {
@@ -19,7 +21,8 @@ const isInvestor = (req, res, next) => {
 // @access  Private (Investor)
 router.post('/buy-tokens', authenticateToken, isInvestor, async (req, res) => {
     const { invoiceId, amountToInvest } = req.body;
-    const investorWallet = req.user.walletAddress;
+    // FIX: Get walletAddress from req.user (based on auth.js and isInvestor middleware)
+    const investorWallet = req.user.wallet_address; 
 
     try {
         const invoice = await Invoice.findById(invoiceId);
@@ -81,14 +84,20 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
         // to see which token IDs this investor (req.user.walletAddress) owns
         // and in what quantity.
 
-        /*
-        const web3 = require('../config/blockchain');
-        const fractionToken = new web3.eth.Contract(FractionTokenABI, fractionTokenAddress);
-        
         // You'd need a list of all possible token IDs (from the 'invoices' table)
-        const tokenIdsResult = await pool.query("SELECT token_id FROM invoices WHERE is_tokenized = TRUE");
+        const tokenIdsResult = await pool.query("SELECT token_id, id FROM invoices WHERE is_tokenized = TRUE AND token_id IS NOT NULL");
+        
+        if (tokenIdsResult.rows.length === 0) {
+            return res.json([]); // No tokenized invoices exist yet
+        }
+
         const tokenIds = tokenIdsResult.rows.map(r => r.token_id);
-        const investorWallet = req.user.walletAddress;
+        const invoiceIdMap = tokenIdsResult.rows.reduce((map, obj) => {
+            map[obj.token_id] = obj.id;
+            return map;
+        }, {});
+
+        const investorWallet = req.user.wallet_address;
 
         // Create an array of wallet addresses, one for each token ID
         const wallets = Array(tokenIds.length).fill(investorWallet);
@@ -98,26 +107,21 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
 
         const portfolio = [];
         for (let i = 0; i < tokenIds.length; i++) {
-            if (balances[i] > 0) {
-                const invoice = await Invoice.findOne({ where: { token_id: tokenIds[i] } });
-                portfolio.push({
-                    invoice: invoice,
-                    tokensOwned: balances[i],
-                    tokenId: tokenIds[i]
-                });
+            const balance = balances[i].toString(); // Balances are often returned as strings or BigNumbers
+            if (balance > 0) {
+                // Find the original invoice details from the database
+                const invoice = await Invoice.findById(invoiceIdMap[tokenIds[i]]);
+                if (invoice) {
+                    portfolio.push({
+                        invoice: invoice, // Contains all invoice details (amount, maturity_date, etc.)
+                        tokens_owned: balance,
+                        token_id: tokenIds[i]
+                    });
+                }
             }
         }
         res.json(portfolio);
-        */
-
-        // --- MOCKUP for testing ---
-        const mockPortfolio = [
-            { invoice_id: 'mock-inv-123', token_id: 1, amount: 1000, face_value: 1000, maturity_date: '2025-12-01', tokens_owned: 250, status: 'listed' },
-            { invoice_id: 'mock-inv-456', token_id: 2, amount: 5000, face_value: 5000, maturity_date: '2026-01-15', tokens_owned: 1000, status: 'listed' }
-        ];
-        res.json(mockPortfolio);
-        // --- End Mockup ---
-
+        
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
@@ -129,15 +133,18 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
 // @access  Private (Investor)
 router.post('/redeem-tokens', authenticateToken, isInvestor, async (req, res) => {
     const { tokenId, amount } = req.body;
-    const investorWallet = req.user.walletAddress;
+    const investorWallet = req.user.wallet_address; // Corrected from walletAddress
 
     try {
         // 1. --- WEB3 INTERACTION ---
         // Call the 'redeem' function on FractionToken.sol
         
-        /*
-        const web3 = require('../config/blockchain');
-        const fractionToken = new web3.eth.Contract(FractionTokenABI, fractionTokenAddress);
+        // Ensure contract instance is ready
+        if (!fractionToken) {
+            return res.status(500).json({ msg: 'Blockchain service not initialized' });
+        }
+
+        console.log(`Attempting redeem: Investor ${investorWallet} redeeming ${amount} tokens of Token ID ${tokenId}`);
 
         const gas = await fractionToken.methods.redeem(tokenId, amount)
             .estimateGas({ from: investorWallet });
@@ -145,24 +152,34 @@ router.post('/redeem-tokens', authenticateToken, isInvestor, async (req, res) =>
         const tx = await fractionToken.methods.redeem(tokenId, amount)
             .send({ from: investorWallet, gas });
         
+        // Get redemption value from the event emitted by the contract
         const redemptionValue = tx.events.Redeemed.returnValues.amount;
-        */
-
-        // --- MOCKUP for testing ---
-        console.log(`Simulating redeem: Investor ${investorWallet} redeeming ${amount} tokens of Token ID ${tokenId}`);
-        const MOCK_REDEMPTION_VALUE = amount; // In a real scenario, this is (amount * faceValue) / totalSupply
-        // --- End Mockup ---
-
+        
         // 2. Update database (e.g., update the 'investments' table)
-        // ...
+        // This step is crucial for tracking.
+        // e.g., UPDATE investments SET amount = amount - ${amount} WHERE user_id = ${req.user.id} AND token_id = ${tokenId}
+        // e.g., INSERT INTO redemptions (user_id, token_id, redeemed_amount, paid_amount) ...
+        console.log(`Redemption successful. Tx: ${tx.transactionHash}. Value: ${redemptionValue}`);
+
 
         res.json({ 
-            msg: 'Tokens redeemed successfully (simulation)', 
-            redeemed_value: MOCK_REDEMPTION_VALUE 
+            msg: 'Tokens redeemed successfully', 
+            redeemed_value: redemptionValue,
+            txHash: tx.transactionHash
         });
 
     } catch (err) {
         console.error(err.message);
+        // Handle common contract errors
+        if (err.message.includes("Invoice not matured")) {
+            return res.status(400).json({ msg: 'Redemption failed: Invoice has not matured yet.' });
+        }
+        if (err.message.includes("Not enough tokens")) {
+            return res.status(400).json({ msg: 'Redemption failed: Insufficient token balance.' });
+        }
+        if (err.message.includes("reverted")) {
+             return res.status(400).json({ msg: 'Transaction failed. Check contract conditions (e.g., maturity, funds).' });
+        }
         res.status(500).send('Server Error');
     }
 });

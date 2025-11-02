@@ -6,6 +6,7 @@ const Invoice = require('../models/Invoice');
 const User = require('../models/User');
 const pool = require('../config/database');
 const { emitToMarketplace } = require('../socket');
+const { web3, fractionToken, fractionTokenAddress, FractionTokenABI } = require('../config/blockchain'); // Assumed imports for Web3 logic
 
 // @route   POST /api/financing/tokenize
 // @desc    Seller requests to tokenize a verified invoice
@@ -48,40 +49,48 @@ router.post('/tokenize', authenticateToken, async (req, res) => {
         const totalSupply = faceValue; 
         const issuerAddress = seller.wallet_address;
         
-        /*
-        const web3 = require('../config/blockchain'); // Assume web3 is configured
-        const fractionToken = new web3.eth.Contract(FractionTokenABI, fractionTokenAddress);
+        // Convert JS date to Unix timestamp (seconds) for Solidity
+        const maturityTimestamp = Math.floor(new Date(maturityDate).getTime() / 1000);
+
+        // Ensure contract instance is ready
+        if (!fractionToken) {
+            return res.status(500).json({ msg: 'Blockchain service not initialized' });
+        }
         
         // The backend admin/owner account calls the contract
+        const adminWallet = process.env.ADMIN_WALLET_ADDRESS;
+        if (!adminWallet) {
+            return res.status(500).json({ msg: 'Admin wallet not configured for tokenization' });
+        }
+
+        console.log(`Tokenizing invoice ${invoice.id} (Hash: ${invoice.invoice_hash})`);
+        
         const gas = await fractionToken.methods.tokenizeInvoice(
             invoice.invoice_hash, // Using invoice_hash as bytes32 ID
             totalSupply,
             faceValue,
-            maturityDate,
+            maturityTimestamp, // Pass timestamp
             issuerAddress
-        ).estimateGas({ from: process.env.ADMIN_WALLET_ADDRESS });
+        ).estimateGas({ from: adminWallet });
 
         const tx = await fractionToken.methods.tokenizeInvoice(
             invoice.invoice_hash,
             totalSupply,
             faceValue,
-            maturityDate,
+            maturityTimestamp,
             issuerAddress
-        ).send({ from: process.env.ADMIN_WALLET_ADDRESS, gas });
+        ).send({ from: adminWallet, gas });
 
+        // Get the new tokenId from the event
         const tokenId = tx.events.Tokenized.returnValues.tokenId;
-        */
         
-        // --- MOCKUP for testing without live contract ---
-        console.log(`Simulating tokenization for invoice ${invoiceId}`);
-        const MOCK_TOKEN_ID = Math.floor(Math.random() * 1000) + 1;
-        // --- End Mockup ---
+        console.log(`Tokenization successful. Token ID: ${tokenId}, Tx: ${tx.transactionHash}`);
 
         // 4. Update database with tokenization details
         const financingStatus = 'listed'; // 'listed' means it's on the marketplace
         const updatedInvoice = await Invoice.updateTokenizationStatus(
             invoiceId, 
-            MOCK_TOKEN_ID, // Use `tokenId` from the tx receipt in production
+            tokenId, // Use `tokenId` from the tx receipt
             financingStatus
         );
 
@@ -93,6 +102,9 @@ router.post('/tokenize', authenticateToken, async (req, res) => {
 
     } catch (err) {
         console.error(err.message);
+         if (err.message.includes("reverted")) {
+             return res.status(400).json({ msg: 'Transaction failed. Check contract conditions (e.g., unique hash).' });
+        }
         res.status(500).send('Server Error');
     }
 });
@@ -124,14 +136,17 @@ router.get('/:invoiceId', authenticateToken, async (req, res) => {
             return res.status(404).json({ msg: 'Tokenized invoice not found' });
         }
         
-        // TODO: In a real app, you would also fetch on-chain data
-        // e.g., remainingSupply from FractionToken.sol
-        // const remainingSupply = await fractionToken.methods.tokenDetails(invoice.token_id).call();
+        // Fetch on-chain data for remaining supply
+        let remaining_supply = 0;
+        if (fractionToken && invoice.token_id) {
+            // We need to know the seller's (issuer's) balance of their own token
+            const sellerBalance = await fractionToken.methods.balanceOf(invoice.seller_address, invoice.token_id).call();
+            remaining_supply = sellerBalance.toString();
+        }
 
         res.json({
             ...invoice,
-            // mock remaining supply
-            remaining_supply: Math.floor(Math.random() * invoice.amount) 
+            remaining_supply: remaining_supply 
         });
     } catch (err) {
         console.error(err.message);
