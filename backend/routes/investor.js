@@ -81,6 +81,9 @@ router.post('/buy-tokens', authenticateToken, isInvestor, async (req, res) => {
             tokenAmount,     // amount (NOW A WHOLE NUMBER STRING)
             "0x"             // data (empty)
         );
+
+        console.log(`Transaction sent. Waiting for confirmation... Tx Hash: ${tx.hash}`);
+        const receipt = await tx.wait();
         
         console.log(`On-chain transfer successful. Tx: ${tx.hash || tx.transactionHash}`);
 
