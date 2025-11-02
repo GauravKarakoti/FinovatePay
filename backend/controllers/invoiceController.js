@@ -55,9 +55,9 @@ exports.createInvoice = async (req, res) => {
                 invoice_id, invoice_hash, seller_address, buyer_address,
                 amount, due_date, description, items, currency,
                 contract_address, token_address, lot_id, quotation_id, escrow_status,
-                financing_status // <-- ADD THIS COLUMN
+                financing_status
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none') // <-- ADD THE DEFAULT VALUE
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none')
             RETURNING *
         `;
         const values = [

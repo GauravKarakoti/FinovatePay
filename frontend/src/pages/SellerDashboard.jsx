@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
 import { 
     getSellerInvoices, createInvoice, updateInvoiceStatus,
     getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
-    createProduceLot as syncProduceLot // Renamed for clarity
+    createProduceLot as syncProduceLot , api
 } from '../utils/api';
 import { connectWallet, getInvoiceFactoryContract, getProduceTrackingContract } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
@@ -21,6 +21,8 @@ import CreateProduceLot from '../components/Produce/CreateProduceLot';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import QuotationList from '../components/Dashboard/QuotationList';
 import CreateQuotation from '../components/Quotation/CreateQuotation';
+import FinancingTab from '../components/Financing/FinancingTab'; // Adjust path as needed
+import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
 
 const uuidToBytes32 = (uuid) => {
     return ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
@@ -44,6 +46,7 @@ const SellerDashboard = ({ activeTab }) => {
   const [showCreateQuotation, setShowCreateQuotation] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
+  const [invoiceToTokenize, setInvoiceToTokenize] = useState(null);
 
   const loadProduceLots = async () => {
     try {
@@ -95,6 +98,32 @@ const SellerDashboard = ({ activeTab }) => {
       } catch (error) {
           toast.error("Failed to approve quotation.");
       }
+  };
+
+  const handleTokenizeInvoice = async (invoiceId, { faceValue, maturityDate }) => {
+    setIsSubmitting(true);
+    
+    const promise = api.post('/financing/tokenize', {
+        invoiceId,
+        faceValue,
+        maturityDate
+    });
+
+    try {
+        await toast.promise(promise, {
+            loading: "Tokenizing invoice on the blockchain...",
+            success: (response) => {
+                loadInitialData(); // Reload all data
+                setInvoiceToTokenize(null); // Close modal
+                return `Invoice tokenized! Token ID: ${response.data.token_id}`;
+            },
+            error: (err) => `Tokenization failed: ${err.response?.data?.msg || err.message}`
+        });
+    } catch (error) {
+        console.error('Failed to tokenize invoice:', error);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const handleRejectQuotation = async (quotationId) => {
@@ -159,6 +188,7 @@ const SellerDashboard = ({ activeTab }) => {
         bytes32InvoiceId, invoiceHash, quotation.buyer_address,
         amountInWei, dueDateTimestamp, tokenAddress
       );
+      console.log("Transaction sent:", tx);
   
       const receipt = await tx.wait();
       const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
@@ -530,6 +560,14 @@ const SellerDashboard = ({ activeTab }) => {
                 )}
             </div>
         );
+
+      case 'financing':
+        return (
+            <FinancingTab
+                invoices={invoices}
+                onTokenizeClick={(invoice) => setInvoiceToTokenize(invoice)}
+            />
+        );
       
       default:
         return (
@@ -552,6 +590,15 @@ const SellerDashboard = ({ activeTab }) => {
         />
       ) : (
         renderTabContent()
+      )}
+
+      {invoiceToTokenize && (
+        <TokenizeInvoiceModal
+            invoice={invoiceToTokenize}
+            onClose={() => setInvoiceToTokenize(null)}
+            onSubmit={handleTokenizeInvoice}
+            isSubmitting={isSubmitting}
+        />
       )}
 
       {showQRCode && selectedLot && (

@@ -30,12 +30,12 @@ router.post('/tokenize', authenticateToken, async (req, res) => {
             return res.status(401).json({ msg: 'User not authorized to tokenize this invoice' });
         }
 
-        // 2. Check for KYC and invoice status (e.g., must be 'approved' or 'funded_in_escrow')
+        // 2. Check for KYC and invoice status (e.g., must be 'approved' or 'deposited_in_escrow')
         if (seller.kyc_status !== 'verified') {
              return res.status(400).json({ msg: 'Seller must be KYC verified to tokenize' });
         }
-        if (invoice.escrow_status !== 'funded') {
-             return res.status(400).json({ msg: 'Invoice must be funded in escrow to be tokenized' });
+        if (invoice.escrow_status !== 'deposited') {
+             return res.status(400).json({ msg: 'Invoice must be deposited in escrow to be tokenized' });
         }
         if (invoice.is_tokenized) {
             return res.status(400).json({ msg: 'Invoice already tokenized' });

@@ -29,6 +29,21 @@ api.interceptors.response.use(
   }
 );
 
+export const tokenizeInvoice = (invoiceId, faceValue, maturityDate) => {
+  const token = localStorage.getItem('token');
+  return axios.post('/api/financing/tokenize', 
+    { invoiceId, faceValue, maturityDate },
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+};
+
+export const getMarketplaceListings = () => {
+    const token = localStorage.getItem('token');
+    return axios.get('/api/financing/marketplace', 
+        { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+};
+
 // Auth API
 export const login = (email, password) => {
   return api.post('/auth/login', { email, password });

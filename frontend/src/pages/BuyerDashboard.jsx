@@ -147,10 +147,12 @@ const BuyerDashboard = ({ activeTab }) => {
             
             const invoiceContract = new ethers.Contract(contract_address, InvoiceContractABI.abi, signer);
             const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
+            console.log("Depositing to escrow:", { invoiceId: invoice.invoice_id, amount: amountWei.toString(), seller_address: invoice.seller_address });
             let tx;
 
             if (currency === 'MATIC') {
                 tx = await invoiceContract.depositNative({ value: amountWei });
+                console.log("Transaction sent:", tx);
             } else {
                 const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
                 toast.info('Requesting token approval from your wallet...');
