@@ -138,7 +138,7 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
         // --- WEB3 INTERACTION ---
         // You'd need a list of all possible token IDs (from the 'invoices' table)
         const tokenIdsResult = await pool.query("SELECT token_id, id FROM invoices WHERE is_tokenized = TRUE AND token_id IS NOT NULL");
-        
+        console.log(`Found ${tokenIdsResult.rows.length} tokenized invoices in the database.`);
         if (tokenIdsResult.rows.length === 0) {
             return res.json([]); // No tokenized invoices exist yet
         }
@@ -158,12 +158,14 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
         const balances = await fractionToken.balanceOfBatch(wallets, tokenIds);
 
         const portfolio = [];
+        console.log("Token balances fetched:", balances.map(b => b.toString()));
         for (let i = 0; i < tokenIds.length; i++) {
             // Note: Balances from ethers.js are BigNumbers, web3.js returns strings.
             // .toString() works for both.
             const balance = balances[i].toString(); 
             if (balance !== "0") {
                 const invoice = await Invoice.findByPk(invoiceIdMap[tokenIds[i]]);
+                console.log("Found invoice for token ID", tokenIds[i], ":", invoice);
                 if (invoice) {
                     portfolio.push({
                         invoice: invoice, // Contains all invoice details (amount, maturity_date, etc.)

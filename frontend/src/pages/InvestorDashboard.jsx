@@ -57,14 +57,13 @@ const InvoiceCard = ({ invoice, onInvest }) => {
 };
 
 const PortfolioItem = ({ item, onRedeem }) => {
-    // --- FIX ---
-    // The item prop is { invoice: {...}, tokens_owned: "...", token_id: "..." }
-    // Destructure the nested invoice object first
-    const { invoice, tokens_owned, token_id } = item;
-    // Now destructure the properties from the 'invoice' object
+    // --- START FIX ---
+    // The item prop will now be an aggregated object  
+    // Destructure the aggregated item
+    const { invoice, total_tokens, holdings } = item;
+    // Destructure from the nested invoice object
     const { invoice_id, due_date, status } = invoice;
     
-    // Use 'due_date' instead of 'maturity_date'
     const maturity = new Date(due_date).toLocaleDateString();
     const isMatured = new Date(due_date) < new Date();
     // --- END FIX ---
@@ -73,24 +72,21 @@ const PortfolioItem = ({ item, onRedeem }) => {
         <div className="bg-white shadow rounded-lg p-4 flex justify-between items-center">
             <div>
                 <h3 className="text-lg font-semibold">Invoice {invoice_id.substring(0, 8)}...</h3>
-                <p className="text-sm text-gray-600">Tokens Owned: <span className="font-medium">{tokens_owned}</span></p>
-                {/* FIX: 'maturity' is now correctly derived from 'due_date' */}
+                {/* FIX: Display the aggregated 'total_tokens' */}
+                <p className="text-sm text-gray-600">Tokens Owned: <span className="font-medium">{total_tokens}</span></p>
                 <p className="text-sm text-gray-600">Maturity: {maturity}</p>
             </div>
             <button
-                // FIX: Pass the correctly destructured 'token_id'
-                onClick={() => onRedeem(token_id, tokens_owned)}
-                // FIX: Use 'status' from the nested invoice object
+                // FIX: Pass the full 'holdings' array to onRedeem
+                onClick={() => onRedeem(holdings)}
                 disabled={!isMatured || status === 'redeemed'}
                 className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
             >
-                {/* FIX: Use 'status' from the nested invoice object */}
                 {status === 'redeemed' ? 'Redeemed' : (isMatured ? 'Redeem' : 'Matures ' + maturity)}
             </button>
         </div>
     );
 };
-
 
 const InvestorDashboard = ({ activeTab }) => {
     const [marketplaceListings, setMarketplaceListings] = useState([]);
@@ -142,7 +138,45 @@ const InvestorDashboard = ({ activeTab }) => {
     const fetchPortfolio = async () => {
         try {
             const res = await api.get('/investor/portfolio');
-            setPortfolio(res.data);
+            console.log("Raw portfolio data:", res.data);
+
+            // --- START FIX: Aggregate portfolio data by invoice ---
+            const holdings = new Map();
+            res.data.forEach(item => {
+                const { invoice, tokens_owned, token_id } = item;
+                
+                // Ensure invoice and invoice_id exist before proceeding
+                if (!invoice || !invoice.invoice_id) {
+                    console.warn("Skipping portfolio item with missing invoice data", item);
+                    return; 
+                }
+                
+                const invoiceId = invoice.invoice_id;
+                const tokenAmount = parseFloat(tokens_owned);
+
+                if (Number.isNaN(tokenAmount)) {
+                     console.warn("Skipping portfolio item with invalid token amount", item);
+                    return;
+                }
+
+                if (holdings.has(invoiceId)) {
+                    const existing = holdings.get(invoiceId);
+                    existing.total_tokens += tokenAmount;
+                    existing.holdings.push({ token_id: token_id, amount: tokenAmount });
+                } else {
+                    holdings.set(invoiceId, {
+                        invoice: invoice,
+                        total_tokens: tokenAmount,
+                        holdings: [{ token_id: token_id, amount: tokenAmount }],
+                        // Use invoice_id as the unique key for the aggregated item
+                        item_key: invoiceId 
+                    });
+                }
+            });
+            
+            setPortfolio(Array.from(holdings.values()));
+            // --- END FIX ---
+
         } catch (error) {
             toast.error('Failed to load portfolio.');
             console.error(error);
@@ -163,14 +197,49 @@ const InvestorDashboard = ({ activeTab }) => {
         }
     };
 
-    const handleRedeem = async (tokenId, amount) => {
-        toast.loading('Redeeming tokens...');
+    const handleRedeem = async (holdingsToRedeem) => { // 'holdingsToRedeem' is an array: [{token_id, amount}, ...]
+        toast.loading('Redeeming all tokens for this invoice...');
+        let totalRedeemedValue = 0;
+        let failedRedemptions = 0;
+        let successfulRedemptions = 0;
+
         try {
-            const res = await api.post('/investor/redeem-tokens', { tokenId, amount });
-            toast.success(`Successfully redeemed ${res.data.redeemed_value} USD`);
-            fetchPortfolio(); // Refresh portfolio
+            // Loop over each individual holding and redeem it
+            for (const holding of holdingsToRedeem) {
+                // Skip if amount is zero or negative
+                if (holding.amount <= 0) continue; 
+                
+                try {
+                    const res = await api.post('/investor/redeem-tokens', { 
+                        tokenId: holding.token_id, 
+                        amount: holding.amount 
+                    });
+                    // Assuming res.data.redeemed_value is a number or string convertible to number
+                    totalRedeemedValue += parseFloat(res.data.redeemed_value) || 0;
+                    successfulRedemptions++;
+                } catch (error) {
+                    failedRedemptions++;
+                    console.error(`Failed to redeem token ${holding.token_id}`, error);
+                    toast.error(error.response?.data?.msg || `Failed to redeem part of holding (Token ${holding.token_id.substring(0, 6)}...)`);
+                }
+            }
+
+            // Report final status
+            if (successfulRedemptions > 0 && failedRedemptions === 0) {
+                toast.success(`Successfully redeemed ${totalRedeemedValue.toFixed(2)} USD`);
+            } else if (successfulRedemptions > 0 && failedRedemptions > 0) {
+                toast.warning(`Partially redeemed ${totalRedeemedValue.toFixed(2)} USD. ${failedRedemptions} parts failed.`);
+            } else if (successfulRedemptions === 0 && failedRedemptions > 0) {
+                toast.error('All redemption attempts failed.');
+            } else {
+                // This case (0 success, 0 fails) might happen if holdings array was empty or all amounts were 0
+                toast.info('No tokens to redeem.');
+            }
+            
+            fetchPortfolio(); // Refresh portfolio regardless of outcome
         } catch (error) {
-            toast.error(error.response?.data?.msg || 'Redemption failed.');
+            // Catch any unexpected error in the looping logic itself
+            toast.error('An unexpected error occurred during the redemption process.');
             console.error(error);
         }
     };
@@ -197,14 +266,13 @@ const InvestorDashboard = ({ activeTab }) => {
                 </div>
             </div>
 
-            {/* Column 2: My Portfolio */}
             <div>
                 <h2 className="text-2xl font-semibold mb-4">My Portfolio</h2>
                 <div className="space-y-4">
                      {portfolio.length > 0 ? (
                         portfolio.map(item => (
                             <PortfolioItem 
-                                key={item.token_id} 
+                                key={item.item_key} // FIX: Use the aggregated item_key
                                 item={item} 
                                 onRedeem={handleRedeem}
                             />
