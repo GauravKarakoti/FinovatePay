@@ -1,8 +1,10 @@
 import { connectWallet, disconnectWallet } from '../../utils/web3';
 import { updateCurrentUserRole } from '../../utils/api';
+import { useNavigate } from 'react-router-dom';
 
 // FIX: Receive the onToggleRole prop
-const Header = ({ user, onLogout, walletConnected }) => {
+const Header = ({ user, onLogout, walletConnected, onUserUpdate }) => {
+  const navigate = useNavigate();
   const handleWalletConnect = async () => {
     try {
       await connectWallet();
@@ -19,12 +21,24 @@ const Header = ({ user, onLogout, walletConnected }) => {
 
   const handleRoleSwitch = async (newRole) => {
     try {
-      await updateCurrentUserRole(newRole);
-      // Reload the page to refresh all user data and components
-      window.location.reload(); 
+      const response = await updateCurrentUserRole(newRole);
+      console.log('Role switch response:', response);
+
+      if (response && response.data.user) {
+        // 4. THIS IS THE FIX:
+        //    Update localStorage
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        //    Update the live React state in App.jsx
+        onUserUpdate(response.data.user);
+
+        // 5. Navigate to the root. App.jsx's routing logic
+        //    will see the new role and navigate to the correct dashboard.
+        navigate(`/`); 
+      } else {
+        console.error('API response did not contain user object.', response);
+      }
     } catch (error) {
       console.error('Failed to switch role:', error);
-      // You could show an error toast here
     }
   };
    
@@ -52,7 +66,7 @@ const Header = ({ user, onLogout, walletConnected }) => {
                   Connect Wallet
               </button>
           )}
-
+          {console.log('User in Header.jsx:', user)}
           {user && (
             <div className="flex items-center space-x-2">
               

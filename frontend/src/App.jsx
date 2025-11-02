@@ -97,8 +97,9 @@ function App() {
             user={user} 
             onLogout={handleLogout} 
             walletConnected={walletConnected}
+            onUserUpdate={setUser}
         />
-        
+        {console.log('Current user role in App.jsx:', user)}
         <main>
           <Routes>
             <Route 
