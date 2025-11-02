@@ -1,7 +1,8 @@
 import { connectWallet, disconnectWallet } from '../../utils/web3';
+import { updateCurrentUserRole } from '../../utils/api';
 
 // FIX: Receive the onToggleRole prop
-const Header = ({ user, onLogout, walletConnected, onToggleRole }) => {
+const Header = ({ user, onLogout, walletConnected }) => {
   const handleWalletConnect = async () => {
     try {
       await connectWallet();
@@ -14,6 +15,17 @@ const Header = ({ user, onLogout, walletConnected, onToggleRole }) => {
   const handleWalletDisconnect = async () => {
     await disconnectWallet();
     window.location.reload();
+  };
+
+  const handleRoleSwitch = async (newRole) => {
+    try {
+      await updateCurrentUserRole(newRole);
+      // Reload the page to refresh all user data and components
+      window.location.reload(); 
+    } catch (error) {
+      console.error('Failed to switch role:', error);
+      // You could show an error toast here
+    }
   };
    
   return (
@@ -44,47 +56,47 @@ const Header = ({ user, onLogout, walletConnected, onToggleRole }) => {
           {user && (
             <div className="flex items-center space-x-2">
               
-              {/* FIX: Add the role-switching button for non-admin users */}
               {user.role !== 'admin' && (
                 <div>
+                  {/* START: 3. UPDATE ALL onClicks */}
                   {user.role === 'buyer' ? <div className="flex items-center space-x-2">
-                      <button onClick={() => onToggleRole('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
+                      <button onClick={() => handleRoleSwitch('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
                           Switch to Seller
                       </button>
-                      <button onClick={() => onToggleRole('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
+                      <button onClick={() => handleRoleSwitch('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
                           Switch to Shipment
                       </button>
-                      <button onClick={() => onToggleRole('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
+                      <button onClick={() => handleRoleSwitch('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
                           Switch to Investor
                       </button>
                   </div> : user.role === 'seller' ? <div className="flex items-center space-x-2">
-                      <button onClick={() => onToggleRole('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                      <button onClick={() => handleRoleSwitch('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                           Switch to Buyer
                       </button>
-                      <button onClick={() => onToggleRole('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
+                      <button onClick={() => handleRoleSwitch('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
                           Switch to Shipment
                       </button>
-                      <button onClick={() => onToggleRole('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
+                      <button onClick={() => handleRoleSwitch('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
                           Switch to Investor
                       </button>
                   </div> : user.role === 'shipment' ? <div className="flex items-center space-x-2">
-                      <button onClick={() => onToggleRole('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                      <button onClick={() => handleRoleSwitch('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                           Switch to Buyer
                       </button>
-                      <button onClick={() => onToggleRole('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
+                      <button onClick={() => handleRoleSwitch('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
                           Switch to Seller
                       </button>
-                      <button onClick={() => onToggleRole('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
+                      <button onClick={() => handleRoleSwitch('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
                           Switch to Investor
                       </button>
                   </div> : <div className="flex items-center space-x-2">
-                      <button onClick={() => onToggleRole('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                      <button onClick={() => handleRoleSwitch('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                           Switch to Buyer
                       </button>
-                      <button onClick={() => onToggleRole('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
+                      <button onClick={() => handleRoleSwitch('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
                           Switch to Seller
                       </button>
-                      <button onClick={() => onToggleRole('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
+                      <button onClick={() => handleRoleSwitch('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
                           Switch to Shipment
                       </button>
                   </div>}

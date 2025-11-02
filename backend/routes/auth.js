@@ -3,7 +3,30 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const User = require('../models/User');
 const router = express.Router();
+
+router.put('/role', authenticateToken, async (req, res) => {
+  const { role } = req.body;
+  const userId = req.user.id;
+
+  // Validate the role
+  const allowedRoles = ['buyer', 'seller', 'shipment', 'investor'];
+  if (!role || !allowedRoles.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role specified' });
+  }
+
+  try {
+    const updatedUser = await User.updateRole(userId, role);
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ message: 'Role updated successfully', user: updatedUser });
+  } catch (error) {
+    console.error('Role update error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Register new user
 router.post('/register', async (req, res) => {

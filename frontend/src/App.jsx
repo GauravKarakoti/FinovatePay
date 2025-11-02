@@ -65,17 +65,6 @@ function App() {
   const handleTabChange = (tab) => {
     setActiveTab(tab);
   };
-  
-  const handleToggleRole = (role) => {
-    // Allow admin to toggle to any role for testing, but not other users
-    if (!user) return;
-    if (user.role !== 'admin' && (role === 'admin' || user.role === 'admin')) return;
-
-    const updatedUser = { ...user, role: role };
-    
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
-  };
 
   const renderDashboard = (dashboardComponent) => {
     return (
@@ -108,7 +97,6 @@ function App() {
             user={user} 
             onLogout={handleLogout} 
             walletConnected={walletConnected}
-            onToggleRole={handleToggleRole} 
         />
         
         <main>

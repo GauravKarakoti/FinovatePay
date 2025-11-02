@@ -38,6 +38,10 @@ export const register = (userData) => {
   return api.post('/auth/register', userData);
 };
 
+export const updateCurrentUserRole = (role) => {
+  return api.put('/auth/role', { role });
+};
+
 // Invoice API
 export const createInvoice = (invoiceData) => {
   return api.post('/invoices', invoiceData);
