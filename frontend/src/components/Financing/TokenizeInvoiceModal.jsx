@@ -7,7 +7,10 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
     defaultMaturity.setDate(defaultMaturity.getDate() + 30);
     const defaultMaturityString = defaultMaturity.toISOString().split('T')[0];
 
-    const [faceValue, setFaceValue] = useState(invoice.amount || '');
+    // ---
+    // **UPDATE**: Ensure the initial state is always a string
+    // ---
+    const [faceValue, setFaceValue] = useState(invoice.amount ? String(invoice.amount) : '');
     const [maturityDate, setMaturityDate] = useState(defaultMaturityString);
 
     const handleSubmit = (e) => {

@@ -55,8 +55,8 @@ router.post('/tokenize', authenticateToken, async (req, res) => {
         console.log(`Parameters: totalSupply=${totalSupply}, faceValue=${faceValue}, maturity=${maturityTimestamp}, issuer=${issuerAddress}`);
         const tx = await fractionToken.tokenizeInvoice(
             invoice.invoice_hash, // Using invoice_hash as bytes32 ID
-            Number(totalSupply),
-            Number(faceValue),
+            totalSupply,
+            faceValue,
             maturityTimestamp,
             issuerAddress
         );

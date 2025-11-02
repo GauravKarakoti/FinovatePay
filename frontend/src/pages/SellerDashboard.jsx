@@ -6,7 +6,12 @@ import {
     getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
     createProduceLot as syncProduceLot , api
 } from '../utils/api';
-import { connectWallet, getInvoiceFactoryContract, getProduceTrackingContract } from '../utils/web3';
+// ---
+// **UPDATE**: Import erc20ABI
+// ---
+import { 
+    connectWallet, getInvoiceFactoryContract, getProduceTrackingContract, erc20ABI 
+} from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
@@ -100,22 +105,50 @@ const SellerDashboard = ({ activeTab }) => {
       }
   };
 
+  // ---
+  // **UPDATE**: Reworked this function to handle decimal conversion
+  // ---
   const handleTokenizeInvoice = async (invoiceId, { faceValue, maturityDate }) => {
     setIsSubmitting(true);
     
-    const promise = api.post('/financing/tokenize', {
-        invoiceId,
-        faceValue,
-        maturityDate
-    });
+    // Define the async function that toast.promise will run
+    const tokenizationPromise = async () => {
+        // 1. Get the full invoice object from state
+        if (!invoiceToTokenize) {
+            throw new Error("No invoice selected for tokenization.");
+        }
+
+        // 2. Get the token's decimals
+        const { provider } = await connectWallet(); // Need provider for read-only
+        const tokenAddress = invoiceToTokenize.token_address;
+        
+        let decimals;
+        if (tokenAddress === NATIVE_CURRENCY_ADDRESS) {
+            decimals = 18; // Default for native currency (ETH/MATIC)
+        } else {
+            const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
+            decimals = await tokenContract.decimals();
+        }
+        
+        // 3. Convert the faceValue string to the correct integer (uint256)
+        // faceValue is now guaranteed to be a string from the modal fix
+        const faceValueAsUint = ethers.utils.parseUnits(faceValue, decimals);
+        
+        // 4. Call the backend API with the converted value
+        return api.post('/financing/tokenize', {
+            invoiceId,
+            faceValue: faceValueAsUint.toString(), // Send the large integer as a string
+            maturityDate
+        });
+    };
 
     try {
-        await toast.promise(promise, {
+        await toast.promise(tokenizationPromise(), { // Execute the new async function
             loading: "Tokenizing invoice on the blockchain...",
             success: (response) => {
                 loadInitialData(); // Reload all data
                 setInvoiceToTokenize(null); // Close modal
-                return `Invoice tokenized! Token ID: ${response.data.token_id}`;
+                return `Invoice tokenized! ${response.data.msg || (response.data.token_id ? `Token ID: ${response.data.token_id}` : '')}`;
             },
             error: (err) => `Tokenization failed: ${err.response?.data?.msg || err.message}`
         });
@@ -168,7 +201,7 @@ const SellerDashboard = ({ activeTab }) => {
 
   const handleCreateInvoiceFromQuotation = async (quotation) => {
     setIsSubmitting(true);
-  
+ 
     const creationPromise = async () => {
       const invoiceId = uuidv4();
       const bytes32InvoiceId = uuidToBytes32(invoiceId);
@@ -182,20 +215,20 @@ const SellerDashboard = ({ activeTab }) => {
       const contract = await getInvoiceFactoryContract();
       const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
       const dueDateTimestamp = Math.floor(new Date().getTime() / 1000) + 86400 * 30;
-  
+ 
       toast.info("Please confirm invoice creation in your wallet...");
       const tx = await contract.createInvoice(
         bytes32InvoiceId, invoiceHash, quotation.buyer_address,
         amountInWei, dueDateTimestamp, tokenAddress
       );
       console.log("Transaction sent:", tx);
-  
+ 
       const receipt = await tx.wait();
       const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
       if (!event) throw new Error("InvoiceCreated event not found.");
       
       const newContractAddress = event.args.invoiceContractAddress;
-  
+ 
       const finalInvoiceData = {
         quotation_id: quotation.id,
         invoice_id: invoiceId,
@@ -207,7 +240,7 @@ const SellerDashboard = ({ activeTab }) => {
       
       await createInvoice(finalInvoiceData);
     };
-  
+ 
     try {
       await toast.promise(creationPromise(), {
         loading: "Deploying invoice contract...",

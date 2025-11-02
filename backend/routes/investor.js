@@ -3,7 +3,10 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const Invoice = require('../models/Invoice');
 const pool = require('../config/database'); // Added for portfolio query
-const { web3, fractionToken, fractionTokenAddress, FractionTokenABI } = require('../config/blockchain'); // Assumed imports for Web3 logic
+const { getSigner, getFractionTokenContract } = require('../config/blockchain');
+
+const signer = getSigner();
+const fractionToken = getFractionTokenContract(signer);
 
 // Middleware to check for 'investor' role
 const isInvestor = (req, res, next) => {
@@ -103,7 +106,7 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
         const wallets = Array(tokenIds.length).fill(investorWallet);
 
         // Check balances for all tokens at once
-        const balances = await fractionToken.methods.balanceOfBatch(wallets, tokenIds).call();
+        const balances = await fractionToken.balanceOfBatch(wallets, tokenIds).call();
 
         const portfolio = [];
         for (let i = 0; i < tokenIds.length; i++) {
@@ -146,10 +149,10 @@ router.post('/redeem-tokens', authenticateToken, isInvestor, async (req, res) =>
 
         console.log(`Attempting redeem: Investor ${investorWallet} redeeming ${amount} tokens of Token ID ${tokenId}`);
 
-        const gas = await fractionToken.methods.redeem(tokenId, amount)
+        const gas = await fractionToken.redeem(tokenId, amount)
             .estimateGas({ from: investorWallet });
 
-        const tx = await fractionToken.methods.redeem(tokenId, amount)
+        const tx = await fractionToken.redeem(tokenId, amount)
             .send({ from: investorWallet, gas });
         
         // Get redemption value from the event emitted by the contract
