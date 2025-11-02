@@ -3,16 +3,17 @@ import { api } from '../utils/api'; // Assuming you have a configured api utilit
 import { toast } from 'sonner';
 import io from 'socket.io-client';
 
-// Helper component for a single invoice card
 const InvoiceCard = ({ invoice, onInvest }) => {
-    const { invoice_id, amount, face_value, maturity_date, remaining_supply, currency } = invoice;
+    // Destructure the properties that actually exist in the invoice object
+    const { invoice_id, amount, due_date, currency } = invoice;
+    
     console.log("InvoiceCard props:", invoice);
     const [investmentAmount, setInvestmentAmount] = useState('');
 
-    console.log("Before changes:",invoice_id,face_value,amount,maturity_date);
-    const potentialYield = ((face_value - amount) / amount * 100).toFixed(2);
-    const maturity = new Date(maturity_date).toLocaleDateString();
-    console.log("After changes:",potentialYield,maturity);
+    // --- FIX ---
+    // Rename variables to match what the component's UI expects
+    const face_value_display = amount; // The invoice 'amount' is its face value
+    const maturity = new Date(due_date).toLocaleDateString(); // Use 'due_date'
 
     const handleInvest = () => {
         if (!investmentAmount || +investmentAmount <= 0) {
@@ -26,23 +27,20 @@ const InvoiceCard = ({ invoice, onInvest }) => {
         <div className="bg-white shadow rounded-lg p-4 border border-gray-200">
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-lg font-semibold text-finovate-blue-800">Invoice {invoice_id.substring(0, 8)}...</h3>
-                <span className="text-sm font-medium text-green-600">Yield: {potentialYield}%</span>
             </div>
+            {/* FIX: Use 'maturity' (derived from 'due_date') */}
             <p className="text-sm text-gray-600">Matures on: {maturity}</p>
             <div className="mt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                     <span>Face Value:</span>
-                    <span className="font-medium">{currency} {face_value}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                    <span>Amount Remaining:</span>
-                    <span className="font-medium">{currency} {remaining_supply || 'N/A'}</span>
+                    {/* FIX: Use 'face_value_display' (derived from 'amount') */}
+                    <span className="font-medium">{currency} {face_value_display}</span>
                 </div>
             </div>
             <div className="mt-4 flex space-x-2">
                 <input
                     type="number"
-                    placeholder="Amount (USD)"
+                    placeholder="Amount"
                     value={investmentAmount}
                     onChange={(e) => setInvestmentAmount(e.target.value)}
                     className="flex-1 p-2 border rounded-md text-sm"
@@ -58,24 +56,35 @@ const InvoiceCard = ({ invoice, onInvest }) => {
     );
 };
 
-// Helper component for portfolio item
 const PortfolioItem = ({ item, onRedeem }) => {
-    const { invoice_id, tokens_owned, face_value, maturity_date, status } = item;
-    const maturity = new Date(maturity_date).toLocaleDateString();
-    const isMatured = new Date(maturity_date) < new Date();
+    // --- FIX ---
+    // The item prop is { invoice: {...}, tokens_owned: "...", token_id: "..." }
+    // Destructure the nested invoice object first
+    const { invoice, tokens_owned, token_id } = item;
+    // Now destructure the properties from the 'invoice' object
+    const { invoice_id, due_date, status } = invoice;
+    
+    // Use 'due_date' instead of 'maturity_date'
+    const maturity = new Date(due_date).toLocaleDateString();
+    const isMatured = new Date(due_date) < new Date();
+    // --- END FIX ---
 
     return (
         <div className="bg-white shadow rounded-lg p-4 flex justify-between items-center">
             <div>
                 <h3 className="text-lg font-semibold">Invoice {invoice_id.substring(0, 8)}...</h3>
                 <p className="text-sm text-gray-600">Tokens Owned: <span className="font-medium">{tokens_owned}</span></p>
+                {/* FIX: 'maturity' is now correctly derived from 'due_date' */}
                 <p className="text-sm text-gray-600">Maturity: {maturity}</p>
             </div>
             <button
-                onClick={() => onRedeem(item.token_id, tokens_owned)}
+                // FIX: Pass the correctly destructured 'token_id'
+                onClick={() => onRedeem(token_id, tokens_owned)}
+                // FIX: Use 'status' from the nested invoice object
                 disabled={!isMatured || status === 'redeemed'}
                 className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
             >
+                {/* FIX: Use 'status' from the nested invoice object */}
                 {status === 'redeemed' ? 'Redeemed' : (isMatured ? 'Redeem' : 'Matures ' + maturity)}
             </button>
         </div>
