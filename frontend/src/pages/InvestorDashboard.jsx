@@ -6,10 +6,13 @@ import io from 'socket.io-client';
 // Helper component for a single invoice card
 const InvoiceCard = ({ invoice, onInvest }) => {
     const { invoice_id, amount, face_value, maturity_date, remaining_supply, currency } = invoice;
+    console.log("InvoiceCard props:", invoice);
     const [investmentAmount, setInvestmentAmount] = useState('');
 
+    console.log("Before changes:",invoice_id,face_value,amount,maturity_date);
     const potentialYield = ((face_value - amount) / amount * 100).toFixed(2);
     const maturity = new Date(maturity_date).toLocaleDateString();
+    console.log("After changes:",potentialYield,maturity);
 
     const handleInvest = () => {
         if (!investmentAmount || +investmentAmount <= 0) {

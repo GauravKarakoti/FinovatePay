@@ -106,7 +106,7 @@ router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
         const wallets = Array(tokenIds.length).fill(investorWallet);
 
         // Check balances for all tokens at once
-        const balances = await fractionToken.balanceOfBatch(wallets, tokenIds).call();
+        const balances = await fractionToken.balanceOfBatch(wallets, tokenIds);
 
         const portfolio = [];
         for (let i = 0; i < tokenIds.length; i++) {
