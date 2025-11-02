@@ -1,13 +1,18 @@
 const { ethers } = require('ethers');
 require('dotenv').config();
+// 1. Import the ABI
+const FractionTokenABI = require('../../deployed/FractionToken.json').abi;
 
 // --- Validation ---
-// Check for missing environment variables to prevent silent failures.
 if (!process.env.BLOCKCHAIN_RPC_URL) {
   throw new Error("Missing BLOCKCHAIN_RPC_URL in .env file. Please provide a valid RPC URL.");
 }
 if (!process.env.DEPLOYER_PRIVATE_KEY) {
   throw new Error("Missing DEPLOYER_PRIVATE_KEY in .env file. Please provide the deployer's private key.");
+}
+// 2. Add validation for the token address
+if (!process.env.FRACTION_TOKEN_ADDRESS) {
+  throw new Error("Missing FRACTION_TOKEN_ADDRESS in .env file.");
 }
 
 const getProvider = () => {
@@ -15,7 +20,6 @@ const getProvider = () => {
     return new ethers.JsonRpcProvider(process.env.BLOCKCHAIN_RPC_URL);
   } catch (error) {
     console.error("Failed to connect to JSON-RPC provider:", error);
-    // Re-throw the error to ensure the calling function knows about the failure.
     throw error;
   }
 };
@@ -31,15 +35,35 @@ const getSigner = () => {
   }
 };
 
-// Ensure your contract addresses are also present in the .env file
+// 3. Create a function to get the contract instance
+/**
+ * Gets an instance of the FractionToken contract.
+ * @param {ethers.Signer | ethers.Provider} [signerOrProvider] - An ethers signer (for transactions) or provider (for read-only calls).
+ * @returns {ethers.Contract}
+ */
+const getFractionTokenContract = (signerOrProvider) => {
+  const provider = getProvider();
+  return new ethers.Contract(
+    process.env.FRACTION_TOKEN_ADDRESS,
+    FractionTokenABI,
+    signerOrProvider || provider // Use signer if provided, else fallback to provider
+  );
+};
+
+
 const contractAddresses = {
   invoiceFactory: process.env.INVOICE_FACTORY_ADDRESS,
   escrowContract: process.env.ESCROW_CONTRACT_ADDRESS,
   complianceManager: process.env.COMPLIANCE_MANAGER_ADDRESS,
+  // 4. (Optional but good practice) Add address here
+  fractionToken: process.env.FRACTION_TOKEN_ADDRESS,
 };
 
 module.exports = {
   getProvider,
   getSigner,
   contractAddresses,
+  // 5. Export the new function and ABI
+  getFractionTokenContract,
+  FractionTokenABI
 };

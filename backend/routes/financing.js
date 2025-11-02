@@ -6,7 +6,7 @@ const Invoice = require('../models/Invoice');
 const User = require('../models/User');
 const pool = require('../config/database');
 const { emitToMarketplace } = require('../socket');
-const { web3, fractionToken, fractionTokenAddress, FractionTokenABI } = require('../config/blockchain'); // Assumed imports for Web3 logic
+const { getSigner, getFractionTokenContract } = require('../config/blockchain');
 
 // @route   POST /api/financing/tokenize
 // @desc    Seller requests to tokenize a verified invoice
@@ -41,56 +41,54 @@ router.post('/tokenize', authenticateToken, async (req, res) => {
             return res.status(400).json({ msg: 'Invoice already tokenized' });
         }
 
-        // 3. --- WEB3 INTERACTION ---
-        // Call the FractionToken.sol contract's tokenizeInvoice function
-        // This requires: _invoiceId (as bytes32), _totalSupply, _faceValue, _maturityDate, _issuer
-        
-        // For simplicity, we assume totalSupply is the faceValue (e.g., 1000 tokens for $1000)
         const totalSupply = faceValue; 
         const issuerAddress = seller.wallet_address;
-        
-        // Convert JS date to Unix timestamp (seconds) for Solidity
         const maturityTimestamp = Math.floor(new Date(maturityDate).getTime() / 1000);
 
-        // Ensure contract instance is ready
-        if (!fractionToken) {
-            return res.status(500).json({ msg: 'Blockchain service not initialized' });
-        }
-        
-        // The backend admin/owner account calls the contract
-        const adminWallet = process.env.ADMIN_WALLET_ADDRESS;
-        if (!adminWallet) {
-            return res.status(500).json({ msg: 'Admin wallet not configured for tokenization' });
-        }
+        // 2. Get the signer and contract instance
+        // The signer uses the DEPLOYER_PRIVATE_KEY from .env, acting as the admin
+        const signer = getSigner();
+        const fractionToken = getFractionTokenContract(signer);
 
         console.log(`Tokenizing invoice ${invoice.id} (Hash: ${invoice.invoice_hash})`);
         
-        const gas = await fractionToken.methods.tokenizeInvoice(
+        console.log(`Parameters: totalSupply=${totalSupply}, faceValue=${faceValue}, maturity=${maturityTimestamp}, issuer=${issuerAddress}`);
+        const tx = await fractionToken.tokenizeInvoice(
             invoice.invoice_hash, // Using invoice_hash as bytes32 ID
-            totalSupply,
-            faceValue,
-            maturityTimestamp, // Pass timestamp
-            issuerAddress
-        ).estimateGas({ from: adminWallet });
-
-        const tx = await fractionToken.methods.tokenizeInvoice(
-            invoice.invoice_hash,
-            totalSupply,
-            faceValue,
+            Number(totalSupply),
+            Number(faceValue),
             maturityTimestamp,
             issuerAddress
-        ).send({ from: adminWallet, gas });
+        );
 
-        // Get the new tokenId from the event
-        const tokenId = tx.events.Tokenized.returnValues.tokenId;
+        // 4. Wait for the transaction to be mined
+        const receipt = await tx.wait();
+
+        // 5. Get the tokenId from the transaction receipt logs
+        // Find the 'Tokenized' event in the receipt
+        const tokenizedEvent = receipt.logs
+            .map(log => {
+                try {
+                    return fractionToken.interface.parseLog(log);
+                } catch (e) {
+                    return null;
+                }
+            })
+            .find(event => event?.name === 'Tokenized');
+
+        if (!tokenizedEvent) {
+            throw new Error("Tokenized event not found in transaction receipt.");
+        }
+
+        const tokenId = tokenizedEvent.args.tokenId;
         
-        console.log(`Tokenization successful. Token ID: ${tokenId}, Tx: ${tx.transactionHash}`);
+        console.log(`Tokenization successful. Token ID: ${tokenId}, Tx: ${tx.hash}`);
 
-        // 4. Update database with tokenization details
-        const financingStatus = 'listed'; // 'listed' means it's on the marketplace
+        // 6. Update database
+        const financingStatus = 'listed';
         const updatedInvoice = await Invoice.updateTokenizationStatus(
             invoiceId, 
-            tokenId, // Use `tokenId` from the tx receipt
+            tokenId.toString(), // Convert BigNumber to string
             financingStatus
         );
 
@@ -136,11 +134,15 @@ router.get('/:invoiceId', authenticateToken, async (req, res) => {
             return res.status(404).json({ msg: 'Tokenized invoice not found' });
         }
         
-        // Fetch on-chain data for remaining supply
         let remaining_supply = 0;
-        if (fractionToken && invoice.token_id) {
-            // We need to know the seller's (issuer's) balance of their own token
-            const sellerBalance = await fractionToken.methods.balanceOf(invoice.seller_address, invoice.token_id).call();
+        
+        // 7. Update contract call in GET route
+        // Get a read-only instance of the contract
+        const fractionToken = getFractionTokenContract(); 
+        
+        if (invoice.token_id) {
+             // Use ethers.js syntax (no .methods or .call())
+            const sellerBalance = await fractionToken.balanceOf(invoice.seller_address, invoice.token_id);
             remaining_supply = sellerBalance.toString();
         }
 
