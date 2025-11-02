@@ -54,6 +54,9 @@ const Header = ({ user, onLogout, walletConnected, onToggleRole }) => {
                       <button onClick={() => onToggleRole('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
                           Switch to Shipment
                       </button>
+                      <button onClick={() => onToggleRole('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
+                          Switch to Investor
+                      </button>
                   </div> : user.role === 'seller' ? <div className="flex items-center space-x-2">
                       <button onClick={() => onToggleRole('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                           Switch to Buyer
@@ -61,12 +64,28 @@ const Header = ({ user, onLogout, walletConnected, onToggleRole }) => {
                       <button onClick={() => onToggleRole('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
                           Switch to Shipment
                       </button>
+                      <button onClick={() => onToggleRole('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
+                          Switch to Investor
+                      </button>
+                  </div> : user.role === 'shipment' ? <div className="flex items-center space-x-2">
+                      <button onClick={() => onToggleRole('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                          Switch to Buyer
+                      </button>
+                      <button onClick={() => onToggleRole('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
+                          Switch to Seller
+                      </button>
+                      <button onClick={() => onToggleRole('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">
+                          Switch to Investor
+                      </button>
                   </div> : <div className="flex items-center space-x-2">
                       <button onClick={() => onToggleRole('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
                           Switch to Buyer
                       </button>
                       <button onClick={() => onToggleRole('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">
                           Switch to Seller
+                      </button>
+                      <button onClick={() => onToggleRole('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
+                          Switch to Shipment
                       </button>
                   </div>}
                 </div>

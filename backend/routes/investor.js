@@ -6,7 +6,8 @@ const pool = require('../config/database');
 
 // Middleware to check for 'investor' role
 const isInvestor = (req, res, next) => {
-    if (req.user.role !== 'investor' && req.user.role !== 'admin') {
+    console.log(`Checking investor role for user: ${req.user.walletAddress} with role: ${req.user.role}`);
+    if (req.user.role !== 'investor' || req.user.role !== 'admin') {
         return res.status(403).json({ msg: 'Access denied. Investor role required.' });
     }
     next();
@@ -72,6 +73,7 @@ router.post('/buy-tokens', authenticateToken, isInvestor, async (req, res) => {
 // @desc    Get the investing portfolio for the logged-in investor
 // @access  Private (Investor)
 router.get('/portfolio', authenticateToken, isInvestor, async (req, res) => {
+    console.log(`Fetching portfolio for investor: ${req.user.walletAddress}`);
     try {
         // --- WEB3 INTERACTION ---
         // This is crucial. You'd need to query the FractionToken contract

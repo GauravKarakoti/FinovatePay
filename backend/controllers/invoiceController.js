@@ -50,14 +50,14 @@ exports.createInvoice = async (req, res) => {
             await client.query(updateLotQuery, [quotation.quantity, quotation.lot_id]);
         }
 
-        // 3. Insert the new invoice using the locked data from the quotation
         const insertInvoiceQuery = `
             INSERT INTO invoices (
                 invoice_id, invoice_hash, seller_address, buyer_address,
                 amount, due_date, description, items, currency,
-                contract_address, token_address, lot_id, quotation_id, escrow_status
+                contract_address, token_address, lot_id, quotation_id, escrow_status,
+                financing_status // <-- ADD THIS COLUMN
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created')
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none') // <-- ADD THE DEFAULT VALUE
             RETURNING *
         `;
         const values = [
