@@ -113,13 +113,20 @@ router.post('/tokenize', authenticateToken, async (req, res) => {
 // FIX: Use the 'authenticateToken' function as middleware
 router.get('/marketplace', authenticateToken, async (req, res) => {
     try {
-        const result = await pool.query(
-            "SELECT * FROM invoices WHERE financing_status = 'listed' ORDER BY created_at DESC"
-        );
+        // --- THIS IS THE KEY ---
+        // Ensure your query selects 'remaining_supply'
+        const query = `
+            SELECT * FROM invoices 
+            WHERE financing_status = 'listed' 
+            AND remaining_supply > 0
+            ORDER BY created_at DESC
+        `;
+        const result = await pool.query(query);
+        
         res.json(result.rows);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+    } catch (error) {
+        console.error('Failed to fetch marketplace listings:', error);
+        res.status(500).json({ msg: 'Server error' });
     }
 });
 

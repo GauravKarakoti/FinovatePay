@@ -47,19 +47,49 @@ class Invoice {
     return result.rows[0];
   }
   
-  // Method to update tokenization status
   static async updateTokenizationStatus(invoiceId, tokenId, financingStatus) {
     const query = `
-      UPDATE invoices 
-      SET 
-        is_tokenized = TRUE, 
-        token_id = $1, 
-        financing_status = $2
+      UPDATE invoices
+      SET
+        is_tokenized = TRUE,
+        token_id = $1,
+        financing_status = $2, -- $2 is used for the enum column
+        remaining_supply = CASE
+          -- $4 is used for the text comparison
+          WHEN $4 = 'listed' THEN amount
+          ELSE remaining_supply
+        END
       WHERE invoice_id = $3
       RETURNING *
     `;
-    const result = await pool.query(query, [tokenId, financingStatus, invoiceId]);
+    
+    // Pass the financingStatus variable twice
+    const result = await pool.query(query, [
+      tokenId,
+      financingStatus, // $2
+      invoiceId,       // $3
+      financingStatus  // $4
+    ]);
+    
     return result.rows[0];
+  }
+  // --- NEW METHOD ---
+  // Method to decrement supply after an investment
+  static async decrementRemainingSupply(invoiceId, amountInvested) {
+    try {
+      const query = `
+        UPDATE invoices
+        SET remaining_supply = remaining_supply - $1
+        WHERE invoice_id = $2
+        RETURNING remaining_supply
+      `;
+      // Ensure amountInvested is treated as a number
+      const result = await pool.query(query, [parseFloat(amountInvested), invoiceId]);
+      return result.rows[0]?.remaining_supply;
+    } catch (error) {
+      console.error("Error decrementing remaining supply:", error);
+      throw error;
+    }
   }
 
   static async findByPk(id) {

@@ -27,6 +27,7 @@ router.post('/record-investment', authenticateToken, isInvestor, async (req, res
     try {
         console.log(`Recording on-chain investment: Investor ${investorId} bought ${amountInvested} tokens for invoice ${invoiceId} (Token ID: ${tokenId})`);
 
+        // 1. Record the investment in your 'investments' table
         const investmentQuery = `
             INSERT INTO investments (user_id, invoice_id, token_id, amount_invested, tokens_bought, status, tx_hash, created_at)
             VALUES ($1, $2, $3, $4, $5, 'completed', $6, NOW())
@@ -39,15 +40,26 @@ router.post('/record-investment', authenticateToken, isInvestor, async (req, res
         const { rows } = await pool.query(investmentQuery, values);
         const newInvestment = rows[0];
 
-        // 4. Emit socket event for marketplace update (supply changed)
+        // --- START: MODIFIED SECTION ---
+
+        // 2. Decrement the remaining supply in the 'invoices' table
+        //    This relies on the 'decrementRemainingSupply' method in 'backend/models/Invoice.js'
+        const newSupply = await Invoice.decrementRemainingSupply(invoiceId, amountInvested);
+
+        // 3. Emit socket event for marketplace update (supply changed)
         const io = req.app.get('io');
+
+        // Note: Ensure your frontend is joined to this 'marketplace' room!
+        // The InvestorDashboard.jsx was emitting 'join-marketplace'.
+        // Your socket.js must handle that and add the client to this room.
         io.to('marketplace').emit('investment-made', { 
             invoiceId, 
-            tokensBought: amountInvested,
-            investorWallet
+            newSupply: newSupply // <-- Send the new, authoritative supply
         });
+        
+        // --- END: MODIFIED SECTION ---
 
-        res.json({ msg: 'Investment recorded successfully', investment: newInvestment });
+        res.json({ msg: 'Investment recorded successfully', investment: newInvestment, newSupply: newSupply });
 
     } catch (err) {
         console.error("Failed to record investment:", err.message);
@@ -73,6 +85,8 @@ router.post('/record-redemption', authenticateToken, async (req, res) => {
 
         // 1. Update the investor's holdings to zero (or mark as redeemed)
         // This query assumes you want to set tokens_owned to 0 after redemption.
+        // ** NOTE: This updates 'investor_holdings' table, but your investment route uses 'investments' table.
+        //    You should verify these two tables are correct.
         const updateQuery = `
             UPDATE investor_holdings ih
             SET tokens_owned = 0
@@ -171,7 +185,7 @@ router.post('/redeem-tokens', authenticateToken, isInvestor, async (req, res) =>
     const investorWallet = req.user.wallet_address; // Corrected from walletAddress
 
     try {
-        // 1. --- WEB3 INTERACTION ---       
+        // 1. --- WEB3 INTERACTION ---      
         // Ensure contract instance is ready
         if (!fractionToken) {
             return res.status(500).json({ msg: 'Blockchain service not initialized' });

@@ -3,14 +3,12 @@ import { api } from '../utils/api'; // Assuming you have a configured api utilit
 import { toast } from 'sonner';
 import io from 'socket.io-client';
 // --- IMPORT NEW WEB3 FUNCTIONS AND UTILS ---
-import {
-    getFractionTokenContract,
-    connectWallet // Added for getting investor address
-} from '../utils/web3';
+import { getFractionTokenContract } from '../utils/web3';
 import { ethers } from 'ethers';
 
 const InvoiceCard = ({ invoice, onInvest }) => {
-    const { invoice_id, amount, due_date, currency } = invoice;
+    // --- UPDATED: Destructured remaining_supply ---
+    const { invoice_id, amount, due_date, currency, remaining_supply } = invoice;
 
     console.log("InvoiceCard props:", invoice);
     const [investmentAmount, setInvestmentAmount] = useState('');
@@ -37,6 +35,13 @@ const InvoiceCard = ({ invoice, onInvest }) => {
                     <span>Face Value:</span>
                     {/* Display currency as MATIC if it's the chain's native token */}
                     <span className="font-medium">{currency === 'MATIC' ? 'MATIC' : currency} {face_value_display}</span>
+                </div>
+                {/* --- ADDED: Remaining Value Section --- */}
+                <div className="flex justify-between text-sm">
+                    <span>Remaining to Invest:</span>
+                    <span className="font-medium text-green-600">
+                        {currency === 'MATIC' ? 'MATIC' : currency} {Number(remaining_supply)}
+                    </span>
                 </div>
             </div>
             <div className="mt-4 flex space-x-2">
