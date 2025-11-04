@@ -19,111 +19,41 @@ const isInvestor = (req, res, next) => {
     next();
 };
 
-// @route   POST /api/investor/buy-tokens
-// @desc    Investor buys fractions of a tokenized invoice
-// @access  Private (Investor)
-router.post('/buy-tokens', authenticateToken, isInvestor, async (req, res) => {
-    const { invoiceId, amountToInvest } = req.body;
-    // Get walletAddress and user ID from the authenticated user
-    const investorWallet = req.user.wallet_address; 
-    const investorId = req.user.id; // Added: Get numeric ID for foreign key
-    
-    // --- FIX: Get the signer's address (the server's wallet) ---
-    let platformWallet;
-    try {
-        platformWallet = await signer.getAddress(); // Ethers.js
-    } catch (e) {
-        platformWallet = signer.address; // Web3.js / Truffle
-    }
+router.post('/record-investment', authenticateToken, isInvestor, async (req, res) => {
+    const { invoiceId, amountInvested, tokenId, txHash } = req.body;
+    const investorId = req.user.id;
+    const investorWallet = req.user.wallet_address;
 
     try {
-        const invoice = await Invoice.findById(invoiceId);
-        if (!invoice || invoice.financing_status !== 'listed' || !invoice.is_tokenized) {
-            return res.status(404).json({ msg: 'Invoice not available for investment' });
-        }
+        console.log(`Recording on-chain investment: Investor ${investorId} bought ${amountInvested} tokens for invoice ${invoiceId} (Token ID: ${tokenId})`);
 
-        const tokenId = invoice.token_id;
-        
-        // --- FIX: Convert decimal string to a whole number (BigInt) string ---
-        // The error "invalid BigNumberish string" means the contract
-        // cannot accept "0.001" as a token amount. It expects a whole number.
-        // We assume 1 token = $1 and tokens are indivisible (no decimals).
-        
-        let tokenAmount; // This will be our final, clean, integer string
-        try {
-            const floatAmount = parseFloat(amountToInvest);
-            if (isNaN(floatAmount)) {
-                throw new Error('Not a valid number.');
-            }
-
-            // We round to the nearest whole token. You could also use Math.floor()
-            const intAmount = Math.round(floatAmount);
-
-            if (intAmount <= 0) {
-                return res.status(400).json({ msg: `Investment amount (${amountToInvest}) is too small. Must invest at least 1 token.` });
-            }
-
-            // Convert the valid integer back to a string for the contract library
-            tokenAmount = intAmount.toString();
-
-        } catch (e) {
-            return res.status(400).json({ msg: 'Invalid investment amount format. Must be a whole number.' });
-        }
-        // --- END FIX ---
-
-        // 1. --- WEB3 INTERACTION ---
-        console.log(`Transferring ${tokenAmount} of token ${tokenId} from ${platformWallet} to ${investorWallet}`);
-        
-        const tx = await fractionToken.safeTransferFrom(
-            platformWallet,  // from (the platform)
-            investorWallet,  // to (the investor)
-            tokenId,         // id (the token ID)
-            tokenAmount,     // amount (NOW A WHOLE NUMBER STRING)
-            "0x"             // data (empty)
-        );
-
-        console.log(`Transaction sent. Waiting for confirmation... Tx Hash: ${tx.hash}`);
-        const receipt = await tx.wait();
-        
-        console.log(`On-chain transfer confirmed. Block: ${receipt.blockNumber}`);
-
-        // 2. Update database - Create a record in the 'investments' table.
-        console.log(`Recording investment: Investor ${investorId} buying ${tokenAmount} tokens for invoice ${invoiceId} (Token ID: ${tokenId})`);
-        
         const investmentQuery = `
-            INSERT INTO investments (user_id, invoice_id, token_id, amount_invested, tokens_bought, status, created_at)
-            VALUES ($1, $2, $3, $4, $5, 'completed', NOW())
+            INSERT INTO investments (user_id, invoice_id, token_id, amount_invested, tokens_bought, status, tx_hash, created_at)
+            VALUES ($1, $2, $3, $4, $5, 'completed', $6, NOW())
             RETURNING *;
         `;
         
-        // --- FIX: Use the rounded tokenAmount for BOTH amount_invested and tokens_bought ---
-        // This keeps the 1 token = $1 logic clean in the database.
-        const values = [investorId, invoiceId, tokenId, tokenAmount, tokenAmount];
+        // Assuming 1 token = $1 (amountInvested = tokens_bought)
+        const values = [investorId, invoiceId, tokenId, amountInvested, amountInvested, txHash];
         
         const { rows } = await pool.query(investmentQuery, values);
         const newInvestment = rows[0];
 
-        // 3. Potentially update the invoice's remaining supply (if tracked off-chain)
-        // (No change here)
-        
         // 4. Emit socket event for marketplace update (supply changed)
         const io = req.app.get('io');
         io.to('marketplace').emit('investment-made', { 
             invoiceId, 
-            tokensBought: tokenAmount,
+            tokensBought: amountInvested,
             investorWallet
         });
 
-        res.json({ msg: 'Investment successful', investment: newInvestment });
+        res.json({ msg: 'Investment recorded successfully', investment: newInvestment });
 
     } catch (err) {
-        console.error(err.message);
-        // Handle potential blockchain errors
-        if (err.message.includes("transfer to non ERC1155Receiver implementer")) {
-             return res.status(400).json({ msg: 'Blockchain Error: Investor wallet cannot receive tokens.' });
-        }
-        if (err.message.includes("insufficient balance for transfer")) {
-            return res.status(500).json({ msg: 'Platform Error: Not enough tokens in treasury to sell.' });
+        console.error("Failed to record investment:", err.message);
+        // Handle potential DB errors (e.g., duplicate tx_hash)
+        if (err.code === '23505') { // unique_violation
+             return res.status(400).json({ msg: 'Transaction already recorded.' });
         }
         res.status(500).send('Server Error');
     }

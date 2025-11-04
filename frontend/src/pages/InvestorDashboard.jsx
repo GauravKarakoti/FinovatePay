@@ -2,11 +2,19 @@ import { useState, useEffect } from 'react';
 import { api } from '../utils/api'; // Assuming you have a configured api utility
 import { toast } from 'sonner';
 import io from 'socket.io-client';
+// --- IMPORT NEW WEB3 FUNCTIONS AND UTILS ---
+import {
+    getFractionTokenContract,
+    getErc20Contract,
+    stablecoinAddresses,
+    connectWallet // Added for getting investor address
+} from '../utils/web3';
+import { ethers } from 'ethers';
 
 const InvoiceCard = ({ invoice, onInvest }) => {
     // Destructure the properties that actually exist in the invoice object
     const { invoice_id, amount, due_date, currency } = invoice;
-    
+
     console.log("InvoiceCard props:", invoice);
     const [investmentAmount, setInvestmentAmount] = useState('');
 
@@ -19,7 +27,8 @@ const InvoiceCard = ({ invoice, onInvest }) => {
         if (!investmentAmount || +investmentAmount <= 0) {
             return toast.error("Please enter a valid amount to invest");
         }
-        onInvest(invoice_id, investmentAmount);
+        // Pass the full invoice object and the amount
+        onInvest(invoice, investmentAmount);
         setInvestmentAmount('');
     };
 
@@ -63,7 +72,7 @@ const PortfolioItem = ({ item, onRedeem }) => {
     const { invoice, total_tokens, holdings } = item;
     // Destructure from the nested invoice object
     const { invoice_id, due_date, status } = invoice;
-    
+
     const maturity = new Date(due_date).toLocaleDateString();
     const isMatured = new Date(due_date) < new Date();
     // --- END FIX ---
@@ -92,10 +101,10 @@ const InvestorDashboard = ({ activeTab }) => {
     const [marketplaceListings, setMarketplaceListings] = useState([]);
     const [portfolio, setPortfolio] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // Setup Socket.IO
     useEffect(() => {
-        const socket = io(import.meta.env.VITE_API_BASE_URL); // Your backend URL
+        const socket = io(import.meta.env.VITE_API_URL); // Your backend URL
         socket.emit('join-marketplace');
 
         socket.on('new-listing', (newInvoice) => {
@@ -105,8 +114,8 @@ const InvestorDashboard = ({ activeTab }) => {
 
         socket.on('investment-made', ({ invoiceId, newSupply }) => {
             // Update the supply on the specific invoice card
-            setMarketplaceListings(prev => 
-                prev.map(inv => 
+            setMarketplaceListings(prev =>
+                prev.map(inv =>
                     inv.invoice_id === invoiceId ? { ...inv, remaining_supply: newSupply } : inv
                 )
             );
@@ -144,18 +153,18 @@ const InvestorDashboard = ({ activeTab }) => {
             const holdings = new Map();
             res.data.forEach(item => {
                 const { invoice, tokens_owned, token_id } = item;
-                
+
                 // Ensure invoice and invoice_id exist before proceeding
                 if (!invoice || !invoice.invoice_id) {
                     console.warn("Skipping portfolio item with missing invoice data", item);
-                    return; 
+                    return;
                 }
-                
+
                 const invoiceId = invoice.invoice_id;
                 const tokenAmount = parseFloat(tokens_owned);
 
                 if (Number.isNaN(tokenAmount)) {
-                     console.warn("Skipping portfolio item with invalid token amount", item);
+                    console.warn("Skipping portfolio item with invalid token amount", item);
                     return;
                 }
 
@@ -169,11 +178,11 @@ const InvestorDashboard = ({ activeTab }) => {
                         total_tokens: tokenAmount,
                         holdings: [{ token_id: token_id, amount: tokenAmount }],
                         // Use invoice_id as the unique key for the aggregated item
-                        item_key: invoiceId 
+                        item_key: invoiceId
                     });
                 }
             });
-            
+
             setPortfolio(Array.from(holdings.values()));
             // --- END FIX ---
 
@@ -183,38 +192,170 @@ const InvestorDashboard = ({ activeTab }) => {
         }
     };
 
-    const handleInvest = async (invoiceId, amountToInvest) => {
-        toast.loading('Processing investment...');
+    // --- UPDATED INVESTMENT LOGIC ---
+    const handleInvest = async (invoice, amountToInvest) => {
+        // This must be set in your .env.local file (e.g., VITE_PLATFORM_TREASURY_ADDRESS=0x...)
+        const PLATFORM_TREASURY_WALLET = import.meta.env.VITE_PLATFORM_TREASURY_ADDRESS;
+        // Using USDC, but you can add logic to select based on invoice.currency
+        const PAYMENT_TOKEN_ADDRESS = stablecoinAddresses.USDC; 
+
+        if (!PLATFORM_TREASURY_WALLET) {
+            toast.error("Platform treasury address is not configured. Please contact support.");
+            return;
+        }
+
+        let fractionToken;
+        let paymentTokenContract;
+        let tokenId;
+
         try {
-            const res = await api.post('/investor/buy-tokens', { invoiceId, amountToInvest });
-            toast.success(res.data.msg || 'Investment successful!');
-            // Refetch data
+            toast.loading('Preparing transaction... Please check your wallet.');
+            
+            // Get contract instances
+            fractionToken = await getFractionTokenContract();
+            paymentTokenContract = await getErc20Contract(PAYMENT_TOKEN_ADDRESS);
+            tokenId = invoice.token_id;
+
+            // 1. Parse amount based on the payment token's decimals
+            // This is critical. If amountToInvest is "100" (for $100) and USDC has 6 decimals,
+            // tokenAmount will be 100 * 10^6 = 100,000,000
+            const paymentTokenDecimals = await paymentTokenContract.decimals();
+            const tokenAmount = ethers.utils.parseUnits(amountToInvest, paymentTokenDecimals);
+            
+            // This is the amount of ERC1155 tokens to buy. 
+            // We assume 1 token = $1, so "100" tokens.
+            // **NOTE:** If your ERC1155 tokens also have decimals, you must adjust this.
+            // For simplicity, we'll assume the ERC1155 amount is the same as the dollar amount.
+            // If 1 token = $1, and USDC has 6 decimals, you pay 100,000,000 (USDC) for 100 (tokens).
+            // The new contract function should handle this distinction.
+            // Let's adjust based on the previous recommendation:
+            // We'll assume the ERC1155 amount is `amountToInvest` (e.g., "100")
+            // And the payment amount is the decimal-adjusted `tokenAmount`.
+            // The `purchaseTokens` contract function needs to accept both.
+            //
+            // --- RE-READING ---
+            // The previous `purchaseTokens` assumed `_amount` was for BOTH.
+            // `uint256 paymentAmount = _amount;`
+            // This means we must send the *decimal-adjusted* amount for both.
+            // This implies 1 token = 1 unit of stablecoin (1 USDC, not $1).
+            // e.g., to buy $100 (100,000,000 USDC units), you buy 100,000,000 tokens.
+            // Let's stick to that for consistency.
+
+            // 2. Check allowance
+            const { address: investorAddress } = await connectWallet();
+            const allowance = await paymentTokenContract.allowance(investorAddress, fractionToken.address);
+
+            // 3. Approve ERC20 (USDC) spend if necessary
+            if (allowance.lt(tokenAmount)) {
+                toast.loading('Please approve USDC spending in your wallet...');
+                const approveTx = await paymentTokenContract.approve(fractionToken.address, tokenAmount);
+                await approveTx.wait();
+                toast.success('Approval successful! Now confirming purchase...');
+            } else {
+                toast.loading('Approval found. Processing purchase...');
+            }
+
+            // 4. Call the purchaseTokens function
+            // We send the decimal-adjusted amount for both payment and token quantity
+            const tx = await fractionToken.purchaseTokens(
+                tokenId,
+                tokenAmount, // The amount of ERC1155 tokens (e.g., 100,000,000)
+                PAYMENT_TOKEN_ADDRESS,
+                PLATFORM_TREASURY_WALLET
+            );
+
+            await tx.wait();
+            toast.success('Investment successful! Transaction confirmed.');
+
+            // 5. Notify backend to *record* the investment
+            // Use the human-readable amount ("100") for the database
+            await api.post('/investor/record-investment', {
+                invoiceId: invoice.invoice_id,
+                amountInvested: amountToInvest, // The human-readable amount
+                tokenId: tokenId,
+                txHash: tx.hash
+            });
+
+            // 6. Refetch data
             fetchMarketplace();
             fetchPortfolio();
+
         } catch (error) {
-            toast.error(error.response?.data?.msg || 'Investment failed.');
             console.error(error);
+            if (error.code === 4001) { // User rejected transaction
+                toast.error('Transaction rejected in wallet.');
+            } else if (error.reason?.includes("ERC20 payment failed")) {
+                toast.error("Payment failed. Do you have enough USDC?");
+            } else if (error.reason?.includes("insufficient balance for transfer")) {
+                toast.error("Platform treasury is empty. Cannot complete purchase.");
+            } else {
+                toast.error(error.reason || 'Investment failed. See console for details.');
+            }
         }
     };
+    // --- END UPDATED LOGIC ---
+
 
     const handleRedeem = async (holdingsToRedeem) => { // 'holdingsToRedeem' is an array: [{token_id, amount}, ...]
         toast.loading('Redeeming all tokens for this invoice...');
+        
+        // --- NOTE ---
+        // This function also needs to be updated to use the frontend wallet,
+        // similar to `handleInvest`. The backend `redeem-tokens` route
+        // should be removed or changed to a `record-redemption` endpoint.
+        // For now, the old logic is left as a placeholder.
+
         let totalRedeemedValue = 0;
         let failedRedemptions = 0;
         let successfulRedemptions = 0;
 
         try {
-            // Loop over each individual holding and redeem it
+            // This loop calls the *old* backend API, which will fail
+            // as the backend signer doesn't own the tokens.
+            // This entire block needs to be rewritten.
+            
+            // --- START REWRITE (EXAMPLE) ---
+            // 1. Get contract
+            // const fractionToken = await getFractionTokenContract();
+            
+            // 2. Loop and call redeem from frontend
+            // for (const holding of holdingsToRedeem) {
+            //     if (holding.amount <= 0) continue; 
+            //     try {
+            //         // NOTE: `holding.amount` must be converted to the
+            //         // correct decimal-adjusted BigNumber
+            //         const tokenAmount = ethers.utils.parseUnits(holding.amount.toString(), 6); // Assuming 6 decimals
+            //
+            //         const tx = await fractionToken.redeem(holding.token_id, tokenAmount);
+            //         const receipt = await tx.wait();
+            //
+            //         // Find the 'Redeemed' event in receipt.logs to get the value
+            //         // (This part is complex and requires parsing logs)
+            //         
+            //         successfulRedemptions++;
+            //
+            //         // 5. Notify backend to record redemption
+            //         await api.post('/investor/record-redemption', { ... });
+            //
+            //     } catch (error) {
+            //          failedRedemptions++;
+            //          toast.error(error.reason || `Failed to redeem token ${holding.token_id}`);
+            //     }
+            // }
+            // --- END REWRITE (EXAMPLE) ---
+
+            // Using old logic as a placeholder:
+            toast.error("Redeem function not yet updated for frontend wallet. Please contact admin.");
+            
+            /*
+            // OLD LOGIC (will fail)
             for (const holding of holdingsToRedeem) {
-                // Skip if amount is zero or negative
-                if (holding.amount <= 0) continue; 
-                
+                if (holding.amount <= 0) continue;
                 try {
-                    const res = await api.post('/investor/redeem-tokens', { 
-                        tokenId: holding.token_id, 
-                        amount: holding.amount 
+                    const res = await api.post('/investor/redeem-tokens', {
+                        tokenId: holding.token_id,
+                        amount: holding.amount
                     });
-                    // Assuming res.data.redeemed_value is a number or string convertible to number
                     totalRedeemedValue += parseFloat(res.data.redeemed_value) || 0;
                     successfulRedemptions++;
                 } catch (error) {
@@ -223,6 +364,7 @@ const InvestorDashboard = ({ activeTab }) => {
                     toast.error(error.response?.data?.msg || `Failed to redeem part of holding (Token ${holding.token_id.substring(0, 6)}...)`);
                 }
             }
+            */
 
             // Report final status
             if (successfulRedemptions > 0 && failedRedemptions === 0) {
@@ -230,12 +372,11 @@ const InvestorDashboard = ({ activeTab }) => {
             } else if (successfulRedemptions > 0 && failedRedemptions > 0) {
                 toast.warning(`Partially redeemed ${totalRedeemedValue.toFixed(2)} USD. ${failedRedemptions} parts failed.`);
             } else if (successfulRedemptions === 0 && failedRedemptions > 0) {
-                toast.error('All redemption attempts failed.');
+                // toast.error('All redemption attempts failed.');
             } else {
-                // This case (0 success, 0 fails) might happen if holdings array was empty or all amounts were 0
-                toast.info('No tokens to redeem.');
+                // toast.info('No tokens to redeem.');
             }
-            
+
             fetchPortfolio(); // Refresh portfolio regardless of outcome
         } catch (error) {
             // Catch any unexpected error in the looping logic itself
@@ -243,7 +384,7 @@ const InvestorDashboard = ({ activeTab }) => {
             console.error(error);
         }
     };
-    
+
     // Render financing tab content
     const renderFinancingContent = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -254,10 +395,10 @@ const InvestorDashboard = ({ activeTab }) => {
                 <div className="space-y-4">
                     {marketplaceListings.length > 0 ? (
                         marketplaceListings.map(invoice => (
-                            <InvoiceCard 
-                                key={invoice.invoice_id} 
+                            <InvoiceCard
+                                key={invoice.invoice_id}
                                 invoice={invoice}
-                                onInvest={handleInvest} 
+                                onInvest={handleInvest}
                             />
                         ))
                     ) : (
@@ -269,17 +410,17 @@ const InvestorDashboard = ({ activeTab }) => {
             <div>
                 <h2 className="text-2xl font-semibold mb-4">My Portfolio</h2>
                 <div className="space-y-4">
-                     {portfolio.length > 0 ? (
+                    {portfolio.length > 0 ? (
                         portfolio.map(item => (
-                            <PortfolioItem 
+                            <PortfolioItem
                                 key={item.item_key} // FIX: Use the aggregated item_key
-                                item={item} 
+                                item={item}
                                 onRedeem={handleRedeem}
                             />
                         ))
-                     ) : (
+                    ) : (
                         <p>You have not invested in any invoices yet.</p>
-                     )}
+                    )}
                 </div>
             </div>
         </div>
