@@ -59,6 +59,56 @@ router.post('/record-investment', authenticateToken, isInvestor, async (req, res
     }
 });
 
+router.post('/record-redemption', authenticateToken, async (req, res) => {
+    const { invoiceId, redeemedAmount, txHashes } = req.body;
+    const investorAddress = req.user.wallet_address;
+
+    if (!invoiceId || !redeemedAmount || !txHashes) {
+        return res.status(400).json({ error: 'Missing required fields.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Update the investor's holdings to zero (or mark as redeemed)
+        // This query assumes you want to set tokens_owned to 0 after redemption.
+        const updateQuery = `
+            UPDATE investor_holdings ih
+            SET tokens_owned = 0
+            FROM invoices i
+            WHERE ih.invoice_id = i.id
+              AND i.invoice_id = $1
+              AND ih.investor_address = $2
+        `;
+        await client.query(updateQuery, [invoiceId, investorAddress]);
+
+        // 2. Update the main invoice status to 'redeemed'
+        // This assumes the *entire* invoice is redeemed, which might be a business logic choice.
+        // You may want to check if all tokens are redeemed first.
+        const updateInvoiceQuery = `
+            UPDATE invoices
+            SET financing_status = 'redeemed'
+            WHERE invoice_id = $1
+        `;
+        await client.query(updateInvoiceQuery, [invoiceId]);
+
+        // 3. (Optional) Log the redemption transaction
+        // You might want a new table `redemptions` to log this.
+        // e.g., INSERT INTO redemptions (invoice_id, investor_address, amount, tx_hashes) ...
+        
+        await client.query('COMMIT');
+        res.status(200).json({ success: true, message: 'Redemption recorded.' });
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error recording redemption:', error);
+        res.status(500).json({ error: 'Failed to record redemption.' });
+    } finally {
+        client.release();
+    }
+});
+
 // @route   GET /api/investor/portfolio
 // @desc    Get the investing portfolio for the logged-in investor
 // @access  Private (Investor)

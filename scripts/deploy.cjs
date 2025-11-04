@@ -1,4 +1,4 @@
-const { ethers } = require("hardhat");
+const { ethers, artifacts } = require("hardhat");
 const fs = require("fs");
 
 async function main() {
@@ -25,18 +25,29 @@ async function main() {
   await escrowContract.deployed();
   console.log("EscrowContract deployed to:", escrowContract.address);
 
-  // **UPDATE**: Deploy InvoiceFactory instead of InvoiceRegistry
+  // Deploy InvoiceFactory
   const InvoiceFactory = await ethers.getContractFactory("InvoiceFactory");
   const invoiceFactory = await InvoiceFactory.deploy();
   await invoiceFactory.deployed();
   console.log("InvoiceFactory deployed to:", invoiceFactory.address);
 
-  // Deploy FractionToken (optional)
+  // Deploy FractionToken
   const FractionToken = await ethers.getContractFactory("FractionToken");
   const fractionToken = await FractionToken.deploy();
   await fractionToken.deployed();
   console.log("FractionToken deployed to:", fractionToken.address);
 
+  // ---!! IMPORTANT FIX !! ---
+  // This is the one-time setup to fix the ERC1155MissingApprovalForAll error
+  // The deployer (who owns the contract and tokens) approves the contract
+  // to transfer tokens on its behalf during 'purchaseTokens'.
+  console.log(`\nApproving FractionToken (${fractionToken.address}) to manage deployer's tokens...`);
+  const approvalTx = await fractionToken.setApprovalForAll(fractionToken.address, true);
+  await approvalTx.wait();
+  console.log(`FractionToken approval set. Transaction hash: ${approvalTx.hash}\n`);
+  // --- END FIX ---
+
+  // Deploy ProduceTracking
   const ProduceTracking = await ethers.getContractFactory("ProduceTracking");
   const produceTracking = await ProduceTracking.deploy();
   await produceTracking.deployed();
@@ -54,7 +65,6 @@ async function main() {
     JSON.stringify({
       ComplianceManager: complianceManager.address,
       EscrowContract: escrowContract.address,
-      // **UPDATE**: Save InvoiceFactory address
       InvoiceFactory: invoiceFactory.address,
       FractionToken: fractionToken.address,
       ProduceTracking: produceTracking.address,
@@ -64,7 +74,6 @@ async function main() {
   // Save contract ABIs
   const complianceManagerArtifact = await artifacts.readArtifact("ComplianceManager");
   const escrowContractArtifact = await artifacts.readArtifact("EscrowContract");
-  // **UPDATE**: Read InvoiceFactory artifact
   const invoiceFactoryArtifact = await artifacts.readArtifact("InvoiceFactory");
   const fractionTokenArtifact = await artifacts.readArtifact("FractionToken");
   const invoiceArtifact = await artifacts.readArtifact("Invoice");
@@ -78,7 +87,6 @@ async function main() {
     contractsDir + "/EscrowContract.json",
     JSON.stringify(escrowContractArtifact, null, 2)
   );
-  // **UPDATE**: Save InvoiceFactory ABI
   fs.writeFileSync(
     contractsDir + "/InvoiceFactory.json",
     JSON.stringify(invoiceFactoryArtifact, null, 2)
