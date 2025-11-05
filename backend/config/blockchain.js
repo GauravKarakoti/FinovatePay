@@ -55,7 +55,7 @@ const contractAddresses = {
   invoiceFactory: process.env.INVOICE_FACTORY_ADDRESS,
   escrowContract: process.env.ESCROW_CONTRACT_ADDRESS,
   complianceManager: process.env.COMPLIANCE_MANAGER_ADDRESS,
-  // 4. (Optional but good practice) Add address here
+  produceTracking: process.env.PRODUCE_TRACKING_ADDRESS,
   fractionToken: process.env.FRACTION_TOKEN_ADDRESS,
 };
 

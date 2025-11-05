@@ -1,20 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-// import { updateLotLocation } from '../utils/api'; // Assuming this is your API utility
+import { updateLotLocation } from '../utils/api';
 import { Html5Qrcode } from 'html5-qrcode';
-
-// Mock API function for demonstration purposes
-const updateLotLocation = ({ lotId, location }) => {
-    return new Promise((resolve, reject) => {
-        console.log(`Updating location for Lot ID: ${lotId} to ${location}`);
-        if (lotId && location) {
-            setTimeout(() => resolve({ success: true }), 500);
-        } else {
-            setTimeout(() => reject({ response: { data: { error: "Invalid data provided." } } }), 500);
-        }
-    });
-};
-
 
 const ShipmentDashboard = () => {
     const [scannedLotId, setScannedLotId] = useState(null);
@@ -33,9 +20,7 @@ const ShipmentDashboard = () => {
         scannerRef.current = html5QrCodeScanner;
 
         const qrCodeSuccessCallback = (decodedText, decodedResult) => {
-            handleScan(decodedText.substring(decodedText.length - 1));
-            // The scanner will continue to scan, which is often desired in warehouse environments.
-            // If you want it to stop after one scan, you would call .stop() here.
+            handleScan(decodedText);
         };
 
         const config = { 
@@ -80,8 +65,14 @@ const ShipmentDashboard = () => {
                 try {
                     const scannedData = JSON.parse(scannedText);
                     console.log("Scanned Data:", scannedData);
-                    lotId = scannedData.lotId;
-                    console.log("Extracted Lot ID:", lotId);
+                    // Check if it's an object with a lotId property
+                    if (scannedData && typeof scannedData === 'object' && scannedData.lotId) {
+                        lotId = scannedData.lotId;
+                    } else {
+                        // If it's valid JSON but not the expected object,
+                        // stringify it to treat it as a plain ID (e.g., JSON "123" becomes 123)
+                        lotId = String(scannedData);
+                    }
                 } catch (e) {
                     // If parsing fails, assume the whole text is the lotId
                     lotId = scannedText;
@@ -108,7 +99,7 @@ const ShipmentDashboard = () => {
 
         setIsSubmitting(true);
         try {
-            await updateLotLocation({ lotId: scannedLotId, location });
+            await updateLotLocation({ lotId: String(scannedLotId), location });
             toast.success("Location updated successfully!");
             // Reset the form for the next scan
             setScannedLotId(null);

@@ -311,12 +311,17 @@ const SellerDashboard = ({ activeTab }) => {
 
           // 2. Call the smart contract function to create the lot on-chain
           toast.info("Please confirm the transaction in your wallet to create the produce lot...");
+          
+          // ---
+          // **FIX**: Added an empty string "" as the last argument for _tokenURI
+          // ---
           const tx = await contract.createProduceLot(
               formData.produceType,
               formData.harvestDate, // Already in UNIX timestamp format from the form component
               formData.qualityMetrics,
               formData.origin,
-              ethers.utils.parseUnits(formData.quantity.toString(), 18) // Assuming quantity can have decimals
+              ethers.utils.parseUnits(formData.quantity.toString(), 18), // Assuming quantity can have decimals
+              "" // Pass an empty string for the _tokenURI argument
           );
           console.log("Transaction sent:", tx);
 

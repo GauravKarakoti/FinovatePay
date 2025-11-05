@@ -53,11 +53,11 @@ router.get('/lots/producer', authenticateToken, async (req, res) => {
 
 router.get('/lots/seller', authenticateToken, produceController.getSellerLots);
 
-// Get a specific produce lot by ID
 router.get('/lots/:lotId', async (req, res) => {
   try {
     const { lotId } = req.params;
     
+    // 1. Get Lot Details
     const lotResult = await pool.query(
       'SELECT * FROM produce_lots WHERE lot_id = $1',
       [lotId]
@@ -67,15 +67,23 @@ router.get('/lots/:lotId', async (req, res) => {
       return res.status(404).json({ error: 'Produce lot not found' });
     }
     
+    // 2. Get Lot Transactions
     const transactionsResult = await pool.query(
       'SELECT * FROM produce_transactions WHERE lot_id = $1 ORDER BY created_at DESC',
+      [lotId]
+    );
+    
+    // 3. (NEW) Get Location History
+    const locationHistoryResult = await pool.query(
+      'SELECT * FROM produce_location_history WHERE lot_id = $1 ORDER BY timestamp DESC',
       [lotId]
     );
     
     res.json({
       success: true,
       lot: lotResult.rows[0],
-      transactions: transactionsResult.rows
+      transactions: transactionsResult.rows,
+      locations: locationHistoryResult.rows // <-- Send locations to frontend
     });
   } catch (error) {
     console.error('Error getting produce lot:', error);

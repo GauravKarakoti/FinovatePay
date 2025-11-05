@@ -73,15 +73,15 @@ const availableTools = {
             console.log(`[AI Tool] Called get_shipment_location for: ${lotId}`);
             // Query the database for the produce lot's origin
             // Based on produceController.js, 'origin' is a field.
-            const query = 'SELECT origin FROM produce_lots WHERE lot_id = $1';
+            const query = 'SELECT location FROM produce_location_history WHERE lot_id = $1 ORDER BY timestamp DESC LIMIT 1';
             const result = await pool.query(query, [lotId]);
+            console.log(`[AI Tool] DB result for lot ${lotId}:`, result.rows);
 
             if (result.rows.length === 0) {
                 return JSON.stringify({ location: "Lot Not Found" });
             }
 
-            // Return the 'origin' as the location
-            return JSON.stringify({ location: result.rows[0].origin });
+            return JSON.stringify({ location: result.rows[0].location });
             
         } catch (error) {
             console.error(`[AI Tool Error] get_shipment_location:`, error.message);
@@ -115,9 +115,9 @@ router.post('/', async (req, res) => {
             tools: tools,
             tool_choice: "auto",
         });
+        console.log("Groq API first response:", firstResponse.choices[0]);
 
         const responseMessage = firstResponse.choices[0].message;
-        console.log("Groq API response message:", responseMessage.tool_calls[0].function);
 
         // Check if the model wants to call a tool
         if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
@@ -141,12 +141,13 @@ router.post('/', async (req, res) => {
                     content: toolResponse,
                 });
             }
-
+            console.log("[AI Agent] Completed tool calls, preparing final response.", messages);
             // --- NEW: Second API call to get a natural language response ---
             const finalResponse = await groq.chat.completions.create({
                 model: "llama-3.3-70b-versatile",
                 messages: messages,
             });
+            console.log("Groq API final response:", finalResponse);
 
             const reply = finalResponse.choices[0]?.message?.content;
             console.log("Groq API final reply:", reply);
