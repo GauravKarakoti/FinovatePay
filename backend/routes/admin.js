@@ -9,6 +9,7 @@ const {
     updateUserRole,
     checkCompliance,
     resolveDispute,
+    setInvoiceSpread
 } = require('../controllers/adminController');
 
 // All routes in this file are protected and require admin privileges
@@ -21,5 +22,6 @@ router.post('/users/:userId/unfreeze', unfreezeAccount);
 router.put('/users/:userId/role', updateUserRole);
 router.post('/check-compliance', checkCompliance);
 router.post('/resolve-dispute', resolveDispute);
+router.post('/financing/spread', authenticateToken, setInvoiceSpread);
 
 module.exports = router;

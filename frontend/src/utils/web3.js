@@ -6,6 +6,10 @@ import InvoiceFactoryArtifact from '../../../deployed/InvoiceFactory.json';
 import ProduceTrackingArtifact from '../../../deployed/ProduceTracking.json';
 import FractionTokenArtifact from '../../../deployed/FractionToken.json';
 import contractAddresses from '../../../deployed/contract-addresses.json';
+import FinancingManagerArtifact from "../../../deployed/FinancingManager.json";
+// You need a standard ERC20 ABI file. You can get this from OpenZeppelin.
+// Place it in 'deployed/ERC20.json' or 'src/abis/ERC20.json'
+import ERC20Artifact from "../../../deployed/ERC20.json";
 
 let web3Modal;
 let provider;
@@ -44,6 +48,52 @@ export async function getEscrowContract() {
     );
 }
 
+export async function getFinancingManagerContract() {
+    const { signer } = await connectWallet();
+    return new ethers.Contract(
+        contractAddresses.FinancingManager, // Ensure this exists in your contract-addresses.json
+        FinancingManagerArtifact.abi,
+        signer
+    );
+}
+
+export const getStablecoinContract = (stablecoinAddress, withSigner = false) => {
+  return getContract(stablecoinAddress, erc20ABI, withSigner);
+};
+
+export async function approveFinancingManager() {
+    const contract = await getFractionTokenContract();
+    const tx = await contract.setApprovalForAll(contractAddresses.FinancingManager, true);
+    return tx.wait();
+}
+
+export async function checkFinancingManagerApproval() {
+    const { signer, address } = await connectWallet();
+    // We need a read-only contract instance or just use the one with signer
+    const contract = await getFractionTokenContract(); 
+    return await contract.isApprovedForAll(address, contractAddresses.FinancingManager);
+}
+
+export async function approveStablecoin(stablecoinAddress, amount) {
+    const { signer } = await connectWallet();
+    const contract = new ethers.Contract(stablecoinAddress, erc20ABI, signer);
+    const tx = await contract.approve(contractAddresses.FinancingManager, amount);
+    return tx.wait();
+}
+
+export async function checkStablecoinAllowance(stablecoinAddress) {
+    const { signer, address } = await connectWallet();
+    const contract = new ethers.Contract(stablecoinAddress, erc20ABI, signer);
+    // Returns a BigNumber in v5
+    return await contract.allowance(address, contractAddresses.FinancingManager);
+}
+
+export async function buyFractions(tokenId, amount) {
+    const contract = await getFinancingManagerContract();
+    const tx = await contract.buyFractions(tokenId, amount);
+    return tx.wait();
+}
+
 export async function getInvoiceFactoryContract() {
     const { signer } = await connectWallet();
     return new ethers.Contract(
@@ -71,12 +121,7 @@ export async function getFractionTokenContract() {
     );
 }
 
-export const erc20ABI = [
-    "function approve(address spender, uint256 amount) public returns (bool)",
-    "function symbol() view returns (string)",
-    "function decimals() view returns (uint8)",
-    "function allowance(address owner, address spender) view returns (uint256)"
-];
+export const erc20ABI = ERC20Artifact.abi;
 
 export async function getErc20Contract(tokenAddress) {
     const { signer } = await connectWallet();

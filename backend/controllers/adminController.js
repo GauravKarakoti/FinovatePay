@@ -2,6 +2,7 @@ const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
 const pool = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
+const { getFinancingManagerContract } = require('../config/blockchain');
 
 // Helper function to convert UUID to bytes32
 const uuidToBytes32 = (uuid) => {
@@ -9,6 +10,31 @@ const uuidToBytes32 = (uuid) => {
   const hex = '0x' + uuid.replace(/-/g, '');
   // 2. Pad to 32 bytes
   return ethers.zeroPadValue(hex, 32);
+};
+
+exports.setInvoiceSpread = async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(401).json({ msg: 'Not authorized' });
+  }
+
+  const { tokenId, spreadBps } = req.body;
+
+  if (!tokenId || !spreadBps) {
+    return res.status(400).json({ msg: 'Token ID and spreadBps are required' });
+  }
+
+  try {
+    // Get contract with admin signer
+    const financingContract = getFinancingManagerContract(true); 
+    
+    const tx = await financingContract.setInvoiceSpread(tokenId, spreadBps);
+    await tx.wait();
+
+    res.json({ msg: 'Invoice spread updated successfully', tokenId, spreadBps });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
 };
 
 // --- USER MANAGEMENT ---

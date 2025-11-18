@@ -1,7 +1,10 @@
 const { ethers } = require('ethers');
+const { get } = require('../routes/chatbot');
 require('dotenv').config();
 // 1. Import the ABI
 const FractionTokenABI = require('../../deployed/FractionToken.json').abi;
+const ComplianceManagerABI = require('../../deployed/ComplianceManager.json').abi;
+const FinancingManagerABI = require('../../deployed/FinancingManager.json').abi;
 
 // --- Validation ---
 if (!process.env.BLOCKCHAIN_RPC_URL) {
@@ -50,6 +53,23 @@ const getFractionTokenContract = (signerOrProvider) => {
   );
 };
 
+const getComplianceManagerContract = (signerOrProvider) => {
+  const provider = getProvider();
+  return new ethers.Contract(
+    process.env.COMPLIANCE_MANAGER_ADDRESS,
+    ComplianceManagerABI,
+    signerOrProvider || provider // Use signer if provided, else fallback to provider
+  );
+};
+
+const getFinancingManagerContract = (signerOrProvider) => {
+  const provider = getProvider();
+  return new ethers.Contract(
+    process.env.FINANCING_MANAGER_ADDRESS,
+    FinancingManagerABI,
+    signerOrProvider || provider // Use signer if provided, else fallback to provider
+  );
+};
 
 const contractAddresses = {
   invoiceFactory: process.env.INVOICE_FACTORY_ADDRESS,
@@ -57,13 +77,15 @@ const contractAddresses = {
   complianceManager: process.env.COMPLIANCE_MANAGER_ADDRESS,
   produceTracking: process.env.PRODUCE_TRACKING_ADDRESS,
   fractionToken: process.env.FRACTION_TOKEN_ADDRESS,
+  financingManager: process.env.FINANCING_MANAGER_ADDRESS
 };
 
 module.exports = {
   getProvider,
   getSigner,
   contractAddresses,
-  // 5. Export the new function and ABI
+  getComplianceManagerContract,
   getFractionTokenContract,
+  getFinancingManagerContract,
   FractionTokenABI
 };

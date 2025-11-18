@@ -37,10 +37,17 @@ async function main() {
   await fractionToken.deployed();
   console.log("FractionToken deployed to:", fractionToken.address);
 
-  // ---!! IMPORTANT FIX !! ---
-  // This is the one-time setup to fix the ERC1155MissingApprovalForAll error
-  // The deployer (who owns the contract and tokens) approves the contract
-  // to transfer tokens on its behalf during 'purchaseTokens'.
+  const fractionTokenAddress = fractionToken.address;
+  const stablecoinAddress = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"; // e.g., Polygon USDC
+  const feeWalletAddress = "0xeb4f0cb1644fa1f6dd01aa2f7c49099d2267f3a8";
+
+  console.log("Deploying FinancingManager...");
+  const FinancingManager = await ethers.getContractFactory("FinancingManager");
+
+  const financingManager = await FinancingManager.deploy(fractionTokenAddress,stablecoinAddress,feeWalletAddress);
+  await financingManager.deployed();
+  console.log("FractionToken deployed to:", financingManager.address);
+
   console.log(`\nApproving FractionToken (${fractionToken.address}) to manage deployer's tokens...`);
   const approvalTx = await fractionToken.setApprovalForAll(fractionToken.address, true);
   await approvalTx.wait();
@@ -68,6 +75,7 @@ async function main() {
       InvoiceFactory: invoiceFactory.address,
       FractionToken: fractionToken.address,
       ProduceTracking: produceTracking.address,
+      FinancingManager: financingManager.address
     }, undefined, 2)
   );
 
@@ -78,6 +86,7 @@ async function main() {
   const fractionTokenArtifact = await artifacts.readArtifact("FractionToken");
   const invoiceArtifact = await artifacts.readArtifact("Invoice");
   const produceTrackingArtifact = await artifacts.readArtifact("ProduceTracking");
+  const FinancingManagerArtifact = await artifacts.readArtifact("FinancingManager");
 
   fs.writeFileSync(
     contractsDir + "/ComplianceManager.json",
@@ -102,6 +111,10 @@ async function main() {
   fs.writeFileSync(
     contractsDir + "/ProduceTracking.json",
     JSON.stringify(produceTrackingArtifact, null, 2)
+  );
+  fs.writeFileSync(
+    contractsDir + "/FinancingManager.json",
+    JSON.stringify(FinancingManagerArtifact, null, 2)
   );
 
   console.log("\nDeployment completed and artifacts saved!");

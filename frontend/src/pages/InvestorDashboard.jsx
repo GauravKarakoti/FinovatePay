@@ -1,64 +1,70 @@
 import { useState, useEffect } from 'react';
-import { api } from '../utils/api'; // Assuming you have a configured api utility
+import { api } from '../utils/api';
 import { toast } from 'sonner';
 import io from 'socket.io-client';
-// --- IMPORT NEW WEB3 FUNCTIONS AND UTILS ---
-import { getFractionTokenContract } from '../utils/web3';
 import { ethers } from 'ethers';
 
-const InvoiceCard = ({ invoice, onInvest }) => {
-    // --- UPDATED: Destructured remaining_supply ---
-    const { invoice_id, amount, due_date, currency, remaining_supply } = invoice;
+// --- IMPORTS FOR V3 FINANCING ---
+import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
+import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
 
-    console.log("InvoiceCard props:", invoice);
-    const [investmentAmount, setInvestmentAmount] = useState('');
+// --- UPDATED INVOICE CARD ---
+const InvoiceCard = ({ invoice, onPurchaseSuccess }) => {
+    const { 
+        invoice_id, 
+        amount, 
+        due_date, 
+        currency, 
+        remaining_supply, 
+        token_id 
+    } = invoice;
 
     const face_value_display = amount; 
     const maturity = new Date(due_date).toLocaleDateString();
 
-    const handleInvest = () => {
-        if (!investmentAmount || +investmentAmount <= 0) {
-            return toast.error("Please enter a valid amount to invest");
-        }
-        onInvest(invoice, investmentAmount);
-        setInvestmentAmount('');
-    };
+    // Determine stablecoin details based on currency
+    // Fallback to USDC if currency is unknown, or handle MATIC specifically if needed
+    const isNative = currency === 'MATIC';
+    const stablecoinAddress = stablecoinAddresses[currency] || stablecoinAddresses["USDC"];
+    const stablecoinDecimals = currency === 'USDC' ? 6 : 18; 
 
     return (
         <div className="bg-white shadow rounded-lg p-4 border border-gray-200">
             <div className="flex justify-between items-center mb-2">
-                <h3 className="text-lg font-semibold text-finovate-blue-800">Invoice {invoice_id.substring(0, 8)}...</h3>
+                <h3 className="text-lg font-semibold text-finovate-blue-800">
+                    Invoice {invoice_id.substring(0, 8)}...
+                </h3>
             </div>
             <p className="text-sm text-gray-600">Matures on: {maturity}</p>
-            <div className="mt-4 space-y-2">
+            
+            <div className="mt-4 space-y-2 mb-4">
                 <div className="flex justify-between text-sm">
                     <span>Face Value:</span>
-                    {/* Display currency as MATIC if it's the chain's native token */}
-                    <span className="font-medium">{currency === 'MATIC' ? 'MATIC' : currency} {face_value_display}</span>
+                    <span className="font-medium">{currency} {face_value_display}</span>
                 </div>
-                {/* --- ADDED: Remaining Value Section --- */}
                 <div className="flex justify-between text-sm">
                     <span>Remaining to Invest:</span>
                     <span className="font-medium text-green-600">
-                        {currency === 'MATIC' ? 'MATIC' : currency} {Number(remaining_supply)}
+                        {currency} {Number(remaining_supply).toFixed(2)}
                     </span>
                 </div>
             </div>
-            <div className="mt-4 flex space-x-2">
-                <input
-                    type="number"
-                    placeholder="Amount in MATIC" // <-- Updated placeholder
-                    value={investmentAmount}
-                    onChange={(e) => setInvestmentAmount(e.target.value)}
-                    className="flex-1 p-2 border rounded-md text-sm"
+
+            {/* --- V3 INTEGRATION: BuyFractionToken Component --- */}
+            {isNative ? (
+                 <div className="p-3 bg-yellow-50 text-yellow-800 text-sm rounded">
+                    Native MATIC financing not supported in V3. Use USDC.
+                 </div>
+            ) : (
+                <BuyFractionToken
+                    tokenId={token_id}
+                    stablecoinAddress={stablecoinAddress}
+                    stablecoinDecimals={stablecoinDecimals}
+                    tokenDecimals={18} // FractionToken standard
+                    maxAmount={remaining_supply} // Pass simple number or string
+                    onSuccess={onPurchaseSuccess} // Callback to refresh list
                 />
-                <button
-                    onClick={handleInvest}
-                    className="bg-finovate-blue-600 text-white px-4 py-2 rounded-md hover:bg-finovate-blue-700 text-sm"
-                >
-                    Invest
-                </button>
-            </div>
+            )}
         </div>
     );
 };
@@ -68,22 +74,30 @@ const PortfolioItem = ({ item, onRedeem }) => {
     const { invoice_id, due_date, status } = invoice;
 
     const maturity = new Date(due_date).toLocaleDateString();
-    const isMatured = new Date(due_date) < new Date();
+    // Check if today is past due date
+    const isMatured = new Date() >= new Date(due_date);
 
     return (
         <div className="bg-white shadow rounded-lg p-4 flex justify-between items-center">
             <div>
                 <h3 className="text-lg font-semibold">Invoice {invoice_id.substring(0, 8)}...</h3>
-                {/* We use total_tokens which is a human-readable sum */}
-                <p className="text-sm text-gray-600">Tokens Owned: <span className="font-medium">{total_tokens.toFixed(4)}</span></p>
+                <p className="text-sm text-gray-600">
+                    Tokens Owned: <span className="font-medium">{Number(total_tokens).toFixed(2)}</span>
+                </p>
                 <p className="text-sm text-gray-600">Maturity: {maturity}</p>
             </div>
             <button
-                onClick={() => onRedeem(holdings, invoice)} // <-- Pass invoice for context
+                onClick={() => onRedeem(holdings, invoice)}
                 disabled={!isMatured || status === 'redeemed'}
-                className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:bg-gray-400"
+                className={`px-4 py-2 rounded-md text-white text-sm ${
+                    status === 'redeemed' 
+                        ? 'bg-gray-400 cursor-not-allowed' 
+                        : isMatured 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : 'bg-gray-400 cursor-not-allowed'
+                }`}
             >
-                {status === 'redeemed' ? 'Redeemed' : (isMatured ? 'Redeem' : 'Matures ' + maturity)}
+                {status === 'redeemed' ? 'Redeemed' : (isMatured ? 'Redeem' : 'Not Matured')}
             </button>
         </div>
     );
@@ -96,7 +110,7 @@ const InvestorDashboard = ({ activeTab }) => {
 
     // Setup Socket.IO
     useEffect(() => {
-        const socket = io(import.meta.env.VITE_API_URL); // Your backend URL
+        const socket = io(import.meta.env.VITE_API_URL);
         socket.emit('join-marketplace');
 
         socket.on('new-listing', (newInvoice) => {
@@ -105,7 +119,6 @@ const InvestorDashboard = ({ activeTab }) => {
         });
 
         socket.on('investment-made', ({ invoiceId, newSupply }) => {
-            // Update the supply on the specific invoice card
             setMarketplaceListings(prev =>
                 prev.map(inv =>
                     inv.invoice_id === invoiceId ? { ...inv, remaining_supply: newSupply } : inv
@@ -116,7 +129,6 @@ const InvestorDashboard = ({ activeTab }) => {
         return () => socket.disconnect();
     }, []);
 
-    // Fetch data when activeTab changes
     useEffect(() => {
         if (activeTab === 'financing') {
             fetchMarketplace();
@@ -128,7 +140,9 @@ const InvestorDashboard = ({ activeTab }) => {
         setIsLoading(true);
         try {
             const res = await api.get('/financing/marketplace');
-            setMarketplaceListings(res.data.filter(inv => inv.currency === 'MATIC'));
+            // Filter for currencies supported by V3 (e.g., USDC)
+            // If you still support MATIC, remove the filter
+            setMarketplaceListings(res.data);
         } catch (error) {
             toast.error('Failed to load marketplace listings.');
             console.error(error);
@@ -139,41 +153,25 @@ const InvestorDashboard = ({ activeTab }) => {
     const fetchPortfolio = async () => {
         try {
             const res = await api.get('/investor/portfolio');
-            console.log("Raw portfolio data:", res.data);
-
             const holdings = new Map();
+            
             res.data.forEach(item => {
                 const { invoice, tokens_owned, token_id } = item;
-
-                if (!invoice || !invoice.invoice_id) {
-                    console.warn("Skipping portfolio item with missing invoice data", item);
-                    return;
-                }
+                if (!invoice || !invoice.invoice_id) return;
                 
-                // Only show portfolio items for MATIC invoices
-                if (invoice.currency !== 'MATIC') {
-                    return;
-                }
-
                 const invoiceId = invoice.invoice_id;
-                // Use parseFloat for summing, as this is for display
                 const tokenAmount = parseFloat(tokens_owned); 
 
-                if (Number.isNaN(tokenAmount) || tokenAmount <= 0) {
-                    console.warn("Skipping portfolio item with invalid token amount", item);
-                    return;
-                }
+                if (Number.isNaN(tokenAmount) || tokenAmount <= 0) return;
 
                 if (holdings.has(invoiceId)) {
                     const existing = holdings.get(invoiceId);
                     existing.total_tokens += tokenAmount;
-                    // Store the raw string value for accurate redemption
                     existing.holdings.push({ token_id: token_id, amount: tokens_owned }); 
                 } else {
                     holdings.set(invoiceId, {
                         invoice: invoice,
                         total_tokens: tokenAmount,
-                        // Store the raw string value for accurate redemption
                         holdings: [{ token_id: token_id, amount: tokens_owned }],
                         item_key: invoiceId
                     });
@@ -187,86 +185,15 @@ const InvestorDashboard = ({ activeTab }) => {
         }
     };
 
-    const handleInvest = async (invoice, amountToInvest) => {
-        const PLATFORM_TREASURY_WALLET = import.meta.env.VITE_PLATFORM_TREASURY_ADDRESS;
-
-        if (!PLATFORM_TREASURY_WALLET) {
-            toast.error("Platform treasury address is not configured. Please contact support.");
-            return;
-        }
-        
-        console.log("Starting investment process for invoice:", invoice, "Amount:", amountToInvest);
-        // This is a critical assumption about your tokenization logic:
-        // That 1 MATIC = 1 Token (or 1 WEI = 1 Token unit)
-        // And that `invoice.face_value` and `invoice.total_supply` are set accordingly in the contract
-        if (!invoice.amount) {
-            toast.error("Invoice is missing token supply or face value. Cannot calculate price.");
-            return;
-        }
-
-        let fractionToken;
-        let tokenId;
-
-        try {
-            toast.loading('Preparing transaction... Please check your wallet.');
-            
-            fractionToken = await getFractionTokenContract();
-            tokenId = invoice.token_id;
-            
-            // 1. Convert human-readable MATIC amount (e.g., "100") to WEI
-            // This is the amount of tokens to buy (assuming 1:1)
-            const tokenAmount = ethers.utils.parseEther(amountToInvest);
-            
-            // 2. The payment amount is the same as the token amount (1:1 price)
-            const paymentAmount = tokenAmount;
-
-            // 3. Remove all Allowance and Approval logic
-            toast.loading('Please confirm the transaction in your wallet...');
-            console.log("Calling purchaseTokens");
-            // 4. Call the purchaseTokens function
-            const tx = await fractionToken.purchaseTokens(
-                tokenId,
-                tokenAmount, // The amount of ERC1155 tokens (in WEI)
-                PLATFORM_TREASURY_WALLET, // The address that holds the tokens
-                {
-                    value: paymentAmount // The amount of MATIC to send
-                }
-            );
-
-            await tx.wait();
-            toast.success('Investment successful! Transaction confirmed.');
-
-            // 5. Notify backend to *record* the investment
-            await api.post('/investor/record-investment', {
-                invoiceId: invoice.invoice_id,
-                amountInvested: amountToInvest, // The human-readable amount
-                tokenId: tokenId,
-                txHash: tx.hash
-            });
-
-            // 6. Refetch data
-            fetchMarketplace();
-            fetchPortfolio();
-
-        } catch (error) {
-            console.error(error);
-            if (error.code === 4001) { // User rejected transaction
-                toast.error('Transaction rejected in wallet.');
-            } else if (error.reason?.includes("Incorrect MATIC value sent")) {
-                toast.error("Transaction failed: Incorrect MATIC value.");
-            } else if (error.reason?.includes("insufficient funds")) {
-                toast.error("Payment failed. Do you have enough MATIC?");
-            } else if (error.reason?.includes("transfer failed")) {
-                toast.error("Platform treasury is empty or cannot transfer tokens.");
-            } else {
-                toast.error(error.reason || 'Investment failed. See console for details.');
-            }
-        }
+    const handlePurchaseSuccess = () => {
+        // Refresh data after a successful purchase via BuyFractionToken
+        fetchMarketplace();
+        fetchPortfolio();
     };
 
-    const handleRedeem = async (holdingsToRedeem, invoice) => { // 'holdingsToRedeem' is an array: [{token_id, amount (string)}, ...]
-        
-        toast.loading('Redeeming all tokens for this invoice... Please check your wallet.');
+    // Redemption logic stays largely the same (Direct interaction with FractionToken)
+    const handleRedeem = async (holdingsToRedeem, invoice) => { 
+        toast.loading('Redeeming tokens... Please check your wallet.');
         
         let totalRedeemedValue = ethers.BigNumber.from(0);
         let successfulRedemptions = 0;
@@ -277,12 +204,11 @@ const InvestorDashboard = ({ activeTab }) => {
             const fractionToken = await getFractionTokenContract();
             
             for (const holding of holdingsToRedeem) {
-                // holding.amount is the raw string "100.00" from the DB
                 if (!holding.amount || parseFloat(holding.amount) <= 0) continue; 
                 
                 try {
-                    // Convert the human-readable string amount to WEI (BigNumber)
-                    const tokenAmountToRedeem = ethers.utils.parseEther(holding.amount);
+                    // Ethers v5 Syntax
+                    const tokenAmountToRedeem = ethers.utils.parseEther(holding.amount.toString());
                     
                     if (tokenAmountToRedeem.isZero()) continue;
 
@@ -290,10 +216,10 @@ const InvestorDashboard = ({ activeTab }) => {
                     const receipt = await tx.wait();
                     txHashes.push(receipt.transactionHash);
 
-                    // Parse the event from logs to find out the redeemed MATIC value
+                    // Check for Redeemed event
                     const redeemEvent = receipt.events?.find(e => e.event === 'Redeemed');
                     if (redeemEvent) {
-                        totalRedeemedValue = totalRedeemedValue.add(redeemEvent.args.amount);
+                        totalRedeemedValue = totalRedeemedValue.add(redeemEvent.args.redemptionValue); // Check argument name in ABI
                     }
                     successfulRedemptions++;
 
@@ -304,22 +230,21 @@ const InvestorDashboard = ({ activeTab }) => {
                 }
             }
 
-            // After the loop, report final status
-            const totalRedeemedMatic = ethers.utils.formatEther(totalRedeemedValue);
+            const totalRedeemedReadable = ethers.utils.formatEther(totalRedeemedValue);
 
             if (successfulRedemptions > 0) {
-                toast.success(`Successfully redeemed ${totalRedeemedMatic} MATIC.`);
+                toast.dismiss();
+                toast.success(`Successfully redeemed ${totalRedeemedReadable} ${invoice.currency}.`);
                 
-                // --- Notify backend to record the redemption ---
-                // You must create this backend endpoint!
+                // Record redemption in backend
                 try {
                     await api.post('/investor/record-redemption', {
                         invoiceId: invoice.invoice_id,
-                        redeemedAmount: totalRedeemedMatic, // Human-readable MATIC
+                        redeemedAmount: totalRedeemedReadable,
                         txHashes: txHashes
                     });
                 } catch (apiError) {
-                    toast.error("Failed to record redemption in backend. Please contact support.");
+                    console.error("Backend sync failed", apiError);
                 }
             }
 
@@ -327,23 +252,19 @@ const InvestorDashboard = ({ activeTab }) => {
                 toast.warning(`${failedRedemptions} redemption attempts failed.`);
             }
             
-            if (successfulRedemptions === 0 && failedRedemptions === 0) {
-                 toast.info('No tokens were available to redeem.');
-            }
-
-            fetchPortfolio(); // Refresh portfolio regardless of outcome
+            fetchPortfolio(); 
 
         } catch (error) {
             console.error(error);
-            if (error.code === 4001) { // User rejected transaction
+            toast.dismiss();
+            if (error.code === 4001) {
                 toast.error('Transaction rejected in wallet.');
             } else {
-                toast.error('An unexpected error occurred. See console.');
+                toast.error('An unexpected error occurred.');
             }
         }
     };
 
-    // Render financing tab content
     const renderFinancingContent = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Column 1: Marketplace */}
@@ -356,18 +277,18 @@ const InvestorDashboard = ({ activeTab }) => {
                             <InvoiceCard
                                 key={invoice.invoice_id}
                                 invoice={invoice}
-                                onInvest={handleInvest}
+                                onPurchaseSuccess={handlePurchaseSuccess}
                             />
                         ))
                     ) : (
-                        !isLoading && <p>No MATIC invoices currently listed for financing.</p>
+                        !isLoading && <p>No invoices currently listed for financing.</p>
                     )}
                 </div>
             </div>
 
             {/* Column 2: Portfolio */}
             <div>
-                <h2 className="text-2xl font-semibold mb-4">My Portfolio (MATIC)</h2>
+                <h2 className="text-2xl font-semibold mb-4">My Portfolio</h2>
                 <div className="space-y-4">
                     {portfolio.length > 0 ? (
                         portfolio.map(item => (
@@ -378,14 +299,13 @@ const InvestorDashboard = ({ activeTab }) => {
                             />
                         ))
                     ) : (
-                        <p>You have not invested in any MATIC invoices yet.</p>
+                        <p>You have not invested in any invoices yet.</p>
                     )}
                 </div>
             </div>
         </div>
     );
 
-    // Main render logic for the dashboard
     return (
         <div className="p-6">
             {activeTab === 'overview' && (
