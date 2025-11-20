@@ -22,11 +22,18 @@ const InvoiceCard = ({ invoice, onPurchaseSuccess }) => {
     const face_value_display = amount; 
     const maturity = new Date(due_date).toLocaleDateString();
 
-    // Determine stablecoin details based on currency
-    // Fallback to USDC if currency is unknown, or handle MATIC specifically if needed
-    const isNative = currency === 'MATIC';
+    // Determine stablecoin details.
+    // If currency is Native (MATIC), we still pass USDC details as the 'Stablecoin' option 
+    // because the BuyFractionToken component now offers a toggle between Native and Stablecoin.
+    const isNative = currency === 'MATIC' || currency === 'ETH';
+    
+    // Use specific stablecoin if matches currency, otherwise default to USDC
     const stablecoinAddress = stablecoinAddresses[currency] || stablecoinAddresses["USDC"];
-    const stablecoinDecimals = currency === 'USDC' ? 6 : 18; 
+    
+    // USDC uses 6 decimals, most others (and fallback logic) might default to 18 or 6. 
+    // We force 6 for USDC to prevent approval errors.
+    const isUSDC = stablecoinAddress === stablecoinAddresses["USDC"];
+    const stablecoinDecimals = isUSDC ? 6 : 18; 
 
     return (
         <div className="bg-white shadow rounded-lg p-4 border border-gray-200">
@@ -51,27 +58,22 @@ const InvoiceCard = ({ invoice, onPurchaseSuccess }) => {
             </div>
 
             {/* --- V3 INTEGRATION: BuyFractionToken Component --- */}
-            {isNative ? (
-                 <div className="p-3 bg-yellow-50 text-yellow-800 text-sm rounded">
-                    Native MATIC financing not supported in V3. Use USDC.
-                 </div>
-            ) : (
-                <BuyFractionToken
-                    tokenId={token_id}
-                    stablecoinAddress={stablecoinAddress}
-                    stablecoinDecimals={stablecoinDecimals}
-                    tokenDecimals={18} // FractionToken standard
-                    maxAmount={remaining_supply} // Pass simple number or string
-                    onSuccess={onPurchaseSuccess} // Callback to refresh list
-                />
-            )}
+            {/* Removed the isNative check. The component now handles the toggle internally. */}
+            <BuyFractionToken
+                tokenId={token_id}
+                stablecoinAddress={stablecoinAddress}
+                stablecoinDecimals={stablecoinDecimals}
+                tokenDecimals={18} // FractionToken standard
+                maxAmount={remaining_supply} // Pass simple number or string
+                onSuccess={onPurchaseSuccess} // Callback to refresh list
+            />
         </div>
     );
 };
 
 const PortfolioItem = ({ item, onRedeem }) => {
     const { invoice, total_tokens, holdings } = item;
-    const { invoice_id, due_date, status } = invoice;
+    const { invoice_id, due_date, status, currency } = invoice;
 
     const maturity = new Date(due_date).toLocaleDateString();
     // Check if today is past due date
@@ -140,8 +142,6 @@ const InvestorDashboard = ({ activeTab }) => {
         setIsLoading(true);
         try {
             const res = await api.get('/financing/marketplace');
-            // Filter for currencies supported by V3 (e.g., USDC)
-            // If you still support MATIC, remove the filter
             setMarketplaceListings(res.data);
         } catch (error) {
             toast.error('Failed to load marketplace listings.');
@@ -219,7 +219,7 @@ const InvestorDashboard = ({ activeTab }) => {
                     // Check for Redeemed event
                     const redeemEvent = receipt.events?.find(e => e.event === 'Redeemed');
                     if (redeemEvent) {
-                        totalRedeemedValue = totalRedeemedValue.add(redeemEvent.args.redemptionValue); // Check argument name in ABI
+                        totalRedeemedValue = totalRedeemedValue.add(redeemEvent.args.amount || redeemEvent.args[2]); // Adjust based on exact ABI args
                     }
                     successfulRedemptions++;
 

@@ -49,7 +49,8 @@ contract FinancingManager is Ownable, ReentrancyGuard {
 
     /**
      * @notice Stores the platform's fee (spread) for each invoice token,
-     * in basis points (BPS). e.g., 50 BPS = 0.5%
+     * in basis points (BPS).
+     * e.g., 50 BPS = 0.5%
      */
     mapping(uint256 => uint256) public invoiceSpreadBps;
 
@@ -60,6 +61,7 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         uint256 tokenAmount,
         uint256 platformFee
     );
+    
     event SpreadUpdated(uint256 indexed tokenId, uint256 newSpreadBps);
     event ContractsUpdated(address newFractionToken, address newStablecoin, address newFeeWallet);
 
@@ -101,7 +103,7 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows an investor to buy fractional tokens from the original issuer (seller).
+     * @notice Allows an investor to buy fractional tokens using Stablecoins (ERC20).
      * Assumes a 1:1 price between the stablecoin and the token's base units.
      * @param _tokenId The ID of the token to purchase.
      * @param _tokenAmount The amount of tokens to purchase (in base units, e.g., 10**18).
@@ -139,6 +141,47 @@ contract FinancingManager is Ownable, ReentrancyGuard {
 
         // Step 3d: Transfer platform fee (USDC) to the fee wallet.
         stablecoin.safeTransfer(feeWallet, platformFee);
+
+        // 4. Emit Event
+        emit FractionsPurchased(_tokenId, msg.sender, seller, _tokenAmount, platformFee);
+    }
+
+    /**
+     * @notice Allows an investor to buy fractional tokens using the Native Currency (e.g. ETH, MATIC).
+     * @dev Requires the buyer to send the exact amount of native currency matching _tokenAmount.
+     * @param _tokenId The ID of the token to purchase.
+     * @param _tokenAmount The amount of tokens to purchase.
+     */
+    function buyFractionsNative(uint256 _tokenId, uint256 _tokenAmount) external payable nonReentrant {
+        require(_tokenAmount > 0, "Amount must be positive");
+        require(msg.value == _tokenAmount, "Native currency amount must match token amount");
+
+        // 1. Get Details
+        IFractionToken.TokenDetails memory details = fractionToken.tokenDetails(_tokenId);
+        address seller = details.issuer;
+        uint256 spreadBps = invoiceSpreadBps[_tokenId];
+
+        require(seller != address(0), "Invalid token ID or issuer");
+        require(spreadBps < 10000, "Spread not set or invalid");
+
+        // 2. Calculate Amounts
+        uint256 platformFee = (_tokenAmount * spreadBps) / 10000;
+        uint256 sellerAmount = _tokenAmount - platformFee;
+        
+        require(sellerAmount > 0, "Spread is too high or amount is too low");
+
+        // 3. Perform Atomic Swap
+        
+        // Step 3a: Pull FractionToken from seller to investor (msg.sender).
+        fractionToken.safeTransferFrom(seller, msg.sender, _tokenId, _tokenAmount, "");
+
+        // Step 3b: Transfer Native Currency to the seller.
+        (bool successSeller, ) = payable(seller).call{value: sellerAmount}("");
+        require(successSeller, "Transfer to seller failed");
+
+        // Step 3c: Transfer platform fee to the fee wallet.
+        (bool successFee, ) = payable(feeWallet).call{value: platformFee}("");
+        require(successFee, "Transfer to fee wallet failed");
 
         // 4. Emit Event
         emit FractionsPurchased(_tokenId, msg.sender, seller, _tokenAmount, platformFee);

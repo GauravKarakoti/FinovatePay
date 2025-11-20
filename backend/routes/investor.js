@@ -2,69 +2,64 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const Invoice = require('../models/Invoice');
-const pool = require('../config/database'); // Added for portfolio query
+const pool = require('../config/database');
 const { getSigner, getFractionTokenContract } = require('../config/blockchain');
 
 const signer = getSigner();
 const fractionToken = getFractionTokenContract(signer);
 
-// Middleware to check for 'investor' role
 const isInvestor = (req, res, next) => {
-    console.log("Request user:", req.user);
-    console.log(`Checking investor role for user: ${req.user.wallet_address} with role: ${req.user.role}`);
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
-        console.log('Access denied. User is not an investor.');
         return res.status(403).json({ msg: 'Access denied. Investor role required.' });
     }
     next();
 };
 
 router.post('/record-investment', authenticateToken, isInvestor, async (req, res) => {
-    const { invoiceId, amountInvested, tokenId, txHash } = req.body;
+    // Added 'paymentMethod' to destructuring
+    const { invoiceId, amountInvested, tokenId, txHash, paymentMethod } = req.body;
     const investorId = req.user.id;
-    const investorWallet = req.user.wallet_address;
 
     try {
-        console.log(`Recording on-chain investment: Investor ${investorId} bought ${amountInvested} tokens for invoice ${invoiceId} (Token ID: ${tokenId})`);
+        console.log(`Recording on-chain investment: Investor ${investorId} bought ${amountInvested} tokens. Payment: ${paymentMethod}`);
 
-        // 1. Record the investment in your 'investments' table
+        // FIX: Ensure 'payment_method' column exists in your 'investments' table schema
         const investmentQuery = `
-            INSERT INTO investments (user_id, invoice_id, token_id, amount_invested, tokens_bought, status, tx_hash, created_at)
-            VALUES ($1, $2, $3, $4, $5, 'completed', $6, NOW())
+            INSERT INTO investments 
+            (user_id, invoice_id, token_id, amount_invested, tokens_bought, status, tx_hash, payment_method, created_at)
+            VALUES ($1, $2, $3, $4, $5, 'completed', $6, $7, NOW())
             RETURNING *;
         `;
         
-        // Assuming 1 token = $1 (amountInvested = tokens_bought)
-        const values = [investorId, invoiceId, tokenId, amountInvested, amountInvested, txHash];
+        // Default to 'stablecoin' if not provided
+        const pMethod = paymentMethod || 'stablecoin';
+
+        const values = [
+            investorId, 
+            invoiceId, 
+            tokenId, 
+            amountInvested, 
+            amountInvested, 
+            txHash, 
+            pMethod // New value
+        ];
         
         const { rows } = await pool.query(investmentQuery, values);
         const newInvestment = rows[0];
 
-        // --- START: MODIFIED SECTION ---
-
-        // 2. Decrement the remaining supply in the 'invoices' table
-        //    This relies on the 'decrementRemainingSupply' method in 'backend/models/Invoice.js'
         const newSupply = await Invoice.decrementRemainingSupply(invoiceId, amountInvested);
 
-        // 3. Emit socket event for marketplace update (supply changed)
         const io = req.app.get('io');
-
-        // Note: Ensure your frontend is joined to this 'marketplace' room!
-        // The InvestorDashboard.jsx was emitting 'join-marketplace'.
-        // Your socket.js must handle that and add the client to this room.
         io.to('marketplace').emit('investment-made', { 
             invoiceId, 
-            newSupply: newSupply // <-- Send the new, authoritative supply
+            newSupply: newSupply 
         });
         
-        // --- END: MODIFIED SECTION ---
-
         res.json({ msg: 'Investment recorded successfully', investment: newInvestment, newSupply: newSupply });
 
     } catch (err) {
         console.error("Failed to record investment:", err.message);
-        // Handle potential DB errors (e.g., duplicate tx_hash)
-        if (err.code === '23505') { // unique_violation
+        if (err.code === '23505') {
              return res.status(400).json({ msg: 'Transaction already recorded.' });
         }
         res.status(500).send('Server Error');
