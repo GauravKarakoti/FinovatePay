@@ -9,16 +9,16 @@ const FinancingTab = ({ invoices, onTokenizeClick }) => {
 
     useEffect(() => {
         const checkApproval = async () => {
-        try {
-            setIsCheckingApproval(true);
-            const approved = await checkFinancingManagerApproval();
-            setIsFinancingApproved(approved);
-        } catch (err) {
-            console.error("Failed to check approval", err);
-            toast.error("Failed to check financing approval status.");
-        } finally {
-            setIsCheckingApproval(false);
-        }
+            try {
+                setIsCheckingApproval(true);
+                const approved = await checkFinancingManagerApproval();
+                setIsFinancingApproved(approved);
+            } catch (err) {
+                console.error("Failed to check approval", err);
+                toast.error("Failed to check financing approval status.");
+            } finally {
+                setIsCheckingApproval(false);
+            }
         };
         checkApproval();
     }, []);
@@ -92,7 +92,8 @@ const FinancingTab = ({ invoices, onTokenizeClick }) => {
                                 </div>
                                 <button
                                     onClick={() => onTokenizeClick(invoice)}
-                                    className="btn-primary"
+                                    disabled={!isFinancingApproved}
+                                    className={`btn-primary ${!isFinancingApproved ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     Tokenize
                                 </button>
