@@ -46,7 +46,7 @@ async function main() {
 
   const financingManager = await FinancingManager.deploy(fractionTokenAddress,stablecoinAddress,feeWalletAddress);
   await financingManager.deployed();
-  console.log("FractionToken deployed to:", financingManager.address);
+  console.log("FinancingManager deployed to:", financingManager.address);
 
   console.log(`\nApproving FractionToken (${fractionToken.address}) to manage deployer's tokens...`);
   const approvalTx = await fractionToken.setApprovalForAll(fractionToken.address, true);

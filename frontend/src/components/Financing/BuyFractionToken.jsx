@@ -4,7 +4,7 @@ import {
   approveStablecoin,
   checkStablecoinAllowance,
   buyFractions,
-  buyFractionsNative // Imported the new function
+  buyFractionsNative
 } from '../../utils/web3';
 import { toast } from 'react-hot-toast';
 
@@ -13,7 +13,7 @@ export const BuyFractionToken = ({
   stablecoinAddress,
   stablecoinDecimals,
   tokenDecimals,
-  maxAmount // Passed in base units
+  maxAmount // Can be base units (BigNumber) or formatted string
 }) => {
   console.log("BuyFractionToken mounted with tokenId:", tokenId, "stablecoinAddress:", stablecoinAddress);
   
@@ -26,6 +26,21 @@ export const BuyFractionToken = ({
   // State to toggle payment method
   const [useNativeToken, setUseNativeToken] = useState(false);
   console.log("Using native token for payment:", useNativeToken);
+
+  // Helper to safely format the max amount for display
+  const formatMaxAmount = () => {
+    try {
+      // If it's already a decimal string (e.g. "0.48"), return it as is
+      if (typeof maxAmount === 'string' && maxAmount.includes('.')) {
+        return maxAmount;
+      }
+      // Otherwise, assume it's base units and format it
+      return ethers.utils.formatUnits(maxAmount, tokenDecimals);
+    } catch (error) {
+      // Fallback to displaying as-is if formatting fails
+      return maxAmount;
+    }
+  };
 
   const amountInBaseUnits = () => {
     console.log("Converting amount to base units:", amount, "with decimals:", tokenDecimals);
@@ -71,7 +86,7 @@ export const BuyFractionToken = ({
       }
     };
     checkAllowance();
-  }, [stablecoinAddress, useNativeToken]); // Re-run when payment method changes
+  }, [stablecoinAddress, useNativeToken]);
 
   useEffect(() => {
     console.log("Re-evaluating approval status...");
@@ -115,12 +130,10 @@ export const BuyFractionToken = ({
       
       if (useNativeToken) {
         console.log("Purchased using native token.");
-        // Call the new native function
         await buyFractionsNative(tokenId, amountToBuy);
         console.log("buyFractionsNative called with tokenId:", tokenId, "amount:", amountToBuy.toString());
       } else {
         console.log("Purchased using stablecoin.");
-        // Call the existing stablecoin function
         await buyFractions(tokenId, amountToBuy);
         console.log("buyFractions called with tokenId:", tokenId, "amount:", amountToBuy.toString());
       }
@@ -168,12 +181,12 @@ export const BuyFractionToken = ({
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder={`Amount (max ${ethers.utils.formatUnits(maxAmount, tokenDecimals)})`}
+          // FIX: Use the helper function here instead of calling formatUnits directly
+          placeholder={`Amount (max ${formatMaxAmount()})`}
           className="flex-1 p-2 border rounded-md"
           disabled={isLoading}
         />
         
-        {/* Logic for Buttons based on Payment Method */}
         {useNativeToken ? (
              <button
              onClick={handleBuy}
@@ -183,7 +196,6 @@ export const BuyFractionToken = ({
              {isLoading ? 'Buying...' : 'Buy with Native'}
            </button>
         ) : (
-          // Stablecoin Logic (Approve -> Buy)
           isApproved ? (
             <button
               onClick={handleBuy}
