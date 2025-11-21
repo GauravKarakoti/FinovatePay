@@ -1,8 +1,8 @@
 {
-  "ComplianceManager": "0xA448CA44c12a699Efd19E9e226d124CCd1fE6e5c",
-  "EscrowContract": "0xfaFa4fe76c07Bd0EBd92b2536c128DD089252F6B",
-  "InvoiceFactory": "0xf7A5dA5A87469A337b92e88BE979fF750d1A6c50",
-  "FractionToken": "0x3d161Ce52b81CF03bdac6767CDBf176763a0B870",
-  "ProduceTracking": "0xF0CB6bd389201D248954808c710f6b79baa773f7",
-  "FinancingManager": "0xf90C36537b6a9Bc6233d69faa42aF33C4FBA9EaF"
+  "ComplianceManager": "0xD2C95AC1bFb568dC946eECa19FDeB942D8e09736",
+  "EscrowContract": "0x410596d78a1181629F633ADF1baB70A2c08D2a1F",
+  "InvoiceFactory": "0xfaF428c8c2c56dABC2D1c94cd8AAA864948FEd32",
+  "FractionToken": "0x6b0D2d5B1920192dF112258fB06a18092b6bbe36",
+  "ProduceTracking": "0xc123801E662f74b5cD3a0540781954b695b0aB2A",
+  "FinancingManager": "0x3754B62087Fa421Ae49089628a8d7E6fDc0E3ca3"
 }

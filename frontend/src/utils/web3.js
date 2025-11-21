@@ -17,7 +17,7 @@ const providerOptions = {};
 
 if (typeof window !== 'undefined') {
     web3Modal = new Web3Modal({
-        network: "mumbai",
+        network: "amoy",
         cacheProvider: true,
         providerOptions
     });
@@ -29,8 +29,46 @@ export const stablecoinAddresses = {
     "BRLC": "0x6DEf515A0419D4613c7A3950796339A4405d4191"
 };
 
+// Network Configuration for Polygon Amoy
+const AMOY_CHAIN_ID = '0x13882'; // 80002
+const AMOY_NETWORK_CONFIG = {
+    chainId: AMOY_CHAIN_ID,
+    chainName: 'Polygon Amoy Testnet',
+    nativeCurrency: {
+        name: 'MATIC',
+        symbol: 'MATIC', // This ensures the wallet displays MATIC
+        decimals: 18,
+    },
+    rpcUrls: ['https://rpc-amoy.polygon.technology/'], // Public RPC
+    blockExplorerUrls: ['https://www.oklink.com/amoy'],
+};
+
 export async function connectWallet() {
     provider = await web3Modal.connect();
+    
+    // --- Enforce Network Switch to Amoy ---
+    try {
+        await provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: AMOY_CHAIN_ID }],
+        });
+    } catch (switchError) {
+        // This error code indicates that the chain has not been added to MetaMask.
+        if (switchError.code === 4902) {
+            try {
+                await provider.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [AMOY_NETWORK_CONFIG],
+                });
+            } catch (addError) {
+                console.error("Failed to add Amoy network:", addError);
+            }
+        } else {
+            console.error("Failed to switch network:", switchError);
+        }
+    }
+    // --------------------------------------
+
     const web3Provider = new ethers.providers.Web3Provider(provider);
     const signer = web3Provider.getSigner();
     const address = await signer.getAddress();

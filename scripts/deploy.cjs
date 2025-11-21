@@ -50,7 +50,7 @@ async function main() {
   console.log("FinancingManager deployed to:", financingManager.address);
 
   console.log(`\nApproving FractionToken (${fractionToken.address}) to manage deployer's tokens...`);
-  const approvalTx = await fractionToken.setApprovalForAll(fractionToken.address, true);
+  const approvalTx = await fractionToken.setApprovalForAll(financingManager.address, true);
   await approvalTx.wait();
   console.log(`FractionToken approval set. Transaction hash: ${approvalTx.hash}\n`);
   // --- END FIX ---
