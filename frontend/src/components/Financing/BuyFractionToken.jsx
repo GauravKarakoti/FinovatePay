@@ -18,7 +18,7 @@ export const BuyFractionToken = ({
   console.log("BuyFractionToken mounted with tokenId:", tokenId, "stablecoinAddress:", stablecoinAddress);
   
   const [amount, setAmount] = useState('');
-  const [allowance, setAllowance] = useState(BigInt(0));
+  const [allowance, setAllowance] = useState(ethers.BigNumber.from(0));
   const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAllowance, setIsCheckingAllowance] = useState(true);
@@ -48,7 +48,7 @@ export const BuyFractionToken = ({
       return ethers.utils.parseUnits(amount, tokenDecimals);
     } catch {
       console.log("Error parsing amount:", amount, "with decimals:", tokenDecimals);
-      return BigInt(0);
+      return ethers.BigNumber.from(0);
     }
   };
 
@@ -58,7 +58,7 @@ export const BuyFractionToken = ({
       return ethers.utils.parseUnits(amount, stablecoinDecimals);
     } catch {
       console.log("Error parsing amount for approval:", amount, "with decimals:", stablecoinDecimals);
-      return BigInt(0);
+      return ethers.BigNumber.from(0);
     }
   };
 
@@ -172,7 +172,7 @@ export const BuyFractionToken = ({
             onChange={() => setUseNativeToken(true)}
             className="mr-2"
           />
-          Pay with Native Token (ETH/MATIC)
+          Pay with Native Token (MATIC)
         </label>
       </div>
 

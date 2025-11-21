@@ -46,6 +46,7 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     IFractionToken public fractionToken;
     IERC20 public stablecoin;
     address public feeWallet;
+    uint256 public stablecoinDecimals;
 
     /**
      * @notice Stores the platform's fee (spread) for each invoice token,
@@ -71,11 +72,12 @@ contract FinancingManager is Ownable, ReentrancyGuard {
      * @param _stablecoin The address of the payment stablecoin (ERC20) contract (e.g., USDC).
      * @param _feeWallet The address where platform fees will be collected.
      */
-    constructor(address _fractionToken, address _stablecoin, address _feeWallet) Ownable(msg.sender) {
+    constructor(address _fractionToken, address _stablecoin, address _feeWallet, uint256 _stablecoinDecimals) Ownable(msg.sender) {
         require(_fractionToken != address(0) && _stablecoin != address(0) && _feeWallet != address(0), "Invalid addresses");
         fractionToken = IFractionToken(_fractionToken);
         stablecoin = IERC20(_stablecoin);
         feeWallet = _feeWallet;
+        stablecoinDecimals = _stablecoinDecimals;
         emit ContractsUpdated(_fractionToken, _stablecoin, _feeWallet);
     }
 
@@ -110,39 +112,36 @@ contract FinancingManager is Ownable, ReentrancyGuard {
      */
     function buyFractions(uint256 _tokenId, uint256 _tokenAmount) external nonReentrant {
         require(_tokenAmount > 0, "Amount must be positive");
-
-        // 1. Get Details
+        
         IFractionToken.TokenDetails memory details = fractionToken.tokenDetails(_tokenId);
         address seller = details.issuer;
         uint256 spreadBps = invoiceSpreadBps[_tokenId];
 
         require(seller != address(0), "Invalid token ID or issuer");
-        require(spreadBps < 10000, "Spread not set or invalid");
+        // require(spreadBps < 10000, "Spread not set or invalid"); // Optional check
 
-        // 2. Calculate Amounts
-        // This is the platform's "Invoice Financing Spread"
-        uint256 platformFee = (_tokenAmount * spreadBps) / 10000;
-        uint256 sellerAmount = _tokenAmount - platformFee;
+        // --- FIX: CALCULATE SCALED PAYMENT AMOUNT ---
+        // Converts 18-decimal token amount to Stablecoin precision
+        // Formula: Amount * (10^StableDecimals) / (10^TokenDecimals)
+        // Assuming FractionToken is always 18 decimals:
+        uint256 paymentAmount = (_tokenAmount * (10 ** stablecoinDecimals)) / 1e18;
         
-        require(sellerAmount > 0, "Spread is too high or amount is too low");
+        require(paymentAmount > 0, "Payment amount too small");
 
-        // 3. Perform Atomic Swap (Checks-Effects-Interactions)
-        
-        // Step 3a: Pull stablecoin from investor (msg.sender) to this contract.
-        // Reverts if investor has not approved this contract.
-        stablecoin.safeTransferFrom(msg.sender, address(this), _tokenAmount);
+        // Calculate fees based on the PAYMENT amount (Stablecoins), not the token amount
+        uint256 platformFee = (paymentAmount * spreadBps) / 10000;
+        uint256 sellerAmount = paymentAmount - platformFee;
 
-        // Step 3b: Pull FractionToken from seller to investor (msg.sender).
-        // Reverts if seller has not 'setApprovalForAll' for this contract.
+        // Step 3a: Pull stablecoin (Use calculated paymentAmount)
+        stablecoin.safeTransferFrom(msg.sender, address(this), paymentAmount);
+
+        // Step 3b: Pull FractionToken (Use original _tokenAmount)
         fractionToken.safeTransferFrom(seller, msg.sender, _tokenId, _tokenAmount, "");
 
-        // Step 3c: Transfer net proceeds (USDC) to the seller.
+        // Step 3c & 3d: Distribute Stablecoins
         stablecoin.safeTransfer(seller, sellerAmount);
-
-        // Step 3d: Transfer platform fee (USDC) to the fee wallet.
         stablecoin.safeTransfer(feeWallet, platformFee);
 
-        // 4. Emit Event
         emit FractionsPurchased(_tokenId, msg.sender, seller, _tokenAmount, platformFee);
     }
 

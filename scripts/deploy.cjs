@@ -40,11 +40,12 @@ async function main() {
   const fractionTokenAddress = fractionToken.address;
   const stablecoinAddress = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"; // e.g., Polygon USDC
   const feeWalletAddress = "0xeb4f0cb1644fa1f6dd01aa2f7c49099d2267f3a8";
+  const stablecoinDecimals = 6;
 
   console.log("Deploying FinancingManager...");
   const FinancingManager = await ethers.getContractFactory("FinancingManager");
 
-  const financingManager = await FinancingManager.deploy(fractionTokenAddress,stablecoinAddress,feeWalletAddress);
+  const financingManager = await FinancingManager.deploy(fractionTokenAddress,stablecoinAddress,feeWalletAddress,stablecoinDecimals);
   await financingManager.deployed();
   console.log("FinancingManager deployed to:", financingManager.address);
 
