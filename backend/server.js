@@ -41,6 +41,7 @@ app.use(express.json());
 
 // --- DATABASE CONNECTION ---
 const pool = require('./config/database');
+const listenForTokenization = require('./listeners/contractListener');
 
 const testDbConnection = async () => {
   try {
@@ -109,5 +110,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+listenForTokenization()
 
 module.exports = app;

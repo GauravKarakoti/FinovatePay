@@ -19,6 +19,16 @@ async function main() {
   await tx.wait(); // Wait for the transaction to be confirmed
   console.log(`Deployer account KYC verified. Transaction hash: ${tx.hash}\n`);
 
+  console.log(`\nMinting Identity SBT for deployer: ${deployer.address}...`);
+  // - Updated method call to mintIdentity
+  try {
+      const tx = await complianceManager.mintIdentity(deployer.address);
+      await tx.wait();
+      console.log(`Deployer Identity Verified. Transaction hash: ${tx.hash}\n`);
+  } catch (error) {
+      console.log("Deployer might already have an identity.");
+  }
+
   // Deploy EscrowContract with ComplianceManager address
   const EscrowContract = await ethers.getContractFactory("EscrowContract");
   const escrowContract = await EscrowContract.deploy(complianceManager.address);

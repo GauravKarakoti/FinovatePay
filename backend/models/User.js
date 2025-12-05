@@ -3,34 +3,22 @@ const pool = require('../config/database');
 class User {
   static async create(userData) {
     const {
-      email,
-      passwordHash,
-      walletAddress,
-      companyName,
-      taxId,
-      firstName,
-      lastName,
-      role // <-- Added role
+      email, passwordHash, walletAddress, companyName, 
+      taxId, firstName, lastName, role, organizationId // TWEAK: Added organizationId
     } = userData;
 
     const query = `
       INSERT INTO users (
         email, password_hash, wallet_address, company_name, 
-        tax_id, first_name, last_name, role
+        tax_id, first_name, last_name, role, organization_id
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'seller'))
-      RETURNING id, email, wallet_address, company_name, role, created_at
+      VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'seller'), $9)
+      RETURNING id, email, wallet_address, company_name, role, organization_id, created_at
     `;
 
     const values = [
-      email,
-      passwordHash,
-      walletAddress,
-      companyName,
-      taxId,
-      firstName,
-      lastName,
-      role // <-- Added role
+      email, passwordHash, walletAddress, companyName,
+      taxId, firstName, lastName, role, organizationId
     ];
 
     const result = await pool.query(query, values);
@@ -50,7 +38,8 @@ class User {
   }
 
   static async findById(id) {
-    const query = 'SELECT id, email, wallet_address, company_name, kyc_status, role FROM users WHERE id = $1';
+    // TWEAK: Return organization_id
+    const query = 'SELECT id, email, wallet_address, company_name, kyc_status, role, organization_id FROM users WHERE id = $1';
     const result = await pool.query(query, [id]);
     return result.rows[0];
   }

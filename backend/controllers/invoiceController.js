@@ -29,9 +29,10 @@ exports.createInvoice = async (req, res) => {
         }
         const quotation = quotationResult.rows[0];
         
-        // Authorization check: only the seller can create the invoice
-        if (quotation.seller_address.toLowerCase() !== req.user.wallet_address.toLowerCase()) {
-            throw new Error('Not authorized to create an invoice for this quotation.');
+        // TWEAK: RBAC - Check Organization ID instead of Wallet Address
+        // This allows any authorized user in the company to process the invoice
+        if (quotation.seller_org_id !== req.user.organization_id) {
+            throw new Error('Not authorized: Quotation belongs to a different organization.');
         }
 
         // 2. If it's a produce lot, fetch, lock, and update the inventory

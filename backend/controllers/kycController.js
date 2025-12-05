@@ -35,6 +35,26 @@ exports.verifyUser = async (req, res) => {
     
     const user = userResult.rows[0];
     const kycResult = await verifyKYC(user);
+
+    if (kycResult.verified && user.wallet_address) {
+        try {
+            const signer = getSigner();
+            const complianceSBT = getComplianceSBTContract(signer);
+            
+            // Check if user already has identity to avoid revert
+            const hasIdentity = await complianceSBT.hasIdentity(user.wallet_address);
+            
+            if (!hasIdentity) {
+                console.log(`Minting SBT for ${user.wallet_address}...`);
+                const tx = await complianceSBT.mintIdentity(user.wallet_address);
+                await tx.wait();
+                console.log(`SBT Minted: ${tx.hash}`);
+            }
+        } catch (chainError) {
+            console.error("Blockchain Interaction Failed:", chainError);
+            // Decide if you want to fail the whole request or just log it
+        }
+    }
     
     await pool.query(
       'UPDATE users SET kyc_status = $1, kyc_risk_level = $2, kyc_details = $3 WHERE id = $4',

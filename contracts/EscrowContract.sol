@@ -42,6 +42,7 @@ contract EscrowContract is ReentrancyGuard {
     modifier onlyCompliant(address _account) {
         require(!complianceManager.isFrozen(_account), "Account frozen");
         require(complianceManager.isKYCVerified(_account), "KYC not verified");
+        require(complianceManager.hasIdentity(_account), "Identity not verified (No SBT)");
         _;
     }
     

@@ -22,10 +22,11 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         bytes32 invoiceId;
         uint256 totalSupply;
         uint256 remainingSupply;
-        uint256 faceValue; // Assumes faceValue is also in 18-decimal base units
+        uint256 faceValue;
         uint256 maturityDate;
         address issuer;
         bool isRedeemed;
+        uint256 totalFunded; // TWEAK: Track funded amount for partial funding transparency
     }
 
     event Tokenized(bytes32 indexed invoiceId, uint256 tokenId, uint256 totalSupply, uint256 faceValue);
@@ -64,7 +65,8 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
             faceValue: _faceValue,
             maturityDate: _maturityDate,
             issuer: _issuer,
-            isRedeemed: false
+            isRedeemed: false,
+            totalFunded: 0
         });
         
         _mint(owner(), tokenId, _totalSupply, "");
@@ -81,45 +83,34 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         TokenDetails storage details = tokenDetails[_tokenId];
         require(msg.sender == details.issuer, "Only issuer can fund");
         require(!details.isRedeemed, "Already redeemed");
-        
-        // This check ensures the contract is funded with the full face value.
-        // You could modify this to allow partial funding.
         require(msg.value > 0, "Must send MATIC");
-        
-        // A more robust check might be:
-        // uint256 requiredFunding = details.faceValue;
-        // require(address(this).balance >= requiredFunding, "Contract not fully funded");
+
+        // TWEAK: Allow partials but track them
+        details.totalFunded += msg.value;
         
         emit RedemptionFunded(_tokenId, msg.sender, msg.value);
     }
 
-    /**
-     * @notice Redeems tokens for MATIC.
-     * @dev The 'fundRedemption' function must have been called by the issuer first.
-     */
-    function redeem(uint256 _tokenId, uint256 _amount) external nonReentrant { // <-- Added nonReentrant
+    function redeem(uint256 _tokenId, uint256 _amount) external nonReentrant {
         TokenDetails storage details = tokenDetails[_tokenId];
         require(block.timestamp >= details.maturityDate, "Not yet mature");
-        require(!details.isRedeemed, "Already redeemed");
-        require(balanceOf(msg.sender, _tokenId) >= _amount, "Insufficient tokens");
-        require(_amount > 0, "Amount must be positive");
-
-        // Calculates redemption value based on token's share of total face value.
+        
         uint256 redemptionValue = (_amount * details.faceValue) / details.totalSupply;
         require(redemptionValue > 0, "Redemption value is zero");
-        require(address(this).balance >= redemptionValue, "Contract has insufficient funds for redemption");
         
-        // --- Checks-Effects-Interactions Pattern ---
-        // 1. Effects (State Changes)
+        require(details.totalFunded >= redemptionValue, "Insufficient funding for this specific token");
+        require(address(this).balance >= redemptionValue, "Contract has insufficient funds");
+
         _burn(msg.sender, _tokenId, _amount);
         details.remainingSupply -= _amount;
+        details.totalFunded -= redemptionValue; // Deduct from tracked funds
+
         if (details.remainingSupply == 0) {
             details.isRedeemed = true;
         }
 
-        // 2. Interaction (External Call)
         (bool success, ) = payable(msg.sender).call{value: redemptionValue}("");
-        require(success, "MATIC redemption transfer failed");
+        require(success, "Transfer failed");
         
         emit Redeemed(_tokenId, msg.sender, redemptionValue);
     }

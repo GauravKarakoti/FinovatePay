@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import io from 'socket.io-client';
 import { ethers } from 'ethers';
 
-// --- IMPORTS FOR V3 FINANCING ---
+import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
 
@@ -109,6 +109,7 @@ const InvestorDashboard = ({ activeTab }) => {
     const [marketplaceListings, setMarketplaceListings] = useState([]);
     const [portfolio, setPortfolio] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [showFiatModal, setShowFiatModal] = useState(false);
 
     // Setup Socket.IO
     useEffect(() => {
@@ -308,6 +309,20 @@ const InvestorDashboard = ({ activeTab }) => {
 
     return (
         <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+                {activeTab === 'financing' && (
+                    <button 
+                        onClick={() => setShowFiatModal(true)}
+                        className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-medium flex items-center shadow-md transition-all hover:scale-105"
+                    >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Buy Stablecoins
+                    </button>
+                )}
+            </div>
+
             {activeTab === 'overview' && (
                 <div>
                     <h1 className="text-3xl font-semibold mb-6">Investor Overview</h1>
@@ -316,6 +331,16 @@ const InvestorDashboard = ({ activeTab }) => {
             )}
 
             {activeTab === 'financing' && renderFinancingContent()}
+
+            {showFiatModal && (
+                <FiatOnRampModal 
+                    onClose={() => setShowFiatModal(false)}
+                    onSuccess={(amount) => {
+                        // Optional: Refresh balance or log
+                        console.log(`User purchased ${amount}`);
+                    }}
+                />
+            )}
         </div>
     );
 };
