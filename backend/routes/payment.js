@@ -21,4 +21,41 @@ router.post('/escrow/dispute', async (req, res) => {
   await raiseDispute(req, res);
 });
 
+router.post('/onramp', async (req, res) => {
+    try {
+        const { amount, currency } = req.body;
+        const userId = req.user.id; // From authenticateToken middleware
+
+        // 1. Validate Input
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ error: 'Invalid amount' });
+        }
+
+        // 2. Create Payment Session (Example using Stripe Checkout)
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price_data: {
+                    currency: currency.toLowerCase(),
+                    product_data: {
+                        name: 'USDC Top-up',
+                        description: 'Stablecoin purchase for FinovatePay',
+                    },
+                    unit_amount: Math.round(amount * 100), // Convert to cents
+                },
+                quantity: 1,
+            }],
+            mode: 'payment',
+            success_url: `${process.env.FRONTEND_URL}/dashboard?payment=success&amount=${amount}`,
+            cancel_url: `${process.env.FRONTEND_URL}/dashboard?payment=cancelled`,
+            metadata: { userId, type: 'onramp' }
+        });
+        
+        return res.json({ paymentUrl: session.url });
+    } catch (error) {
+        console.error('On-ramp error:', error);
+        res.status(500).json({ error: 'Payment processing failed' });
+    }
+});
+
 module.exports = router;

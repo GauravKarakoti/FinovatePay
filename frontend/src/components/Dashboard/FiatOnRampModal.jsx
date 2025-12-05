@@ -20,17 +20,36 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
 
         setIsProcessing(true);
 
-        // SIMULATION: Mimic API call to payment provider (e.g., Stripe/Transak)
-        setTimeout(() => {
+        try {
+            // 1. Create a payment session/intent on the backend
+            // (Using the VITE_API_URL pattern implied by existing code)
+            const apiUrl = import.meta.env.VITE_API_URL;
+            const response = await axios.post(`${apiUrl}/payment/onramp`, {
+                amount: parseFloat(amount),
+                currency: currency,
+                paymentMethod: 'card' // Example field
+            });
+
+            const { paymentUrl, clientSecret } = response.data;
+
+            // 2. Redirect user to payment provider (e.g., Stripe Checkout)
+            if (paymentUrl) {
+                window.location.href = paymentUrl;
+            } else {
+                // If using an embedded flow (like Stripe Elements), handle clientSecret here
+                toast.success("Order created! Redirecting to payment...");
+                
+                // For demonstration, we simulate success callback if no redirect URL is provided
+                if (onSuccess) onSuccess(parseFloat(amount));
+                onClose();
+            }
+
+        } catch (error) {
+            console.error('Payment initialization failed:', error);
+            toast.error(error.response?.data?.error || "Payment failed. Please try again.");
+        } finally {
             setIsProcessing(false);
-            const receivedAmount = parseFloat(amount);
-            
-            toast.success(`Payment Successful! ${receivedAmount} USDC has been sent to your wallet.`);
-            
-            // Trigger parent update if provided
-            if (onSuccess) onSuccess(receivedAmount);
-            onClose();
-        }, 2500);
+        }
     };
 
     const fees = amount ? (parseFloat(amount) * FEE_PERCENT) : 0;

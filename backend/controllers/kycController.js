@@ -1,23 +1,66 @@
 const pool = require('../config/database');
 const axios = require('axios');
 
-// Mock KYC provider integration
 const verifyKYC = async (userData) => {
-  // In a real implementation, this would call a KYC provider API
+  // Using environment variables defined in .env.example
+  const PROVIDER_URL = process.env.KYC_PROVIDER_URL;
+  const API_KEY = process.env.KYC_API_KEY;
+
+  if (!PROVIDER_URL || !API_KEY) {
+      console.warn("KYC Configuration missing. Falling back to mock logic.");
+      return { verified: false, riskLevel: 'unknown', details: 'KYC Configuration Missing' };
+  }
+
   try {
-    const response = await axios.post(process.env.KYC_PROVIDER_URL, {
-      apiKey: process.env.KYC_API_KEY,
-      userData: userData
+    // Construct the payload required by your specific provider (e.g., Sumsub, Onfido)
+    const payload = {
+      externalUserId: userData.id,
+      email: userData.email,
+      firstName: userData.first_name, // Assuming these fields exist in your User model
+      lastName: userData.last_name,
+      dob: userData.date_of_birth,
+      document: {
+          // In a real flow, you might pass a document ID or image URL uploaded earlier
+          type: userData.document_type, 
+          number: userData.document_number
+      }
+    };
+
+    const response = await axios.post(PROVIDER_URL, payload, {
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`, // Or 'X-API-KEY': API_KEY depending on provider
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000 // 10 second timeout
     });
     
+    // Parse response based on provider's specific schema
+    // This example assumes a generic response structure
+    const { status, riskScore, failureReason } = response.data;
+
+    // Map provider status to our system's status
+    const isVerified = status === 'APPROVED' || status === 'VERIFIED';
+    
+    // Map risk score to level
+    let riskLevel = 'low';
+    if (riskScore > 0.7) riskLevel = 'high';
+    else if (riskScore > 0.3) riskLevel = 'medium';
+
     return {
-      verified: response.data.verified,
-      riskLevel: response.data.riskLevel,
-      details: response.data.details
+      verified: isVerified,
+      riskLevel: riskLevel,
+      details: isVerified ? 'Verification Successful' : (failureReason || 'Verification declined by provider')
     };
+
   } catch (error) {
-    console.error('KYC verification failed:', error);
-    return { verified: false, riskLevel: 'high', details: 'Verification failed' };
+    console.error('KYC External API verification failed:', error.response?.data || error.message);
+    
+    // Differentiate between network error and rejection
+    return { 
+        verified: false, 
+        riskLevel: 'high', 
+        details: 'Provider Error: ' + (error.response?.data?.message || error.message) 
+    };
   }
 };
 
