@@ -152,6 +152,10 @@ export const verifyKYC = (userData) => {
   return api.post('/kyc/verify', userData);
 };
 
+export const getKYCStatus = () => {
+  return api.get('/kyc/status');
+};
+
 // Admin API
 export const getUsers = () => {
   return api.get('/admin/users');

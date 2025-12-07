@@ -5,6 +5,12 @@ const { ethers } = require('ethers');
 const { getSigner, contractAddresses } = require('../config/blockchain');
 const ComplianceManagerArtifact = require('../../deployed/ComplianceManager.json');
 const router = express.Router();
+const kycController = require('../controllers/kycController');
+
+router.post('/initiate', authenticateToken, kycController.initiateKYC);
+
+// Route to verify OTP and complete process
+router.post('/verify-otp', authenticateToken, kycController.verifyKYCOtp);
 
 router.post('/verify', authenticateToken, async (req, res) => {
   // FIX: Destructure camelCase properties to match the frontend form data
@@ -134,20 +140,21 @@ router.get('/status', authenticateToken, async (req, res) => {
   try {
     const kycResult = await pool.query(
       `SELECT kv.*, u.kyc_status, u.kyc_risk_level 
-       FROM kyc_verifications kv
-       INNER JOIN users u ON kv.user_id = u.id
-       WHERE kv.user_id = $1 
-       ORDER BY kv.created_at DESC 
-       LIMIT 1`,
+      FROM kyc_verifications kv
+      INNER JOIN users u ON kv.user_id = u.id
+      WHERE kv.user_id = $1 
+      ORDER BY kv.created_at DESC LIMIT 1`,
       [req.user.id]
     );
-
+    console.log("KYC Result: ", kycResult.rows)
+    
     if (kycResult.rows.length === 0) {
       return res.json({
         status: 'not_started',
         message: 'KYC verification not initiated'
       });
     }
+    console.log("KYC Status: ", kycResult.rows[0])
 
     res.json(kycResult.rows[0]);
   } catch (error) {

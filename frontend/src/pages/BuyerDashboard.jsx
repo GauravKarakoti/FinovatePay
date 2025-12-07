@@ -7,7 +7,8 @@ import {
     createQuotation,
     getPendingBuyerApprovals, // <-- Use the new specific API call
     buyerApproveQuotation,
-    rejectQuotation
+    rejectQuotation,
+    getKYCStatus
 } from '../utils/api';
 import { connectWallet, erc20ABI } from '../utils/web3';
 import StatsCard from '../components/Dashboard/StatsCard';
@@ -30,8 +31,9 @@ const BuyerDashboard = ({ activeTab }) => {
     const [walletAddress, setWalletAddress] = useState('');
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [timelineEvents, setTimelineEvents] = useState([]);
-    const [kycStatus, setKycStatus] = useState('verified');
-    const [kycRiskLevel, setKycRiskLevel] = useState('low');
+    const [kycStatus, setKycStatus] = useState('not_started');
+    const [kycRiskLevel, setKycRiskLevel] = useState('unknown');
+    const [kycDetails, setKycDetails] = useState('');
     const [loadingInvoice, setLoadingInvoice] = useState(null);
     const [showQRCode, setShowQRCode] = useState(false);
     const [selectedLot, setSelectedLot] = useState(null);
@@ -42,7 +44,8 @@ const BuyerDashboard = ({ activeTab }) => {
                 const { address } = await connectWallet();
                 setWalletAddress(address);
 
-                // Fetch data based on the active tab
+                await loadKYCStatus();
+
                 if (activeTab === 'produce') await loadAvailableLots();
                 else if (activeTab === 'quotations') await loadPendingApprovals(); // Changed this tab name to 'quotations' for consistency, but its purpose is approvals.
                 else await loadInvoices();
@@ -54,6 +57,23 @@ const BuyerDashboard = ({ activeTab }) => {
         };
         loadData();
     }, [activeTab]);
+
+    const loadKYCStatus = async () => {
+        try {
+            const response = await getKYCStatus();
+            const data = response.data;
+            
+            // The backend returns { status: '...', kyc_risk_level: '...', details: '...' }
+            // If the user hasn't started, it returns { status: 'not_started' }
+            setKycStatus(data.status || 'not_started');
+            setKycRiskLevel(data.kyc_risk_level || 'unknown');
+            setKycDetails(data.details || (data.status === 'verified' ? 'Identity verified successfully' : 'Verification pending or not initiated'));
+            
+        } catch (error) {
+            console.error('Failed to load KYC status:', error);
+            // Don't show toast error here to avoid annoyance if it's just a 404/not found
+        }
+    };
 
     const loadInvoices = async () => {
         try {
@@ -89,7 +109,7 @@ const BuyerDashboard = ({ activeTab }) => {
         try {
             await buyerApproveQuotation(quotationId);
             toast.success('Quotation approved! The seller can now create an invoice.');
-            await loadPendingApprovals(); // Refresh list
+            await loadPendingApprovals(); 
         } catch (error) {
             toast.error('Failed to approve quotation: ' + (error.response?.data?.error || error.message));
         }
@@ -99,7 +119,7 @@ const BuyerDashboard = ({ activeTab }) => {
         try {
             await rejectQuotation(quotationId);
             toast.info("Quotation rejected.");
-            await loadPendingApprovals(); // Refresh list
+            await loadPendingApprovals(); 
         } catch (error) {
             toast.error("Failed to reject quotation: " + (error.response?.data?.error || error.message));
         }
@@ -132,9 +152,7 @@ const BuyerDashboard = ({ activeTab }) => {
         }
     };
 
-    // ... handlePayInvoice, handleReleaseFunds, handleRaiseDispute, etc. are unchanged from the previous version ...
-    // [The code for these functions remains the same]
-     const handlePayInvoice = async (invoice) => {
+    const handlePayInvoice = async (invoice) => {
         if (!invoice || !ethers.utils.isAddress(invoice.contract_address)) {
             toast.error(`Error: Invalid or missing contract address for this invoice.`);
             return;
@@ -152,7 +170,6 @@ const BuyerDashboard = ({ activeTab }) => {
 
             if (currency === 'MATIC') {
                 tx = await invoiceContract.depositNative({ value: amountWei });
-                console.log("Transaction sent:", tx);
             } else {
                 const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
                 toast.info('Requesting token approval from your wallet...');
@@ -231,7 +248,6 @@ const BuyerDashboard = ({ activeTab }) => {
     };
 
     const handleShowQRCode = (invoice) => {
-        console.log("Invoice:", invoice)
         setSelectedLot({
             lotId: invoice.lot_id,
             produceType: invoice.produce_type,
@@ -251,11 +267,10 @@ const BuyerDashboard = ({ activeTab }) => {
 
     const renderTabContent = () => {
         switch (activeTab) {
-            case 'quotations': // This is the approvals tab
+            case 'quotations':
                 return (
                     <div>
                         <h2 className="text-2xl font-bold mb-6">Pending Approvals</h2>
-                        {/* Use the BuyerQuotationApproval component */}
                         <BuyerQuotationApproval 
                             quotations={pendingApprovals} 
                             onApprove={handleApproveQuotation}
@@ -288,10 +303,11 @@ const BuyerDashboard = ({ activeTab }) => {
                             </div>
                             <div>
                                 <h3 className="text-xl font-semibold mb-4">KYC Status</h3>
+                                {/* [UPDATED] Pass dynamic data to the KYC Status component */}
                                 <KYCStatus
                                     status={kycStatus}
                                     riskLevel={kycRiskLevel}
-                                    details="Your identity has been verified successfully."
+                                    details={kycDetails}
                                 />
                             </div>
                         </div>
@@ -368,7 +384,6 @@ const BuyerDashboard = ({ activeTab }) => {
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.origin}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.current_quantity} kg</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                    {/* ✅ UPDATED HERE */}
                                                     <AmountDisplay maticAmount={lot.price / 50.75} />
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

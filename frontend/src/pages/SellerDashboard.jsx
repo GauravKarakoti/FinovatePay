@@ -4,7 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { 
     getSellerInvoices, createInvoice, updateInvoiceStatus,
     getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
-    createProduceLot as syncProduceLot , api
+    createProduceLot as syncProduceLot , api,
+    getKYCStatus // [NEW] Import the status fetcher
 } from '../utils/api';
 // ---
 // **UPDATE**: Import erc20ABI
@@ -37,8 +38,12 @@ const SellerDashboard = ({ activeTab }) => {
   const [invoices, setInvoices] = useState([]);
   const [walletAddress, setWalletAddress] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [kycStatus, setKycStatus] = useState('pending');
-  const [kycRiskLevel, setKycRiskLevel] = useState('medium');
+  
+  // [UPDATED] Initialize with dynamic state
+  const [kycStatus, setKycStatus] = useState('not_started');
+  const [kycRiskLevel, setKycRiskLevel] = useState('unknown');
+  const [kycDetails, setKycDetails] = useState(''); 
+
   const [showKYCVerification, setShowKYCVerification] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState([]);
@@ -70,9 +75,30 @@ const SellerDashboard = ({ activeTab }) => {
   const loadInitialData = async () => {
     const { address } = await connectWallet();
     setWalletAddress(address);
+    
+    // [NEW] Load KYC Status
+    await loadKYCStatus();
+    
     await loadData(address);
     await loadProduceLots();
     await loadQuotations(address);
+  };
+
+  // [NEW] Function to fetch and set KYC data
+  const loadKYCStatus = async () => {
+    try {
+        const response = await getKYCStatus();
+        const data = response.data;
+        console.log("Data: ", data);
+        
+        setKycStatus(data.status || 'not_started');
+        console.log("KYC Status: ", kycStatus)
+        setKycRiskLevel(data.kyc_risk_level || 'unknown');
+        setKycDetails(data.details || (data.status === 'verified' ? 'Identity verified successfully' : 'Verification pending or not initiated'));
+        
+    } catch (error) {
+        console.error('Failed to load KYC status:', error);
+    }
   };
 
   const loadQuotations = async (currentAddress) => {
@@ -191,9 +217,6 @@ const SellerDashboard = ({ activeTab }) => {
       
       const invoicesData = await getSellerInvoices();
       setInvoices(invoicesData.data);
-      
-      setKycStatus('verified');
-      setKycRiskLevel('low');
     } catch (error) {
       console.error('Failed to load data:', error);
     }
@@ -297,9 +320,9 @@ const SellerDashboard = ({ activeTab }) => {
 
   const handleKYCVerificationComplete = (result) => {
     setShowKYCVerification(false);
-    setKycStatus(result.verified ? 'verified' : 'failed');
-    setKycRiskLevel(result.riskLevel);
-    result.verified ? toast.success('KYC Verification completed successfully') : toast.error("KYC Verification failed.")
+    // Refresh KYC status from server to ensure synchronization
+    loadKYCStatus();
+    result.verified ? toast.success('KYC Verification completed successfully') : toast.error("KYC Verification failed.");
   };
 
   const handleCreateProduceLot = async (formData) => {
@@ -408,10 +431,11 @@ const SellerDashboard = ({ activeTab }) => {
               
               <div>
                 <h3 className="text-xl font-semibold mb-4">KYC Status</h3>
+                {/* [UPDATED] Pass dynamic data to the KYC Status component */}
                 <KYCStatus
                   status={kycStatus}
                   riskLevel={kycRiskLevel}
-                  details={kycStatus === 'verified' ? 'Your identity has been verified successfully.' : 'Please complete KYC verification to access all features.'}
+                  details={kycDetails}
                   onReverify={() => setShowKYCVerification(true)}
                 />
               </div>

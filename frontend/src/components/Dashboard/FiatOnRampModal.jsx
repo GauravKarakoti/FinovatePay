@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import axios from 'axios';
 
 const FiatOnRampModal = ({ onClose, onSuccess }) => {
     const [amount, setAmount] = useState('');
@@ -24,7 +25,7 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
             // 1. Create a payment session/intent on the backend
             // (Using the VITE_API_URL pattern implied by existing code)
             const apiUrl = import.meta.env.VITE_API_URL;
-            const response = await axios.post(`${apiUrl}/payment/onramp`, {
+            const response = await axios.post(`${apiUrl}/payments/onramp`, {
                 amount: parseFloat(amount),
                 currency: currency,
                 paymentMethod: 'card' // Example field
