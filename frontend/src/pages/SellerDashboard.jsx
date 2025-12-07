@@ -322,7 +322,6 @@ const SellerDashboard = ({ activeTab }) => {
     setShowKYCVerification(false);
     // Refresh KYC status from server to ensure synchronization
     loadKYCStatus();
-    result.verified ? toast.success('KYC Verification completed successfully') : toast.error("KYC Verification failed.");
   };
 
   const handleCreateProduceLot = async (formData) => {

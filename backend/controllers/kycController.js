@@ -13,20 +13,24 @@ exports.initiateKYC = async (req, res) => {
     const sandboxResponse = await sandboxService.generateAadhaarOTP(idNumber);
     console.log("Sandbox Response: ", sandboxResponse);
 
-    console.log(userId, idNumber, sandboxResponse.transaction_id);
+    // CHANGED: Use .data.reference_id instead of .transaction_id
+    const kycReferenceId = sandboxResponse.data.reference_id; 
+
+    console.log(userId, idNumber, kycReferenceId);
+    
     await pool.query(
       `INSERT INTO kyc_verifications 
        (user_id, id_type, id_number, status, reference_id) 
        VALUES ($1, 'aadhaar', $2, 'pending_otp', $3)
        ON CONFLICT (user_id) DO UPDATE 
        SET reference_id = $3, status = 'pending_otp', id_number = $2`,
-      [userId, idNumber, sandboxResponse.transaction_id] 
+      [userId, idNumber, kycReferenceId] // Update this variable
     );
 
     res.json({
       success: true,
       message: 'OTP sent to Aadhaar-linked mobile number',
-      referenceId: sandboxResponse.transaction_id
+      referenceId: kycReferenceId // Update this variable
     });
   } catch (error) {
     res.status(500).json({ 

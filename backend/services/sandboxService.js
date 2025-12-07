@@ -67,8 +67,8 @@ class SandboxService {
         `${this.baseUrl}/kyc/aadhaar/okyc/otp/verify`,
         {
           "@entity": "in.co.sandbox.kyc.aadhaar.okyc.request",
-          "reference_id": referenceId,
-          "otp": otp
+          "reference_id": String(referenceId), // CHANGED: Convert to String
+          "otp": String(otp)                   // CHANGED: Ensure OTP is String
         },
         {
           headers: {
