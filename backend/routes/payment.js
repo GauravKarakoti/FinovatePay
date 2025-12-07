@@ -6,6 +6,7 @@ const {
   releaseEscrow,
   raiseDispute
 } = require('../controllers/escrowController');
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 // All payment routes require authentication and KYC
 router.use(authenticateToken);
@@ -32,6 +33,7 @@ router.post('/onramp', async (req, res) => {
         }
 
         // 2. Create Payment Session (Example using Stripe Checkout)
+        console.log(stripe.checkout);
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [{
