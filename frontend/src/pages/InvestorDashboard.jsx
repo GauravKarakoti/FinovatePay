@@ -133,6 +133,22 @@ const InvestorDashboard = ({ activeTab }) => {
     }, []);
 
     useEffect(() => {
+        // Parse URL query parameters
+        const queryParams = new URLSearchParams(window.location.search);
+        const paymentStatus = queryParams.get('payment');
+        const amount = queryParams.get('amount');
+
+        if (paymentStatus === 'success') {
+            toast.success(`Payment successful! Added ${amount} USDC to your wallet.`);
+            // Clean up the URL so the toast doesn't appear again on refresh
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (paymentStatus === 'cancelled') {
+            toast.info('Payment process was cancelled.');
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+
+    useEffect(() => {
         if (activeTab === 'financing') {
             fetchMarketplace();
             fetchPortfolio();

@@ -48,8 +48,8 @@ router.post('/onramp', async (req, res) => {
                 quantity: 1,
             }],
             mode: 'payment',
-            success_url: `${process.env.FRONTEND_URL}/dashboard?payment=success&amount=${amount}`,
-            cancel_url: `${process.env.FRONTEND_URL}/dashboard?payment=cancelled`,
+            success_url: `${process.env.FRONTEND_URL}/investor?payment=success&amount=${amount}`,
+            cancel_url: `${process.env.FRONTEND_URL}/investor?payment=cancelled`,
             metadata: { userId, type: 'onramp' }
         });
         
