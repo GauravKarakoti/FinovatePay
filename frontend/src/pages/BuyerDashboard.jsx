@@ -430,7 +430,14 @@ const BuyerDashboard = ({ activeTab }) => {
 
     return (
         <div className="container mx-auto p-4">
-            {renderTabContent()}
+            {showKYCVerification ? (
+                <KYCVerification 
+                user={{}} // Pass user object here if available
+                onVerificationComplete={handleKYCVerificationComplete} 
+                />
+            ) : (
+                renderTabContent()
+            )}
 
             {showQRCode && selectedLot && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
