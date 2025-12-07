@@ -2,6 +2,11 @@ import React from 'react';
 
 const KYCStatus = ({ status, riskLevel, details, onReverify }) => {
   const statusConfig = {
+    not_started: {
+      label: 'Not Verified',
+      color: 'text-gray-800 bg-gray-100',
+      icon: '⚪'
+    },
     pending: {
       label: 'Pending Review',
       color: 'text-yellow-800 bg-yellow-100',
@@ -72,12 +77,12 @@ const KYCStatus = ({ status, riskLevel, details, onReverify }) => {
         </div>
       )}
       
-      {(status === 'failed' || status === 'expired') && (
+      {(status === 'failed' || status === 'expired' || status === 'not_started') && (
         <button
           onClick={onReverify}
           className="px-4 py-2 bg-finovate-blue-600 text-white rounded-md hover:bg-finovate-blue-700"
         >
-          Restart Verification
+          {status === 'not_started' ? 'Start Verification' : 'Restart Verification'}
         </button>
       )}
       

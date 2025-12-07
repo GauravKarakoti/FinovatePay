@@ -23,6 +23,7 @@ import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApproval';
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
+import KYCVerification from '../components/KYC/KYCVerification';
 
 const BuyerDashboard = ({ activeTab }) => {
     const [invoices, setInvoices] = useState([]);
@@ -37,6 +38,7 @@ const BuyerDashboard = ({ activeTab }) => {
     const [loadingInvoice, setLoadingInvoice] = useState(null);
     const [showQRCode, setShowQRCode] = useState(false);
     const [selectedLot, setSelectedLot] = useState(null);
+    const [showKYCVerification, setShowKYCVerification] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -73,6 +75,12 @@ const BuyerDashboard = ({ activeTab }) => {
             console.error('Failed to load KYC status:', error);
             // Don't show toast error here to avoid annoyance if it's just a 404/not found
         }
+    };
+
+    const handleKYCVerificationComplete = (result) => {
+        setShowKYCVerification(false);
+        loadKYCStatus(); // Refresh status
+        result.verified ? toast.success('Verified!') : toast.error("Verification failed.");
     };
 
     const loadInvoices = async () => {
@@ -308,6 +316,7 @@ const BuyerDashboard = ({ activeTab }) => {
                                     status={kycStatus}
                                     riskLevel={kycRiskLevel}
                                     details={kycDetails}
+                                    onReverify={() => setShowKYCVerification(true)}
                                 />
                             </div>
                         </div>

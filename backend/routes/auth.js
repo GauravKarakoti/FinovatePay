@@ -53,10 +53,10 @@ router.post('/register', async (req, res) => {
     // Create user
     const newUser = await pool.query(
       `INSERT INTO users 
-       (email, password_hash, wallet_address, company_name, tax_id, first_name, last_name) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) 
+       (email, password_hash, wallet_address, company_name, tax_id, first_name, last_name, role) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING id, email, wallet_address, company_name, created_at`,
-      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name]
+      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, 'buyer']
     );
 
     // Generate JWT token
