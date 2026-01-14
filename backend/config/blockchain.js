@@ -1,10 +1,11 @@
 const { ethers } = require('ethers');
-const { get } = require('../routes/chatbot');
 require('dotenv').config();
-// 1. Import the ABI
+
+// 1. Import ABIs and Deployed Addresses
 const FractionTokenABI = require('../../deployed/FractionToken.json').abi;
 const ComplianceManagerABI = require('../../deployed/ComplianceManager.json').abi;
 const FinancingManagerABI = require('../../deployed/FinancingManager.json').abi;
+const deployedAddresses = require('../../deployed/contract-addresses.json');
 
 // --- Validation ---
 if (!process.env.BLOCKCHAIN_RPC_URL) {
@@ -12,10 +13,6 @@ if (!process.env.BLOCKCHAIN_RPC_URL) {
 }
 if (!process.env.DEPLOYER_PRIVATE_KEY) {
   throw new Error("Missing DEPLOYER_PRIVATE_KEY in .env file. Please provide the deployer's private key.");
-}
-// 2. Add validation for the token address
-if (!process.env.FRACTION_TOKEN_ADDRESS) {
-  throw new Error("Missing FRACTION_TOKEN_ADDRESS in .env file.");
 }
 
 const getProvider = () => {
@@ -30,7 +27,6 @@ const getProvider = () => {
 const getSigner = () => {
   try {
     const provider = getProvider();
-    console.log("Creating signer from private key...");
     return new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
   } catch (error) {
     console.error("Failed to create signer:", error);
@@ -38,46 +34,42 @@ const getSigner = () => {
   }
 };
 
-// 3. Create a function to get the contract instance
-/**
- * Gets an instance of the FractionToken contract.
- * @param {ethers.Signer | ethers.Provider} [signerOrProvider] - An ethers signer (for transactions) or provider (for read-only calls).
- * @returns {ethers.Contract}
- */
+// 2. Centralized Contract Addresses (Priority: JSON File > Env Vars)
+const contractAddresses = {
+  invoiceFactory: deployedAddresses.InvoiceFactory || process.env.INVOICE_FACTORY_ADDRESS,
+  escrowContract: deployedAddresses.EscrowContract || process.env.ESCROW_CONTRACT_ADDRESS,
+  complianceManager: deployedAddresses.ComplianceManager || process.env.COMPLIANCE_MANAGER_ADDRESS,
+  produceTracking: deployedAddresses.ProduceTracking || process.env.PRODUCE_TRACKING_ADDRESS,
+  fractionToken: deployedAddresses.FractionToken || process.env.FRACTION_TOKEN_ADDRESS,
+  financingManager: deployedAddresses.FinancingManager || process.env.FINANCING_MANAGER_ADDRESS
+};
+
+// 3. Contract Instance Getters
 const getFractionTokenContract = (signerOrProvider) => {
   const provider = getProvider();
   return new ethers.Contract(
-    process.env.FRACTION_TOKEN_ADDRESS,
+    contractAddresses.fractionToken,
     FractionTokenABI,
-    signerOrProvider || provider // Use signer if provided, else fallback to provider
+    signerOrProvider || provider
   );
 };
 
 const getComplianceManagerContract = (signerOrProvider) => {
   const provider = getProvider();
   return new ethers.Contract(
-    process.env.COMPLIANCE_MANAGER_ADDRESS,
+    contractAddresses.complianceManager,
     ComplianceManagerABI,
-    signerOrProvider || provider // Use signer if provided, else fallback to provider
+    signerOrProvider || provider
   );
 };
 
 const getFinancingManagerContract = (signerOrProvider) => {
   const provider = getProvider();
   return new ethers.Contract(
-    process.env.FINANCING_MANAGER_ADDRESS,
+    contractAddresses.financingManager,
     FinancingManagerABI,
-    signerOrProvider || provider // Use signer if provided, else fallback to provider
+    signerOrProvider || provider
   );
-};
-
-const contractAddresses = {
-  invoiceFactory: process.env.INVOICE_FACTORY_ADDRESS,
-  escrowContract: process.env.ESCROW_CONTRACT_ADDRESS,
-  complianceManager: process.env.COMPLIANCE_MANAGER_ADDRESS,
-  produceTracking: process.env.PRODUCE_TRACKING_ADDRESS,
-  fractionToken: process.env.FRACTION_TOKEN_ADDRESS,
-  financingManager: process.env.FINANCING_MANAGER_ADDRESS
 };
 
 module.exports = {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import api from '../../utils/api';
 
@@ -6,11 +6,49 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
     const [amount, setAmount] = useState('');
     const [currency, setCurrency] = useState('USD');
     const [isProcessing, setIsProcessing] = useState(false);
+    
+    // State for live exchange rate
+    const [exchangeRate, setExchangeRate] = useState(1.0);
+    const [isLoadingRate, setIsLoadingRate] = useState(false);
 
-    // Mock exchange rate (1 Fiat = 1 USDC for simplicity)
-    const EXCHANGE_RATE = 1.0;
     const FEE_PERCENT = 0.015; // 1.5% fee
 
+    // --- 1. ACTUAL IMPLEMENTATION: Live Exchange Rate Fetching ---
+    useEffect(() => {
+        const fetchExchangeRate = async () => {
+            // USDC is pegged to USD, so rate is always 1
+            if (currency === 'USD') {
+                setExchangeRate(1.0);
+                return;
+            }
+
+            setIsLoadingRate(true);
+            try {
+                // Fetching real-time rates from CoinGecko (Free Tier)
+                // "ids" is the crypto (usdc), "vs_currencies" is the fiat (eur, gbp)
+                const response = await fetch(
+                    `https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=${currency.toLowerCase()}`
+                );
+                const data = await response.json();
+                
+                // The API returns how much 1 USDC costs in Fiat. 
+                // We need the inverse: How much USDC you get for 1 Fiat.
+                // Rate = 1 / (Fiat price of 1 USDC)
+                const rateInFiat = data['usd-coin'][currency.toLowerCase()];
+                setExchangeRate(1 / rateInFiat);
+            } catch (error) {
+                console.error("Failed to fetch exchange rate:", error);
+                toast.error("Could not fetch live rates. Defaulting to 1:1.");
+                setExchangeRate(1.0);
+            } finally {
+                setIsLoadingRate(false);
+            }
+        };
+
+        fetchExchangeRate();
+    }, [currency]);
+
+    // --- 2. ACTUAL IMPLEMENTATION: Handle Purchase ---
     const handlePurchase = async (e) => {
         e.preventDefault();
         
@@ -22,36 +60,44 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
         setIsProcessing(true);
 
         try {
+            // Step 1: Create a Stripe Checkout Session via your Backend
+            // This endpoint (payment.js) should create a Stripe session and return the 'url'
             const response = await api.post('/payments/onramp', {
                 amount: parseFloat(amount),
                 currency: currency,
-                paymentMethod: 'card'
+                targetToken: 'USDC',
+                exchangeRate: exchangeRate // Pass rate to lock it in backend if needed
             });
 
-            const { paymentUrl, clientSecret } = response.data;
+            const { paymentUrl, sessionUrl } = response.data;
+            const targetUrl = paymentUrl || sessionUrl;
 
-            // 2. Redirect user to payment provider (e.g., Stripe Checkout)
-            if (paymentUrl) {
-                window.location.href = paymentUrl;
+            if (targetUrl) {
+                // Step 2: Redirect user to the secure Payment Provider (e.g., Stripe Hosted Page)
+                toast.loading("Redirecting to secure payment gateway...");
+                window.location.href = targetUrl;
             } else {
-                // If using an embedded flow (like Stripe Elements), handle clientSecret here
-                toast.success("Order created! Redirecting to payment...");
-                
-                // For demonstration, we simulate success callback if no redirect URL is provided
+                // Fallback for simulation/testing if backend isn't fully configured with Stripe keys
+                console.warn("No payment URL returned. Falling back to simulation.");
+                toast.success("Payment successful! (Simulated)");
                 if (onSuccess) onSuccess(parseFloat(amount));
                 onClose();
             }
 
         } catch (error) {
             console.error('Payment initialization failed:', error);
-            toast.error(error.response?.data?.error || "Payment failed. Please try again.");
+            const errorMessage = error.response?.data?.error || "Payment connection failed. Please try again.";
+            toast.error(errorMessage);
         } finally {
+            // Only stop processing if we didn't redirect (redirect unmounts the component anyway)
             setIsProcessing(false);
         }
     };
 
+    // Calculate totals based on the dynamic exchange rate
     const fees = amount ? (parseFloat(amount) * FEE_PERCENT) : 0;
-    const totalCharge = amount ? (parseFloat(amount) + fees) : 0;
+    const totalCharge = amount ? (parseFloat(amount) + fees) : 0; // Total Fiat to pay
+    const estimatedTokens = amount ? (parseFloat(amount) * exchangeRate) : 0; // Tokens received
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
@@ -72,14 +118,23 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
                     </button>
                 </div>
                 
-                <p className="text-sm text-gray-600 mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100">
-                    Top up your wallet instantly using your credit card to finance invoices or pay suppliers.
-                </p>
+                <div className="text-sm text-gray-600 mb-6 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                    <p className="font-semibold mb-1">Testing on Amoy?</p>
+                    <p>Since this is a testnet demo, you can get free USDC directly from the faucet.</p>
+                    <a 
+                        href="https://faucet.circle.com/" 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-blue-600 hover:text-blue-800 underline mt-1 block"
+                    >
+                        Go to Circle USDC Faucet &rarr;
+                    </a>
+                </div>
 
                 <form onSubmit={handlePurchase}>
                     <div className="mb-5">
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
-                            You Pay
+                            You Pay (Fiat)
                         </label>
                         <div className="relative group">
                             <input
@@ -107,8 +162,13 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
 
                     <div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200 space-y-2">
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">Rate</span>
-                            <span className="font-medium text-gray-700">1 {currency} ≈ {EXCHANGE_RATE.toFixed(2)} USDC</span>
+                            <span className="text-gray-500">Exchange Rate</span>
+                            <span className="font-medium text-gray-700">
+                                {isLoadingRate 
+                                    ? "Fetching..." 
+                                    : `1 ${currency} ≈ ${exchangeRate.toFixed(4)} USDC`
+                                }
+                            </span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-500">Processing Fee (1.5%)</span>
@@ -120,16 +180,18 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
                             <span className="font-bold text-xl text-finovate-blue-700">{totalCharge.toFixed(2)} {currency}</span>
                         </div>
                         <div className="flex justify-between items-center mt-1">
-                            <span className="text-sm font-medium text-green-600">You Receive</span>
-                            <span className="text-sm font-bold text-green-600">{amount || '0.00'} USDC</span>
+                            <span className="text-sm font-medium text-green-600">You Receive (Est.)</span>
+                            <span className="text-sm font-bold text-green-600">
+                                {estimatedTokens.toFixed(2)} USDC
+                            </span>
                         </div>
                     </div>
 
                     <button
                         type="submit"
-                        disabled={isProcessing}
+                        disabled={isProcessing || isLoadingRate}
                         className={`w-full py-3 px-4 rounded-lg shadow-lg text-white font-bold text-lg transition-all transform hover:-translate-y-0.5
-                            ${isProcessing 
+                            ${(isProcessing || isLoadingRate)
                                 ? 'bg-gray-400 cursor-not-allowed shadow-none' 
                                 : 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 shadow-green-500/30'}`}
                     >
@@ -141,7 +203,7 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
                                 </svg>
                                 Processing...
                             </span>
-                        ) : 'Confirm Purchase'}
+                        ) : 'Proceed to Payment'}
                     </button>
                     
                     <p className="text-xs text-center text-gray-400 mt-4 flex items-center justify-center gap-2">
