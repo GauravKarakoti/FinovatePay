@@ -75,7 +75,7 @@ const InvoiceList = ({
                                     <AmountDisplay maticAmount={invoice.amount} />
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{getStatusChip(invoice.escrow_status)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2 flex items-center">
                                     {userRole === 'buyer' && invoice.escrow_status === 'created' && (
                                         <button onClick={(e) => { e.stopPropagation(); onPayInvoice(invoice); }} className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md text-xs">Pay Invoice</button>
                                     )}
@@ -93,8 +93,17 @@ const InvoiceList = ({
                                     {['deposited', 'shipped'].includes(invoice.escrow_status) && (
                                         <button onClick={(e) => { e.stopPropagation(); onRaiseDispute(invoice); }} className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-xs">Raise Dispute</button>
                                     )}
-                                    <button onClick={(e) => { e.stopPropagation(); onShowQRCode(invoice); }} className="text-white bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded-md text-xs">
-                                        Show QR
+                                    {/* UPDATED: "View Passport" Button */}
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); onShowQRCode(invoice); }} 
+                                        className="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded-md text-xs flex items-center gap-1"
+                                        title="View Produce Passport & Tracking"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
+                                        </svg>
+                                        View Passport
                                     </button>
                                 </td>
                             </tr>
