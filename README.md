@@ -11,6 +11,22 @@ It enables instant stablecoin payments, automated escrow, and tokenized invoice 
 🔐 On-chain settlement and dispute resolution for security and auditability
 
 
+## Getting Started
+
+This guide helps new contributors set up FinovatePay locally.
+
+### Prerequisites
+- Node.js (v18+ recommended)
+- npm or yarn
+- MetaMask wallet
+- Polygon RPC endpoint
+
+### Clone the Repository
+```bash
+git clone https://github.com/<your-username>/FinovatePay.git
+cd FinovatePay
+
+
 
 ## 🔧 Tech Stack
 
