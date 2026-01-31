@@ -2,6 +2,17 @@
 
 Thank you for your interest in contributing to FinovatePay! We are building a hybrid B2B payment rail on Polygon that integrates on-chain settlement with off-chain UX.
 
+## Contribution Workflow (Temporary)
+
+⚠️ Note: The `main` branch is currently in a code-freeze period due to an external review.
+
+Please:
+- Fork the repo's contrib branch
+- Create your feature branch
+- Open PRs **against the `contrib` branch**, not `main`
+
+All reviewed PRs will be merged into `main` after the freeze ends.
+
 ## How Can I Contribute?
 
 ### Reporting Bugs
@@ -17,7 +28,7 @@ Thank you for your interest in contributing to FinovatePay! We are building a hy
     * Improved KYC/AML compliance modules.
 
 ### Pull Requests
-1. Fork the repository and create your branch from `main`.
+1. Fork the repository and create your branch from `contrib` branch.
 2. If you've added code that should be tested, add tests.
 3. Ensure the test suite passes (Hardhat for contracts, Jest/Vitest for frontend/backend).
 4. Update documentation (README.md, architecture.md) if you change functionality.
