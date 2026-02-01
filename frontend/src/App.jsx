@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -11,10 +11,9 @@ import ProduceHistory from './pages/ProduceHistory';
 import { connectWallet } from './utils/web3';
 import Web3Modal from 'web3modal';
 import './App.css';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
-// 1. Import the new InvestorDashboard
 import InvestorDashboard from './pages/InvestorDashboard';
 
 function App() {
@@ -27,7 +26,6 @@ function App() {
       completed: 0,
       produceLots: 0,
   });
-  // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
   useEffect(() => {
@@ -45,7 +43,14 @@ function App() {
         })
         .catch((error) => {
           console.error("Failed to auto-connect wallet:", error);
+          
+          // ✅ ISSUE #14 FIX: Clear stale cached provider when permissions revoked
+          web3Modal.clearCachedProvider();
+          
           setWalletConnected(false);
+          
+          // ✅ ISSUE #14 FIX: Notify user instead of silent failure
+          toast.error('Wallet connection expired. Please reconnect your wallet.');
         });
     }
   }, []);
@@ -84,9 +89,25 @@ function App() {
     );
   };
 
-  // Chatbot toggle handler
   const toggleChatbot = () => {
     setIsChatbotOpen(prevState => !prevState);
+  };
+
+  // ✅ AUTH GUARD: Saves intended route in location state for redirect after login
+  const RequireAuth = ({ children, allowedRoles }) => {
+    const location = useLocation();
+    
+    if (!user) {
+      // Not logged in: redirect to login, remembering where they came from
+      return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    }
+    
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      // Logged in but wrong role: send to home (which handles role-based landing)
+      return <Navigate to="/" replace />;
+    }
+    
+    return children;
   };
 
   return (
@@ -102,6 +123,7 @@ function App() {
         {console.log('Current user role in App.jsx:', user)}
         <main>
           <Routes>
+            {/* Home route - keeps existing role-based logic */}
             <Route 
                 path="/" 
                 element={
@@ -112,7 +134,6 @@ function App() {
                             <Navigate to="/buyer" />
                         ) : user.role === 'shipment' || user.role === 'warehouse' ? (
                             <Navigate to="/shipment" />
-                        // 2. Add redirect for 'investor' role
                         ) : user.role === 'investor' ? (
                             <Navigate to="/investor" />
                         ) : (
@@ -123,39 +144,54 @@ function App() {
                     )
                 } 
             />
+            
+            {/* ✅ PROTECTED: Buyer */}
             <Route 
                 path="/buyer" 
                 element={
-                    user && user.role === 'buyer' 
-                        ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
-                        : <Navigate to="/" />
+                    <RequireAuth allowedRoles={['buyer']}>
+                        {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
+                    </RequireAuth>
                 }
             />
-            {/* 3. Add new route for Investor Dashboard */}
+            
+            {/* ✅ PROTECTED: Investor */}
             <Route 
                 path="/investor" 
                 element={
-                    user && user.role === 'investor' 
-                        ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
-                        : <Navigate to="/" />
+                    <RequireAuth allowedRoles={['investor']}>
+                        {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
+                    </RequireAuth>
                 }
             />
+            
+            {/* ✅ PROTECTED: Admin */}
             <Route 
               path="/admin"
               element={
-                user && user.role === 'admin' ? renderDashboard(<AdminDashboard activeTab={activeTab} />) : <Navigate to="/" />
+                <RequireAuth allowedRoles={['admin']}>
+                    {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
+                </RequireAuth>
               } 
             />
+            
+            {/* ✅ PROTECTED: Shipment/Warehouse */}
             <Route 
               path="/shipment" 
               element={
-                user && (user.role === 'shipment' || user.role === 'warehouse') ? <ShipmentDashboard /> : <Navigate to="/" />
+                <RequireAuth allowedRoles={['shipment', 'warehouse']}>
+                    <ShipmentDashboard />
+                </RequireAuth>
               } 
             />
+            
+            {/* Public: Produce History */}
             <Route 
               path="/produce/:lotId" 
               element={<ProduceHistory />}
             />
+            
+            {/* Auth Pages */}
             <Route 
               path="/login" 
               element={
@@ -171,10 +207,9 @@ function App() {
           </Routes>
         </main>
         
-        {/* 3. Render Chatbot components only if user is logged in */}
+        {/* Chatbot UI */}
         {user && (
           <>
-            {/* 4. Conditionally render the chatbot in a fixed position */}
             <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
               {isChatbotOpen && <FinovateChatbot />}
             </div>
@@ -184,12 +219,10 @@ function App() {
               aria-label="Toggle Chatbot"
             >
               {isChatbotOpen ? (
-                // Close Icon (X)
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                // Chat Icon
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
