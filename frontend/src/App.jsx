@@ -16,7 +16,7 @@ import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 // 1. Import the new InvestorDashboard
 import InvestorDashboard from './pages/InvestorDashboard';
-import { useStats } from './context/StatsContext';
+import { useStatsActions } from './context/StatsContext';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -24,7 +24,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('overview');
   // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-  const { resetStats } = useStats();
+  const { resetStats } = useStatsActions();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
