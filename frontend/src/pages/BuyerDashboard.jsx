@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
 import {
@@ -166,15 +166,15 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, [activeTab]);
 
   useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
-
-  // Load tab-specific data when tab changes
-  useEffect(() => {
-    if (walletAddress) {
-      loadTabData(activeTab);
-    }
-  }, [activeTab, walletAddress]);
+    const init = async () => {
+      if (!walletAddress) {
+        await loadInitialData();
+      } else {
+        await loadTabData(activeTab);
+      }
+    };
+    init();
+  }, [activeTab, walletAddress, loadInitialData]);
 
   const loadTabData = async (tab) => {
     switch (tab) {
@@ -279,13 +279,18 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, [invoices]);
 
   useEffect(() => {
-    setGlobalStats({
+    const nextStats = {
       totalInvoices: invoices.length,
       activeEscrows: escrowInvoices.length,
       completed: completedInvoices.length,
       produceLots: availableLots.length
-    });
-  }, [invoices.length, escrowInvoices.length, completedInvoices.length, availableLots.length, setGlobalStats]);
+    };
+
+    // Only update if data is loaded and actually different
+    if (!isLoading) {
+      setGlobalStats(nextStats);
+    }
+  }, [invoices.length, escrowInvoices.length, completedInvoices.length, availableLots.length, isLoading, setGlobalStats]);
 
   // Handlers
   const handleKYCComplete = useCallback((result) => {

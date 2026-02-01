@@ -11,6 +11,7 @@ const initialStats = {
 const statsReducer = (state, action) => {
   switch (action.type) {
     case 'setTotals':
+      if (JSON.stringify(state) === JSON.stringify(action.payload)) return state;
       return { ...state, ...action.payload };
     case 'reset':
       return initialStats;
