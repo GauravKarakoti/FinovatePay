@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'sonner';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -110,10 +110,13 @@ const QRScanner = ({ onScan, onError }) => {
   const [hasPermission, setHasPermission] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    let html5QrCode;
+
     const initScanner = async () => {
       try {
-        const scanner = new Html5Qrcode("qr-reader");
-        scannerRef.current = scanner;
+        // Create instance
+        html5QrCode = new Html5Qrcode("qr-reader");
 
         const config = { 
           fps: 10, 
@@ -121,32 +124,58 @@ const QRScanner = ({ onScan, onError }) => {
           rememberLastUsedCamera: true,
         };
 
-        await scanner.start(
+        // Start scanning
+        await html5QrCode.start(
           { facingMode: "environment" },
           config,
           (decodedText) => {
-            onScan(decodedText);
+            if (isMounted) onScan(decodedText);
           },
           (errorMessage) => {
             // Scan failures are normal and can be ignored
           }
         );
         
-        setIsInitialized(true);
+        // Only update state and ref if still mounted
+        if (isMounted) {
+          scannerRef.current = html5QrCode;
+          setIsInitialized(true);
+        } else {
+          // If unmounted during startup, stop immediately
+          html5QrCode.stop().catch(console.warn);
+        }
+
       } catch (err) {
-        console.error("Scanner initialization failed:", err);
-        setHasPermission(false);
-        onError?.(err);
+        if (isMounted) {
+          console.error("Scanner initialization failed:", err);
+          setHasPermission(false);
+          onError?.(err);
+        }
       }
     };
 
     initScanner();
 
+    // Cleanup function
     return () => {
+      isMounted = false;
+      
+      // Only stop if the scanner was fully initialized (assigned to ref)
       if (scannerRef.current) {
-        scannerRef.current.stop().catch(err => {
-          console.warn("Scanner stop error (likely StrictMode):", err);
-        });
+        scannerRef.current
+          .stop()
+          .then(() => {
+             try {
+               // Optional: Clear the element to remove the video feed UI
+               scannerRef.current.clear(); 
+             } catch (e) {
+               console.warn("Scanner clear error:", e);
+             }
+          })
+          .catch((err) => {
+            console.warn("Scanner stop error:", err);
+          });
+        scannerRef.current = null;
       }
     };
   }, [onScan, onError]);
