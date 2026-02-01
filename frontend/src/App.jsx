@@ -24,7 +24,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('overview');
   // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-  const { resetStats } = useStatsActions();
+  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
 
   useEffect(() => {
     const token = localStorage.getItem('token');
