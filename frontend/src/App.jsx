@@ -15,6 +15,7 @@ import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
+import { useStatsActions } from './context/StatsContext';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -27,6 +28,7 @@ function App() {
       produceLots: 0,
   });
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -51,6 +53,7 @@ function App() {
   const handleLogin = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
+    resetStats();
     setUser(userData);
   };
 
@@ -58,6 +61,7 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    resetStats();
   };
 
   const handleTabChange = (tab) => {
@@ -72,11 +76,10 @@ function App() {
                   activeTab={activeTab} 
                   onTabChange={handleTabChange} 
                   user={user} 
-                  stats={dashboardStats} 
               />
           </div>
           <div className="flex-1 overflow-auto">
-              {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
+                {dashboardComponent}
           </div>
       </div>
     );
