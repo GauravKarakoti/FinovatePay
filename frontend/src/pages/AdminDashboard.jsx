@@ -12,6 +12,7 @@ import {
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import { toast } from 'sonner';
+import { useStats } from '../context/StatsContext';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -66,6 +67,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
   const [complianceResult, setComplianceResult] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isResolving, setIsResolving] = useState(false);
+  const { setStats: setGlobalStats } = useStats();
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -100,12 +102,26 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
     [invoices]
   );
 
+  const completedCount = useMemo(() => 
+    invoices.filter(inv => inv.escrow_status === 'released').length,
+    [invoices]
+  );
+
   const stats = useMemo(() => [
     { title: 'Total Users', value: String(users.length), change: 5, icon: '👥', color: 'blue' },
     { title: 'Total Invoices', value: String(invoices.length), change: 12, icon: '📝', color: 'green' },
     { title: 'Active Escrows', value: String(activeEscrowsCount), change: -3, icon: '🔒', color: 'purple' },
     { title: 'Disputes', value: String(disputedInvoices.length), change: 0, icon: '⚖️', color: 'orange' },
   ], [users.length, invoices.length, activeEscrowsCount, disputedInvoices.length]);
+
+  useEffect(() => {
+    setGlobalStats({
+      totalInvoices: invoices.length,
+      activeEscrows: activeEscrowsCount,
+      completed: completedCount,
+      produceLots: 0
+    });
+  }, [invoices.length, activeEscrowsCount, completedCount, setGlobalStats]);
 
   // Handlers with optimistic updates and proper error handling
   const handleFreezeToggle = useCallback(async (userId, isFrozen) => {

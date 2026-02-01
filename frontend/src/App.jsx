@@ -16,17 +16,12 @@ import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 // 1. Import the new InvestorDashboard
 import InvestorDashboard from './pages/InvestorDashboard';
+import { StatsProvider } from './context/StatsContext';
 
 function App() {
   const [user, setUser] = useState(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardStats, setDashboardStats] = useState({
-      totalInvoices: 0,
-      activeEscrows: 0,
-      completed: 0,
-      produceLots: 0,
-  });
   // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
@@ -74,11 +69,10 @@ function App() {
                   activeTab={activeTab} 
                   onTabChange={handleTabChange} 
                   user={user} 
-                  stats={dashboardStats} 
               />
           </div>
           <div className="flex-1 overflow-auto">
-              {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
+                {dashboardComponent}
           </div>
       </div>
     );
@@ -90,6 +84,7 @@ function App() {
   };
 
   return (
+  <StatsProvider>
     <Router>
       <Toaster position="top" richColors />
       <div className="App">
@@ -199,6 +194,7 @@ function App() {
         )}
       </div>
     </Router>
+  </StatsProvider>
   );
 }
 
