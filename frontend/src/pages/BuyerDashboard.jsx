@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
 import {
@@ -25,6 +25,7 @@ import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApprov
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
+import { useStatsActions } from '../context/StatsContext';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -140,6 +141,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
   const [showKYCVerification, setShowKYCVerification] = useState(false);
+  const { setStats: setGlobalStats } = useStatsActions();
 
   // Load Initial Data
   const loadInitialData = useCallback(async () => {
@@ -164,15 +166,15 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, [activeTab]);
 
   useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
-
-  // Load tab-specific data when tab changes
-  useEffect(() => {
-    if (walletAddress) {
-      loadTabData(activeTab);
-    }
-  }, [activeTab, walletAddress]);
+    const init = async () => {
+      if (!walletAddress) {
+        await loadInitialData();
+      } else {
+        await loadTabData(activeTab);
+      }
+    };
+    init();
+  }, [activeTab, walletAddress, loadInitialData]);
 
   const loadTabData = async (tab) => {
     switch (tab) {
@@ -275,6 +277,20 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     
     return { escrowInvoices: escrow, completedInvoices: completed, stats: statsData };
   }, [invoices]);
+
+  useEffect(() => {
+    const nextStats = {
+      totalInvoices: invoices.length,
+      activeEscrows: escrowInvoices.length,
+      completed: completedInvoices.length,
+      produceLots: availableLots.length
+    };
+
+    // Only update if data is loaded and actually different
+    if (!isLoading) {
+      setGlobalStats(nextStats);
+    }
+  }, [invoices.length, escrowInvoices.length, completedInvoices.length, availableLots.length, isLoading, setGlobalStats]);
 
   // Handlers
   const handleKYCComplete = useCallback((result) => {

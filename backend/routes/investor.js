@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const Invoice = require('../models/Invoice');
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 const { getSigner, getFractionTokenContract } = require('../config/blockchain');
 
 const signer = getSigner();

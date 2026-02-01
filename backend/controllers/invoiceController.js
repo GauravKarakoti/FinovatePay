@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 
 exports.createInvoice = async (req, res) => {
     const client = await pool.connect();

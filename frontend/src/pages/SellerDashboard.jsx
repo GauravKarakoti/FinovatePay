@@ -27,6 +27,7 @@ import QuotationList from '../components/Dashboard/QuotationList';
 import CreateQuotation from '../components/Quotation/CreateQuotation';
 import FinancingTab from '../components/Financing/FinancingTab';
 import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
+import { useStatsActions } from '../context/StatsContext';
 
 // --- Utility Helpers ---
 
@@ -258,6 +259,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [proofFile, setProofFile] = useState(null);
   const [invoiceToTokenize, setInvoiceToTokenize] = useState(null);
   const [selectedLotQR, setSelectedLotQR] = useState(null);
+  const { setStats: setGlobalStats } = useStatsActions();
 
   // Memoized Derived State
   const { escrowInvoices, completedInvoices, pendingInvoices, stats } = useMemo(() => {
@@ -277,6 +279,15 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       ]
     };
   }, [invoices]);
+
+  useEffect(() => {
+    setGlobalStats({
+      totalInvoices: invoices.length,
+      activeEscrows: escrowInvoices.length,
+      completed: completedInvoices.length,
+      produceLots: produceLots.length
+    });
+  }, [invoices.length, escrowInvoices.length, completedInvoices.length, produceLots.length, setGlobalStats]);
 
   // Data Fetching
   const loadKYCStatus = useCallback(async () => {

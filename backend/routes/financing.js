@@ -4,7 +4,7 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const Invoice = require('../models/Invoice');
 const User = require('../models/User');
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 const { emitToMarketplace } = require('../socket');
 const { getSigner, getFractionTokenContract } = require('../config/blockchain');
 
