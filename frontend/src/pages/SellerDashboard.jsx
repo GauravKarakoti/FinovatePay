@@ -1,17 +1,16 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 import { 
-    getSellerInvoices, createInvoice, updateInvoiceStatus,
-    getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
-    createProduceLot as syncProduceLot , api,
-    getKYCStatus // [NEW] Import the status fetcher
+  getSellerInvoices, createInvoice, updateInvoiceStatus,
+  getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
+  createProduceLot as syncProduceLot, api, getKYCStatus
 } from '../utils/api';
-// ---
-// **UPDATE**: Import erc20ABI
-// ---
 import { 
-    connectWallet, getInvoiceFactoryContract, getProduceTrackingContract, erc20ABI 
+  connectWallet, getInvoiceFactoryContract, getProduceTrackingContract, erc20ABI 
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
@@ -21,707 +20,807 @@ import EscrowTimeline from '../components/Escrow/EscrowTimeline';
 import KYCStatus from '../components/KYC/KYCStatus';
 import KYCVerification from '../components/KYC/KYCVerification';
 import { generateTimelineEvents } from '../utils/timeline';
-import {toast} from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import CreateProduceLot from '../components/Produce/CreateProduceLot';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import QuotationList from '../components/Dashboard/QuotationList';
 import CreateQuotation from '../components/Quotation/CreateQuotation';
-import FinancingTab from '../components/Financing/FinancingTab'; // Adjust path as needed
+import FinancingTab from '../components/Financing/FinancingTab';
 import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
 
+// --- Utility Helpers ---
+
 const uuidToBytes32 = (uuid) => {
-    return ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
+  return ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
 };
 
-const SellerDashboard = ({ activeTab }) => {
-  const [invoices, setInvoices] = useState([]);
-  const [walletAddress, setWalletAddress] = useState('');
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  
-  // [UPDATED] Initialize with dynamic state
-  const [kycStatus, setKycStatus] = useState('not_started');
-  const [kycRiskLevel, setKycRiskLevel] = useState('unknown');
-  const [kycDetails, setKycDetails] = useState(''); 
+// --- Reusable UI Components ---
 
-  const [showKYCVerification, setShowKYCVerification] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [timelineEvents, setTimelineEvents] = useState([]);
-  const [confirmingShipment, setConfirmingShipment] = useState(null);
-  const [proofFile, setProofFile] = useState(null);
-  const [showCreateProduceForm, setShowCreateProduceForm] = useState(false);
-  const [selectedProduceLot, setSelectedProduceLot] = useState(null);
+const LoadingSpinner = ({ size = 'md', className = '' }) => {
+  const sizes = { sm: 'h-4 w-4', md: 'h-8 w-8', lg: 'h-12 w-12' };
+  return (
+    <div className={`flex items-center justify-center ${className}`}>
+      <div className={`animate-spin rounded-full border-b-2 border-blue-600 ${sizes[size]}`} role="status">
+        <span className="sr-only">Loading...</span>
+      </div>
+    </div>
+  );
+};
+
+LoadingSpinner.propTypes = { size: PropTypes.oneOf(['sm', 'md', 'lg']), className: PropTypes.string };
+
+const EmptyState = ({ message, icon = '📭', action = null }) => (
+  <div className="text-center py-12 px-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+    <div className="text-4xl mb-3">{icon}</div>
+    <p className="text-gray-500 font-medium mb-2">{message}</p>
+    {action && (
+      <button onClick={action.onClick} className="text-blue-600 hover:text-blue-700 text-sm font-medium mt-2 underline">
+        {action.label}
+      </button>
+    )}
+  </div>
+);
+
+EmptyState.propTypes = {
+  message: PropTypes.string.isRequired,
+  icon: PropTypes.string,
+  action: PropTypes.shape({ label: PropTypes.string, onClick: PropTypes.func })
+};
+
+const ActionButton = ({ 
+  onClick, children, variant = 'primary', disabled = false, loading = false, className = '' 
+}) => {
+  const baseClasses = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2";
+  const variants = {
+    primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm",
+    success: "bg-green-600 text-white hover:bg-green-700 shadow-sm",
+    danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
+    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+    outline: "border-2 border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+  };
+  
+  return (
+    <button onClick={onClick} disabled={disabled || loading} className={`${baseClasses} ${variants[variant]} ${className}`}>
+      {loading && <span className="animate-spin">⏳</span>}
+      {children}
+    </button>
+  );
+};
+
+ActionButton.propTypes = {
+  onClick: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+  variant: PropTypes.oneOf(['primary', 'success', 'danger', 'secondary', 'outline']),
+  disabled: PropTypes.bool,
+  loading: PropTypes.bool,
+  className: PropTypes.string
+};
+
+const Card = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ${className}`}>
+    {children}
+  </div>
+);
+
+Card.propTypes = { children: PropTypes.node, className: PropTypes.string };
+
+const Modal = ({ isOpen, onClose, title, children, maxWidth = 'md' }) => {
+  if (!isOpen) return null;
+  const widths = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl' };
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full ${widths[maxWidth]} overflow-hidden`}>
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+Modal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  title: PropTypes.string.isRequired,
+  children: PropTypes.node,
+  maxWidth: PropTypes.oneOf(['sm', 'md', 'lg', 'xl'])
+};
+
+// --- Sub-Components ---
+
+const ProduceLotsTable = ({ lots, onSelect, onViewHistory }) => (
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lot ID</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {lots.map((lot) => (
+          <tr key={lot.lot_id} className="hover:bg-gray-50">
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">#{lot.lot_id}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{lot.produce_type}</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.current_quantity} kg</td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+              <button onClick={() => onSelect(lot)} className="text-blue-600 hover:text-blue-900">Details</button>
+              <a href={`/produce/${lot.lot_id}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:text-green-900">
+                History →
+              </a>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    {lots.length === 0 && <EmptyState message="No produce lots registered yet" icon="🌾" />}
+  </div>
+);
+
+ProduceLotsTable.propTypes = {
+  lots: PropTypes.array.isRequired,
+  onSelect: PropTypes.func.isRequired,
+  onViewHistory: PropTypes.func
+};
+
+const ShipmentConfirmationModal = ({ 
+  isOpen, 
+  onClose, 
+  invoice, 
+  proofFile, 
+  setProofFile, 
+  onSubmit, 
+  isSubmitting 
+}) => (
+  <Modal isOpen={isOpen} onClose={onClose} title="Confirm Shipment" maxWidth="md">
+    <div className="space-y-4">
+      <p className="text-gray-600">
+        Upload proof of shipment for invoice <strong>#{invoice?.invoice_id?.substring(0, 8)}...</strong>
+      </p>
+      
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+        <input
+          type="file"
+          accept="image/*,.pdf"
+          onChange={(e) => setProofFile(e.target.files[0])}
+          className="hidden"
+          id="shipment-proof"
+        />
+        <label htmlFor="shipment-proof" className="cursor-pointer block">
+          {proofFile ? (
+            <div className="text-green-600 font-medium">✓ {proofFile.name}</div>
+          ) : (
+            <>
+              <div className="text-gray-400 text-3xl mb-2">📎</div>
+              <span className="text-sm text-gray-600">Click to upload tracking receipt or proof of delivery</span>
+            </>
+          )}
+        </label>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <ActionButton onClick={onClose} variant="secondary" disabled={isSubmitting}>Cancel</ActionButton>
+        <ActionButton 
+          onClick={onSubmit} 
+          disabled={!proofFile || isSubmitting} 
+          loading={isSubmitting}
+          variant="primary"
+        >
+          Sign & Confirm
+        </ActionButton>
+      </div>
+    </div>
+  </Modal>
+);
+
+ShipmentConfirmationModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  invoice: PropTypes.object,
+  proofFile: PropTypes.any,
+  setProofFile: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+  isSubmitting: PropTypes.bool
+};
+
+// --- Main Component ---
+
+const SellerDashboard = ({ activeTab = 'overview' }) => {
+  // Data State
+  const [invoices, setInvoices] = useState([]);
   const [produceLots, setProduceLots] = useState([]);
   const [quotations, setQuotations] = useState([]);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [selectedProduceLot, setSelectedProduceLot] = useState(null);
+  const [timelineEvents, setTimelineEvents] = useState([]);
+  
+  // KYC State (Consolidated)
+  const [kycData, setKycData] = useState({
+    status: 'not_started',
+    riskLevel: 'unknown',
+    details: 'Verification pending'
+  });
+  
+  // UI State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showKYCVerification, setShowKYCVerification] = useState(false);
+  const [showCreateProduceForm, setShowCreateProduceForm] = useState(false);
   const [showCreateQuotation, setShowCreateQuotation] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
-  const [selectedLot, setSelectedLot] = useState(null);
+  const [confirmingShipment, setConfirmingShipment] = useState(null);
+  const [proofFile, setProofFile] = useState(null);
   const [invoiceToTokenize, setInvoiceToTokenize] = useState(null);
+  const [selectedLotQR, setSelectedLotQR] = useState(null);
 
-  const loadProduceLots = async () => {
+  // Memoized Derived State
+  const { escrowInvoices, completedInvoices, pendingInvoices, stats } = useMemo(() => {
+    const escrow = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
+    const completed = invoices.filter(inv => inv.escrow_status === 'released');
+    const pending = invoices.filter(inv => inv.escrow_status === 'created');
+    
+    return {
+      escrowInvoices: escrow,
+      completedInvoices: completed,
+      pendingInvoices: pending,
+      stats: [
+        { title: 'Pending', value: pending.length, icon: '📝', color: 'blue', desc: 'Awaiting payment' },
+        { title: 'Active Escrows', value: escrow.length, icon: '🔒', color: 'green', desc: 'In transit' },
+        { title: 'Completed', value: completed.length, icon: '✅', color: 'purple', desc: 'Paid out' },
+        { title: 'Disputed', value: invoices.filter(i => i.escrow_status === 'disputed').length, icon: '⚖️', color: 'red', desc: 'Needs resolution' },
+      ]
+    };
+  }, [invoices]);
+
+  // Data Fetching
+  const loadKYCStatus = useCallback(async () => {
     try {
-      const response = await getSellerLots();
-      setProduceLots(response.data);
+      const { data } = await getKYCStatus();
+      setKycData({
+        status: data.status || 'not_started',
+        riskLevel: data.kyc_risk_level || 'unknown',
+        details: data.details || (data.status === 'verified' ? 'Verified' : 'Pending verification')
+      });
     } catch (error) {
-      console.error('Failed to load produce lots:', error);
-      toast.error("Could not load produce lots.");
+      console.error('Failed to load KYC:', error);
     }
-  };
-
-  useEffect(() => {
-    loadInitialData();
   }, []);
 
-  const loadInitialData = async () => {
-    const { address } = await connectWallet();
-    setWalletAddress(address);
-    
-    // [NEW] Load KYC Status
-    await loadKYCStatus();
-    
-    await loadData(address);
-    await loadProduceLots();
-    await loadQuotations(address);
-  };
-
-  // [NEW] Function to fetch and set KYC data
-  const loadKYCStatus = async () => {
-    try {
-        const response = await getKYCStatus();
-        const data = response.data;
-        console.log("Data: ", data);
-        
-        setKycStatus(data.status || 'not_started');
-        console.log("KYC Status: ", kycStatus)
-        setKycRiskLevel(data.kyc_risk_level || 'unknown');
-        setKycDetails(data.details || (data.status === 'verified' ? 'Identity verified successfully' : 'Verification pending or not initiated'));
-        
-    } catch (error) {
-        console.error('Failed to load KYC status:', error);
-    }
-  };
-
-  const loadQuotations = async (currentAddress) => {
-      try {
-          const response = await getQuotations();
-          const sellerQuotations = response.data.filter(q => q.seller_address.toLowerCase() === currentAddress.toLowerCase());
-          setQuotations(sellerQuotations);
-      } catch (error) {
-          console.error('Failed to load quotations:', error);
-          toast.error("Could not load quotations.");
-      }
-  };
-
-  const handleShowQRCode = (invoice) => {
-      setSelectedLot({
-          lotId: invoice.lot_id,
-          produceType: invoice.produce_type,
-          origin: invoice.origin,
-      });
-      setShowQRCode(true);
-  };
-
-  const handleApproveQuotation = async (quotationId) => {
-      try {
-          await sellerApproveQuotation(quotationId);
-          toast.success("Quotation approved and sent to buyer for final confirmation!");
-          loadQuotations(walletAddress);
-      } catch (error) {
-          toast.error("Failed to approve quotation.");
-      }
-  };
-
-  // ---
-  // **UPDATE**: Reworked this function to handle decimal conversion
-  // ---
-  const handleTokenizeInvoice = async (invoiceId, { faceValue, maturityDate }) => {
-    setIsSubmitting(true);
-    
-    // Define the async function that toast.promise will run
-    const tokenizationPromise = async () => {
-        // 1. Get the full invoice object from state
-        if (!invoiceToTokenize) {
-            throw new Error("No invoice selected for tokenization.");
-        }
-
-        // 2. Get the token's decimals
-        const { provider } = await connectWallet(); // Need provider for read-only
-        const tokenAddress = invoiceToTokenize.token_address;
-        
-        let decimals;
-        if (tokenAddress === NATIVE_CURRENCY_ADDRESS) {
-            decimals = 18; // Default for native currency (ETH/MATIC)
-        } else {
-            const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
-            decimals = await tokenContract.decimals();
-        }
-        
-        // 3. Convert the faceValue string to the correct integer (uint256)
-        // faceValue is now guaranteed to be a string from the modal fix
-        const faceValueAsUint = ethers.utils.parseUnits(faceValue, decimals);
-        
-        // 4. Call the backend API with the converted value
-        return api.post('/financing/tokenize', {
-            invoiceId,
-            faceValue: faceValueAsUint.toString(), // Send the large integer as a string
-            maturityDate
-        });
-    };
-
-    try {
-        await toast.promise(tokenizationPromise(), { // Execute the new async function
-            loading: "Tokenizing invoice on the blockchain...",
-            success: (response) => {
-                loadInitialData(); // Reload all data
-                setInvoiceToTokenize(null); // Close modal
-                return `Invoice tokenized! ${response.data.msg || (response.data.token_id ? `Token ID: ${response.data.token_id}` : '')}`;
-            },
-            error: (err) => `Tokenization failed: ${err.response?.data?.msg || err.message}`
-        });
-    } catch (error) {
-        console.error('Failed to tokenize invoice:', error);
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
-
-  const handleRejectQuotation = async (quotationId) => {
-      try {
-          await rejectQuotation(quotationId);
-          toast.info("Quotation rejected.");
-          loadQuotations(walletAddress);
-      } catch (error) {
-          toast.error("Failed to reject quotation.");
-      }
-  };
-
-  const handleCreateQuotation = async (quotationData) => {
-      try {
-          await createQuotation(quotationData);
-          toast.success('Quotation sent to buyer for approval!');
-          setShowCreateQuotation(false);
-          loadQuotations(walletAddress);
-      } catch (error) {
-          toast.error('Failed to create quotation: ' + (error.response?.data?.error || error.message));
-      }
-  };
-
-  const handleSelectProduceLot = (lot) => {
-    setSelectedProduceLot(lot);
-  };
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const { address } = await connectWallet();
       setWalletAddress(address);
-      
       const invoicesData = await getSellerInvoices();
-      setInvoices(invoicesData.data);
+      setInvoices(invoicesData.data || []);
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('Failed to load invoices:', error);
+      toast.error("Failed to load dashboard data");
     }
-  };
+  }, []);
 
-  const handleCreateInvoiceFromQuotation = async (quotation) => {
+  const loadProduceLots = useCallback(async () => {
+    try {
+      const response = await getSellerLots();
+      setProduceLots(response.data || []);
+    } catch (error) {
+      console.error('Failed to load produce:', error);
+      toast.error("Could not load produce lots");
+    }
+  }, []);
+
+  const loadQuotations = useCallback(async (currentAddress) => {
+    try {
+      const response = await getQuotations();
+      const sellerQuotations = response.data.filter(q => 
+        q.seller_address.toLowerCase() === (currentAddress || walletAddress).toLowerCase()
+      );
+      setQuotations(sellerQuotations);
+    } catch (error) {
+      console.error('Failed to load quotations:', error);
+    }
+  }, [walletAddress]);
+
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    await Promise.all([loadData(), loadKYCStatus()]);
+    setIsLoading(false);
+  }, [loadData, loadKYCStatus]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    if (walletAddress) loadQuotations(walletAddress);
+  }, [walletAddress, loadQuotations]);
+
+  // Event Handlers
+  const handleSelectInvoice = useCallback((invoice) => {
+    setSelectedInvoice(invoice);
+    setTimelineEvents(generateTimelineEvents(invoice));
+  }, []);
+
+  const handleShowQRCode = useCallback((invoice) => {
+    setSelectedLotQR({
+      lotId: invoice.lot_id,
+      produceType: invoice.produce_type,
+      origin: invoice.origin,
+    });
+    setShowQRCode(true);
+  }, []);
+
+  const handleKYCComplete = useCallback(() => {
+    setShowKYCVerification(false);
+    loadKYCStatus();
+    toast.success('KYC status updated');
+  }, [loadKYCStatus]);
+
+  // Blockchain Interactions
+  const handleTokenizeInvoice = useCallback(async (invoiceId, { faceValue, maturityDate }) => {
+    if (!invoiceToTokenize) return;
     setIsSubmitting(true);
- 
-    const creationPromise = async () => {
+    const toastId = toast.loading('Preparing tokenization...');
+
+    try {
+      const { provider } = await connectWallet();
+      const tokenAddress = invoiceToTokenize.token_address;
+      
+      let decimals = 18;
+      if (tokenAddress !== NATIVE_CURRENCY_ADDRESS) {
+        const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
+        decimals = await tokenContract.decimals();
+      }
+      
+      const faceValueAsUint = ethers.utils.parseUnits(faceValue.toString(), decimals);
+      
+      const response = await api.post('/financing/tokenize', {
+        invoiceId,
+        faceValue: faceValueAsUint.toString(),
+        maturityDate
+      });
+
+      toast.success('Invoice tokenized successfully!', { id: toastId });
+      await loadData();
+      setInvoiceToTokenize(null);
+    } catch (error) {
+      console.error('Tokenization failed:', error);
+      toast.error(error.response?.data?.msg || error.message, { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [invoiceToTokenize, loadData]);
+
+  const handleCreateInvoiceFromQuotation = useCallback(async (quotation) => {
+    setIsSubmitting(true);
+    const toastId = toast.loading('Creating invoice contract...');
+
+    try {
       const invoiceId = uuidv4();
       const bytes32InvoiceId = uuidToBytes32(invoiceId);
       const { address: sellerAddress } = await connectWallet();
       
       const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
       const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
-      
       const tokenAddress = NATIVE_CURRENCY_ADDRESS;
       
       const contract = await getInvoiceFactoryContract();
       const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
-      const dueDateTimestamp = Math.floor(new Date().getTime() / 1000) + 86400 * 30;
- 
-      toast.info("Please confirm invoice creation in your wallet...");
+      const dueDateTimestamp = Math.floor(Date.now() / 1000) + 86400 * 30;
+
+      toast.loading('Waiting for wallet confirmation...', { id: toastId });
+      
       const tx = await contract.createInvoice(
         bytes32InvoiceId, invoiceHash, quotation.buyer_address,
         amountInWei, dueDateTimestamp, tokenAddress
       );
-      console.log("Transaction sent:", tx);
- 
+      
+      toast.loading('Mining transaction...', { id: toastId });
       const receipt = await tx.wait();
       const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
-      if (!event) throw new Error("InvoiceCreated event not found.");
       
-      const newContractAddress = event.args.invoiceContractAddress;
- 
-      const finalInvoiceData = {
+      if (!event) throw new Error("InvoiceCreated event not found");
+
+      await createInvoice({
         quotation_id: quotation.id,
         invoice_id: invoiceId,
         invoice_hash: invoiceHash,
-        contract_address: newContractAddress,
+        contract_address: event.args.invoiceContractAddress,
         token_address: tokenAddress,
         due_date: new Date(dueDateTimestamp * 1000).toISOString(),
-      };
-      
-      await createInvoice(finalInvoiceData);
-    };
- 
-    try {
-      await toast.promise(creationPromise(), {
-        loading: "Deploying invoice contract...",
-        success: () => {
-          loadInitialData();
-          return 'Invoice created successfully from quotation!';
-        },
-        error: (err) => `Invoice creation failed: ${err.reason || err.message}`
       });
+
+      toast.success('Invoice created and deployed!', { id: toastId });
+      await loadData();
+      await loadQuotations();
     } catch (error) {
       console.error('Failed to create invoice:', error);
+      toast.error(error.reason || error.message, { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [loadData, loadQuotations]);
 
-  const handleConfirmShipment = (invoice) => {
-      setConfirmingShipment(invoice);
-  };
+  const handleCreateProduceLot = useCallback(async (formData) => {
+    setIsSubmitting(true);
+    const toastId = toast.loading('Registering on blockchain...');
 
-  const submitShipmentProof = async () => {
-      if (!proofFile || !confirmingShipment) {
-          toast.error("Please select a proof of shipment file.");
-          return;
-      }
-      setIsSubmitting(true);
-      try {
-          const proofHash = `bafybeigdyrzt5s6dfx7sidefusha4u62piu7k26k5e4szm3oogv5s2d2bu-${Date.now()}`;
-          
-          const { signer } = await connectWallet();
-          const message = `I confirm the shipment for invoice ${confirmingShipment.invoice_id}.\nProof Hash: ${proofHash}`;
-          
-          await signer.signMessage(message);
-          await updateInvoiceStatus(confirmingShipment.invoice_id, 'shipped', proofHash);
-          
-          toast.success('Shipment confirmed and buyer notified!');
-          
-          setConfirmingShipment(null);
-          setProofFile(null);
-          loadData();
+    try {
+      const contract = await getProduceTrackingContract();
+      const tx = await contract.createProduceLot(
+        formData.produceType,
+        formData.harvestDate,
+        formData.qualityMetrics,
+        formData.origin,
+        ethers.utils.parseUnits(formData.quantity.toString(), 18),
+        ""
+      );
 
-      } catch (error) {
-          console.error('Failed to confirm shipment:', error);
-          toast.error('Shipment confirmation failed: ' + (error.reason || error.message));
-      } finally {
-          setIsSubmitting(false);
-      }
-  };
-
-  const handleSelectInvoice = (invoice) => {
-      setSelectedInvoice(invoice);
-      setTimelineEvents(generateTimelineEvents(invoice));
-  };
-
-  const handleKYCVerificationComplete = (result) => {
-    setShowKYCVerification(false);
-    // Refresh KYC status from server to ensure synchronization
-    loadKYCStatus();
-  };
-
-  const handleCreateProduceLot = async (formData) => {
-      setIsSubmitting(true);
-      const creationPromise = async () => {
-          // 1. Get the smart contract instance
-          const contract = await getProduceTrackingContract();
-          console.log("ProduceTracking contract instance:", contract);
-
-          // 2. Call the smart contract function to create the lot on-chain
-          toast.info("Please confirm the transaction in your wallet to create the produce lot...");
-          
-          // ---
-          // **FIX**: Added an empty string "" as the last argument for _tokenURI
-          // ---
-          const tx = await contract.createProduceLot(
-              formData.produceType,
-              formData.harvestDate, // Already in UNIX timestamp format from the form component
-              formData.qualityMetrics,
-              formData.origin,
-              ethers.utils.parseUnits(formData.quantity.toString(), 18), // Assuming quantity can have decimals
-              "" // Pass an empty string for the _tokenURI argument
-          );
-          console.log("Transaction sent:", tx);
-
-          // 3. Wait for the transaction to be mined and get the receipt
-          const receipt = await tx.wait();
-          console.log("Transaction mined:", receipt);
-
-          // 4. Find the event log to get the new lot ID
-          const event = receipt.events?.find(e => e.event === 'ProduceLotCreated');
-          if (!event) {
-              throw new Error("ProduceLotCreated event not found in the transaction receipt.");
-          }
-          console.log("ProduceLotCreated event:", event);
-          const lotId = event.args.lotId.toNumber(); // Convert BigNumber to number
-
-          // 5. Sync the on-chain data with the backend database
-          const syncData = {
-              ...formData,
-              lotId,
-              txHash: tx.hash,
-              quantity: formData.quantity // Send the plain quantity number to backend
-          };
-          console.log("Syncing produce lot with backend:", syncData);
-          await syncProduceLot(syncData);
-      };
-
-      try {
-          await toast.promise(creationPromise(), {
-              loading: "Registering produce lot on the blockchain...",
-              success: () => {
-                  setShowCreateProduceForm(false);
-                  loadProduceLots(); // Refresh the list of produce lots
-                  return 'Produce lot registered successfully!';
-              },
-              error: (err) => `Registration failed: ${err.reason || err.message}`
-          });
-      } catch (error) {
-          console.error('Failed to create produce lot:', error);
-      } finally {
-          setIsSubmitting(false);
-      }
-  };
-  
-  const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
-  const completedInvoices = invoices.filter(inv => inv.escrow_status === 'released');
-  
-  const stats = [
-      { title: 'Pending Invoices', value: invoices.filter(i => i.escrow_status === 'created').length, change: 0, icon: '📝', color: 'blue' },
-      { title: 'Active Escrows', value: escrowInvoices.length, change: 0, icon: '🔒', color: 'green' },
-      { title: 'Completed', value: invoices.filter(i => i.escrow_status === 'released').length, change: 0, icon: '✅', color: 'purple' },
-      { title: 'Disputed', value: invoices.filter(i => i.escrow_status === 'disputed').length, change: 0, icon: '⚖️', color: 'red' },
-  ];
-
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'overview':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => (
-                <StatsCard
-                  key={index}
-                  title={stat.title}
-                  value={stat.value}
-                  change={stat.change}
-                  icon={stat.icon}
-                  color={stat.color}
-                />
-              ))}
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-xl font-semibold mb-4">Recent Invoices</h3>
-                <InvoiceList
-                  invoices={invoices.slice(0, 5)}
-                  onSelectInvoice={handleSelectInvoice}
-                  onConfirmShipment={handleConfirmShipment}
-                  onShowQRCode={handleShowQRCode}
-                  userRole="seller"
-                />
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-semibold mb-4">KYC Status</h3>
-                {/* [UPDATED] Pass dynamic data to the KYC Status component */}
-                <KYCStatus
-                  status={kycStatus}
-                  riskLevel={kycRiskLevel}
-                  details={kycDetails}
-                  onReverify={() => setShowKYCVerification(true)}
-                />
-              </div>
-            </div>
-          </div>
-        );
+      toast.loading('Confirming transaction...', { id: toastId });
+      const receipt = await tx.wait();
+      const event = receipt.events?.find(e => e.event === 'ProduceLotCreated');
       
-      case 'invoices':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Invoices</h2>
+      if (!event) throw new Error("ProduceLotCreated event not found");
+
+      await syncProduceLot({
+        ...formData,
+        lotId: event.args.lotId.toNumber(),
+        txHash: tx.hash,
+      });
+
+      toast.success('Produce lot registered!', { id: toastId });
+      setShowCreateProduceForm(false);
+      await loadProduceLots();
+    } catch (error) {
+      console.error('Failed to create lot:', error);
+      toast.error(error.reason || error.message, { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadProduceLots]);
+
+  const submitShipmentProof = useCallback(async () => {
+    if (!proofFile || !confirmingShipment) return;
+    
+    setIsSubmitting(true);
+    const toastId = toast.loading('Uploading proof and signing...');
+
+    try {
+      const proofHash = `bafybeigdyrzt5s6dfx7sidefusha4u62piu7k26k5e4szm3oogv5s2d2bu-${Date.now()}`;
+      const { signer } = await connectWallet();
+      const message = `Confirm shipment for invoice ${confirmingShipment.invoice_id}\nProof: ${proofHash}`;
+      
+      await signer.signMessage(message);
+      await updateInvoiceStatus(confirmingShipment.invoice_id, 'shipped', proofHash);
+      
+      toast.success('Shipment confirmed!', { id: toastId });
+      setConfirmingShipment(null);
+      setProofFile(null);
+      await loadData();
+    } catch (error) {
+      console.error('Shipment confirmation failed:', error);
+      toast.error(error.reason || error.message, { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [proofFile, confirmingShipment, loadData]);
+
+  const handleApproveQuotation = useCallback(async (quotationId) => {
+    try {
+      await sellerApproveQuotation(quotationId);
+      toast.success('Quotation approved! Waiting for buyer confirmation.');
+      await loadQuotations();
+    } catch (error) {
+      toast.error("Failed to approve quotation");
+    }
+  }, [loadQuotations]);
+
+  const handleRejectQuotation = useCallback(async (quotationId) => {
+    try {
+      await rejectQuotation(quotationId);
+      toast.info("Quotation rejected");
+      await loadQuotations();
+    } catch (error) {
+      toast.error("Failed to reject");
+    }
+  }, [loadQuotations]);
+
+  const handleCreateQuotation = useCallback(async (quotationData) => {
+    try {
+      await createQuotation(quotationData);
+      toast.success('Quotation sent to buyer!');
+      setShowCreateQuotation(false);
+      await loadQuotations();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to create quotation');
+    }
+  }, [loadQuotations]);
+
+  // Tab Content Components
+  const OverviewTab = () => (
+    <div className="space-y-6 animate-fadeIn">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <StatsCard key={index} {...stat} />
+        ))}
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Invoices</h3>
+          {invoices.length > 0 ? (
             <InvoiceList
-              invoices={invoices}
+              invoices={invoices.slice(0, 5)}
               onSelectInvoice={handleSelectInvoice}
-              onConfirmShipment={handleConfirmShipment}
-              userRole="seller"
+              onConfirmShipment={setConfirmingShipment}
               onShowQRCode={handleShowQRCode}
+              userRole="seller"
             />
-          </div>
-        );
-      
-      case 'payments':
-        return (
-            <div>
-                <h2 className="text-2xl font-bold mb-6">Payment History</h2>
-                <PaymentHistoryList invoices={completedInvoices} userRole="seller" />
-            </div>
-        );
-      
-      case 'escrow':
-        return (
-          <div>
-              <h2 className="text-2xl font-bold mb-6">Escrow Management</h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <EscrowStatus
-                      status={selectedInvoice}
-                      onConfirm={handleConfirmShipment}
-                      onDispute={(invoiceId, reason) => toast.success(`Dispute raised for invoice ${invoiceId}: ${reason}`)}
-                  />
-                  <EscrowTimeline events={timelineEvents} />
-              </div>
-              <div className="mt-6">
-                  <h3 className="text-xl font-semibold mb-4">Invoices in Escrow</h3>
-                  <InvoiceList
-                      invoices={escrowInvoices}
-                      onSelectInvoice={handleSelectInvoice}
-                      onConfirmShipment={handleConfirmShipment}
-                      userRole="buyer"
-                      onShowQRCode={handleShowQRCode}
-                  />
-              </div>
-          </div>
-        );
+          ) : (
+            <EmptyState message="No invoices yet" icon="📝" />
+          )}
+        </Card>
+        
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">KYC Status</h3>
+          <KYCStatus
+            status={kycData.status}
+            riskLevel={kycData.riskLevel}
+            details={kycData.details}
+            onReverify={() => setShowKYCVerification(true)}
+          />
+        </Card>
+      </div>
+    </div>
+  );
 
-      case 'produce':
-        return (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold">Produce Management</h2>
-              <button
-                onClick={() => setShowCreateProduceForm(true)}
-                className="btn-primary"
+  const InvoicesTab = () => (
+    <Card className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold text-gray-900">All Invoices</h2>
+        <span className="text-sm text-gray-500">{invoices.length} total</span>
+      </div>
+      <InvoiceList
+        invoices={invoices}
+        onSelectInvoice={handleSelectInvoice}
+        onConfirmShipment={setConfirmingShipment}
+        onShowQRCode={handleShowQRCode}
+        userRole="seller"
+      />
+    </Card>
+  );
+
+  const PaymentsTab = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Payment History</h2>
+      {completedInvoices.length > 0 ? (
+        <PaymentHistoryList invoices={completedInvoices} userRole="seller" />
+      ) : (
+        <EmptyState message="No completed payments yet" icon="💰" />
+      )}
+    </div>
+  );
+
+  const EscrowTab = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Escrow Management</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <EscrowStatus
+          invoice={selectedInvoice}
+          onConfirm={setConfirmingShipment}
+          onDispute={(id, reason) => toast.success(`Dispute raised: ${reason}`)}
+        />
+        <EscrowTimeline events={timelineEvents} />
+      </div>
+      
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-4">Active Escrows</h3>
+        <InvoiceList
+          invoices={escrowInvoices}
+          onSelectInvoice={handleSelectInvoice}
+          onConfirmShipment={setConfirmingShipment}
+          userRole="seller"
+        />
+      </Card>
+    </div>
+  );
+
+  const ProduceTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Produce Management</h2>
+        <ActionButton onClick={() => setShowCreateProduceForm(true)} variant="primary">
+          + Register New Lot
+        </ActionButton>
+      </div>
+
+      {showCreateProduceForm ? (
+        <Card className="p-6">
+          <CreateProduceLot
+            onSubmit={handleCreateProduceLot}
+            onCancel={() => setShowCreateProduceForm(false)}
+            isSubmitting={isSubmitting}
+          />
+        </Card>
+      ) : selectedProduceLot ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-6">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Lot #{selectedProduceLot.lot_id}</h3>
+              <button 
+                onClick={() => setSelectedProduceLot(null)}
+                className="text-sm text-gray-500 hover:text-gray-700"
               >
-                Register New Produce Lot
+                ← Back to List
               </button>
             </div>
-            
-            {showCreateProduceForm ? (
-              <CreateProduceLot
-                onSubmit={handleCreateProduceLot}
-                onCancel={() => setShowCreateProduceForm(false)}
-                isSubmitting={isSubmitting}
-              />
-            ) : selectedProduceLot ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-lg shadow-md p-6">
-                  <h3 className="text-lg font-semibold mb-4">Produce Details</h3>
-                  <p><strong>Lot ID:</strong> {selectedProduceLot.lot_id}</p>
-                  <p><strong>Type:</strong> {selectedProduceLot.produce_type}</p>
-                  <p><strong>Origin:</strong> {selectedProduceLot.origin}</p>
-                  <p><strong>Harvest Date:</strong> {new Date(selectedProduceLot.harvest_date).toLocaleDateString()}</p>
-                  <p><strong>Quantity:</strong> {selectedProduceLot.quantity} kg</p>
-                  <p><strong>Quality Metrics:</strong> {selectedProduceLot.quality_metrics}</p>
-                  <button
-                    onClick={() => setSelectedProduceLot(null)}
-                    className="mt-4 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-                  >
-                    Back to List
-                  </button>
-                </div>
-                <ProduceQRCode
-                  lotId={selectedProduceLot.lot_id}
-                  produceType={selectedProduceLot.produce_type}
-                  origin={selectedProduceLot.origin}
-                />
+            <dl className="space-y-3">
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Type</span>
+                <span className="font-medium">{selectedProduceLot.produce_type}</span>
               </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold">Your Produce Lots</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Lot ID
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Produce Type
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Quantity
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {produceLots.map((lot) => (
-                        <tr key={lot.lot_id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {lot.lot_id}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {lot.produce_type}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {lot.current_quantity} kg
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button
-                              onClick={() => handleSelectProduceLot(lot)}
-                              className="text-blue-600 hover:text-blue-900 mr-3"
-                            >
-                              View Details
-                            </button>
-                            <a
-                              href={`/produce/${lot.lot_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              View History
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Origin</span>
+                <span className="font-medium">{selectedProduceLot.origin}</span>
               </div>
-            )}
-          </div>
-        );
-
-      case 'quotations':
-        return (
-            <div>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">Quotations</h2>
-                    <button
-                        onClick={() => setShowCreateQuotation(true)}
-                        className="btn-primary"
-                    >
-                        Create Off-Platform Quotation
-                    </button>
-                </div>
-                
-                {showCreateQuotation ? (
-                    <CreateQuotation
-                        onSubmit={handleCreateQuotation}
-                        onCancel={() => setShowCreateQuotation(false)}
-                    />
-                ) : (
-                    <QuotationList
-                        quotations={quotations}
-                        userRole="seller"
-                        onApprove={handleApproveQuotation}
-                        onReject={handleRejectQuotation}
-                        onCreateInvoice={handleCreateInvoiceFromQuotation}
-                    />
-                )}
-            </div>
-        );
-
-      case 'financing':
-        return (
-            <FinancingTab
-                invoices={invoices}
-                onTokenizeClick={(invoice) => setInvoiceToTokenize(invoice)}
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Harvest Date</span>
+                <span className="font-medium">{new Date(selectedProduceLot.harvest_date).toLocaleDateString()}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-gray-500">Initial Qty</span>
+                <span className="font-medium">{selectedProduceLot.quantity} kg</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Available</span>
+                <span className="font-medium text-green-600">{selectedProduceLot.current_quantity} kg</span>
+              </div>
+            </dl>
+          </Card>
+          <Card className="p-6 flex flex-col items-center justify-center bg-gray-50">
+            <ProduceQRCode
+              lotId={selectedProduceLot.lot_id}
+              produceType={selectedProduceLot.produce_type}
+              origin={selectedProduceLot.origin}
             />
-        );
-      
-      default:
-        return (
-          <div>
-            <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <p className="text-gray-600">Select a section from the sidebar to get started.</p>
-            </div>
+            <p className="text-sm text-gray-500 mt-4 text-center">
+              Scan to verify authenticity and view complete history
+            </p>
+          </Card>
+        </div>
+      ) : (
+        <Card>
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h3 className="font-semibold text-gray-900">Your Produce Lots</h3>
           </div>
-        );
+          <ProduceLotsTable 
+            lots={produceLots} 
+            onSelect={setSelectedProduceLot} 
+          />
+        </Card>
+      )}
+    </div>
+  );
+
+  const QuotationsTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Quotations</h2>
+        <ActionButton onClick={() => setShowCreateQuotation(true)} variant="primary">
+          + Create Quotation
+        </ActionButton>
+      </div>
+
+      {showCreateQuotation ? (
+        <Card className="p-6">
+          <CreateQuotation
+            onSubmit={handleCreateQuotation}
+            onCancel={() => setShowCreateQuotation(false)}
+          />
+        </Card>
+      ) : (
+        quotations.length > 0 ? (
+          <QuotationList
+            quotations={quotations}
+            userRole="seller"
+            onApprove={handleApproveQuotation}
+            onReject={handleRejectQuotation}
+            onCreateInvoice={handleCreateInvoiceFromQuotation}
+          />
+        ) : (
+          <EmptyState message="No active quotations" icon="📋" />
+        )
+      )}
+    </div>
+  );
+
+  const renderContent = () => {
+    if (isLoading) return <LoadingSpinner size="lg" className="py-20" />;
+    
+    switch (activeTab) {
+      case 'overview': return <OverviewTab />;
+      case 'invoices': return <InvoicesTab />;
+      case 'payments': return <PaymentsTab />;
+      case 'escrow': return <EscrowTab />;
+      case 'produce': return <ProduceTab />;
+      case 'quotations': return <QuotationsTab />;
+      case 'financing': return (
+        <FinancingTab
+          invoices={invoices}
+          onTokenizeClick={setInvoiceToTokenize}
+        />
+      );
+      default: return <OverviewTab />;
     }
   };
 
   return (
-    <div className="container mx-auto p-4">
-      {showKYCVerification ? (
-        <KYCVerification 
-          user={{}} // Pass user object here if available
-          onVerificationComplete={handleKYCVerificationComplete} 
-        />
-      ) : (
-        renderTabContent()
-      )}
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage produce, invoices, and financing
+          </p>
+        </header>
 
-      {invoiceToTokenize && (
+        {showKYCVerification ? (
+          <KYCVerification 
+            user={{}} 
+            onVerificationComplete={handleKYCComplete} 
+          />
+        ) : (
+          renderContent()
+        )}
+
+        {/* Modals */}
         <TokenizeInvoiceModal
-            invoice={invoiceToTokenize}
-            onClose={() => setInvoiceToTokenize(null)}
-            onSubmit={handleTokenizeInvoice}
-            isSubmitting={isSubmitting}
+          isOpen={!!invoiceToTokenize}
+          invoice={invoiceToTokenize}
+          onClose={() => setInvoiceToTokenize(null)}
+          onSubmit={handleTokenizeInvoice}
+          isSubmitting={isSubmitting}
         />
-      )}
 
-      {showQRCode && selectedLot && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-lg shadow-xl">
-                  <ProduceQRCode
-                      lotId={selectedLot.lotId}
-                      produceType={selectedLot.produceType}
-                      origin={selectedLot.origin}
-                  />
-                  <button
-                      onClick={() => setShowQRCode(false)}
-                      className="mt-4 w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                      Close
-                  </button>
-              </div>
-          </div>
-      )}
-
-      {confirmingShipment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-bold mb-4">Confirm Shipment</h3>
-                <p className="text-gray-600 mb-4">
-                    Upload a proof of shipment (e.g., tracking receipt) and sign with your wallet to confirm.
-                </p>
-                
-                <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Shipment Proof Image</label>
-                    <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => setProofFile(e.target.files[0])}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                    />
-                </div>
-
-                <div className="flex justify-end space-x-3">
-                    <button
-                        onClick={() => {
-                            setConfirmingShipment(null);
-                            setProofFile(null);
-                        }}
-                        disabled={isSubmitting}
-                        className="btn-secondary"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={submitShipmentProof}
-                        disabled={!proofFile || isSubmitting}
-                        className="btn-primary"
-                    >
-                        {isSubmitting ? 'Processing...' : 'Upload & Sign'}
-                    </button>
-                </div>
+        <Modal 
+          isOpen={showQRCode} 
+          onClose={() => setShowQRCode(false)} 
+          title="Produce QR Code"
+        >
+          {selectedLotQR && (
+            <div className="text-center">
+              <ProduceQRCode {...selectedLotQR} />
+              <p className="mt-4 text-sm text-gray-600">
+                {selectedLotQR.produceType} from {selectedLotQR.origin}
+              </p>
             </div>
-        </div>
-      )}
+          )}
+        </Modal>
+
+        <ShipmentConfirmationModal
+          isOpen={!!confirmingShipment}
+          onClose={() => {
+            setConfirmingShipment(null);
+            setProofFile(null);
+          }}
+          invoice={confirmingShipment}
+          proofFile={proofFile}
+          setProofFile={setProofFile}
+          onSubmit={submitShipmentProof}
+          isSubmitting={isSubmitting}
+        />
+      </div>
     </div>
   );
+};
+
+SellerDashboard.propTypes = {
+  activeTab: PropTypes.string
 };
 
 export default SellerDashboard;
