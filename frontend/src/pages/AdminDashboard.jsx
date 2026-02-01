@@ -12,7 +12,7 @@ import {
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import { toast } from 'sonner';
-import { useStats } from '../context/StatsContext';
+import { useStatsActions } from '../context/StatsContext';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -67,7 +67,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
   const [complianceResult, setComplianceResult] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isResolving, setIsResolving] = useState(false);
-  const { setStats: setGlobalStats } = useStats();
+  const { setStats: setGlobalStats } = useStatsActions();
 
   const loadData = useCallback(async () => {
     setIsLoading(true);

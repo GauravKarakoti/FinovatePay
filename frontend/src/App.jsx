@@ -16,7 +16,7 @@ import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 // 1. Import the new InvestorDashboard
 import InvestorDashboard from './pages/InvestorDashboard';
-import { StatsProvider } from './context/StatsContext';
+import { useStats } from './context/StatsContext';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -24,6 +24,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('overview');
   // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const { resetStats } = useStats();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -48,6 +49,7 @@ function App() {
   const handleLogin = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
+    resetStats();
     setUser(userData);
   };
 
@@ -55,6 +57,7 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    resetStats();
   };
 
   const handleTabChange = (tab) => {
@@ -84,7 +87,6 @@ function App() {
   };
 
   return (
-  <StatsProvider>
     <Router>
       <Toaster position="top" richColors />
       <div className="App">
@@ -194,7 +196,6 @@ function App() {
         )}
       </div>
     </Router>
-  </StatsProvider>
   );
 }
 

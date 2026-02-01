@@ -25,7 +25,7 @@ import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApprov
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
-import { useStats } from '../context/StatsContext';
+import { useStatsActions } from '../context/StatsContext';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -141,7 +141,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
   const [showKYCVerification, setShowKYCVerification] = useState(false);
-  const { setStats: setGlobalStats } = useStats();
+  const { setStats: setGlobalStats } = useStatsActions();
 
   // Load Initial Data
   const loadInitialData = useCallback(async () => {

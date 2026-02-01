@@ -27,7 +27,7 @@ import QuotationList from '../components/Dashboard/QuotationList';
 import CreateQuotation from '../components/Quotation/CreateQuotation';
 import FinancingTab from '../components/Financing/FinancingTab';
 import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
-import { useStats } from '../context/StatsContext';
+import { useStatsActions } from '../context/StatsContext';
 
 // --- Utility Helpers ---
 
@@ -259,7 +259,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [proofFile, setProofFile] = useState(null);
   const [invoiceToTokenize, setInvoiceToTokenize] = useState(null);
   const [selectedLotQR, setSelectedLotQR] = useState(null);
-  const { setStats: setGlobalStats } = useStats();
+  const { setStats: setGlobalStats } = useStatsActions();
 
   // Memoized Derived State
   const { escrowInvoices, completedInvoices, pendingInvoices, stats } = useMemo(() => {

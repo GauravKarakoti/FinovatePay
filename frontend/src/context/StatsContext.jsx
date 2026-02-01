@@ -1,5 +1,4 @@
-import { createContext, useContext, useReducer, useCallback } from 'react';
-
+import { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
 const StatsContext = createContext(null);
 
 const initialStats = {
@@ -27,17 +26,36 @@ export const StatsProvider = ({ children }) => {
     dispatch({ type: 'setTotals', payload: next });
   }, []);
 
+  const resetStats = useCallback(() => {
+    dispatch({ type: 'reset' });
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    stats,
+    setStats,
+    resetStats,
+  }), [stats, setStats, resetStats]);
+
   return (
-    <StatsContext.Provider value={{ stats, dispatch, setStats }}>
+    <StatsContext.Provider value={contextValue}>
       {children}
     </StatsContext.Provider>
   );
 };
 
-export const useStats = () => {
+const useStatsContext = () => {
   const context = useContext(StatsContext);
   if (!context) {
-    throw new Error('useStats must be used within a StatsProvider');
+    throw new Error('Stats context is unavailable outside of StatsProvider');
   }
   return context;
+};
+
+export const useStats = () => {
+  return useStatsContext().stats;
+};
+
+export const useStatsActions = () => {
+  const { setStats, resetStats } = useStatsContext();
+  return { setStats, resetStats };
 };
