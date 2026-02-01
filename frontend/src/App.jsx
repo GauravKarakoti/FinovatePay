@@ -16,19 +16,15 @@ import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 // 1. Import the new InvestorDashboard
 import InvestorDashboard from './pages/InvestorDashboard';
+import { useStatsActions } from './context/StatsContext';
 
 function App() {
   const [user, setUser] = useState(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardStats, setDashboardStats] = useState({
-      totalInvoices: 0,
-      activeEscrows: 0,
-      completed: 0,
-      produceLots: 0,
-  });
   // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -53,6 +49,7 @@ function App() {
   const handleLogin = (userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
+    resetStats();
     setUser(userData);
   };
 
@@ -60,6 +57,7 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    resetStats();
   };
 
   const handleTabChange = (tab) => {
@@ -74,11 +72,10 @@ function App() {
                   activeTab={activeTab} 
                   onTabChange={handleTabChange} 
                   user={user} 
-                  stats={dashboardStats} 
               />
           </div>
           <div className="flex-1 overflow-auto">
-              {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
+                {dashboardComponent}
           </div>
       </div>
     );

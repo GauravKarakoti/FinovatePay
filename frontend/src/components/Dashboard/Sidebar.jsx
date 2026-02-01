@@ -1,6 +1,8 @@
 import React from 'react';
+import { useStats } from '../../context/StatsContext';
 
-const Sidebar = ({ activeTab, onTabChange, user, stats }) => {
+const Sidebar = ({ activeTab, onTabChange, user }) => {
+  const { stats } = useStats();
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'quotations', label: 'Quotations', icon: '💬' },
