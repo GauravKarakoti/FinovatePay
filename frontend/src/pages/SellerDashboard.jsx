@@ -779,13 +779,14 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         )}
 
         {/* Modals */}
-        <TokenizeInvoiceModal
-          isOpen={!!invoiceToTokenize}
-          invoice={invoiceToTokenize}
-          onClose={() => setInvoiceToTokenize(null)}
-          onSubmit={handleTokenizeInvoice}
-          isSubmitting={isSubmitting}
-        />
+        {invoiceToTokenize && (
+          <TokenizeInvoiceModal
+            invoice={invoiceToTokenize}
+            onClose={() => setInvoiceToTokenize(null)}
+            onSubmit={handleTokenizeInvoice}
+            isSubmitting={isSubmitting}
+          />
+        )}
 
         <Modal 
           isOpen={showQRCode} 
