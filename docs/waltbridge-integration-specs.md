@@ -33,10 +33,11 @@ FinovatePay CDK Chain (L2) <--- WaltBridge ---> Katana (DeFi Liquidity)
 
 ### Components
 1. **WaltBridge Module**: Handles cross-chain messaging and asset transfers.
-2. **Liquidity Access Service**: Interfaces with Katana pools for borrowing/lending.
+2. **Liquidity Access Service**: Interfaces with Katana pools for borrowing/lending (implemented in bridgeService).
 3. **Financing Manager Contract**: Orchestrates invoice financing using bridged liquidity.
 4. **Compliance Bridge**: Ensures KYC status is verified across chains.
-5. **Backend API**: Provides endpoints for financing operations.
+5. **Backend API**: Provides endpoints for financing operations (financing.js routes).
+6. **Frontend UI**: BridgeFinancingModal component for user interaction.
 
 ## Bridge Setup
 
@@ -71,22 +72,30 @@ FinovatePay CDK Chain (L2) <--- WaltBridge ---> Katana (DeFi Liquidity)
 ## Smart Contract Interactions
 
 ### Key Contracts
-- **BridgeContract**: Handles locking/minting of assets.
-- **LiquidityAdapter**: Interfaces with Katana pools.
-- **FinancingManager**: Manages financing lifecycle.
+- **BridgeAdapter**: Core contract for bridging assets between FinovatePay CDK and Katana. Implements IWaltBridge interface for lockAndSend, mintAndSend, burnAndRelease. Includes compliance checks via ComplianceManager.
+- **LiquidityAdapter**: Interfaces with Katana pools (assumed in bridgeService).
+- **FinancingManager**: Manages financing lifecycle (referenced in web3 utils).
 - **EscrowContract**: Holds collateral during financing.
+- **ComplianceManager**: Ensures KYC verification and account status for bridge operations.
 
 ### Interaction Flow
 ```
-Seller Request -> FinancingManager.approveFinancing()
-             -> BridgeContract.lockAssets()
-             -> LiquidityAdapter.borrowFromKatana()
-             -> Funds transferred to seller
+Seller Request -> BridgeAdapter.lockForBridge() (locks FractionTokens or stablecoins)
+             -> BridgeAdapter.bridgeAsset() (calls WaltBridge.lockAndSend to Katana)
+             -> bridgeService.borrowFromKatana() (backend service borrows from Katana liquidity)
+             -> Funds transferred to seller via backend API
 ```
 
+### Key Functions in BridgeAdapter.sol
+- `lockForBridge(address token, uint256 amount, bytes32 destinationChain)`: Locks ERC20 tokens for bridging, requires KYC compliance.
+- `bridgeAsset(bytes32 lockId, address recipient)`: Initiates bridge transfer to Katana using WaltBridge.
+- `receiveFromBridge(address token, uint256 amount, address recipient, bytes32 sourceChain)`: Receives assets from Katana, transfers to recipient.
+- Events: `AssetLocked`, `AssetBridged`, `AssetReceived` for auditability.
+
 ### Events and Logs
-- Emit events for all bridge operations for auditability.
-- Log liquidity usage and repayment schedules.
+- Emit events for all bridge operations (AssetLocked, AssetBridged, AssetReceived).
+- Log liquidity usage, repayment schedules, and compliance checks.
+- All operations produce on-chain receipts via contract events.
 
 ## Security Considerations
 
@@ -104,16 +113,23 @@ Seller Request -> FinancingManager.approveFinancing()
 
 ## API Endpoints
 
-### Backend API
-- `POST /api/financing/request`: Initiate financing request
-- `GET /api/bridge/status`: Check bridge health
-- `POST /api/liquidity/borrow`: Execute borrowing from Katana
-- `POST /api/compliance/verify`: Cross-chain KYC check
+### Backend API (from backend/routes/financing.js)
+- `POST /financing/request`: Initiate financing request with invoiceId, amount, asset, collateralTokenId. Calls bridgeService.borrowFromKatana().
+- `GET /financing/rates/:asset`: Fetch liquidity rates for a specific asset from Katana.
+- `POST /financing/repay`: Repay financing with financingId, amount, asset. Calls bridgeService.repayToKatana().
+- Additional endpoints for bridge status and compliance verification to be implemented.
 
-### Frontend Integration
-- Use Web3.js/Ethers.js for contract interactions.
-- Display real-time liquidity rates from Katana.
-- Handle bridge confirmations with progress indicators.
+### Frontend Integration (BridgeFinancingModal.jsx)
+- **Component**: BridgeFinancingModal - Modal for requesting bridge financing via Katana.
+- **Features**:
+  - Asset selection: USDC, EURC, BRLC (stablecoins).
+  - Borrow amount input (parsed as 6-decimal units).
+  - Collateral Token ID input (FractionToken ID).
+  - Real-time rate fetching: Calls `/financing/rates/:asset` to display borrow rate and available liquidity.
+  - Wallet connection: Uses connectWallet() and ethers for signing.
+  - API submission: Posts to `/financing/request` with invoiceId, amount, asset, collateralTokenId.
+- **Libraries**: React, ethers.js, api utility for backend calls.
+- **UI Elements**: Form with selects, inputs, rate display, submit/cancel buttons, loading states.
 
 ## Data Flows
 
