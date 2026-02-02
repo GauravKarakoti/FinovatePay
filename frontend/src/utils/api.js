@@ -8,7 +8,7 @@ export const api = axios.create({
   baseURL: API_BASE_URL,
 });
 
-// Add token to requests
+// Add token to requests automatically via interceptor
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -29,35 +29,31 @@ api.interceptors.response.use(
   }
 );
 
+// --- Fixed Functions (Now using 'api' instance) ---
+
 export const tokenizeInvoice = (invoiceId, faceValue, maturityDate) => {
-  const token = localStorage.getItem('token');
-  return axios.post('/api/financing/tokenize', 
-    { invoiceId, faceValue, maturityDate },
-    { headers: { 'Authorization': `Bearer ${token}` } }
-  );
+  // Removed raw axios and manual headers
+  return api.post('/financing/tokenize', { invoiceId, faceValue, maturityDate });
 };
 
 export const getMarketplaceListings = () => {
-    const token = localStorage.getItem('token');
-    return axios.get('/api/financing/marketplace', 
-        { headers: { 'Authorization': `Bearer ${token}` } }
-    );
+  return api.get('/financing/marketplace');
 };
 
-// Auth API
+// --- Auth API ---
 export const login = (email, password) => {
-  return api.post('/auth/login', { email, password });
+  return api.post('auth/login', { email, password });
 };
 
 export const register = (userData) => {
-  return api.post('/auth/register', userData);
+  return api.post('auth/register', userData);
 };
 
 export const updateCurrentUserRole = (role) => {
-  return api.put('/auth/role', { role });
+  return api.put('auth/role', { role });
 };
 
-// Invoice API
+// --- Invoice API ---
 export const createInvoice = (invoiceData) => {
   return api.post('/invoices', invoiceData);
 };
@@ -67,7 +63,6 @@ export const getSellerInvoices = () => {
 };
 
 export const getBuyerInvoices = () => {
-  console.log("Getting Invoice");
   return api.get('/invoices/buyer');
 };
 
@@ -75,6 +70,7 @@ export const getInvoice = (invoiceId) => {
   return api.get(`/invoices/${invoiceId}`);
 };
 
+// --- Produce API ---
 export const createProduceLot = (produceData) => {
   return api.post('/produce/lots', produceData);
 };
@@ -97,6 +93,7 @@ export const getAvailableLots = () => {
 
 export const updateLotLocation = (data) => api.post('/shipment/location', data);
 
+// --- Quotation API ---
 export const createQuotation = (quotationData) => {
   return api.post('/quotations', quotationData);
 };
@@ -121,6 +118,7 @@ export const rejectQuotation = (quotationId) => {
     return api.post(`/quotations/${quotationId}/reject`);
 };
 
+// --- Market API ---
 export const getMarketPrices = (crop, state) => {
     return api.get('/market/prices', { params: { crop, state } });
 };
@@ -133,9 +131,8 @@ export const getProduceTransactions = (lotId) => {
   return api.get(`/produce/lots/${lotId}/transactions`);
 };
 
-// Payment API
+// --- Payment API ---
 export const depositToEscrow = (invoiceId, amount, seller_address) => {
-  console.log('API call to deposit to escrow:', { invoiceId, amount, seller_address });
   return api.post('/payments/escrow/deposit', { invoiceId, amount, seller_address });
 };
 
@@ -147,7 +144,7 @@ export const raiseDispute = (invoiceId, reason) => {
   return api.post('/payments/escrow/dispute', { invoiceId, reason });
 };
 
-// KYC API
+// --- KYC API ---
 export const verifyKYC = (userData) => {
   return api.post('/kyc/verify', userData);
 };
@@ -156,7 +153,7 @@ export const getKYCStatus = () => {
   return api.get('/kyc/status');
 };
 
-// Admin API
+// --- Admin API ---
 export const getUsers = () => {
   return api.get('/admin/users');
 };
@@ -178,12 +175,10 @@ export const checkCompliance = (walletAddress) => {
 };
 
 export const updateUserRole = (userId, role) => {
-  // Using PUT is a common REST convention for updating a resource
   return api.put(`/admin/users/${userId}/role`, { role });
 };
 
 export const updateInvoiceStatus = (invoiceId, status, tx_hash, dispute_reason = '') => {
-    // Note: The second argument is the status, e.g., 'deposited' or 'released'
     return api.post(`/invoices/${invoiceId}/status`, { status, tx_hash, dispute_reason });
 };
 

@@ -1,8 +1,15 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { login } from '../utils/api';
 
 const Login = ({ onLogin }) => {
+  // ✅ Hooks for redirect logic
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // ✅ Get the originally requested path (defaults to '/' if visited /login directly)
+  const from = location.state?.from || '/';
+  
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -22,7 +29,13 @@ const Login = ({ onLogin }) => {
 
     try {
       const response = await login(formData.email, formData.password);
+      
+      // ✅ Update parent state (sets user in App.jsx)
       onLogin(response.data.user, response.data.token);
+      
+      // ✅ Redirect to original requested page instead of default "/"
+      navigate(from, { replace: true });
+      
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
