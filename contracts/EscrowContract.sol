@@ -28,6 +28,9 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     ComplianceManager public complianceManager;
     address public admin;
     
+    // --- MINIMAL FIX: Add arbitrator support ---
+    mapping(address => bool) public arbitrators;
+    
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
@@ -36,6 +39,12 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
+        _;
+    }
+    
+    // --- MINIMAL FIX: Allow admin OR arbitrators to resolve disputes ---
+    modifier onlyAdminOrArbitrator() {
+        require(msg.sender == admin || arbitrators[msg.sender], "Not authorized");
         _;
     }
     
@@ -49,6 +58,16 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     constructor(address _complianceManager) {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+    }
+    
+    // --- MINIMAL FIX: Simple arbitrator management ---
+    function addArbitrator(address _arbitrator) external onlyAdmin {
+        require(_arbitrator != address(0), "Invalid address");
+        arbitrators[_arbitrator] = true;
+    }
+    
+    function removeArbitrator(address _arbitrator) external onlyAdmin {
+        arbitrators[_arbitrator] = false;
     }
     
     function createEscrow(
@@ -142,10 +161,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit DisputeRaised(_invoiceId, msg.sender);
     }
     
-    function resolveDispute(bytes32 _invoiceId, bool _sellerWins)
-        external
-        onlyAdmin
-    {
+    function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdminOrArbitrator {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.disputeRaised, "No dispute raised");
         
