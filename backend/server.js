@@ -7,9 +7,8 @@ require('dotenv').config();
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
 
-const pool = require('./config/database');
 const listenForTokenization = require('./listeners/contractListener');
-const errorHandler = require('./middlewares/errorHandler');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const server = http.createServer(app);
@@ -42,7 +41,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-const { pool, getConnection, getDatabaseHealth } = require('./config/database');
+const { pool, getConnection } = require('./config/database');
 const listenForTokenization = require('./listeners/contractListener');
 
 const testDbConnection = async () => {
