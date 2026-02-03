@@ -14,7 +14,6 @@ import './App.css';
 import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
-// 1. Import the new InvestorDashboard
 import InvestorDashboard from './pages/InvestorDashboard';
 
 function App() {
@@ -27,14 +26,17 @@ function App() {
       completed: 0,
       produceLots: 0,
   });
-  // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
+  // 1. Initial Mount Effect (Read from LS, Web3)
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    
     if (token && userData) {
-      setUser(JSON.parse(userData));
+      // We merge the token into the user object to match the new handleLogin pattern
+      const parsedUser = JSON.parse(userData);
+      setUser({ ...parsedUser, token });
     }
 
     const web3Modal = new Web3Modal({ cacheProvider: true });
@@ -50,10 +52,32 @@ function App() {
     }
   }, []);
 
+  // 2. New Sync Effect: Handles side effects when 'user' state changes
+  useEffect(() => {
+    // If no user, do nothing (or we could handle cleanup here)
+    if (!user) return;
+
+    // A. Sync to LocalStorage
+    // We check if token exists on user (from handleLogin) or fallback to existing LS
+    const tokenToStore = user.token || localStorage.getItem('token');
+    if (tokenToStore) {
+        localStorage.setItem('token', tokenToStore);
+    }
+    localStorage.setItem('user', JSON.stringify(user));
+
+    // B. Reset Dashboard Stats (Ensures clean slate on login/user change)
+    setDashboardStats({
+      totalInvoices: 0,
+      activeEscrows: 0,
+      completed: 0,
+      produceLots: 0,
+    });
+  }, [user]); 
+
+  // 3. Simplified handleLogin (Pure State Update)
   const handleLogin = (userData, token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
+    // We strictly update state here. The useEffect above handles the rest.
+    setUser({ ...userData, token });
   };
 
   const handleLogout = () => {
@@ -84,9 +108,9 @@ function App() {
     );
   };
 
-  // Chatbot toggle handler
+  // 4. Optimized Toggle
   const toggleChatbot = () => {
-    setIsChatbotOpen(prevState => !prevState);
+    setIsChatbotOpen(p => !p);
   };
 
   return (
@@ -99,7 +123,7 @@ function App() {
             walletConnected={walletConnected}
             onUserUpdate={setUser}
         />
-        {console.log('Current user role in App.jsx:', user)}
+        {/* Console log removed for production polish */}
         <main>
           <Routes>
             <Route 
@@ -112,7 +136,6 @@ function App() {
                             <Navigate to="/buyer" />
                         ) : user.role === 'shipment' || user.role === 'warehouse' ? (
                             <Navigate to="/shipment" />
-                        // 2. Add redirect for 'investor' role
                         ) : user.role === 'investor' ? (
                             <Navigate to="/investor" />
                         ) : (
@@ -131,7 +154,6 @@ function App() {
                         : <Navigate to="/" />
                 }
             />
-            {/* 3. Add new route for Investor Dashboard */}
             <Route 
                 path="/investor" 
                 element={
@@ -171,10 +193,8 @@ function App() {
           </Routes>
         </main>
         
-        {/* 3. Render Chatbot components only if user is logged in */}
         {user && (
           <>
-            {/* 4. Conditionally render the chatbot in a fixed position */}
             <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
               {isChatbotOpen && <FinovateChatbot />}
             </div>
@@ -184,13 +204,11 @@ function App() {
               aria-label="Toggle Chatbot"
             >
               {isChatbotOpen ? (
-                // Close Icon (X)
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                // Chat Icon
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               )}
