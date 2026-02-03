@@ -69,8 +69,8 @@ export async function connectWallet() {
     }
     // --------------------------------------
 
-    const web3Provider = new ethers.providers.Web3Provider(provider);
-    const signer = web3Provider.getSigner();
+    const web3Provider = new ethers.BrowserProvider(provider);
+    const signer = await web3Provider.getSigner();
     const address = await signer.getAddress();
     return { signer, address, provider: web3Provider };
 }

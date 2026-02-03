@@ -31,7 +31,7 @@ import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
 // --- Utility Helpers ---
 
 const uuidToBytes32 = (uuid) => {
-  return ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
+  return ethers.zeroPadValue('0x' + uuid.replace(/-/g, ''), 32);
 };
 
 // --- Reusable UI Components ---
@@ -377,7 +377,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         decimals = await tokenContract.decimals();
       }
       
-      const faceValueAsUint = ethers.utils.parseUnits(faceValue.toString(), decimals);
+      const faceValueAsUint = ethers.parseUnits(faceValue.toString(), decimals);
       
       const response = await api.post('/financing/tokenize', {
         invoiceId,
@@ -406,11 +406,11 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       const { address: sellerAddress } = await connectWallet();
       
       const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
-      const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
+      const invoiceHash = ethers.keccak256(ethers.toUtf8Bytes(dataToHash));
       const tokenAddress = NATIVE_CURRENCY_ADDRESS;
       
       const contract = await getInvoiceFactoryContract();
-      const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
+      const amountInWei = ethers.parseUnits(quotation.total_amount.toString(), 18);
       const dueDateTimestamp = Math.floor(Date.now() / 1000) + 86400 * 30;
 
       toast.loading('Waiting for wallet confirmation...', { id: toastId });
@@ -457,7 +457,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         formData.harvestDate,
         formData.qualityMetrics,
         formData.origin,
-        ethers.utils.parseUnits(formData.quantity.toString(), 18),
+        ethers.parseUnits(formData.quantity.toString(), 18),
         ""
       );
 
@@ -469,7 +469,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
       await syncProduceLot({
         ...formData,
-        lotId: event.args.lotId.toNumber(),
+        lotId: Number(event.args.lotId),
         txHash: tx.hash,
       });
 
