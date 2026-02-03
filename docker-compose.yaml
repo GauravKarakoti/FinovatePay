@@ -1,0 +1,29 @@
+
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: finovate-backend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:3000/api/
+    container_name: finovate-frontend
+    ports:
+      - "5173:80"
+    env_file:
+      - ./frontend/.env
+    depends_on:
+      - backend
+    restart: unless-stopped

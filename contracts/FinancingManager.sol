@@ -26,10 +26,6 @@ interface IFractionToken is IERC1155 {
  * @notice Manages the automated purchase of fractionalized invoice tokens.
  * This contract acts as an atomic swap marketplace, taking a platform fee
  * (the "spread") on each trade.
- *
- * @dev The investor (buyer) must approve this contract to spend their stablecoin.
- * The seller (token issuer) must grant 'setApprovalForAll' to this contract
- * on the FractionToken contract.
  */
 contract FinancingManager is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -38,6 +34,10 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     IERC20 public stablecoin;
     address public feeWallet;
     uint256 public stablecoinDecimals;
+
+    // NEW: Price of 1 full token unit (1e18) in Native Currency (Wei)
+    // Example: If 1 Token = 0.01 ETH, set this to 10000000000000000
+    uint256 public nativePerToken; 
 
     mapping(uint256 => uint256) public invoiceSpreadBps;
 
@@ -50,6 +50,7 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     );
     event SpreadUpdated(uint256 indexed tokenId, uint256 newSpreadBps);
     event ContractsUpdated(address newFractionToken, address newStablecoin, address newFeeWallet);
+    event NativePriceUpdated(uint256 newPrice); // NEW Event
 
     constructor(
         address _fractionToken, 
@@ -58,7 +59,6 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         uint256 _stablecoinDecimals
     ) Ownable(msg.sender) {
         require(_fractionToken != address(0) && _stablecoin != address(0) && _feeWallet != address(0), "Invalid addresses");
-        // TWEAK: Strict validation for decimals
         require(_stablecoinDecimals > 0 && _stablecoinDecimals <= 18, "Invalid stablecoin decimals");
         
         fractionToken = IFractionToken(_fractionToken);
@@ -82,9 +82,7 @@ contract FinancingManager is Ownable, ReentrancyGuard {
 
     /**
      * @notice Allows the owner (platform) to set the financing spread (fee)
-     * for a specific invoice token, based on its risk profile.
-     * @param _tokenId The token ID of the fractionalized invoice.
-     * @param _spreadBps The fee in basis points (e.g., 100 BPS = 1%).
+     * for a specific invoice token.
      */
     function setInvoiceSpread(uint256 _tokenId, uint256 _spreadBps) external onlyOwner {
         require(_spreadBps < 10000, "Spread must be less than 10000 BPS (100%)");
@@ -92,6 +90,19 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         emit SpreadUpdated(_tokenId, _spreadBps);
     }
 
+    /**
+     * @notice NEW: Sets the price of 1 Token in Native Currency (Wei).
+     * @param _price The price in Wei for 1e18 units of the token.
+     */
+    function setNativePerToken(uint256 _price) external onlyOwner {
+        require(_price > 0, "Price must be greater than zero");
+        nativePerToken = _price;
+        emit NativePriceUpdated(_price);
+    }
+
+    /**
+     * @notice Purchases fractions using ERC20 Stablecoin.
+     */
     function buyFractions(uint256 _tokenId, uint256 _tokenAmount) external nonReentrant {
         require(_tokenAmount > 0, "Amount must be positive");
         
@@ -100,7 +111,6 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         uint256 spreadBps = invoiceSpreadBps[_tokenId];
 
         require(seller != address(0), "Invalid token ID or issuer");
-        // TWEAK: Uncommented and enforced spread check
         require(spreadBps < 10000, "Spread not set or invalid");
 
         // Formula: Amount * (10^StableDecimals) / (10^TokenDecimals)
@@ -119,16 +129,22 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Allows an investor to buy fractional tokens using the Native Currency (e.g. ETH, MATIC).
-     * @dev Requires the buyer to send the exact amount of native currency matching _tokenAmount.
+     * @notice Allows an investor to buy fractional tokens using Native Currency (ETH/MATIC).
+     * @dev Calculates cost based on nativePerToken. Refunds excess ETH.
      * @param _tokenId The ID of the token to purchase.
-     * @param _tokenAmount The amount of tokens to purchase.
+     * @param _tokenAmount The amount of tokens to purchase (in 1e18 units).
      */
     function buyFractionsNative(uint256 _tokenId, uint256 _tokenAmount) external payable nonReentrant {
         require(_tokenAmount > 0, "Amount must be positive");
-        require(msg.value == _tokenAmount, "Native currency amount must match token amount");
+        require(nativePerToken > 0, "Native price not set");
 
-        // 1. Get Details
+        // 1. Calculate required Native Currency
+        // Formula: (Token Amount * Price Per Token) / 1e18
+        uint256 requiredNative = (_tokenAmount * nativePerToken) / 1e18;
+        
+        require(msg.value >= requiredNative, "Insufficient native currency sent");
+
+        // 2. Get Details
         IFractionToken.TokenDetails memory details = fractionToken.tokenDetails(_tokenId);
         address seller = details.issuer;
         uint256 spreadBps = invoiceSpreadBps[_tokenId];
@@ -136,26 +152,30 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         require(seller != address(0), "Invalid token ID or issuer");
         require(spreadBps < 10000, "Spread not set or invalid");
 
-        // 2. Calculate Amounts
-        uint256 platformFee = (_tokenAmount * spreadBps) / 10000;
-        uint256 sellerAmount = _tokenAmount - platformFee;
+        // 3. Calculate Fee and Seller Amount based on NATIVE value
+        uint256 platformFee = (requiredNative * spreadBps) / 10000;
+        uint256 sellerAmount = requiredNative - platformFee;
         
-        require(sellerAmount > 0, "Spread is too high or amount is too low");
-
-        // 3. Perform Atomic Swap
+        // 4. Perform Transfers
         
-        // Step 3a: Pull FractionToken from seller to investor (msg.sender).
+        // Step 4a: Pull FractionToken from seller to investor
         fractionToken.safeTransferFrom(seller, msg.sender, _tokenId, _tokenAmount, "");
 
-        // Step 3b: Transfer Native Currency to the seller.
+        // Step 4b: Transfer Native Currency to the seller
         (bool successSeller, ) = payable(seller).call{value: sellerAmount}("");
         require(successSeller, "Transfer to seller failed");
 
-        // Step 3c: Transfer platform fee to the fee wallet.
+        // Step 4c: Transfer platform fee to the fee wallet
         (bool successFee, ) = payable(feeWallet).call{value: platformFee}("");
         require(successFee, "Transfer to fee wallet failed");
 
-        // 4. Emit Event
+        // Step 4d: Refund excess Native Currency to buyer (if any)
+        if (msg.value > requiredNative) {
+            (bool successRefund, ) = payable(msg.sender).call{value: msg.value - requiredNative}("");
+            require(successRefund, "Refund failed");
+        }
+
+        // 5. Emit Event
         emit FractionsPurchased(_tokenId, msg.sender, seller, _tokenAmount, platformFee);
     }
 }

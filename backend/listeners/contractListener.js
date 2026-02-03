@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 const { getFractionTokenContract } = require('../config/blockchain');
 
 async function listenForTokenization() {
