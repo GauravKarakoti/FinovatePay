@@ -28,6 +28,8 @@ describe("EscrowContract", function () {
     // Setup KYC
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
+    await compliance.mintIdentity(seller.address);
+    await compliance.mintIdentity(buyer.address);
     
     // Transfer tokens to buyer
     await token.transfer(buyer.address, ethers.utils.parseEther("100"));
@@ -89,6 +91,38 @@ describe("EscrowContract", function () {
     it("Should not allow non-arbitrator to resolve dispute", async function () {
       await expect(escrow.connect(other).resolveDispute(invoiceId, true))
         .to.be.revertedWith("Not authorized");
+    });
+  });
+
+  describe("Compliance Manager Updates", function () {
+    it("Should allow admin to update compliance manager and enforce new rules", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-NEW");
+      const amount = ethers.utils.parseEther("1");
+      const duration = 7 * 24 * 60 * 60;
+
+      await escrow.connect(owner).createEscrow(
+        invoiceId, seller.address, buyer.address, amount, token.address, duration,
+        ethers.constants.AddressZero, 0
+      );
+
+      // Switch to a fresh compliance manager with no KYC/identity set
+      const NewComplianceManager = await ethers.getContractFactory("ComplianceManager");
+      const newCompliance = await NewComplianceManager.deploy();
+      await newCompliance.deployed();
+
+      await escrow.connect(owner).setComplianceManager(newCompliance.address);
+
+      await token.connect(buyer).approve(escrow.address, amount);
+      await expect(
+        escrow.connect(buyer).deposit(invoiceId, amount)
+      ).to.be.revertedWith("KYC not verified");
+
+      // Now comply in the new manager and deposit should succeed
+      await newCompliance.verifyKYC(buyer.address);
+      await newCompliance.mintIdentity(buyer.address);
+
+      await expect(escrow.connect(buyer).deposit(invoiceId, amount))
+        .to.emit(escrow, "DepositConfirmed");
     });
   });
 });
