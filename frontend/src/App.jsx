@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -11,7 +11,7 @@ import ProduceHistory from './pages/ProduceHistory';
 import { connectWallet } from './utils/web3';
 import Web3Modal from 'web3modal';
 import './App.css';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
@@ -47,7 +47,14 @@ function App() {
         })
         .catch((error) => {
           console.error("Failed to auto-connect wallet:", error);
+          
+          // ✅ ISSUE #14 FIX: Clear stale cached provider when permissions revoked
+          web3Modal.clearCachedProvider();
+          
           setWalletConnected(false);
+          
+          // ✅ ISSUE #14 FIX: Notify user instead of silent failure
+          toast.error('Wallet connection expired. Please reconnect your wallet.');
         });
     }
   }, []);
@@ -113,6 +120,23 @@ function App() {
     setIsChatbotOpen(p => !p);
   };
 
+  // ✅ AUTH GUARD: Saves intended route in location state for redirect after login
+  const RequireAuth = ({ children, allowedRoles }) => {
+    const location = useLocation();
+    
+    if (!user) {
+      // Not logged in: redirect to login, remembering where they came from
+      return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    }
+    
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      // Logged in but wrong role: send to home (which handles role-based landing)
+      return <Navigate to="/" replace />;
+    }
+    
+    return children;
+  };
+
   return (
     <Router>
       <Toaster position="top" richColors />
@@ -126,6 +150,7 @@ function App() {
         {/* Console log removed for production polish */}
         <main>
           <Routes>
+            {/* Home route - keeps existing role-based logic */}
             <Route 
                 path="/" 
                 element={
@@ -146,38 +171,52 @@ function App() {
                     )
                 } 
             />
+            
+            {/* ✅ PROTECTED: Buyer */}
             <Route 
                 path="/buyer" 
                 element={
-                    user && user.role === 'buyer' 
-                        ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
-                        : <Navigate to="/" />
+                    <RequireAuth allowedRoles={['buyer']}>
+                        {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
+                    </RequireAuth>
                 }
             />
             <Route 
                 path="/investor" 
                 element={
-                    user && user.role === 'investor' 
-                        ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
-                        : <Navigate to="/" />
+                    <RequireAuth allowedRoles={['investor']}>
+                        {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
+                    </RequireAuth>
                 }
             />
+            
+            {/* ✅ PROTECTED: Admin */}
             <Route 
               path="/admin"
               element={
-                user && user.role === 'admin' ? renderDashboard(<AdminDashboard activeTab={activeTab} />) : <Navigate to="/" />
+                <RequireAuth allowedRoles={['admin']}>
+                    {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
+                </RequireAuth>
               } 
             />
+            
+            {/* ✅ PROTECTED: Shipment/Warehouse */}
             <Route 
               path="/shipment" 
               element={
-                user && (user.role === 'shipment' || user.role === 'warehouse') ? <ShipmentDashboard /> : <Navigate to="/" />
+                <RequireAuth allowedRoles={['shipment', 'warehouse']}>
+                    <ShipmentDashboard />
+                </RequireAuth>
               } 
             />
+            
+            {/* Public: Produce History */}
             <Route 
               path="/produce/:lotId" 
               element={<ProduceHistory />}
             />
+            
+            {/* Auth Pages */}
             <Route 
               path="/login" 
               element={
