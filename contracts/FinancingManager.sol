@@ -103,8 +103,16 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         // TWEAK: Uncommented and enforced spread check
         require(spreadBps < 10000, "Spread not set or invalid");
 
-        // Formula: Amount * (10^StableDecimals) / (10^TokenDecimals)
-        uint256 paymentAmount = (_tokenAmount * (10 ** stablecoinDecimals)) / 1e18;
+        // Calculate payment based on economic value: (tokenAmount / totalSupply) * faceValue
+        // This avoids assumptions about ERC1155 decimals and ties pricing to actual invoice value
+        // First: calculate proportional face value (in 1e18 scale)
+        uint256 faceValueShare = (_tokenAmount * details.faceValue) / details.totalSupply;
+        
+        // Second: scale to stablecoin decimals
+        // Assumes faceValue is denominated in 1e18 (wei-like) units
+        // Integer division rounds down; dust < 1 stablecoin unit may remain in contract
+        uint256 paymentAmount = (faceValueShare * (10 ** stablecoinDecimals)) / 1e18;
+        
         require(paymentAmount > 0, "Payment amount too small");
 
         uint256 platformFee = (paymentAmount * spreadBps) / 10000;
