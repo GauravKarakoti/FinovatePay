@@ -36,6 +36,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event ComplianceManagerUpdated(address indexed newComplianceManager);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
@@ -58,6 +59,12 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     constructor(address _complianceManager) {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+    }
+
+    function setComplianceManager(address _complianceManager) external onlyAdmin {
+        require(_complianceManager != address(0), "Invalid compliance manager");
+        complianceManager = ComplianceManager(_complianceManager);
+        emit ComplianceManagerUpdated(_complianceManager);
     }
     
     // --- MINIMAL FIX: Simple arbitrator management ---
