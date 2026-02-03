@@ -10,7 +10,7 @@ contract ComplianceManager is ERC721, Ownable {
     mapping(address => bool) private kycVerified;
     mapping(address => uint256) public userTokenId;
     
-    event AccountFrozen(address indexed account);
+    event AccountFrozen(address indexed account,string reason);
     event AccountUnfrozen(address indexed account);
     event KYCVerified(address indexed account);
     event KYCRevoked(address indexed account);
@@ -22,9 +22,9 @@ contract ComplianceManager is ERC721, Ownable {
      */
     constructor() ERC721("FinovateVerified", "FVT-ID") Ownable(msg.sender) {}
     
-    function freezeAccount(address _account) external onlyOwner {
+    function freezeAccount(address _account,string calldata reason) external onlyOwner {
         frozenAccounts[_account] = true;
-        emit AccountFrozen(_account);
+        emit AccountFrozen(_account,reason);
     }
     
     function unfreezeAccount(address _account) external onlyOwner {

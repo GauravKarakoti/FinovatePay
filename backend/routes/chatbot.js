@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Groq = require('groq-sdk');
 const Invoice = require('../models/Invoice'); // <-- ADDED
-const pool = require('../config/database');   // <-- ADDED
+const { pool } = require('../config/database');   // <-- ADDED
 
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
