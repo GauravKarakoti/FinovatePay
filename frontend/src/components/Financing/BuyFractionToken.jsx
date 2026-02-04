@@ -13,7 +13,7 @@ export const BuyFractionToken = ({
   stablecoinAddress,
   stablecoinDecimals,
   tokenDecimals,
-  maxAmount // Can be base units (BigNumber) or formatted string
+  maxAmount // Can be base units (BigInt, example: 0n) or formatted string
 }) => {
   console.log("BuyFractionToken mounted with tokenId:", tokenId, "stablecoinAddress:", stablecoinAddress);
   
