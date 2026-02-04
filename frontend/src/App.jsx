@@ -28,12 +28,14 @@ function App() {
   });
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
-  // Effect 1: Restore session from localStorage on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    
     if (token && userData) {
-      setUser({ ...JSON.parse(userData), token });
+      // We merge the token into the user object to match the new handleLogin pattern
+      const parsedUser = JSON.parse(userData);
+      setUser({ ...parsedUser, token });
     }
 
     const web3Modal = new Web3Modal({ cacheProvider: true });
@@ -47,12 +49,20 @@ function App() {
     }
   }, []);
 
-  // Effect 2: Handle all side effects when user state changes
+  // 2. New Sync Effect: Handles side effects when 'user' state changes
   useEffect(() => {
+    // If no user, do nothing (or we could handle cleanup here)
     if (!user) return;
 
-    localStorage.setItem('token', user.token);
+    // A. Sync to LocalStorage
+    // We check if token exists on user (from handleLogin) or fallback to existing LS
+    const tokenToStore = user.token || localStorage.getItem('token');
+    if (tokenToStore) {
+        localStorage.setItem('token', tokenToStore);
+    }
     localStorage.setItem('user', JSON.stringify(user));
+
+    // B. Reset Dashboard Stats (Ensures clean slate on login/user change)
     setDashboardStats({
       totalInvoices: 0,
       activeEscrows: 0,
@@ -101,7 +111,27 @@ function App() {
     );
   };
 
-  const toggleChatbot = () => setIsChatbotOpen(p => !p);
+  // 4. Optimized Toggle
+  const toggleChatbot = () => {
+    setIsChatbotOpen(p => !p);
+  };
+
+  // ✅ AUTH GUARD: Saves intended route in location state
+  const RequireAuth = ({ children, allowedRoles }) => {
+    const location = useLocation();
+    
+    if (!user) {
+      // Not logged in: redirect to login, remembering where they came from
+      return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    }
+    
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      // Logged in but wrong role: send to home (which handles role-based landing)
+      return <Navigate to="/" replace />;
+    }
+    
+    return children;
+  };
 
   return (
     <Router>
@@ -197,11 +227,11 @@ function App() {
               aria-label="Toggle Chatbot"
             >
               {isChatbotOpen ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               )}
