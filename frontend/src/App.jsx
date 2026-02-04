@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -15,34 +15,31 @@ import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
-import { useStatsActions } from './context/StatsContext';
 
 function App() {
   const [user, setUser] = useState(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardStats, setDashboardStats] = useState({
-      totalInvoices: 0,
-      activeEscrows: 0,
-      completed: 0,
-      produceLots: 0,
+    totalInvoices: 0,
+    activeEscrows: 0,
+    completed: 0,
+    produceLots: 0,
   });
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
 
+  // Effect 1: Restore session from localStorage on mount
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
     if (token && userData) {
-      setUser(JSON.parse(userData));
+      setUser({ ...JSON.parse(userData), token });
     }
 
     const web3Modal = new Web3Modal({ cacheProvider: true });
     if (web3Modal.cachedProvider) {
       connectWallet()
-        .then(() => {
-          setWalletConnected(true);
-        })
+        .then(() => setWalletConnected(true))
         .catch((error) => {
           console.error("Failed to auto-connect wallet:", error);
           setWalletConnected(false);
@@ -50,18 +47,36 @@ function App() {
     }
   }, []);
 
+  // Effect 2: Handle all side effects when user state changes
+  useEffect(() => {
+    if (!user) return;
+
+    localStorage.setItem('token', user.token);
+    localStorage.setItem('user', JSON.stringify(user));
+    setDashboardStats({
+      totalInvoices: 0,
+      activeEscrows: 0,
+      completed: 0,
+      produceLots: 0,
+    });
+  }, [user]);
+
+  // Effect 3: Handle logout cleanup
+  useEffect(() => {
+    if (user === null && localStorage.getItem('token')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+  }, [user]);
+
+  // Clean login handler - only updates state
   const handleLogin = (userData, token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    resetStats();
-    setUser(userData);
+    setUser({ ...userData, token });
   };
 
+  // Clean logout handler - only updates state
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
     setUser(null);
-    resetStats();
   };
 
   const handleTabChange = (tab) => {
@@ -71,123 +86,91 @@ function App() {
   const renderDashboard = (dashboardComponent) => {
     return (
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9]">
-          <div className="md:w-64 flex-shrink-0 hidden md:block">
-              <Sidebar 
-                  activeTab={activeTab} 
-                  onTabChange={handleTabChange} 
-                  user={user} 
-              />
-          </div>
-          <div className="flex-1 overflow-auto">
-                {dashboardComponent}
-          </div>
+        <div className="md:w-64 flex-shrink-0 hidden md:block">
+          <Sidebar 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange} 
+            user={user} 
+            stats={dashboardStats} 
+          />
+        </div>
+        <div className="flex-1 overflow-auto">
+          {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
+        </div>
       </div>
     );
   };
 
-  const toggleChatbot = () => {
-    setIsChatbotOpen(prevState => !prevState);
-  };
-
-  // ✅ AUTH GUARD: Saves intended route in location state
-  const RequireAuth = ({ children, allowedRoles }) => {
-    const location = useLocation();
-    
-    if (!user) {
-      // Not logged in: redirect to login, remembering where they came from
-      return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-    }
-    
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-      // Logged in but wrong role: send to home (which handles role-based landing)
-      return <Navigate to="/" replace />;
-    }
-    
-    return children;
-  };
+  const toggleChatbot = () => setIsChatbotOpen(p => !p);
 
   return (
     <Router>
       <Toaster position="top" richColors />
       <div className="App">
         <Header 
-            user={user} 
-            onLogout={handleLogout} 
-            walletConnected={walletConnected}
-            onUserUpdate={setUser}
+          user={user} 
+          onLogout={handleLogout} 
+          walletConnected={walletConnected}
+          onUserUpdate={setUser}
         />
-        {console.log('Current user role in App.jsx:', user)}
         <main>
           <Routes>
-            {/* Home route - keeps existing role-based logic */}
             <Route 
-                path="/" 
-                element={
-                    user ? (
-                        user.role === 'admin' ? (
-                            renderDashboard(<AdminDashboard activeTab={activeTab} />)
-                        ) : user.role === 'buyer' ? (
-                            <Navigate to="/buyer" />
-                        ) : user.role === 'shipment' || user.role === 'warehouse' ? (
-                            <Navigate to="/shipment" />
-                        ) : user.role === 'investor' ? (
-                            <Navigate to="/investor" />
-                        ) : (
-                            renderDashboard(<SellerDashboard activeTab={activeTab} />)
-                        )
-                    ) : (
-                        <Navigate to="/login" />
-                    )
-                } 
+              path="/" 
+              element={
+                user ? (
+                  user.role === 'admin' ? (
+                    renderDashboard(<AdminDashboard activeTab={activeTab} />)
+                  ) : user.role === 'buyer' ? (
+                    <Navigate to="/buyer" />
+                  ) : user.role === 'shipment' || user.role === 'warehouse' ? (
+                    <Navigate to="/shipment" />
+                  ) : user.role === 'investor' ? (
+                    <Navigate to="/investor" />
+                  ) : (
+                    renderDashboard(<SellerDashboard activeTab={activeTab} />)
+                  )
+                ) : (
+                  <Navigate to="/login" />
+                )
+              } 
             />
-            
-            {/* ✅ PROTECTED: Buyer */}
             <Route 
-                path="/buyer" 
-                element={
-                    <RequireAuth allowedRoles={['buyer']}>
-                        {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
-                    </RequireAuth>
-                }
+              path="/buyer" 
+              element={
+                user && user.role === 'buyer' 
+                  ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
+                  : <Navigate to="/" />
+              }
             />
-            
-            {/* ✅ PROTECTED: Investor */}
             <Route 
-                path="/investor" 
-                element={
-                    <RequireAuth allowedRoles={['investor']}>
-                        {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
-                    </RequireAuth>
-                }
+              path="/investor" 
+              element={
+                user && user.role === 'investor' 
+                  ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
+                  : <Navigate to="/" />
+              }
             />
-            
-            {/* ✅ PROTECTED: Admin */}
             <Route 
               path="/admin"
               element={
-                <RequireAuth allowedRoles={['admin']}>
-                    {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
-                </RequireAuth>
+                user && user.role === 'admin' 
+                  ? renderDashboard(<AdminDashboard activeTab={activeTab} />) 
+                  : <Navigate to="/" />
               } 
             />
-            
-            {/* ✅ PROTECTED: Shipment/Warehouse */}
             <Route 
               path="/shipment" 
               element={
-                <RequireAuth allowedRoles={['shipment', 'warehouse']}>
-                    <ShipmentDashboard />
-                </RequireAuth>
+                user && (user.role === 'shipment' || user.role === 'warehouse') 
+                  ? <ShipmentDashboard /> 
+                  : <Navigate to="/" />
               } 
             />
-            
-            {/* Public: Produce History */}
             <Route 
               path="/produce/:lotId" 
               element={<ProduceHistory />}
             />
-            
-            {/* Auth Pages */}
             <Route 
               path="/login" 
               element={
@@ -198,12 +181,11 @@ function App() {
               path="/register" 
               element={
                 user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
-              } 
+              }
             />
           </Routes>
         </main>
         
-        {/* Chatbot UI */}
         {user && (
           <>
             <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
