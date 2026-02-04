@@ -27,6 +27,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     mapping(bytes32 => Escrow) public escrows;
     ComplianceManager public complianceManager;
     address public admin;
+    address public keeper;
     
     // --- MINIMAL FIX: Add arbitrator support ---
     mapping(address => bool) public arbitrators;
@@ -58,6 +59,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     
     constructor(address _complianceManager) {
         admin = msg.sender;
+        keeper = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
     }
 
@@ -230,6 +232,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     
     function expireEscrow(bytes32 _invoiceId) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
+        require(msg.sender == escrow.seller || msg.sender == escrow.buyer || msg.sender == keeper, "Not authorized to expire escrow");
         require(block.timestamp >= escrow.expiresAt, "Escrow not expired");
         require(
             !escrow.sellerConfirmed || !escrow.buyerConfirmed,
