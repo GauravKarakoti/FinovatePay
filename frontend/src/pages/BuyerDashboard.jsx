@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
 import {
-    getBuyerInvoices,
-    updateInvoiceStatus,
-    getAvailableLots,
-    createQuotation,
-    getPendingBuyerApprovals, // <-- Use the new specific API call
-    buyerApproveQuotation,
-    rejectQuotation,
-    getKYCStatus
+  getBuyerInvoices,
+  updateInvoiceStatus,
+  getAvailableLots,
+  createQuotation,
+  getPendingBuyerApprovals,
+  buyerApproveQuotation,
+  rejectQuotation,
+  getKYCStatus
 } from '../utils/api';
 import { connectWallet, erc20ABI } from '../utils/web3';
 import StatsCard from '../components/Dashboard/StatsCard';
@@ -24,440 +25,715 @@ import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApprov
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
+import { useStatsActions } from '../context/StatsContext';
 
-const BuyerDashboard = ({ activeTab }) => {
-    const [invoices, setInvoices] = useState([]);
-    const [availableLots, setAvailableLots] = useState([]);
-    const [pendingApprovals, setPendingApprovals] = useState([]); // <-- Renamed state for clarity
-    const [walletAddress, setWalletAddress] = useState('');
-    const [selectedInvoice, setSelectedInvoice] = useState(null);
-    const [timelineEvents, setTimelineEvents] = useState([]);
-    const [kycStatus, setKycStatus] = useState('not_started');
-    const [kycRiskLevel, setKycRiskLevel] = useState('unknown');
-    const [kycDetails, setKycDetails] = useState('');
-    const [loadingInvoice, setLoadingInvoice] = useState(null);
-    const [showQRCode, setShowQRCode] = useState(false);
-    const [selectedLot, setSelectedLot] = useState(null);
-    const [showKYCVerification, setShowKYCVerification] = useState(false);
+// Loading Spinner Component
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center py-12">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" role="status">
+      <span className="sr-only">Loading...</span>
+    </div>
+  </div>
+);
 
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                const { address } = await connectWallet();
-                setWalletAddress(address);
+// Empty State Component
+const EmptyState = ({ message = "No data available", icon = "📭" }) => (
+  <div className="text-center py-12 px-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+    <div className="text-4xl mb-2">{icon}</div>
+    <p className="text-gray-500 font-medium">{message}</p>
+  </div>
+);
 
-                await loadKYCStatus();
+EmptyState.propTypes = {
+  message: PropTypes.string,
+  icon: PropTypes.string
+};
 
-                if (activeTab === 'produce') await loadAvailableLots();
-                else if (activeTab === 'quotations') await loadPendingApprovals(); // Changed this tab name to 'quotations' for consistency, but its purpose is approvals.
-                else await loadInvoices();
+// Action Button Component
+const ActionButton = ({ 
+  onClick, 
+  children, 
+  variant = 'primary', 
+  disabled = false, 
+  loading = false,
+  className = '' 
+}) => {
+  const baseClasses = "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2";
+  const variants = {
+    primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm",
+    success: "bg-green-600 text-white hover:bg-green-700 shadow-sm",
+    danger: "bg-red-600 text-white hover:bg-red-700 shadow-sm",
+    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+    outline: "border-2 border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+  };
+  
+  return (
+    <button 
+      onClick={onClick} 
+      disabled={disabled || loading}
+      className={`${baseClasses} ${variants[variant]} ${className}`}
+    >
+      {loading && <span className="animate-spin">⏳</span>}
+      {children}
+    </button>
+  );
+};
 
-            } catch (error) {
-                console.error('Failed to load initial data:', error);
-                toast.error("Failed to load dashboard data.");
-            }
-        };
-        loadData();
-    }, [activeTab]);
+ActionButton.propTypes = {
+  onClick: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+  variant: PropTypes.oneOf(['primary', 'success', 'danger', 'secondary', 'outline']),
+  disabled: PropTypes.bool,
+  loading: PropTypes.bool,
+  className: PropTypes.string
+};
 
-    const loadKYCStatus = async () => {
-        try {
-            const response = await getKYCStatus();
-            const data = response.data;
-            
-            // The backend returns { status: '...', kyc_risk_level: '...', details: '...' }
-            // If the user hasn't started, it returns { status: 'not_started' }
-            setKycStatus(data.status || 'not_started');
-            setKycRiskLevel(data.kyc_risk_level || 'unknown');
-            setKycDetails(data.details || (data.status === 'verified' ? 'Identity verified successfully' : 'Verification pending or not initiated'));
-            
-        } catch (error) {
-            console.error('Failed to load KYC status:', error);
-            // Don't show toast error here to avoid annoyance if it's just a 404/not found
-        }
-    };
-
-    const handleKYCVerificationComplete = (result) => {
-        setShowKYCVerification(false);
-        loadKYCStatus(); // Refresh status
-        result.verified ? toast.success('Verified!') : toast.error("Verification failed.");
-    };
-
-    const loadInvoices = async () => {
-        try {
-            const invoicesData = await getBuyerInvoices();
-            setInvoices(invoicesData.data);
-        } catch (error) {
-            console.error('Failed to load invoices:', error);
-            toast.error("Could not load your invoices.");
-        }
-    };
-    
-    const loadAvailableLots = async () => {
-        try {
-            const lotsData = await getAvailableLots();
-            setAvailableLots(lotsData.data);
-        } catch (error) {
-            console.error('Failed to load available lots:', error);
-            toast.error("Could not load the produce marketplace.");
-        }
-    };
-
-    const loadPendingApprovals = async () => {
-        try {
-            const response = await getPendingBuyerApprovals();
-            setPendingApprovals(response.data);
-        } catch (error) {
-            console.error('Failed to load pending approvals:', error);
-            toast.error("Could not load pending approvals.");
-        }
-    };
-
-    const handleApproveQuotation = async (quotationId) => {
-        try {
-            await buyerApproveQuotation(quotationId);
-            toast.success('Quotation approved! The seller can now create an invoice.');
-            await loadPendingApprovals(); 
-        } catch (error) {
-            toast.error('Failed to approve quotation: ' + (error.response?.data?.error || error.message));
-        }
-    };
-
-    const handleRejectQuotation = async (quotationId) => {
-        try {
-            await rejectQuotation(quotationId);
-            toast.info("Quotation rejected.");
-            await loadPendingApprovals(); 
-        } catch (error) {
-            toast.error("Failed to reject quotation: " + (error.response?.data?.error || error.message));
-        }
-    };
-
-    const handleRequestToBuy = async (lot) => {
-        const quantity = prompt(`How much "${lot.produce_type}" do you want to request? (Available: ${lot.current_quantity} kg)`);
-        if (!quantity || isNaN(quantity) || parseFloat(quantity) <= 0) {
-            toast.error("Please enter a valid quantity.");
-            return;
-        }
-        if (parseFloat(quantity) > parseFloat(lot.current_quantity)) {
-            toast.error("Requested quantity exceeds available stock.");
-            return;
-        }
-
-        try {
-            const quotationData = {
-                lot_id: lot.lot_id,
-                seller_address: lot.farmer_address,
-                quantity: parseFloat(quantity),
-                price_per_unit: lot.price / 50.75,
-                description: `${quantity}kg of ${lot.produce_type} from lot #${lot.lot_id}`
-            };
-            await createQuotation(quotationData);
-            toast.success("Quotation request sent to the seller!");
-        } catch (error) {
-            console.error("Failed to create quotation:", error);
-            toast.error("Failed to send quotation request.");
-        }
-    };
-
-    const handlePayInvoice = async (invoice) => {
-        if (!invoice || !ethers.utils.isAddress(invoice.contract_address)) {
-            toast.error(`Error: Invalid or missing contract address for this invoice.`);
-            return;
-        }
-
-        setLoadingInvoice(invoice.invoice_id);
-        const paymentPromise = async () => {
-            const { signer } = await connectWallet();
-            const { amount, currency, contract_address, token_address } = invoice;
-            
-            const invoiceContract = new ethers.Contract(contract_address, InvoiceContractABI.abi, signer);
-            const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
-            console.log("Depositing to escrow:", { invoiceId: invoice.invoice_id, amount: amountWei.toString(), seller_address: invoice.seller_address });
-            let tx;
-
-            if (currency === 'MATIC') {
-                tx = await invoiceContract.depositNative({ value: amountWei });
-            } else {
-                const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
-                toast.info('Requesting token approval from your wallet...');
-                const approveTx = await tokenContract.approve(contract_address, amountWei);
-                await approveTx.wait();
-                toast.success('Approval successful! Now confirming deposit...');
-                tx = await invoiceContract.depositToken();
-            }
-            
-            await tx.wait();
-            await updateInvoiceStatus(invoice.invoice_id, 'deposited', tx.hash);
-            return tx.hash;
-        };
-
-        try {
-            await toast.promise(paymentPromise(), {
-                loading: 'Processing payment deposit...',
-                success: (txHash) => {
-                    loadInvoices();
-                    return `Payment deposited successfully! Tx: ${txHash.substring(0, 10)}...`;
-                },
-                error: (err) => `Payment failed: ${err.reason || err.message}`
-            });
-        } catch (error) {
-            console.error('Payment process failed:', error);
-        } finally {
-            setLoadingInvoice(null);
-        }
-    };
-
-    const handleReleaseFunds = async (invoice) => {
-        if (!window.confirm("Are you sure you want to release the funds to the seller? This action is irreversible.")) {
-            return;
-        }
-        setLoadingInvoice(invoice.invoice_id);
-        try {
-            const { signer } = await connectWallet();
-            const invoiceContract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
-            const tx = await invoiceContract.releaseFunds();
-            await tx.wait();
-            toast.success(`Funds released! Tx: ${tx.hash}`);
-            await updateInvoiceStatus(invoice.invoice_id, 'released', tx.hash);
-            loadInvoices();
-        } catch (error) {
-            console.error('Failed to release funds:', error);
-            toast.error(`Release failed: ${error.reason || error.message}`);
-        } finally {
-            setLoadingInvoice(null);
-        }
-    };
-
-    const handleRaiseDispute = async (invoice) => {
-        const reason = prompt('Please enter the reason for the dispute:');
-        if (!reason) return;
-
-        setLoadingInvoice(invoice.invoice_id);
-        try {
-            const { signer } = await connectWallet();
-            const invoiceContract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
-            const tx = await invoiceContract.raiseDispute();
-            await tx.wait();
-            toast.success(`Dispute raised! Tx: ${tx.hash}`);
-            await updateInvoiceStatus(invoice.invoice_id, 'disputed', tx.hash, reason);
-            loadInvoices();
-        } catch (error) {
-            console.error('Failed to raise dispute:', error);
-            toast.error(`Dispute failed: ${error.reason || error.message}`);
-        } finally {
-            setLoadingInvoice(null);
-        }
-    };
-
-    const handleSelectInvoice = (invoice) => {
-        setSelectedInvoice(invoice);
-        setTimelineEvents(generateTimelineEvents(invoice));
-    };
-
-    const handleShowQRCode = (invoice) => {
-        setSelectedLot({
-            lotId: invoice.lot_id,
-            produceType: invoice.produce_type,
-            origin: invoice.origin,
-        });
-        setShowQRCode(true);
-    };
-
-    const escrowInvoices = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
-    const completedInvoices = invoices.filter(inv => inv.escrow_status === 'released');
-    const stats = [
-        { title: 'Pending Invoices', value: invoices.filter(i => i.escrow_status === 'created').length, icon: '📝', color: 'blue' },
-        { title: 'Active Escrows', value: escrowInvoices.length, icon: '🔒', color: 'green' },
-        { title: 'Completed', value: invoices.filter(i => i.escrow_status === 'released').length, icon: '✅', color: 'purple' },
-        { title: 'Disputed', value: invoices.filter(i => i.escrow_status === 'disputed').length, icon: '⚖️', color: 'red' },
-    ];
-
-    const renderTabContent = () => {
-        switch (activeTab) {
-            case 'quotations':
-                return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6">Pending Approvals</h2>
-                        <BuyerQuotationApproval 
-                            quotations={pendingApprovals} 
-                            onApprove={handleApproveQuotation}
-                            onReject={handleRejectQuotation}
-                        />
-                    </div>
-                );
-
-            case 'overview':
-                return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6">Overview</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            {stats.map((stat, index) => (
-                                <StatsCard key={index} {...stat} />
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div>
-                                <h3 className="text-xl font-semibold mb-4">Recent Invoices</h3>
-                                <InvoiceList
-                                    invoices={invoices.slice(0, 5)}
-                                    userRole="buyer"
-                                    onSelectInvoice={handleSelectInvoice}
-                                    onPayInvoice={handlePayInvoice}
-                                    onConfirmRelease={handleReleaseFunds}
-                                    onRaiseDispute={handleRaiseDispute}
-                                    onShowQRCode={handleShowQRCode}
-                                />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-semibold mb-4">KYC Status</h3>
-                                {/* [UPDATED] Pass dynamic data to the KYC Status component */}
-                                <KYCStatus
-                                    status={kycStatus}
-                                    riskLevel={kycRiskLevel}
-                                    details={kycDetails}
-                                    onReverify={() => setShowKYCVerification(true)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                );
-            case 'invoices':
-                return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6">Your Invoices</h2>
-                        <InvoiceList
-                            invoices={invoices}
-                            userRole="buyer"
-                            onSelectInvoice={handleSelectInvoice}
-                            onPayInvoice={handlePayInvoice}
-                            onConfirmRelease={handleReleaseFunds}
-                            onRaiseDispute={handleRaiseDispute}
-                            onShowQRCode={handleShowQRCode}
-                        />
-                    </div>
-                );
-            case 'payments':
-                return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6">Payment History</h2>
-                        <PaymentHistoryList invoices={completedInvoices} userRole="buyer" />
-                    </div>
-                );
-            case 'escrow':
-                return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6">Escrow Management</h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <EscrowStatus
-                                invoice={selectedInvoice}
-                                onConfirm={handleReleaseFunds}
-                                onDispute={handleRaiseDispute}
-                            />
-                            <EscrowTimeline events={timelineEvents} />
-                        </div>
-                        <div className="mt-6">
-                            <h3 className="text-xl font-semibold mb-4">Invoices in Escrow</h3>
-                            <InvoiceList
-                                invoices={escrowInvoices}
-                                userRole="buyer"
-                                onSelectInvoice={handleSelectInvoice}
-                                onConfirmRelease={handleReleaseFunds}
-                                onRaiseDispute={handleRaiseDispute}
-                            />
-                        </div>
-                    </div>
-                );
-            case 'produce':
-                return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6">Produce Marketplace</h2>
-                        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produce</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Farmer</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Origin</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Available</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price / kg</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {availableLots.map((lot) => (
-                                            <tr key={lot.lot_id}>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{lot.produce_type}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" title={lot.farmer_address}>{lot.farmer_name || ethers.utils.getAddress(lot.farmer_address).slice(0,6)}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.origin}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.current_quantity} kg</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                    <AmountDisplay maticAmount={lot.price / 50.75} />
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <button
-                                                        onClick={() => handleRequestToBuy(lot)}
-                                                        className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md text-xs"
-                                                    >
-                                                        Request Quotation
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {availableLots.length === 0 && (
-                                <div className="text-center py-12 text-gray-500">
-                                    <p>No produce is currently available in the marketplace.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            default:
-                return (
-                    <div>
-                        <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
-                        <div className="bg-white rounded-lg shadow-md p-6">
-                            <p className="text-gray-600">Select a section from the sidebar to get started.</p>
-                        </div>
-                    </div>
-                );
-        }
-    };
-
-    return (
-        <div className="container mx-auto p-4">
-            {showKYCVerification ? (
-                <KYCVerification 
-                user={{}} // Pass user object here if available
-                onVerificationComplete={handleKYCVerificationComplete} 
-                />
-            ) : (
-                renderTabContent()
-            )}
-
-            {showQRCode && selectedLot && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg shadow-xl">
-                        <ProduceQRCode
-                            lotId={selectedLot.lotId}
-                            produceType={selectedLot.produceType}
-                            origin={selectedLot.origin}
-                        />
-                        <button
-                            onClick={() => setShowQRCode(false)}
-                            className="mt-4 w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                        >
-                            Close
-                        </button>
-                    </div>
-                </div>
-            )}
+// Modal Component for QR Code
+const Modal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-fadeIn">
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            aria-label="Close modal"
+          >
+            ✕
+          </button>
         </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+Modal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  title: PropTypes.string,
+  children: PropTypes.node
+};
+
+const BuyerDashboard = ({ activeTab = 'overview' }) => {
+  // State Management
+  const [invoices, setInvoices] = useState([]);
+  const [availableLots, setAvailableLots] = useState([]);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [timelineEvents, setTimelineEvents] = useState([]);
+  const [kycData, setKycData] = useState({
+    status: 'not_started',
+    riskLevel: 'unknown',
+    details: 'Verification pending or not initiated'
+  });
+  
+  // UI State
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingInvoiceId, setLoadingInvoiceId] = useState(null);
+  const [processingLotId, setProcessingLotId] = useState(null);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [selectedLot, setSelectedLot] = useState(null);
+  const [showKYCVerification, setShowKYCVerification] = useState(false);
+  const { setStats: setGlobalStats } = useStatsActions();
+
+  // Load Initial Data
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { address } = await connectWallet();
+      setWalletAddress(address);
+      
+      // Load KYC status in parallel with tab-specific data
+      const kycPromise = loadKYCStatus();
+      
+      await Promise.all([
+        kycPromise,
+        loadTabData(activeTab)
+      ]);
+    } catch (error) {
+      console.error('Failed to load initial data:', error);
+      toast.error("Please connect your wallet to access the dashboard");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const init = async () => {
+      if (!walletAddress) {
+        await loadInitialData();
+      } else {
+        await loadTabData(activeTab);
+      }
+    };
+    init();
+  }, [activeTab, walletAddress, loadInitialData]);
+
+  const loadTabData = async (tab) => {
+    switch (tab) {
+      case 'produce':
+        await loadAvailableLots();
+        break;
+      case 'quotations':
+        await loadPendingApprovals();
+        break;
+      case 'overview':
+      case 'invoices':
+      case 'escrow':
+      case 'payments':
+        await loadInvoices();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const loadKYCStatus = async () => {
+    try {
+      const { data } = await getKYCStatus();
+      setKycData({
+        status: data.status || 'not_started',
+        riskLevel: data.kyc_risk_level || 'unknown',
+        details: data.details || (data.status === 'verified' ? 'Identity verified successfully' : 'Verification pending')
+      });
+    } catch (error) {
+      console.error('Failed to load KYC status:', error);
+      // Silent fail - user might not have started KYC yet
+    }
+  };
+
+  const loadInvoices = async () => {
+    try {
+      const { data } = await getBuyerInvoices();
+      setInvoices(data || []);
+    } catch (error) {
+      console.error('Failed to load invoices:', error);
+      toast.error("Could not load your invoices");
+    }
+  };
+
+  const loadAvailableLots = async () => {
+    try {
+      const { data } = await getAvailableLots();
+      setAvailableLots(data || []);
+    } catch (error) {
+      console.error('Failed to load lots:', error);
+      toast.error("Could not load marketplace");
+    }
+  };
+
+  const loadPendingApprovals = async () => {
+    try {
+      const { data } = await getPendingBuyerApprovals();
+      setPendingApprovals(data || []);
+    } catch (error) {
+      console.error('Failed to load approvals:', error);
+      toast.error("Could not load pending approvals");
+    }
+  };
+
+  // Memoized Calculations
+  const { escrowInvoices, completedInvoices, stats } = useMemo(() => {
+    const escrow = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
+    const completed = invoices.filter(inv => inv.escrow_status === 'released');
+    
+    const statsData = [
+      { 
+        title: 'Pending', 
+        value: invoices.filter(i => i.escrow_status === 'created').length, 
+        icon: '📝', 
+        color: 'blue',
+        description: 'Awaiting payment'
+      },
+      { 
+        title: 'Active Escrows', 
+        value: escrow.length, 
+        icon: '🔒', 
+        color: 'green',
+        description: 'In progress'
+      },
+      { 
+        title: 'Completed', 
+        value: completed.length, 
+        icon: '✅', 
+        color: 'purple',
+        description: 'Successfully delivered'
+      },
+      { 
+        title: 'Disputed', 
+        value: invoices.filter(i => i.escrow_status === 'disputed').length, 
+        icon: '⚖️', 
+        color: 'red',
+        description: 'Requires resolution'
+      },
+    ];
+    
+    return { escrowInvoices: escrow, completedInvoices: completed, stats: statsData };
+  }, [invoices]);
+
+  useEffect(() => {
+    const nextStats = {
+      totalInvoices: invoices.length,
+      activeEscrows: escrowInvoices.length,
+      completed: completedInvoices.length,
+      produceLots: availableLots.length
+    };
+
+    // Only update if data is loaded and actually different
+    if (!isLoading) {
+      setGlobalStats(nextStats);
+    }
+  }, [invoices.length, escrowInvoices.length, completedInvoices.length, availableLots.length, isLoading, setGlobalStats]);
+
+  // Handlers
+  const handleKYCComplete = useCallback((result) => {
+    setShowKYCVerification(false);
+    loadKYCStatus();
+    toast[result.verified ? 'success' : 'error'](
+      result.verified ? 'Identity verified successfully!' : 'Verification failed or cancelled'
     );
+  }, []);
+
+  const handleApproveQuotation = useCallback(async (quotationId) => {
+    try {
+      await buyerApproveQuotation(quotationId);
+      toast.success('Quotation approved! Seller can now create an invoice.');
+      await loadPendingApprovals();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to approve quotation');
+    }
+  }, []);
+
+  const handleRejectQuotation = useCallback(async (quotationId) => {
+    try {
+      await rejectQuotation(quotationId);
+      toast.info("Quotation rejected");
+      await loadPendingApprovals();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to reject quotation');
+    }
+  }, []);
+
+  const handleRequestToBuy = useCallback(async (lot) => {
+    const quantity = prompt(`Enter quantity for ${lot.produce_type} (Available: ${lot.current_quantity}kg):`);
+    const parsedQty = parseFloat(quantity);
+
+    if (!quantity || isNaN(parsedQty) || parsedQty <= 0) {
+      toast.error("Please enter a valid quantity");
+      return;
+    }
+    if (parsedQty > parseFloat(lot.current_quantity)) {
+      toast.error("Quantity exceeds available stock");
+      return;
+    }
+
+    setProcessingLotId(lot.lot_id);
+    try {
+      await createQuotation({
+        lot_id: lot.lot_id,
+        seller_address: lot.farmer_address,
+        quantity: parsedQty,
+        price_per_unit: lot.price / 50.75,
+        description: `${parsedQty}kg of ${lot.produce_type} from lot #${lot.lot_id}`
+      });
+      toast.success("Quotation request sent to seller!");
+    } catch (error) {
+      console.error("Failed to create quotation:", error);
+      toast.error("Failed to send request");
+    } finally {
+      setProcessingLotId(null);
+    }
+  }, []);
+
+  const handlePayInvoice = useCallback(async (invoice) => {
+    if (!ethers.utils.isAddress(invoice.contract_address)) {
+      toast.error('Invalid contract address');
+      return;
+    }
+
+    setLoadingInvoiceId(invoice.invoice_id);
+    const toastId = toast.loading('Processing payment...');
+
+    try {
+      const { signer } = await connectWallet();
+      const { amount, currency, contract_address, token_address } = invoice;
+      const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
+      
+      const invoiceContract = new ethers.Contract(contract_address, InvoiceContractABI.abi, signer);
+      let tx;
+
+      if (currency === 'MATIC') {
+        tx = await invoiceContract.depositNative({ value: amountWei });
+      } else {
+        const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
+        toast.loading('Approving tokens...', { id: toastId });
+        
+        const approveTx = await tokenContract.approve(contract_address, amountWei);
+        await approveTx.wait();
+        
+        toast.loading('Confirming deposit...', { id: toastId });
+        tx = await invoiceContract.depositToken();
+      }
+      
+      await tx.wait();
+      await updateInvoiceStatus(invoice.invoice_id, 'deposited', tx.hash);
+      
+      toast.success(`Payment successful! ${tx.hash.slice(0, 10)}...`, { id: toastId });
+      await loadInvoices();
+    } catch (error) {
+      console.error('Payment failed:', error);
+      toast.error(error.reason || error.message || 'Payment failed', { id: toastId });
+    } finally {
+      setLoadingInvoiceId(null);
+    }
+  }, []);
+
+  const handleReleaseFunds = useCallback(async (invoice) => {
+    if (!window.confirm("Release funds to seller? This cannot be undone.")) return;
+
+    setLoadingInvoiceId(invoice.invoice_id);
+    try {
+      const { signer } = await connectWallet();
+      const contract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
+      const tx = await contract.releaseFunds();
+      await tx.wait();
+      
+      await updateInvoiceStatus(invoice.invoice_id, 'released', tx.hash);
+      toast.success(`Funds released! ${tx.hash.slice(0, 10)}...`);
+      await loadInvoices();
+    } catch (error) {
+      toast.error(error.reason || 'Failed to release funds');
+    } finally {
+      setLoadingInvoiceId(null);
+    }
+  }, []);
+
+  const handleRaiseDispute = useCallback(async (invoice) => {
+    const reason = prompt('Enter reason for dispute:');
+    if (!reason?.trim()) return;
+
+    setLoadingInvoiceId(invoice.invoice_id);
+    try {
+      const { signer } = await connectWallet();
+      const contract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
+      const tx = await contract.raiseDispute();
+      await tx.wait();
+      
+      await updateInvoiceStatus(invoice.invoice_id, 'disputed', tx.hash, reason);
+      toast.success('Dispute raised successfully');
+      await loadInvoices();
+    } catch (error) {
+      toast.error(error.reason || 'Failed to raise dispute');
+    } finally {
+      setLoadingInvoiceId(null);
+    }
+  }, []);
+
+  const handleSelectInvoice = useCallback((invoice) => {
+    setSelectedInvoice(invoice);
+    setTimelineEvents(generateTimelineEvents(invoice));
+  }, []);
+
+  const handleShowQRCode = useCallback((invoice) => {
+    setSelectedLot({
+      lotId: invoice.lot_id,
+      produceType: invoice.produce_type,
+      origin: invoice.origin,
+    });
+    setShowQRCode(true);
+  }, []);
+
+  // Tab Components
+  const QuotationsTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Pending Approvals</h2>
+        <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+          {pendingApprovals.length} pending
+        </span>
+      </div>
+      
+      {pendingApprovals.length > 0 ? (
+        <BuyerQuotationApproval 
+          quotations={pendingApprovals} 
+          onApprove={handleApproveQuotation}
+          onReject={handleRejectQuotation}
+        />
+      ) : (
+        <EmptyState message="No pending quotations to approve" icon="📋" />
+      )}
+    </div>
+  );
+
+  const OverviewTab = () => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <StatsCard key={`${stat.title}-${index}`} {...stat} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900">Recent Invoices</h3>
+            </div>
+            <div className="p-6">
+              {invoices.length > 0 ? (
+                <InvoiceList
+                  invoices={invoices.slice(0, 5)}
+                  userRole="buyer"
+                  onSelectInvoice={handleSelectInvoice}
+                  onPayInvoice={handlePayInvoice}
+                  onConfirmRelease={handleReleaseFunds}
+                  onRaiseDispute={handleRaiseDispute}
+                  onShowQRCode={handleShowQRCode}
+                  loadingId={loadingInvoiceId}
+                />
+              ) : (
+                <EmptyState message="No invoices yet" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <KYCStatus
+              status={kycData.status}
+              riskLevel={kycData.riskLevel}
+              details={kycData.details}
+              onReverify={() => setShowKYCVerification(true)}
+            />
+          </div>
+          
+          <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+            <h4 className="font-semibold text-blue-900 mb-2">💡 Quick Tip</h4>
+            <p className="text-sm text-blue-800">
+              Always verify produce quality before releasing funds from escrow. Once released, transactions cannot be reversed.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const InvoicesTab = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-gray-900">Your Invoices</h2>
+        <span className="text-sm text-gray-500">{invoices.length} total</span>
+      </div>
+      <div className="p-6">
+        {invoices.length > 0 ? (
+          <InvoiceList
+            invoices={invoices}
+            userRole="buyer"
+            onSelectInvoice={handleSelectInvoice}
+            onPayInvoice={handlePayInvoice}
+            onConfirmRelease={handleReleaseFunds}
+            onRaiseDispute={handleRaiseDispute}
+            onShowQRCode={handleShowQRCode}
+            loadingId={loadingInvoiceId}
+          />
+        ) : (
+          <EmptyState message="No invoices found" />
+        )}
+      </div>
+    </div>
+  );
+
+  const PaymentsTab = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Payment History</h2>
+      {completedInvoices.length > 0 ? (
+        <PaymentHistoryList invoices={completedInvoices} userRole="buyer" />
+      ) : (
+        <EmptyState message="No completed payments yet" icon="💳" />
+      )}
+    </div>
+  );
+
+  const EscrowTab = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-gray-900">Escrow Management</h2>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <EscrowStatus
+          invoice={selectedInvoice}
+          onConfirm={handleReleaseFunds}
+          onDispute={handleRaiseDispute}
+        />
+        <EscrowTimeline events={timelineEvents} />
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900">Active Escrows</h3>
+        </div>
+        <div className="p-6">
+          {escrowInvoices.length > 0 ? (
+            <InvoiceList
+              invoices={escrowInvoices}
+              userRole="buyer"
+              onSelectInvoice={handleSelectInvoice}
+              onConfirmRelease={handleReleaseFunds}
+              onRaiseDispute={handleRaiseDispute}
+              loadingId={loadingInvoiceId}
+            />
+          ) : (
+            <EmptyState message="No active escrows" icon="🔓" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const ProduceTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Produce Marketplace</h2>
+        <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+          {availableLots.length} lots available
+        </span>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produce</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Farmer</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Origin</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price/kg</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {availableLots.map((lot) => (
+                <tr key={lot.lot_id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {lot.produce_type}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono" title={lot.farmer_address}>
+                    {lot.farmer_name || `${lot.farmer_address.slice(0, 6)}...${lot.farmer_address.slice(-4)}`}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{lot.origin}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      {lot.current_quantity} kg
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <AmountDisplay maticAmount={lot.price / 50.75} />
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <ActionButton
+                      onClick={() => handleRequestToBuy(lot)}
+                      variant="success"
+                      loading={processingLotId === lot.lot_id}
+                      className="text-xs"
+                    >
+                      Request Quote
+                    </ActionButton>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {availableLots.length === 0 && (
+          <EmptyState message="No produce available at the moment" icon="🌾" />
+        )}
+      </div>
+    </div>
+  );
+
+  const renderContent = () => {
+    if (isLoading) return <LoadingSpinner />;
+    
+    switch (activeTab) {
+      case 'quotations': return <QuotationsTab />;
+      case 'overview': return <OverviewTab />;
+      case 'invoices': return <InvoicesTab />;
+      case 'payments': return <PaymentsTab />;
+      case 'escrow': return <EscrowTab />;
+      case 'produce': return <ProduceTab />;
+      default: return <OverviewTab />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Buyer Dashboard</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Wallet: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
+            </p>
+          </div>
+          {kycData.status !== 'verified' && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 flex items-center gap-2">
+              <span className="text-yellow-600">⚠️</span>
+              <span className="text-sm text-yellow-800">Complete KYC to unlock all features</span>
+            </div>
+          )}
+        </div>
+
+        {/* Main Content */}
+        <main className="animate-fadeIn">
+          {renderContent()}
+        </main>
+      </div>
+
+      {/* Modals */}
+      <Modal
+        isOpen={showKYCVerification}
+        onClose={() => setShowKYCVerification(false)}
+        title="Identity Verification"
+      >
+        <KYCVerification 
+          user={{}} 
+          onVerificationComplete={handleKYCComplete} 
+        />
+      </Modal>
+
+      <Modal
+        isOpen={showQRCode}
+        onClose={() => setShowQRCode(false)}
+        title="Produce QR Code"
+      >
+        {selectedLot && (
+          <div className="text-center">
+            <ProduceQRCode
+              lotId={selectedLot.lotId}
+              produceType={selectedLot.produceType}
+              origin={selectedLot.origin}
+            />
+            <p className="mt-4 text-sm text-gray-600">
+              Scan to verify authenticity of {selectedLot.produceType}
+            </p>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+};
+
+BuyerDashboard.propTypes = {
+  activeTab: PropTypes.string
 };
 
 export default BuyerDashboard;

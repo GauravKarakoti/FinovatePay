@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./ComplianceManager.sol";
 
 /**
@@ -31,14 +32,24 @@ contract EscrowContract is ReentrancyGuard {
     ComplianceManager public complianceManager;
     address public admin;
     
+    // --- MINIMAL FIX: Add arbitrator support ---
+    mapping(address => bool) public arbitrators;
+    
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event ComplianceManagerUpdated(address indexed newComplianceManager);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
+        _;
+    }
+    
+    // --- MINIMAL FIX: Allow admin OR arbitrators to resolve disputes ---
+    modifier onlyAdminOrArbitrator() {
+        require(msg.sender == admin || arbitrators[msg.sender], "Not authorized");
         _;
     }
     
@@ -52,6 +63,22 @@ contract EscrowContract is ReentrancyGuard {
     constructor(address _complianceManager) {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+    }
+
+    function setComplianceManager(address _complianceManager) external onlyAdmin {
+        require(_complianceManager != address(0), "Invalid compliance manager");
+        complianceManager = ComplianceManager(_complianceManager);
+        emit ComplianceManagerUpdated(_complianceManager);
+    }
+    
+    // --- MINIMAL FIX: Simple arbitrator management ---
+    function addArbitrator(address _arbitrator) external onlyAdmin {
+        require(_arbitrator != address(0), "Invalid address");
+        arbitrators[_arbitrator] = true;
+    }
+    
+    function removeArbitrator(address _arbitrator) external onlyAdmin {
+        arbitrators[_arbitrator] = false;
     }
     
     /**
@@ -109,7 +136,10 @@ contract EscrowContract is ReentrancyGuard {
         require(_amount == escrow.amount, "Incorrect amount");
         
         IERC20 token = IERC20(escrow.token);
-        require(token.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+        require(
+            token.transferFrom(msg.sender, address(this), _amount),
+            "Transfer failed"
+        );
 
         escrow.buyerConfirmed = true;
         emit DepositConfirmed(_invoiceId, msg.sender, _amount);
@@ -176,8 +206,10 @@ contract EscrowContract is ReentrancyGuard {
         Escrow storage escrow = escrows[_invoiceId];
         IERC20 token = IERC20(escrow.token);
         
-        // Transfer funds to Seller
-        require(token.transfer(escrow.seller, escrow.amount), "Transfer failed");
+        require(
+            token.transfer(escrow.seller, escrow.amount),
+            "Transfer failed"
+        );
         
         // Release RWA NFT to Buyer
         if (escrow.rwaNftContract != address(0)) {
@@ -204,9 +236,22 @@ contract EscrowContract is ReentrancyGuard {
         // Refund Buyer if they deposited
         if (escrow.buyerConfirmed) {
             IERC20 token = IERC20(escrow.token);
-            require(token.transfer(escrow.buyer, escrow.amount), "Refund failed");
+            require(
+                token.transfer(escrow.buyer, escrow.amount),
+                "Refund failed"
+            );
         }
 
         delete escrows[_invoiceId];
+    }
+
+    // --- ERC721 Receiver ---
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
     }
 }
