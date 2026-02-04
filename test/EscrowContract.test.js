@@ -113,5 +113,106 @@ describe("EscrowContract", function () {
     });
   });
 
+  describe("Expiring escrow", function () {
+    beforeEach(async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-001");
+      const amount = ethers.utils.parseEther("1");
+      const duration = 7 * 24 * 60 * 60;
+      
+      await escrow.connect(owner).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        amount,
+        token.address,
+        duration
+      );
+    });
+    
+    it("Should allow seller to expire escrow after time passes", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // Deposit funds
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      
+      // Fast forward time
+      await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]); // 8 days
+      await ethers.provider.send("evm_mine");
+      
+      await expect(escrow.connect(seller).expireEscrow(invoiceId))
+        .to.emit(escrow, "EscrowExpired"); // Assuming event is added, or check balances
+    });
+    
+    it("Should allow buyer to expire escrow after time passes", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // Deposit funds
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      
+      // Fast forward time
+      await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+      
+      await expect(escrow.connect(buyer).expireEscrow(invoiceId))
+        .to.not.be.reverted;
+    });
+    
+    it("Should allow keeper to expire escrow after time passes", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // Deposit funds
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      
+      // Fast forward time
+      await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+      
+      await expect(escrow.connect(owner).expireEscrow(invoiceId)) // owner is keeper
+        .to.not.be.reverted;
+    });
+    
+    it("Should not allow unauthorized user to expire escrow", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-001");
+      
+      // Fast forward time
+      await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+      
+      await expect(escrow.connect(other).expireEscrow(invoiceId))
+        .to.be.revertedWith("Not authorized to expire escrow");
+    });
+    
+    it("Should not allow expiration before time passes", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-001");
+      
+      await expect(escrow.connect(seller).expireEscrow(invoiceId))
+        .to.be.revertedWith("Escrow not expired");
+    });
+    
+    it("Should not allow expiration if already confirmed", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // Deposit and confirm
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      await escrow.connect(seller).confirmRelease(invoiceId);
+      await escrow.connect(buyer).confirmRelease(invoiceId);
+      
+      // Fast forward time
+      await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+      
+      await expect(escrow.connect(seller).expireEscrow(invoiceId))
+        .to.be.revertedWith("Already confirmed");
+    });
+  });
+
   // Additional tests for release, disputes, etc.
 });

@@ -26,6 +26,7 @@ contract EscrowContract is ReentrancyGuard {
     mapping(bytes32 => Escrow) public escrows;
     ComplianceManager public complianceManager;
     address public admin;
+    address public keeper;
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -47,6 +48,7 @@ contract EscrowContract is ReentrancyGuard {
     
     constructor(address _complianceManager) {
         admin = msg.sender;
+        keeper = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
     }
     
@@ -170,6 +172,7 @@ contract EscrowContract is ReentrancyGuard {
     
     function expireEscrow(bytes32 _invoiceId) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
+        require(msg.sender == escrow.seller || msg.sender == escrow.buyer || msg.sender == keeper, "Not authorized to expire escrow");
         require(block.timestamp >= escrow.expiresAt, "Escrow not expired");
         require(!escrow.sellerConfirmed || !escrow.buyerConfirmed, "Already confirmed");
         
