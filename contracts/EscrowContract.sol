@@ -43,6 +43,18 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     }
     mapping(bytes32 => Proposal) public proposals;
     mapping(bytes32 => mapping(address => bool)) public approved;
+
+    // --- Multi-signature for arbitrator management ---
+    address[] public managers;
+    uint256 public threshold;
+    struct Proposal {
+        address arbitrator;
+        bool isAdd;
+        uint256 approvals;
+        bool executed;
+    }
+    mapping(bytes32 => Proposal) public proposals;
+    mapping(bytes32 => mapping(address => bool)) public approved;
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -50,6 +62,9 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
     event ComplianceManagerUpdated(address indexed newComplianceManager);
+    event ProposalCreated(bytes32 indexed proposalId, address arbitrator, bool isAdd);
+    event ProposalApproved(bytes32 indexed proposalId, address approver);
+    event ProposalExecuted(bytes32 indexed proposalId);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
