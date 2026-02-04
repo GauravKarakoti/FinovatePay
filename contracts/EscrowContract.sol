@@ -31,6 +31,18 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     
     // --- MINIMAL FIX: Add arbitrator support ---
     mapping(address => bool) public arbitrators;
+
+    // --- Multi-signature for arbitrator management ---
+    address[] public managers;
+    uint256 public threshold;
+    struct Proposal {
+        address arbitrator;
+        bool isAdd;
+        uint256 approvals;
+        bool executed;
+    }
+    mapping(bytes32 => Proposal) public proposals;
+    mapping(bytes32 => mapping(address => bool)) public approved;
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -61,6 +73,8 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         admin = msg.sender;
         keeper = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        managers.push(msg.sender);
+        threshold = 1;
     }
 
     function setComplianceManager(address _complianceManager) external onlyAdmin {
@@ -69,14 +83,89 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit ComplianceManagerUpdated(_complianceManager);
     }
     
-    // --- MINIMAL FIX: Simple arbitrator management ---
-    function addArbitrator(address _arbitrator) external onlyAdmin {
+    // --- Multi-signature arbitrator management ---
+    function proposeAddArbitrator(address _arbitrator) external {
         require(_arbitrator != address(0), "Invalid address");
+        require(!arbitrators[_arbitrator], "Already an arbitrator");
+        bytes32 proposalId = keccak256(abi.encodePacked("add", _arbitrator, block.timestamp));
+        require(proposals[proposalId].arbitrator == address(0), "Proposal already exists");
+        proposals[proposalId] = Proposal(_arbitrator, true, 0, false);
+        approved[proposalId][msg.sender] = true;
+        proposals[proposalId].approvals++;
+        emit ProposalCreated(proposalId, _arbitrator, true);
+    }
+
+    function proposeRemoveArbitrator(address _arbitrator) external {
+        require(arbitrators[_arbitrator], "Not an arbitrator");
+        bytes32 proposalId = keccak256(abi.encodePacked("remove", _arbitrator, block.timestamp));
+        require(proposals[proposalId].arbitrator == address(0), "Proposal already exists");
+        proposals[proposalId] = Proposal(_arbitrator, false, 0, false);
+        approved[proposalId][msg.sender] = true;
+        proposals[proposalId].approvals++;
+        emit ProposalCreated(proposalId, _arbitrator, false);
+    }
+
+    function approveProposal(bytes32 _proposalId) external {
+        require(proposals[_proposalId].arbitrator != address(0), "Proposal does not exist");
+        require(!proposals[_proposalId].executed, "Proposal already executed");
+        require(!approved[_proposalId][msg.sender], "Already approved");
+        approved[_proposalId][msg.sender] = true;
+        proposals[_proposalId].approvals++;
+        emit ProposalApproved(_proposalId, msg.sender);
+    }
+
+    function executeProposal(bytes32 _proposalId) external {
+        Proposal storage proposal = proposals[_proposalId];
+        require(proposal.arbitrator != address(0), "Proposal does not exist");
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.approvals >= threshold, "Not enough approvals");
+        proposal.executed = true;
+        if (proposal.isAdd) {
+            _addArbitrator(proposal.arbitrator);
+        } else {
+            _removeArbitrator(proposal.arbitrator);
+        }
+        emit ProposalExecuted(_proposalId);
+    }
+
+    function _addArbitrator(address _arbitrator) internal {
         arbitrators[_arbitrator] = true;
     }
-    
-    function removeArbitrator(address _arbitrator) external onlyAdmin {
+
+    function _removeArbitrator(address _arbitrator) internal {
         arbitrators[_arbitrator] = false;
+    }
+
+    function setThreshold(uint256 _threshold) external onlyAdmin {
+        require(_threshold > 0 && _threshold <= managers.length, "Invalid threshold");
+        threshold = _threshold;
+    }
+
+    function addManager(address _manager) external onlyAdmin {
+        require(_manager != address(0), "Invalid address");
+        require(!isManager(_manager), "Already a manager");
+        managers.push(_manager);
+    }
+
+    function removeManager(address _manager) external onlyAdmin {
+        require(isManager(_manager), "Not a manager");
+        require(managers.length > 1, "Cannot remove last manager");
+        for (uint256 i = 0; i < managers.length; i++) {
+            if (managers[i] == _manager) {
+                managers[i] = managers[managers.length - 1];
+                managers.pop();
+                break;
+            }
+        }
+    }
+
+    function isManager(address _account) public view returns (bool) {
+        for (uint256 i = 0; i < managers.length; i++) {
+            if (managers[i] == _account) {
+                return true;
+            }
+        }
+        return false;
     }
     
     function createEscrow(

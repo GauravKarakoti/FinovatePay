@@ -214,5 +214,35 @@ describe("EscrowContract", function () {
     });
   });
 
+  describe("Arbitrator Management", function () {
+    it("Should allow proposing to add an arbitrator", async function () {
+      await expect(escrow.connect(owner).proposeAddArbitrator(seller.address))
+        .to.emit(escrow, "ProposalCreated");
+    });
+
+    it("Should allow approving a proposal", async function () {
+      const proposalId = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "address", "uint256"], ["add", seller.address, await ethers.provider.getBlockNumber()]));
+      await escrow.connect(owner).proposeAddArbitrator(seller.address);
+      await expect(escrow.connect(owner).approveProposal(proposalId))
+        .to.be.revertedWith("Already approved"); // Since proposer auto-approves
+    });
+
+    it("Should allow executing a proposal with enough approvals", async function () {
+      const proposalId = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "address", "uint256"], ["add", seller.address, await ethers.provider.getBlockNumber()]));
+      await escrow.connect(owner).proposeAddArbitrator(seller.address);
+      await escrow.connect(owner).executeProposal(proposalId);
+      expect(await escrow.arbitrators(seller.address)).to.equal(true);
+    });
+
+    it("Should not allow executing a proposal without enough approvals", async function () {
+      // Set threshold to 2
+      await escrow.connect(owner).setThreshold(2);
+      const proposalId = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "address", "uint256"], ["add", buyer.address, await ethers.provider.getBlockNumber()]));
+      await escrow.connect(owner).proposeAddArbitrator(buyer.address);
+      await expect(escrow.connect(owner).executeProposal(proposalId))
+        .to.be.revertedWith("Not enough approvals");
+    });
+  });
+
   // Additional tests for release, disputes, etc.
 });
