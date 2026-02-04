@@ -4,7 +4,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const Invoice = require('../models/Invoice');
 const { createInvoice } = require('../controllers/invoiceController');
-const pool = require("../config/database");
+const { pool } = require("../config/database");
 
 // All invoice routes require authentication
 router.use(authenticateToken);

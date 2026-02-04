@@ -1,6 +1,6 @@
 const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 
 // Helper function to convert UUID to bytes32 using ethers v6 syntax

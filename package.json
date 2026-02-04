@@ -26,5 +26,13 @@
     "@openzeppelin/contracts": "^5.4.0",
     "dotenv": "^17.2.2",
     "sonner": "^2.0.7"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GauravKarakoti/FinovatePay.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GauravKarakoti/FinovatePay/issues"
+  },
+  "homepage": "https://github.com/GauravKarakoti/FinovatePay#readme"
 }
