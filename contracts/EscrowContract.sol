@@ -8,9 +8,18 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./ComplianceManager.sol";
 
 contract EscrowContract is ReentrancyGuard, IERC721Receiver {
+    enum EscrowStatus {
+        Created,
+        Funded,
+        Released,
+        Disputed,
+        Expired
+    }
+
     struct Escrow {
         address seller;
         address buyer;
+        EscrowStatus status;
         uint256 amount;
         address token; // The ERC20 payment token
         bool sellerConfirmed;
@@ -103,6 +112,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         escrows[_invoiceId] = Escrow({
             seller: _seller,
             buyer: _buyer,
+            status: EscrowStatus.Created,
             amount: _amount,
             token: _token,
             sellerConfirmed: false,
@@ -125,6 +135,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         onlyCompliant(msg.sender)
     {
         Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Created, "Escrow not active");
         require(escrow.buyer == msg.sender, "Not the buyer");
         require(_amount == escrow.amount, "Incorrect amount");
         
@@ -135,11 +146,13 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         );
 
         escrow.buyerConfirmed = true;
+        escrow.status = EscrowStatus.Funded;
         emit DepositConfirmed(_invoiceId, msg.sender, _amount);
     }
     
     function confirmRelease(bytes32 _invoiceId) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
         require(
             msg.sender == escrow.seller || msg.sender == escrow.buyer,
             "Not a party to this escrow"
@@ -158,6 +171,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     
     function raiseDispute(bytes32 _invoiceId) external {
         Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Cannot dispute now");
         require(
             msg.sender == escrow.seller || msg.sender == escrow.buyer,
             "Not a party to this escrow"
@@ -165,11 +179,13 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         require(!escrow.disputeRaised, "Dispute already raised");
         
         escrow.disputeRaised = true;
+        escrow.status = EscrowStatus.Disputed;
         emit DisputeRaised(_invoiceId, msg.sender);
     }
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdminOrArbitrator {
         Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Disputed, "No active dispute");
         require(escrow.disputeRaised, "No dispute raised");
         
         escrow.disputeResolver = msg.sender;
@@ -204,12 +220,14 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
                 );
             }
         }
-        
+
+        escrow.status = EscrowStatus.Released;
         emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
     }
     
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
         IERC20 token = IERC20(escrow.token);
         
         require(
@@ -224,12 +242,14 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
                 escrow.rwaTokenId
             );
         }
-        
+
+        escrow.status = EscrowStatus.Released;
         emit EscrowReleased(_invoiceId, escrow.amount);
     }
     
     function expireEscrow(bytes32 _invoiceId) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded || escrow.status == EscrowStatus.Created, "Escrow not active");
         require(block.timestamp >= escrow.expiresAt, "Escrow not expired");
         require(
             !escrow.sellerConfirmed || !escrow.buyerConfirmed,
@@ -251,6 +271,8 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
                 "Refund failed"
             );
         }
+
+        escrow.status = EscrowStatus.Expired;
     }
 
     // --- ERC721 Receiver ---
