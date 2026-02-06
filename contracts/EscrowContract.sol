@@ -37,13 +37,13 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     ComplianceManager public complianceManager;
     address public admin;
     address public keeper;
+    address public invoiceFactory;
     
     // --- MINIMAL FIX: Add arbitrator support ---
     mapping(address => bool) public arbitrators;
 
     // --- Multi-signature for arbitrator management ---
-    address[] public managers;
-    uint256 public threshold;
+ 
     struct Proposal {
         address arbitrator;
         bool isAdd;
@@ -56,14 +56,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     // --- Multi-signature for arbitrator management ---
     address[] public managers;
     uint256 public threshold;
-    struct Proposal {
-        address arbitrator;
-        bool isAdd;
-        uint256 approvals;
-        bool executed;
-    }
-    mapping(bytes32 => Proposal) public proposals;
-    mapping(bytes32 => mapping(address => bool)) public approved;
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -74,6 +66,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     event ProposalCreated(bytes32 indexed proposalId, address arbitrator, bool isAdd);
     event ProposalApproved(bytes32 indexed proposalId, address approver);
     event ProposalExecuted(bytes32 indexed proposalId);
+    event InvoiceFactoryUpdated(address indexed newInvoiceFactory);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
@@ -92,6 +85,16 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         require(complianceManager.hasIdentity(_account), "Identity not verified (No SBT)");
         _;
     }
+
+    modifier onlyEscrowCreator(address _seller, address _buyer) {
+        if (msg.sender == admin || msg.sender == invoiceFactory) {
+            _;
+        } else {
+            require(msg.sender == _seller || msg.sender == _buyer, "Not a party to this escrow");
+            _requireCompliant(msg.sender);
+            _;
+        }
+    }
     
     constructor(address _complianceManager) {
         admin = msg.sender;
@@ -105,6 +108,12 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         require(_complianceManager != address(0), "Invalid compliance manager");
         complianceManager = ComplianceManager(_complianceManager);
         emit ComplianceManagerUpdated(_complianceManager);
+    }
+
+    function setInvoiceFactory(address _invoiceFactory) external onlyAdmin {
+        require(_invoiceFactory != address(0), "Invalid invoice factory");
+        invoiceFactory = _invoiceFactory;
+        emit InvoiceFactoryUpdated(_invoiceFactory);
     }
     
     // --- Multi-signature arbitrator management ---
@@ -204,8 +213,10 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         uint256 _duration,
         address _rwaNftContract,
         uint256 _rwaTokenId
-    ) external onlyAdmin returns (bool) {
+    ) external onlyEscrowCreator(_seller, _buyer) returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
+        _requireCompliant(_seller);
+        _requireCompliant(_buyer);
 
         // Lock the Produce NFT as Collateral
         if (_rwaNftContract != address(0)) {
@@ -231,6 +242,12 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
         return true;
+    }
+
+    function _requireCompliant(address _account) internal view {
+        require(!complianceManager.isFrozen(_account), "Account frozen");
+        require(complianceManager.isKYCVerified(_account), "KYC not verified");
+        require(complianceManager.hasIdentity(_account), "Identity not verified (No SBT)");
     }
     
     /**
@@ -297,7 +314,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     /**
      * @notice Admin resolves the dispute and distributes RWA/Funds accordingly.
      */
-    function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
+    function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdminOrArbitrator() {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.status == EscrowStatus.Disputed, "No active dispute");
         require(escrow.disputeRaised, "No dispute raised");
