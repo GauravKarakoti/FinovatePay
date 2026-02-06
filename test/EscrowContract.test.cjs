@@ -2,8 +2,8 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("EscrowContract", function () {
-  let EscrowContract, ComplianceManager;
-  let escrow, compliance;
+  let EscrowContract, ComplianceManager, InvoiceFactory;
+  let escrow, compliance, invoiceFactory;
   let owner, seller, buyer, arbitrator, other;
   let token;
 
@@ -19,10 +19,15 @@ describe("EscrowContract", function () {
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
     compliance = await ComplianceManager.deploy();
     await compliance.deployed();
+
+    // Deploy InvoiceFactory
+    InvoiceFactory = await ethers.getContractFactory("InvoiceFactory");
+    invoiceFactory = await InvoiceFactory.deploy();
+    await invoiceFactory.deployed();
     
     // Deploy EscrowContract
     EscrowContract = await ethers.getContractFactory("EscrowContract");
-    escrow = await EscrowContract.deploy(compliance.address);
+    escrow = await EscrowContract.deploy(compliance.address, invoiceFactory.address);
     await escrow.deployed();
     
     // Setup KYC
@@ -61,12 +66,18 @@ describe("EscrowContract", function () {
     beforeEach(async function () {
       invoiceId = ethers.utils.formatBytes32String("INV-001");
       const duration = 7 * 24 * 60 * 60;
+
+      // Create invoice first (seller is msg.sender in the factory call)
+      const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("INV-001"));
+      const dueDate = Math.floor(Date.now() / 1000) + 86400;
+      await invoiceFactory
+        .connect(seller)
+        .createInvoice(invoiceId, invoiceHash, buyer.address, amount, dueDate, token.address);
       
       // Create escrow
-      await escrow.connect(owner).createEscrow(
-        invoiceId, seller.address, buyer.address, amount, token.address, duration,
-        ethers.constants.AddressZero, 0
-      );
+      await escrow
+        .connect(seller)
+        .createEscrow(invoiceId, amount, token.address, duration, ethers.constants.AddressZero, 0);
       
       // Buyer deposits
       await token.connect(buyer).approve(escrow.address, amount);
@@ -100,10 +111,15 @@ describe("EscrowContract", function () {
       const amount = ethers.utils.parseEther("1");
       const duration = 7 * 24 * 60 * 60;
 
-      await escrow.connect(owner).createEscrow(
-        invoiceId, seller.address, buyer.address, amount, token.address, duration,
-        ethers.constants.AddressZero, 0
-      );
+      const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("INV-NEW"));
+      const dueDate = Math.floor(Date.now() / 1000) + 86400;
+      await invoiceFactory
+        .connect(seller)
+        .createInvoice(invoiceId, invoiceHash, buyer.address, amount, dueDate, token.address);
+
+      await escrow
+        .connect(seller)
+        .createEscrow(invoiceId, amount, token.address, duration, ethers.constants.AddressZero, 0);
 
       // Switch to a fresh compliance manager with no KYC/identity set
       const NewComplianceManager = await ethers.getContractFactory("ComplianceManager");

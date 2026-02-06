@@ -25,14 +25,20 @@ async function main() {
   // Verify ComplianceManager
   await verify(addresses.ComplianceManager, []);
   
-  // Verify EscrowContract with its constructor argument
-  await verify(addresses.EscrowContract, [addresses.ComplianceManager]);
-  
-  // Verify InvoiceRegistry
-  await verify(addresses.InvoiceRegistry, []);
+  // Verify InvoiceFactory
+  await verify(addresses.InvoiceFactory, []);
+
+  // Verify EscrowContract with its constructor arguments
+  await verify(addresses.EscrowContract, [addresses.ComplianceManager, addresses.InvoiceFactory]);
   
   // Verify FractionToken
   await verify(addresses.FractionToken, []);
+
+  // Verify ProduceTracking
+  await verify(addresses.ProduceTracking, []);
+
+  // Verify FinancingManager
+  await verify(addresses.FinancingManager, []);
 }
 
 main()

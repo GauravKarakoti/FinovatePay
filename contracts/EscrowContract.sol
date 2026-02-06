@@ -6,6 +6,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "./ComplianceManager.sol";
+import "./InvoiceFactory.sol";
+
+interface IInvoice {
+    function seller() external view returns (address);
+    function buyer() external view returns (address);
+    function amount() external view returns (uint256);
+    function tokenAddress() external view returns (address);
+}
 
 contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     enum EscrowStatus {
@@ -36,6 +44,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     mapping(bytes32 => Escrow) public escrows;
     ComplianceManager public complianceManager;
     address public admin;
+    InvoiceFactory public invoiceFactory;
     
     // --- MINIMAL FIX: Add arbitrator support ---
     mapping(address => bool) public arbitrators;
@@ -58,16 +67,24 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         _;
     }
     
-    modifier onlyCompliant(address _account) {
-        require(!complianceManager.isFrozen(_account), "Account frozen");
-        require(complianceManager.isKYCVerified(_account), "KYC not verified");
-        require(complianceManager.hasIdentity(_account), "Identity not verified (No SBT)");
+    modifier onlyCompliant{
+        require(!complianceManager.isFrozen(msg.sender), "Account frozen");
+        require(complianceManager.isKYCVerified(msg.sender), "KYC not verified");
+        require(complianceManager.hasIdentity(msg.sender), "Identity not verified (No SBT)");
         _;
     }
+
+   
     
-    constructor(address _complianceManager) {
+    constructor(address _complianceManager, address _invoiceFactory) {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        invoiceFactory = InvoiceFactory(_invoiceFactory);
+    }
+
+    function setInvoiceFactory(address _invoiceFactory) external onlyAdmin {
+        require(_invoiceFactory != address(0), "Invalid invoice factory");
+        invoiceFactory = InvoiceFactory(_invoiceFactory);
     }
 
     function setComplianceManager(address _complianceManager) external onlyAdmin {
@@ -85,33 +102,41 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     function removeArbitrator(address _arbitrator) external onlyAdmin {
         arbitrators[_arbitrator] = false;
     }
+
+    
     
     function createEscrow(
         bytes32 _invoiceId,
-        address _seller,
-        address _buyer,
         uint256 _amount,
         address _token,
         uint256 _duration,
         // --- NEW: RWA Parameters ---
         address _rwaNftContract,
         uint256 _rwaTokenId
-    ) external onlyAdmin returns (bool) {
+    ) external onlyCompliant returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
+
+        address invoiceAddr = invoiceFactory.getInvoiceAddress(_invoiceId);
+        require(invoiceAddr != address(0), "Invoice not found");
+        address seller = IInvoice(invoiceAddr).seller();
+        address buyer = IInvoice(invoiceAddr).buyer();
+        require(msg.sender == seller || msg.sender == buyer, "Only seller or buyer");
+        require(_amount == IInvoice(invoiceAddr).amount(), "Amount mismatch");
+        require(_token == IInvoice(invoiceAddr).tokenAddress(), "Token mismatch");
 
         // --- Lock the Produce NFT as Collateral ---
         // The seller must have approved the EscrowContract beforehand.
         if (_rwaNftContract != address(0)) {
             IERC721(_rwaNftContract).safeTransferFrom(
-                _seller,
+                seller,
                 address(this),
                 _rwaTokenId
             );
         }
 
         escrows[_invoiceId] = Escrow({
-            seller: _seller,
-            buyer: _buyer,
+            seller: seller,
+            buyer: buyer,
             status: EscrowStatus.Created,
             amount: _amount,
             token: _token,
@@ -125,14 +150,14 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
             rwaTokenId: _rwaTokenId
         });
 
-        emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
+        emit EscrowCreated(_invoiceId, seller, buyer, _amount);
         return true;
     }
     
     function deposit(bytes32 _invoiceId, uint256 _amount)
         external
         nonReentrant
-        onlyCompliant(msg.sender)
+        onlyCompliant
     {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.status == EscrowStatus.Created, "Escrow not active");

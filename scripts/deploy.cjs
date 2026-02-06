@@ -29,17 +29,17 @@ async function main() {
       console.log("Deployer might already have an identity.");
   }
 
-  // Deploy EscrowContract with ComplianceManager address
-  const EscrowContract = await ethers.getContractFactory("EscrowContract");
-  const escrowContract = await EscrowContract.deploy(complianceManager.address);
-  await escrowContract.deployed();
-  console.log("EscrowContract deployed to:", escrowContract.address);
-
   // Deploy InvoiceFactory
   const InvoiceFactory = await ethers.getContractFactory("InvoiceFactory");
   const invoiceFactory = await InvoiceFactory.deploy();
   await invoiceFactory.deployed();
   console.log("InvoiceFactory deployed to:", invoiceFactory.address);
+
+  // Deploy EscrowContract with ComplianceManager + InvoiceFactory addresses
+  const EscrowContract = await ethers.getContractFactory("EscrowContract");
+  const escrowContract = await EscrowContract.deploy(complianceManager.address, invoiceFactory.address);
+  await escrowContract.deployed();
+  console.log("EscrowContract deployed to:", escrowContract.address);
 
   // Deploy FractionToken
   const FractionToken = await ethers.getContractFactory("FractionToken");
