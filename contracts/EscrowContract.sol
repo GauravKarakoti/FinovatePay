@@ -44,18 +44,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     mapping(bytes32 => Proposal) public proposals;
     mapping(bytes32 => mapping(address => bool)) public approved;
 
-    // --- Multi-signature for arbitrator management ---
-    address[] public managers;
-    uint256 public threshold;
-    struct Proposal {
-        address arbitrator;
-        bool isAdd;
-        uint256 approvals;
-        bool executed;
-    }
-    mapping(bytes32 => Proposal) public proposals;
-    mapping(bytes32 => mapping(address => bool)) public approved;
-    
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
@@ -65,25 +53,26 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     event ProposalCreated(bytes32 indexed proposalId, address arbitrator, bool isAdd);
     event ProposalApproved(bytes32 indexed proposalId, address approver);
     event ProposalExecuted(bytes32 indexed proposalId);
+    event EscrowExpired(bytes32 indexed invoiceId);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
         _;
     }
-    
+
     // --- MINIMAL FIX: Allow admin OR arbitrators to resolve disputes ---
     modifier onlyAdminOrArbitrator() {
         require(msg.sender == admin || arbitrators[msg.sender], "Not authorized");
         _;
     }
-    
+
     modifier onlyCompliant(address _account) {
         require(!complianceManager.isFrozen(_account), "Account frozen");
         require(complianceManager.isKYCVerified(_account), "KYC not verified");
         require(complianceManager.hasIdentity(_account), "Identity not verified (No SBT)");
         _;
     }
-    
+
     constructor(address _complianceManager) {
         admin = msg.sender;
         keeper = msg.sender;
@@ -102,7 +91,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     function proposeAddArbitrator(address _arbitrator) external {
         require(_arbitrator != address(0), "Invalid address");
         require(!arbitrators[_arbitrator], "Already an arbitrator");
-        bytes32 proposalId = keccak256(abi.encodePacked("add", _arbitrator, block.timestamp));
+        bytes32 proposalId = keccak256(abi.encodePacked("add", _arbitrator, block.number));
         require(proposals[proposalId].arbitrator == address(0), "Proposal already exists");
         proposals[proposalId] = Proposal(_arbitrator, true, 0, false);
         approved[proposalId][msg.sender] = true;
@@ -112,7 +101,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
 
     function proposeRemoveArbitrator(address _arbitrator) external {
         require(arbitrators[_arbitrator], "Not an arbitrator");
-        bytes32 proposalId = keccak256(abi.encodePacked("remove", _arbitrator, block.timestamp));
+        bytes32 proposalId = keccak256(abi.encodePacked("remove", _arbitrator, block.number));
         require(proposals[proposalId].arbitrator == address(0), "Proposal already exists");
         proposals[proposalId] = Proposal(_arbitrator, false, 0, false);
         approved[proposalId][msg.sender] = true;
@@ -358,6 +347,8 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
                 "Refund failed"
             );
         }
+
+        emit EscrowExpired(_invoiceId);
     }
 
     // --- ERC721 Receiver ---

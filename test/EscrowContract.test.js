@@ -9,26 +9,29 @@ describe("EscrowContract", function () {
 
   beforeEach(async function () {
     [owner, seller, buyer, other] = await ethers.getSigners();
-    
+
     // Deploy mock ERC20 token
     const Token = await ethers.getContractFactory("MockERC20");
     token = await Token.deploy("Test Token", "TEST", ethers.utils.parseEther("1000"));
     await token.deployed();
-    
+
     // Deploy ComplianceManager
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
     compliance = await ComplianceManager.deploy();
     await compliance.deployed();
-    
+
     // Deploy EscrowContract
     EscrowContract = await ethers.getContractFactory("EscrowContract");
     escrow = await EscrowContract.deploy(compliance.address);
     await escrow.deployed();
-    
+
+    // Add other as manager
+    await escrow.connect(owner).addManager(other.address);
+
     // Verify KYC for seller and buyer
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
-    
+
     // Transfer tokens to buyer
     await token.transfer(buyer.address, ethers.utils.parseEther("100"));
   });
@@ -230,6 +233,7 @@ describe("EscrowContract", function () {
     it("Should allow executing a proposal with enough approvals", async function () {
       const proposalId = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "address", "uint256"], ["add", seller.address, await ethers.provider.getBlockNumber()]));
       await escrow.connect(owner).proposeAddArbitrator(seller.address);
+      await escrow.connect(other).approveProposal(proposalId);
       await escrow.connect(owner).executeProposal(proposalId);
       expect(await escrow.arbitrators(seller.address)).to.equal(true);
     });
@@ -241,6 +245,14 @@ describe("EscrowContract", function () {
       await escrow.connect(owner).proposeAddArbitrator(buyer.address);
       await expect(escrow.connect(owner).executeProposal(proposalId))
         .to.be.revertedWith("Not enough approvals");
+    });
+
+    it("Should allow executing a proposal after successful approval", async function () {
+      const proposalId = ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "address", "uint256"], ["add", seller.address, await ethers.provider.getBlockNumber()]));
+      await escrow.connect(owner).proposeAddArbitrator(seller.address);
+      await escrow.connect(other).approveProposal(proposalId);
+      await expect(escrow.connect(owner).executeProposal(proposalId))
+        .to.emit(escrow, "ProposalExecuted");
     });
   });
 
