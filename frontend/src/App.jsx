@@ -32,7 +32,7 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-
+    
     if (token && userData) {
       const parsedUser = JSON.parse(userData);
       setUser({ ...parsedUser, token });
@@ -53,7 +53,7 @@ function App() {
     if (!user) return;
     const tokenToStore = user.token || localStorage.getItem('token');
     if (tokenToStore) {
-      localStorage.setItem('token', tokenToStore);
+        localStorage.setItem('token', tokenToStore);
     }
     localStorage.setItem('user', JSON.stringify(user));
     setDashboardStats({
@@ -87,11 +87,11 @@ function App() {
     return (
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9]">
         <div className="md:w-64 flex-shrink-0 hidden md:block">
-          <Sidebar
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            user={user}
-            stats={dashboardStats}
+          <Sidebar 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange} 
+            user={user} 
+            stats={dashboardStats} 
           />
         </div>
         <div className="flex-1 overflow-auto">
@@ -108,15 +108,15 @@ function App() {
   // Note: Ensure useLocation is imported from 'react-router-dom' if using this component
   const RequireAuth = ({ children, allowedRoles }) => {
     const location = useLocation();
-
+    
     if (!user) {
       return <Navigate to="/login" state={{ from: location.pathname }} replace />;
     }
-
+    
     if (allowedRoles && !allowedRoles.includes(user.role)) {
       return <Navigate to="/" replace />;
     }
-
+    
     return children;
   };
 
@@ -124,16 +124,16 @@ function App() {
     <Router>
       <Toaster position="top" richColors />
       <div className="App">
-        <Header
-          user={user}
-          onLogout={handleLogout}
+        <Header 
+          user={user} 
+          onLogout={handleLogout} 
           walletConnected={walletConnected}
           onUserUpdate={setUser}
         />
         <main>
           <Routes>
-            <Route
-              path="/"
+            <Route 
+              path="/" 
               element={
                 user ? (
                   user.role === 'admin' ? (
@@ -150,71 +150,72 @@ function App() {
                 ) : (
                   <Navigate to="/login" />
                 )
-              }
+              } 
             />
-
+            
             {/* ... other existing routes ... */}
-
-            <Route
-              path="/buyer"
+            
+            <Route 
+              path="/buyer" 
               element={
-                user && user.role === 'buyer'
-                  ? renderDashboard(<BuyerDashboard activeTab={activeTab} />)
+                user && user.role === 'buyer' 
+                  ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
                   : <Navigate to="/" />
               }
             />
-            <Route
-              path="/investor"
+            <Route 
+              path="/investor" 
               element={
-                user && user.role === 'investor'
-                  ? renderDashboard(<InvestorDashboard activeTab={activeTab} />)
+                user && user.role === 'investor' 
+                  ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
                   : <Navigate to="/" />
               }
             />
-            <Route
+            <Route 
               path="/admin"
               element={
-                user && user.role === 'admin'
-                  ? renderDashboard(<AdminDashboard activeTab={activeTab} />)
+                user && user.role === 'admin' 
+                  ? renderDashboard(<AdminDashboard activeTab={activeTab} />) 
                   : <Navigate to="/" />
-              }
+              } 
             />
-            <Route
-              path="/shipment"
+            <Route 
+              path="/shipment" 
               element={
-                user && (user.role === 'shipment' || user.role === 'warehouse')
-                  ? <ShipmentDashboard />
+                user && (user.role === 'shipment' || user.role === 'warehouse') 
+                  ? <ShipmentDashboard /> 
                   : <Navigate to="/" />
-              }
+              } 
             />
-            <Route
-              path="/produce/:lotId"
+            <Route 
+              path="/produce/:lotId" 
               element={<ProduceHistory />}
             />
 
             {/* --- 2. ADD THIS NEW ROUTE --- */}
-            <Route
-              path="/invoices/:id"
-              element={<InvoiceDetails />}
+            <Route 
+              path="/invoices/:id" 
+              element={
+                user ? <InvoiceDetails /> : <Navigate to="/login" />
+              } 
             />
-
             {/* ----------------------------- */}
 
-            <Route
-              path="/login"
+            <Route 
+              path="/login" 
               element={
                 user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
-              }
+              } 
             />
-            <Route
-              path="/register"
+            <Route 
+              path="/register" 
               element={
                 user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
               }
             />
           </Routes>
         </main>
-
+        
         {user && (
           <>
             <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
