@@ -35,6 +35,24 @@ describe("EscrowContract", function () {
     await token.transfer(buyer.address, ethers.utils.parseEther("100"));
   });
 
+  async function addArbitratorViaProposal(escrowInstance, proposer, arbitratorAddr) {
+    const tx = await escrowInstance.connect(proposer).proposeAddArbitrator(arbitratorAddr);
+    const receipt = await tx.wait();
+    const event = receipt.events.find((e) => e.event === "ProposalCreated");
+    const proposalId = event.args.proposalId;
+    await escrowInstance.connect(proposer).executeProposal(proposalId);
+    return proposalId;
+  }
+
+  async function removeArbitratorViaProposal(escrowInstance, proposer, arbitratorAddr) {
+    const tx = await escrowInstance.connect(proposer).proposeRemoveArbitrator(arbitratorAddr);
+    const receipt = await tx.wait();
+    const event = receipt.events.find((e) => e.event === "ProposalCreated");
+    const proposalId = event.args.proposalId;
+    await escrowInstance.connect(proposer).executeProposal(proposalId);
+    return proposalId;
+  }
+
   describe("Deployment", function () {
     it("Should set the right admin", async function () {
       expect(await escrow.admin()).to.equal(owner.address);
@@ -43,13 +61,13 @@ describe("EscrowContract", function () {
 
   describe("Arbitrator Management", function () {
     it("Should allow admin to add arbitrator", async function () {
-      await escrow.connect(owner).addArbitrator(arbitrator.address);
+      await addArbitratorViaProposal(escrow, owner, arbitrator.address);
       expect(await escrow.arbitrators(arbitrator.address)).to.be.true;
     });
     
     it("Should allow admin to remove arbitrator", async function () {
-      await escrow.connect(owner).addArbitrator(arbitrator.address);
-      await escrow.connect(owner).removeArbitrator(arbitrator.address);
+      await addArbitratorViaProposal(escrow, owner, arbitrator.address);
+      await removeArbitratorViaProposal(escrow, owner, arbitrator.address);
       expect(await escrow.arbitrators(arbitrator.address)).to.be.false;
     });
   });
@@ -82,7 +100,7 @@ describe("EscrowContract", function () {
     });
     
     it("Should allow arbitrator to resolve dispute", async function () {
-      await escrow.connect(owner).addArbitrator(arbitrator.address);
+      await addArbitratorViaProposal(escrow, owner, arbitrator.address);
       
       await expect(escrow.connect(arbitrator).resolveDispute(invoiceId, false))
         .to.emit(escrow, "DisputeResolved");

@@ -13,10 +13,9 @@ FinovatePay is a hybrid payment rail for B2B payments that combines off-chain UX
 5. **Storage**: IPFS/S3 for document storage
 
 ### Smart Contracts
-1. **InvoiceRegistry**: Records invoice hashes and metadata on-chain
-2. **EscrowContract**: Handles payment escrow and dispute resolution
-3. **ComplianceManager**: Manages KYC status and account freezing
-4. **FractionToken**: ERC-1155 for tokenizing invoices (optional v2)
+1. **EscrowContract**: Handles payment escrow and dispute resolution
+2. **ComplianceManager**: Manages KYC status and account freezing
+3. **FractionToken**: ERC-1155 for tokenizing invoices (optional v2)
 
 ### Data Flow
 1. Seller creates invoice → stored in DB with hash recorded on-chain
