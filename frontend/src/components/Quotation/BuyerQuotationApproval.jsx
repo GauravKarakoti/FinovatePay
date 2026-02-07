@@ -7,11 +7,16 @@ const useTokenSymbol = (tokenAddress) => {
     const [symbol, setSymbol] = useState(tokenAddress);
 
     useEffect(() => {
-        if (ethers.utils.isAddress(tokenAddress)) {
+        if (ethers.isAddress(tokenAddress)) {
             const fetchSymbol = async () => {
                 try {
                     // Use a generic provider for read-only calls
-                    const provider = new ethers.providers.JsonRpcProvider(process.env.REACT_APP_POLYGON_RPC_URL); 
+                    const rpcUrl = import.meta.env.VITE_POLYGON_RPC_URL || process.env.REACT_APP_POLYGON_RPC_URL;
+                    if (!rpcUrl) {
+                        setSymbol("UNKNOWN");
+                        return;
+                    }
+                    const provider = new ethers.JsonRpcProvider(rpcUrl); 
                     const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
                     const tokenSymbol = await tokenContract.symbol();
                     setSymbol(tokenSymbol);
