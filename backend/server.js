@@ -6,9 +6,10 @@ require('dotenv').config();
 
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
-
 const listenForTokenization = require('./listeners/contractListener');
 const errorHandler = require('./middleware/errorHandler');
+// Added this line for [Feature]: email notifications 
+const notificationRoutes = require('./routes/notifications');
 
 const app = express();
 const server = http.createServer(app);
@@ -50,7 +51,6 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 const { pool, getConnection } = require('./config/database');
-const listenForTokenization = require('./listeners/contractListener');
 const testDbConnection = require('./utils/testDbConnection');
 
 testDbConnection();
@@ -66,6 +66,12 @@ app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
+
+// Added this line for [Feature]: email notifications 
+app.use('/api/notifications', notificationRoutes);
+
+// --- V2 FINANCING ROUTES ---
+// NOTE: You will need to create 'routes/financing.js' and 'routes/investor.js'
 app.use('/api/financing', require('./routes/financing'));
 app.use('/api/investor', require('./routes/investor'));
 
