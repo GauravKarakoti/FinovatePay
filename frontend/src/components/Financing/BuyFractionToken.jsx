@@ -3,176 +3,186 @@ import { ethers } from 'ethers';
 import {
   approveStablecoin,
   checkStablecoinAllowance,
-  buyFractions,
   buyFractionsNative
 } from '../../utils/web3';
+
+import { gaslessDeposit } from '../../utils/gasless';
 import { toast } from 'react-hot-toast';
+
+const ESCROW_ADDRESS = import.meta.env.VITE_ESCROW_ADDRESS;
 
 export const BuyFractionToken = ({
   tokenId,
   stablecoinAddress,
   stablecoinDecimals,
   tokenDecimals,
-  maxAmount // Can be base units (BigNumber) or formatted string
+  maxAmount,
+  onSuccess
 }) => {
-  console.log("BuyFractionToken mounted with tokenId:", tokenId, "stablecoinAddress:", stablecoinAddress);
-  
+
   const [amount, setAmount] = useState('');
   const [allowance, setAllowance] = useState(ethers.BigNumber.from(0));
   const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAllowance, setIsCheckingAllowance] = useState(true);
-  
-  // State to toggle payment method
   const [useNativeToken, setUseNativeToken] = useState(false);
-  console.log("Using native token for payment:", useNativeToken);
 
-  // Helper to safely format the max amount for display
+  /* ================= HELPERS ================= */
+
   const formatMaxAmount = () => {
     try {
-      // If it's already a decimal string (e.g. "0.48"), return it as is
       if (typeof maxAmount === 'string' && maxAmount.includes('.')) {
         return maxAmount;
       }
-      // Otherwise, assume it's base units and format it
       return ethers.utils.formatUnits(maxAmount, tokenDecimals);
-    } catch (error) {
-      // Fallback to displaying as-is if formatting fails
+    } catch {
       return maxAmount;
     }
   };
 
   const amountInBaseUnits = () => {
-    console.log("Converting amount to base units:", amount, "with decimals:", tokenDecimals);
     try {
       return ethers.utils.parseUnits(amount, tokenDecimals);
     } catch {
-      console.log("Error parsing amount:", amount, "with decimals:", tokenDecimals);
       return ethers.BigNumber.from(0);
     }
   };
 
   const amountToApprove = () => {
-    console.log("Calculating amount to approve:", amount, "with decimals:", stablecoinDecimals);
     try {
       return ethers.utils.parseUnits(amount, stablecoinDecimals);
     } catch {
-      console.log("Error parsing amount for approval:", amount, "with decimals:", stablecoinDecimals);
       return ethers.BigNumber.from(0);
     }
   };
 
+  /* ================= ALLOWANCE ================= */
+
   useEffect(() => {
-    console.log("Checking stablecoin allowance...");
-    // If using native token, we don't need to check stablecoin allowance
     if (useNativeToken) {
+      setIsApproved(true);
       setIsCheckingAllowance(false);
-      setIsApproved(true); // Native tokens don't need approval
-      console.log("Skipping stablecoin allowance check due to native token payment.");
       return;
     }
 
-    console.log("Checking allowance for stablecoin:", stablecoinAddress);
     const checkAllowance = async () => {
       try {
         setIsCheckingAllowance(true);
         const currentAllowance = await checkStablecoinAllowance(stablecoinAddress);
         setAllowance(currentAllowance);
-        console.log("Current allowance:", ethers.utils.formatUnits(currentAllowance, stablecoinDecimals));
       } catch (err) {
-        console.error("Failed to check allowance", err);
+        console.error(err);
       } finally {
         setIsCheckingAllowance(false);
       }
     };
+
     checkAllowance();
   }, [stablecoinAddress, useNativeToken]);
 
   useEffect(() => {
-    console.log("Re-evaluating approval status...");
-    if (useNativeToken) return; // Skip logic if native
+    if (useNativeToken) return;
 
-    if (!amount || isNaN(Number(amount))) {
+    if (!amount) {
       setIsApproved(false);
-      console.log("Amount is invalid:", amount);
       return;
     }
+
     const needed = amountToApprove();
     setIsApproved(allowance.gte(needed));
-    console.log("Is approved check:", allowance.toString(), "needed:", needed.toString());
-  }, [amount, allowance, stablecoinDecimals, useNativeToken]);
+  }, [amount, allowance, useNativeToken]);
+
+  /* ================= APPROVE ================= */
 
   const handleApprove = async () => {
-    console.log("Handling stablecoin approval for amount:", amount);
     setIsLoading(true);
-    toast.loading("Waiting for approval...");
+    toast.loading("Approving stablecoin...");
+
     try {
       const needed = amountToApprove();
       await approveStablecoin(stablecoinAddress, needed);
-      setAllowance(needed); 
+
+      setAllowance(needed);
       setIsApproved(true);
+
       toast.dismiss();
-      toast.success("Approved! You can now buy.");
-    } catch (err) {
+      toast.success("Approved!");
+    } catch {
       toast.dismiss();
-      toast.error("Approval failed or rejected.");
-    } finally {
-      setIsLoading(false);
+      toast.error("Approval failed");
     }
+
+    setIsLoading(false);
   };
 
+  /* ================= BUY (UPDATED GASLESS) ================= */
+
   const handleBuy = async () => {
-    console.log("Handling buy for tokenId:", tokenId, "amount:", amount, "using native token:", useNativeToken);
     setIsLoading(true);
     toast.loading("Processing purchase...");
+
     try {
       const amountToBuy = amountInBaseUnits();
-      
+
+      /* ---------- NATIVE FLOW (unchanged) ---------- */
       if (useNativeToken) {
-        console.log("Purchased using native token.");
         await buyFractionsNative(tokenId, amountToBuy);
-        console.log("buyFractionsNative called with tokenId:", tokenId, "amount:", amountToBuy.toString());
-      } else {
-        console.log("Purchased using stablecoin.");
-        await buyFractions(tokenId, amountToBuy);
-        console.log("buyFractions called with tokenId:", tokenId, "amount:", amountToBuy.toString());
+      }
+
+      /* ---------- STABLECOIN FLOW (NOW GASLESS) ---------- */
+      else {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+
+        const result = await gaslessDeposit(
+          signer,
+          ESCROW_ADDRESS,
+          tokenId,
+          amountToBuy
+        );
+
+        if (!result.success) {
+          throw new Error(result.error || "Gasless failed");
+        }
+
+        console.log("Gasless tx:", result.hash);
       }
 
       toast.dismiss();
       toast.success("Purchase successful!");
-      setAmount(''); 
+      setAmount('');
+      onSuccess?.();
+
     } catch (err) {
       toast.dismiss();
-      toast.error("Purchase failed.");
+      toast.error(err.message || "Purchase failed");
       console.error(err);
-    } finally {
-      setIsLoading(false);
     }
+
+    setIsLoading(false);
   };
+
+  /* ================= UI ================= */
 
   return (
     <div className="mt-4 p-3 bg-gray-50 rounded-md border">
-      {/* Payment Method Toggle */}
+
+      {/* Toggle */}
       <div className="flex gap-4 mb-3 text-sm">
-        <label className="flex items-center cursor-pointer">
-          <input 
-            type="radio" 
-            name="paymentMethod" 
-            checked={!useNativeToken} 
+        <label>
+          <input
+            type="radio"
+            checked={!useNativeToken}
             onChange={() => setUseNativeToken(false)}
-            className="mr-2"
-          />
-          Pay with Stablecoin
+          /> Stablecoin
         </label>
-        <label className="flex items-center cursor-pointer">
-          <input 
-            type="radio" 
-            name="paymentMethod" 
-            checked={useNativeToken} 
+
+        <label>
+          <input
+            type="radio"
+            checked={useNativeToken}
             onChange={() => setUseNativeToken(true)}
-            className="mr-2"
-          />
-          Pay with Native Token (MATIC)
+          /> Native
         </label>
       </div>
 
@@ -181,51 +191,26 @@ export const BuyFractionToken = ({
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          // FIX: Use the helper function here instead of calling formatUnits directly
           placeholder={`Amount (max ${formatMaxAmount()})`}
-          className="flex-1 p-2 border rounded-md"
-          disabled={isLoading}
+          className="flex-1 p-2 border rounded"
         />
-        
+
         {useNativeToken ? (
-             <button
-             onClick={handleBuy}
-             disabled={isLoading || !amount}
-             className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-           >
-             {isLoading ? 'Buying...' : 'Buy with Native'}
-           </button>
+          <button onClick={handleBuy} className="bg-green-600 text-white px-3 py-2 rounded">
+            Buy Native
+          </button>
         ) : (
           isApproved ? (
-            <button
-              onClick={handleBuy}
-              disabled={isLoading || !amount}
-              className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400"
-            >
-              {isLoading ? 'Buying...' : 'Buy'}
+            <button onClick={handleBuy} className="bg-green-600 text-white px-3 py-2 rounded">
+              Buy (Gasless)
             </button>
           ) : (
-            <button
-              onClick={handleApprove}
-              disabled={isLoading || isCheckingAllowance || !amount}
-              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-            >
-              {isLoading ? 'Approving...' : (isCheckingAllowance ? 'Checking...' : 'Approve')}
+            <button onClick={handleApprove} className="bg-blue-600 text-white px-3 py-2 rounded">
+              Approve
             </button>
           )
         )}
       </div>
-      
-      {!isApproved && !isCheckingAllowance && !useNativeToken && (
-        <p className="text-xs text-gray-500 mt-1">
-          You must approve the contract to spend your stablecoin first.
-        </p>
-      )}
-       {useNativeToken && (
-        <p className="text-xs text-gray-500 mt-1">
-          Native payments require no approval. Ensure you have sufficient gas and funds.
-        </p>
-      )}
     </div>
   );
 };

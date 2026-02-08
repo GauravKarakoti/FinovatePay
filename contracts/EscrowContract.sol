@@ -4,9 +4,11 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./ComplianceManager.sol";
 
-contract EscrowContract is ReentrancyGuard {
+contract EscrowContract is ReentrancyGuard, EIP712 {
     enum State { Created, Deposited, Released, Disputed, Cancelled }
 
     struct Escrow {
@@ -48,6 +50,13 @@ contract EscrowContract is ReentrancyGuard {
     
     mapping(uint256 => Proposal) public proposals;
     
+    // ================= GASLESS META TX =================
+    
+    mapping(address => uint256) public nonces;
+    
+    bytes32 private constant META_TX_TYPEHASH =
+        keccak256("MetaTx(address user,bytes functionData,uint256 nonce)");
+    
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
@@ -64,6 +73,9 @@ contract EscrowContract is ReentrancyGuard {
     event ProposalCreated(uint256 id, address arbitrator, Action action);
     event ProposalApproved(uint256 id, address manager);
     event ProposalExecuted(uint256 id);
+    
+    // Gasless events
+    event MetaTxExecuted(address indexed user, bytes functionData, uint256 nonce);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
@@ -82,7 +94,9 @@ contract EscrowContract is ReentrancyGuard {
         _;
     }
     
-    constructor(address _complianceManager) {
+    constructor(address _complianceManager)
+        EIP712("FinovatePay", "1")
+    {
         admin = msg.sender;
         treasury = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
@@ -90,6 +104,21 @@ contract EscrowContract is ReentrancyGuard {
         // Initialize multisig: admin is first manager, threshold starts at 1
         managers[msg.sender] = true;
         approvalThreshold = 1;
+    }
+    
+    /**
+     * @notice Extract real sender from meta-transaction or return msg.sender
+     * @return sender The actual user address (not the relayer)
+     */
+    function _msgSenderMeta() internal view returns (address sender) {
+        if (msg.sender == address(this)) {
+            // Meta-transaction: extract user address appended to calldata
+            assembly {
+                sender := shr(96, calldataload(sub(calldatasize(), 20)))
+            }
+        } else {
+            sender = msg.sender;
+        }
     }
     
     function setTreasury(address _treasury) external onlyAdmin {
@@ -115,9 +144,11 @@ contract EscrowContract is ReentrancyGuard {
         // --- NEW: RWA Parameters ---
         address _rwaNftContract,
         uint256 _rwaTokenId
-    ) external onlyCompliant(msg.sender) returns (bool) {
+    ) external onlyCompliant(_msgSenderMeta()) returns (bool) {
+        address realSender = _msgSenderMeta();
+        
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
-        require(msg.sender == _seller || msg.sender == _buyer, "Must be party");
+        require(realSender == _seller || realSender == _buyer, "Must be party");
 
         // Default arbitrator to admin if not provided
         address assignedArbitrator = _arbitrator == address(0) ? admin : _arbitrator;
@@ -139,7 +170,7 @@ contract EscrowContract is ReentrancyGuard {
         // --- NEW: Lock the Produce NFT as Collateral ---
         // The seller must have approved the EscrowContract to spend this NFT beforehand.
         if (_rwaNftContract != address(0)) {
-            require(msg.sender == _seller, "Only seller can pledge RWA");
+            require(realSender == _seller, "Only seller can pledge RWA");
             IERC721(_rwaNftContract).transferFrom(_seller, address(this), _rwaTokenId);
         }
 
@@ -147,34 +178,40 @@ contract EscrowContract is ReentrancyGuard {
         return true;
     }
     
-    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(msg.sender) {
+    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(_msgSenderMeta()) {
+        address realSender = _msgSenderMeta();
         Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.buyer == msg.sender, "Not the buyer");
+        
+        require(escrow.buyer == realSender, "Not the buyer");
         require(escrow.state == State.Created, "Already deposited or invalid state");
         require(_amount == escrow.amount, "Incorrect amount");
         
         IERC20 token = IERC20(escrow.token);
-        require(token.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+        require(token.transferFrom(realSender, address(this), _amount), "Transfer failed");
 
         escrow.state = State.Deposited;
-        emit DepositConfirmed(_invoiceId, msg.sender, _amount);
+        emit DepositConfirmed(_invoiceId, realSender, _amount);
     }
     
     function confirmRelease(bytes32 _invoiceId) external nonReentrant {
+        address realSender = _msgSenderMeta();
         Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.buyer, "Only buyer can confirm release");
+        
+        require(realSender == escrow.buyer, "Only buyer can confirm release");
         require(escrow.state == State.Deposited, "Not deposited");
 
-        _releaseFunds(_invoiceId);
+        _releaseFunds(_invoiceId, realSender);
     }
     
     function raiseDispute(bytes32 _invoiceId) external {
+        address realSender = _msgSenderMeta();
         Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.seller || msg.sender == escrow.buyer, "Not a party to this escrow");
+        
+        require(realSender == escrow.seller || realSender == escrow.buyer, "Not a party to this escrow");
         require(escrow.state == State.Deposited, "Cannot dispute now");
         
         escrow.state = State.Disputed;
-        emit DisputeRaised(_invoiceId, msg.sender);
+        emit DisputeRaised(_invoiceId, realSender);
     }
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external nonReentrant {
@@ -215,7 +252,7 @@ contract EscrowContract is ReentrancyGuard {
         emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
     }
     
-    function _releaseFunds(bytes32 _invoiceId) internal {
+    function _releaseFunds(bytes32 _invoiceId, address _realSender) internal {
         Escrow storage escrow = escrows[_invoiceId];
         escrow.state = State.Released; // Checks-Effects-Interactions
 
@@ -284,6 +321,10 @@ contract EscrowContract is ReentrancyGuard {
         p.arbitrator = _arb;
         p.action = _add ? Action.AddArbitrator : Action.RemoveArbitrator;
         
+        // FIX 3: Auto-approve proposer for better UX
+        p.approvedBy[msg.sender] = true;
+        p.approvals = 1;
+        
         emit ProposalCreated(proposalId, _arb, p.action);
     }
     
@@ -295,6 +336,9 @@ contract EscrowContract is ReentrancyGuard {
         external
         onlyManager
     {
+        // FIX 2: Validate proposal exists
+        require(_id < proposalCount, "Invalid proposal");
+        
         Proposal storage p = proposals[_id];
         
         require(!p.executed, "Already executed");
@@ -314,6 +358,9 @@ contract EscrowContract is ReentrancyGuard {
         external
         onlyManager
     {
+        // FIX 2: Validate proposal exists
+        require(_id < proposalCount, "Invalid proposal");
+        
         Proposal storage p = proposals[_id];
         
         require(!p.executed, "Already executed");
@@ -339,5 +386,40 @@ contract EscrowContract is ReentrancyGuard {
     function setApprovalThreshold(uint256 _t) external onlyAdmin {
         require(_t > 0, "Threshold must be > 0");
         approvalThreshold = _t;
+    }
+    
+    // ================= GASLESS META TX FUNCTION =================
+    
+    /**
+     * @notice Execute gasless meta-transaction
+     * @param user The address of the user who signed the transaction
+     * @param functionData The encoded function call data
+     * @param signature The EIP-712 signature from the user
+     */
+    function executeMetaTx(
+        address user,
+        bytes calldata functionData,
+        bytes calldata signature
+    ) external payable nonReentrant {
+        
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(abi.encode(
+                META_TX_TYPEHASH,
+                user,
+                keccak256(functionData),
+                nonces[user]++
+            ))
+        );
+
+        address signer = ECDSA.recover(digest, signature);
+        require(signer == user, "Invalid signature");
+
+        // FIX 1: Append user address to calldata for _msgSenderMeta() extraction
+        (bool success, ) = address(this).call(
+            abi.encodePacked(functionData, user)
+        );
+        require(success, "Meta tx failed");
+        
+        emit MetaTxExecuted(user, functionData, nonces[user] - 1);
     }
 }
