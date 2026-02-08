@@ -8,9 +8,7 @@ const dbConfig = {
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    ssl: {
-      rejectUnauthorized: false
-    },
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     
     // Enhanced Pool Settings for Maximum Resilience
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 30000,

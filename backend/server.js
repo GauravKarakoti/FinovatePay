@@ -6,6 +6,10 @@ require('dotenv').config();
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
 
+// Added this line for [Feature]: email notifications 
+const notificationRoutes = require('./routes/notifications');
+
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -117,6 +121,9 @@ app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
+
+// Added this line for [Feature]: email notifications 
+app.use('/api/notifications', notificationRoutes);
 
 // --- V2 FINANCING ROUTES ---
 // NOTE: You will need to create 'routes/financing.js' and 'routes/investor.js'
