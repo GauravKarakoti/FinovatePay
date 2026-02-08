@@ -62,19 +62,19 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         require(msg.sender == admin, "Not admin");
         _;
     }
-    
-    modifier onlyAdminOrArbitrator() {
-        require(msg.sender == admin || arbitrators[msg.sender], "Not authorized");
-        _;
-    }
-    
+<<<<<<< HEAD
+
+    // --- MINIMAL FIX: Allow admin OR arbitrators to resolve disputes ---
+=======
+
     modifier onlyCompliant(address _account) {
         require(!complianceManager.isFrozen(_account), "Account frozen");
-        require(complianceManager.isKYCVerified(_account), "KYC not verified");
         require(complianceManager.hasIdentity(_account), "Identity not verified (No SBT)");
         _;
     }
 
+<<<<<<< HEAD
+=======
     modifier onlyEscrowParty(bytes32 _invoiceId) {
         Escrow storage escrow = escrows[_invoiceId];
         require(
@@ -87,6 +87,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         _;
     }
     
+>>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
     constructor(address _complianceManager) {
         require(_complianceManager != address(0), "Invalid compliance manager");
         admin = msg.sender;
@@ -102,6 +103,54 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit InvoiceFactoryUpdated(_invoiceFactory);
     }
     
+<<<<<<< HEAD
+    // --- Multi-signature arbitrator management ---
+    function proposeAddArbitrator(address _arbitrator) external {
+        require(_arbitrator != address(0), "Invalid address");
+        require(!arbitrators[_arbitrator], "Already an arbitrator");
+        bytes32 proposalId = keccak256(abi.encodePacked("add", _arbitrator, block.number));
+        require(proposals[proposalId].arbitrator == address(0), "Proposal already exists");
+        proposals[proposalId] = Proposal(_arbitrator, true, 0, false);
+        approved[proposalId][msg.sender] = true;
+        proposals[proposalId].approvals++;
+        emit ProposalCreated(proposalId, _arbitrator, true);
+    }
+
+    function proposeRemoveArbitrator(address _arbitrator) external {
+        require(arbitrators[_arbitrator], "Not an arbitrator");
+        bytes32 proposalId = keccak256(abi.encodePacked("remove", _arbitrator, block.number));
+        require(proposals[proposalId].arbitrator == address(0), "Proposal already exists");
+        proposals[proposalId] = Proposal(_arbitrator, false, 0, false);
+        approved[proposalId][msg.sender] = true;
+        proposals[proposalId].approvals++;
+        emit ProposalCreated(proposalId, _arbitrator, false);
+    }
+
+    function approveProposal(bytes32 _proposalId) external {
+        require(proposals[_proposalId].arbitrator != address(0), "Proposal does not exist");
+        require(!proposals[_proposalId].executed, "Proposal already executed");
+        require(!approved[_proposalId][msg.sender], "Already approved");
+        approved[_proposalId][msg.sender] = true;
+        proposals[_proposalId].approvals++;
+        emit ProposalApproved(_proposalId, msg.sender);
+    }
+
+    function executeProposal(bytes32 _proposalId) external {
+        Proposal storage proposal = proposals[_proposalId];
+        require(proposal.arbitrator != address(0), "Proposal does not exist");
+        require(!proposal.executed, "Proposal already executed");
+        require(proposal.approvals >= threshold, "Not enough approvals");
+        proposal.executed = true;
+        if (proposal.isAdd) {
+            _addArbitrator(proposal.arbitrator);
+        } else {
+            _removeArbitrator(proposal.arbitrator);
+        }
+        emit ProposalExecuted(_proposalId);
+    }
+
+    function _addArbitrator(address _arbitrator) internal {
+=======
     function setKeeper(address _keeper) external onlyAdmin {
         require(_keeper != address(0), "Invalid keeper");
         keeper = _keeper;
@@ -109,6 +158,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     
     function addArbitrator(address _arbitrator) external onlyAdmin {
         require(_arbitrator != address(0), "Invalid arbitrator");
+>>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
         arbitrators[_arbitrator] = true;
         emit ArbitratorAdded(_arbitrator);
     }
@@ -317,6 +367,12 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
             IERC20 token = IERC20(escrow.token);
             require(token.transfer(escrow.buyer, escrow.amount), "Refund failed");
         }
+<<<<<<< HEAD
+
+        emit EscrowExpired(_invoiceId);
+    }
+=======
+>>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
 
         emit EscrowCancelled(_invoiceId);
         delete escrows[_invoiceId];
