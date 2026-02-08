@@ -72,6 +72,8 @@ app.use('/api/shipment', shipmentRoutes);
 // NOTE: You will need to create 'routes/financing.js' and 'routes/investor.js'
 app.use('/api/financing', require('./routes/financing'));
 app.use('/api/investor', require('./routes/investor'));
+app.use('/api/dispute', require('./routes/dispute'));
+
 
 
 // Socket.io, error handlers, and server.listen call
