@@ -4,39 +4,49 @@ const http = require('http');
 const socketIo = require('socket.io');
 const { ethers } = require('ethers');
 require('dotenv').config();
+
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
 
+const listenForTokenization = require('./listeners/contractListener');
+const errorHandler = require('./middleware/errorHandler');
+
 const app = express();
 const server = http.createServer(app);
+
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    methods: ["GET", "POST"]
-  }
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+  },
 });
 
 const allowedOrigins = [
-    'https://finovate-pay.vercel.app', 
-    'http://localhost:5173'
+  'https://finovate-pay.vercel.app',
+  'http://localhost:5173',
 ];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow null origin ONLY in development
+    if (!origin || allowedOrigins.includes(origin)) {
+      if (process.env.NODE_ENV !== "production") {
+        return callback(null, true);
+      }
+      return callback(new Error("Not allowed by CORS"));
     }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
   },
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
 };
 
-// --- MIDDLEWARE SETUP ---
-
-// This single middleware at the top will handle all CORS and preflight requests
 app.use(cors(corsOptions));
 app.use(express.json());
 
@@ -63,21 +73,11 @@ console.log('✅ Relayer wallet connected:', relayerWallet.address);
 // --- DATABASE CONNECTION ---
 const pool = require('./config/database');
 const listenForTokenization = require('./listeners/contractListener');
+const testDbConnection = require('./utils/testDbConnection');
 
-const testDbConnection = async () => {
-  try {
-    const client = await pool.connect();
-    console.log('✅ Connected to database successfully.');
-    client.release();
-  } catch (err) {
-    console.error('❌ Database connection error:', err.stack);
-    process.exit(1);
-  }
-};
 testDbConnection();
 
-
-// --- ROUTES ---
+app.use('/api/health', require('./routes/health'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/invoices', require('./routes/invoice'));
 app.use('/api/payments', require('./routes/payment'));
@@ -88,9 +88,6 @@ app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
-
-// --- V2 FINANCING ROUTES ---
-// NOTE: You will need to create 'routes/financing.js' and 'routes/investor.js'
 app.use('/api/financing', require('./routes/financing'));
 app.use('/api/investor', require('./routes/investor'));
 
@@ -173,16 +170,15 @@ app.get('/api/health', (req, res) => {
 // Socket.io, error handlers, and server.listen call
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
-  
+
   socket.on('join-invoice', (invoiceId) => {
     socket.join(`invoice-${invoiceId}`);
   });
 
-  // Room for investors to receive marketplace updates
   socket.on('join-marketplace', () => {
     socket.join('marketplace');
   });
-  
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
   });
@@ -190,24 +186,22 @@ io.on('connection', (socket) => {
 
 app.set('io', io);
 
-app.use((err, req, res, next) => {
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ error: 'Access denied by CORS policy.' });
-  }
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+  });
 });
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔗 Relayer address: ${relayerWallet.address}`);
 });
 
-listenForTokenization()
+listenForTokenization();
 
 module.exports = app;

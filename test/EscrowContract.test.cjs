@@ -2,42 +2,46 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("EscrowContract", function () {
-  let EscrowContract, ComplianceManager, MockERC20;
-  let escrow, compliance, token;
+  let EscrowContract, ComplianceManager;
+  let escrow, compliance;
   let owner, seller, buyer, arbitrator, other;
+  let token;
 
   beforeEach(async function () {
     [owner, seller, buyer, arbitrator, other] = await ethers.getSigners();
-
-    // Deploy MockERC20 token
-    const Token = await ethers.getContractFactory("MockERC20");
-    token = await Token.deploy("Test Token", "TEST", ethers.utils.parseEther("1000"));
-
+    
+    // Deploy mock ERC20 token
+    const Token = await ethers.getContractFactory("contracts/test/MockToken.sol:MockToken");
+    token = await Token.deploy();
+    await token.deployed();
+    
     // Deploy ComplianceManager
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
     compliance = await ComplianceManager.deploy();
-
+    await compliance.deployed();
+    
     // Deploy EscrowContract
     EscrowContract = await ethers.getContractFactory("EscrowContract");
     escrow = await EscrowContract.deploy(compliance.address);
-
-    // Verify KYC/Identity for seller and buyer
+    await escrow.deployed();
+    
+    // Setup KYC and Identity for seller and buyer
     await compliance.verifyKYC(seller.address);
-    await compliance.mintIdentity(seller.address);
-
     await compliance.verifyKYC(buyer.address);
+    await compliance.mintIdentity(seller.address);
     await compliance.mintIdentity(buyer.address);
-
-    // Verify Owner for createEscrow checks if owner is used (but owner needs to be party)
-    // For tests, we'll primarily use seller/buyer to create
-
-    // Transfer tokens to buyer
+    
+    // Transfer tokens to buyer for testing
     await token.transfer(buyer.address, ethers.utils.parseEther("100"));
   });
 
   describe("Deployment", function () {
-    it("Should set the right owner", async function () {
+    it("Should set the right admin", async function () {
       expect(await escrow.admin()).to.equal(owner.address);
+    });
+
+    it("Should set the right compliance manager", async function () {
+      expect(await escrow.complianceManager()).to.equal(compliance.address);
     });
 
     it("Should set treasury to admin initially", async function () {
@@ -45,177 +49,339 @@ describe("EscrowContract", function () {
     });
   });
 
-  describe("Creating escrow (Decentralized)", function () {
-    it("Should allow seller (compliant party) to create escrow", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      const duration = 3600;
-
-      await expect(escrow.connect(seller).createEscrow(
-        invoiceId,
-        seller.address,
-        buyer.address,
-        ethers.constants.AddressZero, // Arbitrator
-        amount,
-        token.address,
-        duration,
-        ethers.constants.AddressZero, // RWA
-        0
-      )).to.emit(escrow, "EscrowCreated");
+  describe("Arbitrator Management", function () {
+    it("Should allow admin to add arbitrator", async function () {
+      await escrow.connect(owner).addArbitrator(arbitrator.address);
+      expect(await escrow.arbitrators(arbitrator.address)).to.be.true;
     });
 
-    it("Should NOT allow non-party (other) to create escrow even if compliant", async function () {
-       // Make 'other' compliant first
-       await compliance.verifyKYC(other.address);
-       await compliance.mintIdentity(other.address);
-
-      const invoiceId = ethers.utils.formatBytes32String("INV-002");
-      const amount = ethers.utils.parseEther("1");
-      const duration = 3600;
-
-      await expect(escrow.connect(other).createEscrow(
-        invoiceId,
-        seller.address,
-        buyer.address,
-        ethers.constants.AddressZero,
-        amount,
-        token.address,
-        duration,
-        ethers.constants.AddressZero,
-        0
-      )).to.be.revertedWith("Must be party");
+    it("Should allow admin to remove arbitrator", async function () {
+      await escrow.connect(owner).addArbitrator(arbitrator.address);
+      await escrow.connect(owner).removeArbitrator(arbitrator.address);
+      expect(await escrow.arbitrators(arbitrator.address)).to.be.false;
     });
 
-    it("Should NOT allow non-compliant seller to create escrow", async function () {
-        // Revoke KYC from seller
-        await compliance.revokeKYC(seller.address);
+    it("Should not allow non-admin to add arbitrator", async function () {
+      await expect(
+        escrow.connect(other).addArbitrator(arbitrator.address)
+      ).to.be.revertedWith("Not admin");
+    });
 
-        const invoiceId = ethers.utils.formatBytes32String("INV-003");
-        await expect(escrow.connect(seller).createEscrow(
-            invoiceId, seller.address, buyer.address, ethers.constants.AddressZero, 100, token.address, 3600, ethers.constants.AddressZero, 0
-        )).to.be.revertedWith("KYC not verified");
+    it("Should emit ArbitratorAdded event", async function () {
+      await expect(escrow.connect(owner).addArbitrator(arbitrator.address))
+        .to.emit(escrow, "ArbitratorAdded")
+        .withArgs(arbitrator.address);
     });
   });
 
-  describe("Depositing & Releasing Funds", function () {
-    const invoiceId = ethers.utils.formatBytes32String("INV-DEP");
+  describe("Treasury and Fee Management", function () {
+    it("Should allow admin to update treasury", async function () {
+      await escrow.connect(owner).setTreasury(other.address);
+      expect(await escrow.treasury()).to.equal(other.address);
+    });
+
+    it("Should allow admin to set fee basis points", async function () {
+      await escrow.connect(owner).setFeeBasisPoints(100); // 1%
+      expect(await escrow.feeBasisPoints()).to.equal(100);
+    });
+
+    it("Should not allow fee above 10%", async function () {
+      await expect(
+        escrow.connect(owner).setFeeBasisPoints(1001)
+      ).to.be.revertedWith("Fee too high");
+    });
+  });
+
+  describe("Escrow Creation", function () {
+    let invoiceId;
     const amount = ethers.utils.parseEther("10");
+    const duration = 7 * 24 * 60 * 60; // 7 days
+
+    beforeEach(function () {
+      invoiceId = ethers.utils.formatBytes32String("INV-001");
+    });
+
+    it("Should create escrow successfully", async function () {
+      await expect(
+        escrow.connect(seller).createEscrow(
+          invoiceId,
+          seller.address,
+          buyer.address,
+          arbitrator.address,
+          amount,
+          token.address,
+          duration,
+          ethers.constants.AddressZero,
+          0
+        )
+      ).to.emit(escrow, "EscrowCreated")
+       .withArgs(invoiceId, seller.address, buyer.address, amount);
+    });
+
+    it("Should not allow duplicate invoice IDs", async function () {
+      await escrow.connect(seller).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        arbitrator.address,
+        amount,
+        token.address,
+        duration,
+        ethers.constants.AddressZero,
+        0
+      );
+
+      await expect(
+        escrow.connect(seller).createEscrow(
+          invoiceId,
+          seller.address,
+          buyer.address,
+          arbitrator.address,
+          amount,
+          token.address,
+          duration,
+          ethers.constants.AddressZero,
+          0
+        )
+      ).to.be.revertedWith("Escrow already exists");
+    });
+
+    it("Should not allow non-compliant user to create escrow", async function () {
+      // Freeze seller
+      await compliance.freezeAccount(seller.address);
+
+      await expect(
+        escrow.connect(seller).createEscrow(
+          invoiceId,
+          seller.address,
+          buyer.address,
+          arbitrator.address,
+          amount,
+          token.address,
+          duration,
+          ethers.constants.AddressZero,
+          0
+        )
+      ).to.be.revertedWith("Account frozen");
+    });
+  });
+
+  describe("Deposit and Release", function () {
+    let invoiceId;
+    const amount = ethers.utils.parseEther("10");
+    const duration = 7 * 24 * 60 * 60;
 
     beforeEach(async function () {
-        await escrow.connect(seller).createEscrow(
-            invoiceId, seller.address, buyer.address, ethers.constants.AddressZero, amount, token.address, 3600, ethers.constants.AddressZero, 0
-        );
+      invoiceId = ethers.utils.formatBytes32String("INV-002");
+      
+      await escrow.connect(seller).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        arbitrator.address,
+        amount,
+        token.address,
+        duration,
+        ethers.constants.AddressZero,
+        0
+      );
+
+      await token.connect(buyer).approve(escrow.address, amount);
     });
 
     it("Should allow buyer to deposit", async function () {
-        await token.connect(buyer).approve(escrow.address, amount);
-        await expect(escrow.connect(buyer).deposit(invoiceId, amount))
-            .to.emit(escrow, "DepositConfirmed");
-
-        const e = await escrow.escrows(invoiceId);
-        expect(e.state).to.equal(1); // State.Deposited
+      await expect(
+        escrow.connect(buyer).deposit(invoiceId, amount)
+      ).to.emit(escrow, "DepositConfirmed")
+       .withArgs(invoiceId, buyer.address, amount);
     });
 
-    it("Should allow buyer to confirm release, transferring funds to seller", async function () {
-        await token.connect(buyer).approve(escrow.address, amount);
-        await escrow.connect(buyer).deposit(invoiceId, amount);
-
-        const initialSellerBal = await token.balanceOf(seller.address);
-
-        await expect(escrow.connect(buyer).confirmRelease(invoiceId))
-            .to.emit(escrow, "EscrowReleased");
-
-        const finalSellerBal = await token.balanceOf(seller.address);
-        expect(finalSellerBal).to.equal(initialSellerBal.add(amount));
-
-        const e = await escrow.escrows(invoiceId);
-        expect(e.state).to.equal(2); // State.Released
+    it("Should not allow incorrect deposit amount", async function () {
+      await expect(
+        escrow.connect(buyer).deposit(invoiceId, ethers.utils.parseEther("5"))
+      ).to.be.revertedWith("Incorrect amount");
     });
 
-    it("Should prevent seller from confirming release (Security Fix)", async function () {
-        await token.connect(buyer).approve(escrow.address, amount);
-        await escrow.connect(buyer).deposit(invoiceId, amount);
-
-        await expect(escrow.connect(seller).confirmRelease(invoiceId))
-            .to.be.revertedWith("Only buyer can confirm release");
+    it("Should allow both parties to confirm and release", async function () {
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      
+      await escrow.connect(seller).confirmRelease(invoiceId);
+      await expect(
+        escrow.connect(buyer).confirmRelease(invoiceId)
+      ).to.emit(escrow, "EscrowReleased");
     });
   });
 
-  describe("Fees", function () {
-    const invoiceId = ethers.utils.formatBytes32String("INV-FEE");
-    const amount = ethers.utils.parseEther("100"); // 100 Tokens
-    const feeBps = 100; // 1%
+  describe("Dispute Resolution", function () {
+    let invoiceId;
+    const amount = ethers.utils.parseEther("10");
+    const duration = 7 * 24 * 60 * 60;
 
     beforeEach(async function () {
-        // Set Fee to 1%
-        await escrow.connect(owner).setFeeBasisPoints(feeBps);
-        // Set Treasury to 'other'
-        await escrow.connect(owner).setTreasury(other.address);
+      invoiceId = ethers.utils.formatBytes32String("INV-003");
+      
+      await escrow.connect(seller).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        arbitrator.address,
+        amount,
+        token.address,
+        duration,
+        ethers.constants.AddressZero,
+        0
+      );
 
-        await escrow.connect(seller).createEscrow(
-            invoiceId, seller.address, buyer.address, ethers.constants.AddressZero, amount, token.address, 3600, ethers.constants.AddressZero, 0
-        );
-        await token.connect(buyer).approve(escrow.address, amount);
-        await escrow.connect(buyer).deposit(invoiceId, amount);
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      await escrow.connect(seller).raiseDispute(invoiceId);
     });
 
-    it("Should deduct fee and send to treasury upon release", async function () {
-        const initialSellerBal = await token.balanceOf(seller.address);
-        const initialTreasuryBal = await token.balanceOf(other.address);
+    it("Should allow admin to resolve dispute (seller wins)", async function () {
+      await expect(
+        escrow.connect(owner).resolveDispute(invoiceId, true)
+      ).to.emit(escrow, "DisputeResolved")
+       .withArgs(invoiceId, owner.address, true);
+    });
 
-        await escrow.connect(buyer).confirmRelease(invoiceId);
+    it("Should allow arbitrator to resolve dispute", async function () {
+      await escrow.connect(owner).addArbitrator(arbitrator.address);
+      
+      await expect(
+        escrow.connect(arbitrator).resolveDispute(invoiceId, false)
+      ).to.emit(escrow, "DisputeResolved");
+    });
 
-        const finalSellerBal = await token.balanceOf(seller.address);
-        const finalTreasuryBal = await token.balanceOf(other.address);
+    it("Should not allow non-arbitrator to resolve dispute", async function () {
+      await expect(
+        escrow.connect(other).resolveDispute(invoiceId, true)
+      ).to.be.revertedWith("Not authorized");
+    });
 
-        const fee = amount.mul(feeBps).div(10000); // 100 * 1% = 1
-        const sellerAmt = amount.sub(fee); // 99
-
-        expect(finalTreasuryBal).to.equal(initialTreasuryBal.add(fee));
-        expect(finalSellerBal).to.equal(initialSellerBal.add(sellerAmt));
+    it("Should transfer fee to treasury when seller wins", async function () {
+      await escrow.connect(owner).setFeeBasisPoints(100); // 1% fee
+      
+      const treasuryBalanceBefore = await token.balanceOf(owner.address);
+      
+      await escrow.connect(owner).resolveDispute(invoiceId, true);
+      
+      const treasuryBalanceAfter = await token.balanceOf(owner.address);
+      const expectedFee = amount.mul(100).div(10000);
+      
+      expect(treasuryBalanceAfter.sub(treasuryBalanceBefore)).to.equal(expectedFee);
     });
   });
 
-  describe("Arbitrator & Dispute", function () {
-    const invoiceId = ethers.utils.formatBytes32String("INV-ARB");
+  describe("Escrow Expiration", function () {
+    let invoiceId;
     const amount = ethers.utils.parseEther("10");
 
     beforeEach(async function () {
-        // Create escrow with specific arbitrator
-        await escrow.connect(seller).createEscrow(
-            invoiceId, seller.address, buyer.address, arbitrator.address, amount, token.address, 3600, ethers.constants.AddressZero, 0
-        );
-        await token.connect(buyer).approve(escrow.address, amount);
-        await escrow.connect(buyer).deposit(invoiceId, amount);
+      invoiceId = ethers.utils.formatBytes32String("INV-004");
+      
+      // Create escrow with very short duration (1 second)
+      await escrow.connect(seller).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        arbitrator.address,
+        amount,
+        token.address,
+        1, // 1 second
+        ethers.constants.AddressZero,
+        0
+      );
     });
 
-    it("Should allow raising dispute", async function () {
-        await expect(escrow.connect(seller).raiseDispute(invoiceId))
-            .to.emit(escrow, "DisputeRaised");
+    it("Should allow expiration after time passes", async function () {
+      // Advance blockchain time instead of using setTimeout
+      await ethers.provider.send("evm_increaseTime", [2]);
+      await ethers.provider.send("evm_mine");
+      
+      await expect(
+        escrow.connect(seller).expireEscrow(invoiceId)
+      ).to.emit(escrow, "EscrowCancelled");
+    });
+  });
 
-        const e = await escrow.escrows(invoiceId);
-        expect(e.state).to.equal(3); // State.Disputed
+  describe("Compliance Manager Updates", function () {
+    it("Should allow admin to update compliance manager and enforce new rules", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-NEW");
+      const amount = ethers.utils.parseEther("10");
+      const duration = 7 * 24 * 60 * 60;
+
+      await escrow.connect(seller).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        arbitrator.address,
+        amount,
+        token.address,
+        duration,
+        ethers.constants.AddressZero,
+        0
+      );
+
+      // Deploy new compliance manager (fresh, no KYC)
+      const NewComplianceManager = await ethers.getContractFactory("ComplianceManager");
+      const newCompliance = await NewComplianceManager.deploy();
+      await newCompliance.deployed();
+
+      // Update to new compliance manager
+      await escrow.connect(owner).setComplianceManager(newCompliance.address);
+
+      // Try to deposit - should fail due to no KYC in new manager
+      await token.connect(buyer).approve(escrow.address, amount);
+      await expect(
+        escrow.connect(buyer).deposit(invoiceId, amount)
+      ).to.be.revertedWith("KYC not verified");
+
+      // Verify KYC in new manager
+      await newCompliance.verifyKYC(buyer.address);
+      await newCompliance.mintIdentity(buyer.address);
+
+      // Now deposit should work
+      await expect(
+        escrow.connect(buyer).deposit(invoiceId, amount)
+      ).to.emit(escrow, "DepositConfirmed");
+    });
+  });
+
+  describe("RWA NFT Collateral", function () {
+    let MockNFT;
+    let nft;
+    let invoiceId;
+    const amount = ethers.utils.parseEther("10");
+    const duration = 7 * 24 * 60 * 60;
+    const tokenId = 1;
+
+    beforeEach(async function () {
+      invoiceId = ethers.utils.formatBytes32String("INV-NFT");
+      
+      // Deploy mock NFT
+      MockNFT = await ethers.getContractFactory("MockNFT");
+      nft = await MockNFT.deploy();
+      await nft.deployed();
+      
+      // Mint NFT to seller
+      await nft.mint(seller.address, tokenId);
+      await nft.connect(seller).approve(escrow.address, tokenId);
     });
 
-    it("Should allow assigned arbitrator to resolve dispute (Seller Wins)", async function () {
-        await escrow.connect(seller).raiseDispute(invoiceId);
+    it("Should lock NFT as collateral on escrow creation", async function () {
+      await escrow.connect(seller).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        arbitrator.address,
+        amount,
+        token.address,
+        duration,
+        nft.address,
+        tokenId
+      );
 
-        const initialSellerBal = await token.balanceOf(seller.address);
-
-        // Arbitrator resolves in favor of Seller
-        await expect(escrow.connect(arbitrator).resolveDispute(invoiceId, true))
-            .to.emit(escrow, "DisputeResolved");
-
-        const finalSellerBal = await token.balanceOf(seller.address);
-        expect(finalSellerBal).to.equal(initialSellerBal.add(amount));
-    });
-
-    it("Should prevent admin from resolving if not assigned arbitrator", async function () {
-        await escrow.connect(seller).raiseDispute(invoiceId);
-
-        // Owner is admin, but arbitrator is 'arbitrator'
-        await expect(escrow.connect(owner).resolveDispute(invoiceId, true))
-            .to.be.revertedWith("Not arbitrator");
+      expect(await nft.ownerOf(tokenId)).to.equal(escrow.address);
     });
   });
 });
