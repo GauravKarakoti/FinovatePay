@@ -9,8 +9,8 @@ const dbConfig = {
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
     
-    // SSL Configuration for Cloud Providers (Render, Heroku, etc.)
-    ssl: process.env.NODE_ENV === 'production' ? {
+    // SSL Configuration for Cloud Providers (Render, Heroku, Neon, etc.)
+    ssl: (process.env.NODE_ENV === 'production' || process.env.DB_SSL === 'true') ? {
       rejectUnauthorized: false
     } : false,
     
