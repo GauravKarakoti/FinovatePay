@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'; // Added useLocation
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -7,28 +7,31 @@ import Register from './components/Register';
 import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
-import InvoiceDetails from './pages/InvoiceDetails'; // <--- 1. ADD IMPORT
+import InvestorDashboard from './pages/InvestorDashboard';
+import InvoiceTracking from './pages/InvoiceTracking';
+import InvoiceDetails from './pages/InvoiceDetails';
+import DisputeDashboard from './pages/DisputeDashboard';
 import { connectWallet } from './utils/web3';
 import Web3Modal from 'web3modal';
-import './App.css';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
-import ShipmentDashboard from './pages/ShipmentDashboard';
-import InvestorDashboard from './pages/InvestorDashboard';
+import './App.css';
 
 function App() {
   const [user, setUser] = useState(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [dashboardStats, setDashboardStats] = useState({
     totalInvoices: 0,
     activeEscrows: 0,
     completed: 0,
     produceLots: 0,
   });
-  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
+  // ================= INIT =================
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
@@ -39,12 +42,15 @@ function App() {
     }
 
     const web3Modal = new Web3Modal({ cacheProvider: true });
+
     if (web3Modal.cachedProvider) {
       connectWallet()
         .then(() => setWalletConnected(true))
         .catch((error) => {
           console.error("Failed to auto-connect wallet:", error);
+          web3Modal.clearCachedProvider();
           setWalletConnected(false);
+          toast.error('Wallet connection expired. Please reconnect your wallet.');
         });
     }
   }, []);
@@ -56,12 +62,6 @@ function App() {
         localStorage.setItem('token', tokenToStore);
     }
     localStorage.setItem('user', JSON.stringify(user));
-    setDashboardStats({
-      totalInvoices: 0,
-      activeEscrows: 0,
-      completed: 0,
-      produceLots: 0,
-    });
   }, [user]);
 
   useEffect(() => {
@@ -71,18 +71,22 @@ function App() {
     }
   }, [user]);
 
+  // ================= AUTH =================
   const handleLogin = (userData, token) => {
     setUser({ ...userData, token });
   };
 
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
   };
 
+  // ================= LAYOUT WRAPPER =================
   const renderDashboard = (dashboardComponent) => {
     return (
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9]">
@@ -101,11 +105,12 @@ function App() {
     );
   };
 
+  // ================= CHATBOT =================
   const toggleChatbot = () => {
-    setIsChatbotOpen(p => !p);
+    setIsChatbotOpen(prev => !prev);
   };
 
-  // Note: Ensure useLocation is imported from 'react-router-dom' if using this component
+  // ================= AUTH GUARD =================
   const RequireAuth = ({ children, allowedRoles }) => {
     const location = useLocation();
     
@@ -120,6 +125,7 @@ function App() {
     return children;
   };
 
+  // ================= ROUTES =================
   return (
     <Router>
       <Toaster position="top" richColors />
@@ -132,6 +138,7 @@ function App() {
         />
         <main>
           <Routes>
+            {/* ================= ROOT ================= */}
             <Route 
               path="/" 
               element={
@@ -153,69 +160,100 @@ function App() {
               } 
             />
             
-            {/* ... other existing routes ... */}
-            
+            {/* ================= BUYER ================= */}
             <Route 
               path="/buyer" 
               element={
-                user && user.role === 'buyer' 
-                  ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
-                  : <Navigate to="/" />
+                <RequireAuth allowedRoles={['buyer']}>
+                  {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
+                </RequireAuth>
               }
             />
+            
+            {/* ================= INVESTOR ================= */}
             <Route 
               path="/investor" 
               element={
-                user && user.role === 'investor' 
-                  ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
-                  : <Navigate to="/" />
+                <RequireAuth allowedRoles={['investor']}>
+                  {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
+                </RequireAuth>
               }
             />
+            
+            {/* ================= ADMIN ================= */}
             <Route 
               path="/admin"
               element={
-                user && user.role === 'admin' 
-                  ? renderDashboard(<AdminDashboard activeTab={activeTab} />) 
-                  : <Navigate to="/" />
+                <RequireAuth allowedRoles={['admin']}>
+                  {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
+                </RequireAuth>
               } 
             />
+            
+            {/* ================= SHIPMENT ================= */}
             <Route 
               path="/shipment" 
               element={
-                user && (user.role === 'shipment' || user.role === 'warehouse') 
-                  ? <ShipmentDashboard /> 
-                  : <Navigate to="/" />
+                <RequireAuth allowedRoles={['shipment', 'warehouse']}>
+                  <ShipmentDashboard />
+                </RequireAuth>
               } 
             />
+            
+            {/* ================= INVOICE TRACKING ================= */}
             <Route 
-              path="/produce/:lotId" 
-              element={<ProduceHistory />}
+              path="/tracking"
+              element={
+                <RequireAuth allowedRoles={['buyer', 'seller', 'admin', 'investor']}>
+                  {renderDashboard(<InvoiceTracking />)}
+                </RequireAuth>
+              }
             />
-
-            {/* --- 2. ADD THIS NEW ROUTE --- */}
+            
+            {/* ================= INVOICE DETAILS ================= */}
             <Route 
               path="/invoices/:id" 
               element={
-                user ? <InvoiceDetails /> : <Navigate to="/login" />
+                <RequireAuth allowedRoles={['buyer', 'seller', 'admin', 'investor']}>
+                  <InvoiceDetails />
+                </RequireAuth>
               } 
             />
-            {/* ----------------------------- */}
-
+            
+            {/* ================= DISPUTE CENTER ================= */}
+            <Route 
+              path="/dispute/:invoiceId" 
+              element={
+                <RequireAuth allowedRoles={['buyer', 'seller', 'admin']}>
+                  {renderDashboard(<DisputeDashboard />)}
+                </RequireAuth>
+              } 
+            />
+            
+            {/* ================= PRODUCE ================= */}
+            <Route 
+              path="/produce/:lotId" 
+              element={<ProduceHistory />} 
+            />
+            
+            {/* ================= AUTH ================= */}
             <Route 
               path="/login" 
               element={
                 user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
               } 
             />
+            
             <Route 
               path="/register" 
               element={
                 user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
-              }
+              } 
             />
           </Routes>
         </main>
         
+        {/* ================= CHATBOT ================= */}
         {user && (
           <>
             <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
@@ -227,11 +265,11 @@ function App() {
               aria-label="Toggle Chatbot"
             >
               {isChatbotOpen ? (
-                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               )}
