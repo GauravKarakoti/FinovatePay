@@ -68,6 +68,7 @@ app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
+app.use('/api/documents', documentRoutes); // ✅ NEW
 
 // Added this line for [Feature]: email notifications 
 app.use('/api/notifications', notificationRoutes);
