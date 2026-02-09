@@ -11,6 +11,8 @@ const errorHandler = require('./middleware/errorHandler');
 // Added this line for [Feature]: email notifications 
 const notificationRoutes = require('./routes/notifications');
 
+const startComplianceListeners = require('./listeners/complianceListener');
+
 const app = express();
 const server = http.createServer(app);
 
@@ -109,5 +111,13 @@ server.listen(PORT, () => {
 });
 
 listenForTokenization();
+
+
+// Start compliance/on-chain event listeners to keep wallet KYC mappings in sync
+try {
+  startComplianceListeners();
+} catch (err) {
+  console.error('[server] Failed to start compliance listeners:', err && err.message ? err.message : err);
+}
 
 module.exports = app;
