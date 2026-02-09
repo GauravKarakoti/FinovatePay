@@ -21,14 +21,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardStats, setDashboardStats] = useState({
-      totalInvoices: 0,
-      activeEscrows: 0,
-      completed: 0,
-      produceLots: 0,
-  });
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
+  const { resetStats } = useStatsActions(); 
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -89,17 +83,15 @@ function App() {
     setIsChatbotOpen(prevState => !prevState);
   };
 
-  // ✅ AUTH GUARD: Saves intended route in location state
+  // ✅ AUTH GUARD
   const RequireAuth = ({ children, allowedRoles }) => {
     const location = useLocation();
     
     if (!user) {
-      // Not logged in: redirect to login, remembering where they came from
       return <Navigate to="/login" state={{ from: location.pathname }} replace />;
     }
     
     if (allowedRoles && !allowedRoles.includes(user.role)) {
-      // Logged in but wrong role: send to home (which handles role-based landing)
       return <Navigate to="/" replace />;
     }
     
@@ -116,10 +108,10 @@ function App() {
             walletConnected={walletConnected}
             onUserUpdate={setUser}
         />
-        {console.log('Current user role in App.jsx:', user)}
+        
         <main>
           <Routes>
-            {/* Home route - keeps existing role-based logic */}
+            {/* --- ROOT ROUTE (Role-Based Redirect) --- */}
             <Route 
                 path="/" 
                 element={
@@ -133,6 +125,7 @@ function App() {
                         ) : user.role === 'investor' ? (
                             <Navigate to="/investor" />
                         ) : (
+                            // Default to Seller Dashboard for sellers
                             renderDashboard(<SellerDashboard activeTab={activeTab} />)
                         )
                     ) : (
@@ -141,7 +134,17 @@ function App() {
                 } 
             />
             
-            {/* ✅ PROTECTED: Buyer */}
+            {/* ✅ ADDED: EXPLICIT SELLER DASHBOARD ROUTE */}
+            <Route 
+                path="/seller-dashboard" 
+                element={
+                    <RequireAuth allowedRoles={['seller']}>
+                        {renderDashboard(<SellerDashboard activeTab={activeTab} />)}
+                    </RequireAuth>
+                }
+            />
+            
+            {/* ✅ Buyer Route */}
             <Route 
                 path="/buyer" 
                 element={
@@ -151,7 +154,7 @@ function App() {
                 }
             />
             
-            {/* ✅ PROTECTED: Investor */}
+            {/* ✅ Investor Route */}
             <Route 
                 path="/investor" 
                 element={
@@ -161,7 +164,7 @@ function App() {
                 }
             />
             
-            {/* ✅ PROTECTED: Admin */}
+            {/* ✅ Admin Route */}
             <Route 
               path="/admin"
               element={
@@ -171,7 +174,7 @@ function App() {
               } 
             />
             
-            {/* ✅ PROTECTED: Shipment/Warehouse */}
+            {/* ✅ Shipment Route */}
             <Route 
               path="/shipment" 
               element={
