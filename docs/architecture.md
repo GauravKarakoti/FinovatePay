@@ -9,14 +9,13 @@ FinovatePay is a hybrid payment rail for B2B payments that combines off-chain UX
 1. **Frontend**: React application with wallet integration
 2. **Backend**: Node.js/Express API server with Socket.IO for real-time updates
 3. **Database**: PostgreSQL for storing application data
-4. **Blockchain**: Ethereum L2 (Polygon) for smart contracts
+4. **Blockchain**: Polygon for smart contracts
 5. **Storage**: IPFS/S3 for document storage
 
 ### Smart Contracts
-1. **InvoiceRegistry**: Records invoice hashes and metadata on-chain
-2. **EscrowContract**: Handles payment escrow and dispute resolution
-3. **ComplianceManager**: Manages KYC status and account freezing
-4. **FractionToken**: ERC-1155 for tokenizing invoices (optional v2)
+1. **EscrowContract**: Handles payment escrow and dispute resolution
+2. **ComplianceManager**: Manages KYC status and account freezing
+3. **FractionToken**: ERC-1155 for tokenizing invoices (optional v2)
 
 ### Data Flow
 1. Seller creates invoice → stored in DB with hash recorded on-chain
@@ -47,7 +46,7 @@ FinovatePay is a hybrid payment rail for B2B payments that combines off-chain UX
 - Frontend: Vercel/Netlify
 - Backend: AWS/Azure/Google Cloud
 - Database: Managed PostgreSQL (AWS RDS, Google Cloud SQL)
-- Blockchain: Polygon/Mumbai testnet initially, then mainnet
+- Blockchain: Polygon Amoy testnet initially, then mainnet
 - Storage: IPFS cluster or S3-compatible storage
 
 ---

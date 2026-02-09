@@ -1,6 +1,6 @@
 const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 const { getFinancingManagerContract } = require('../config/blockchain');
 
