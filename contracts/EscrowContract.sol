@@ -35,7 +35,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     }
     
     mapping(bytes32 => Escrow) public escrows;
-    mapping(address => bool) public arbitrators;
     
     ComplianceManager public complianceManager;
     address public admin;
@@ -43,6 +42,26 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     address public invoiceFactory;
     address public keeper;
     uint256 public feeBasisPoints;
+    
+    // --- Arbitrator Registry ---
+    mapping(address => bool) public isArbitrator;
+    // ================= MULTISIG MANAGEMENT =================
+    
+    mapping(address => bool) public managers;
+    uint256 public approvalThreshold;
+    uint256 public proposalCount;
+    
+    enum Action { AddArbitrator, RemoveArbitrator }
+    
+    struct Proposal {
+        address arbitrator;
+        Action action;
+        uint256 approvals;
+        bool executed;
+        mapping(address => bool) approvedBy;
+    }
+    
+    mapping(uint256 => Proposal) public proposals;
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -53,6 +72,13 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     event TreasuryUpdated(address indexed newTreasury);
     event FeeUpdated(uint256 newFeeBasisPoints);
     event FeeTaken(bytes32 indexed invoiceId, uint256 feeAmount);
+    
+    // Multisig events
+    event ManagerAdded(address manager);
+    event ManagerRemoved(address manager);
+    event ProposalCreated(uint256 id, address arbitrator, Action action);
+    event ProposalApproved(uint256 id, address manager);
+    event ProposalExecuted(uint256 id);
     event ComplianceManagerUpdated(address indexed newComplianceManager);
     event InvoiceFactoryUpdated(address indexed newInvoiceFactory);
     event ArbitratorAdded(address indexed arbitrator);
@@ -62,19 +88,20 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         require(msg.sender == admin, "Not admin");
         _;
     }
-<<<<<<< HEAD
+    
+    modifier onlyManager() {
+        require(managers[msg.sender], "Not manager");
+        _;
+    }
+    
 
     // --- MINIMAL FIX: Allow admin OR arbitrators to resolve disputes ---
-=======
-
     modifier onlyCompliant(address _account) {
         require(!complianceManager.isFrozen(_account), "Account frozen");
         require(complianceManager.hasIdentity(_account), "Identity not verified (No SBT)");
         _;
     }
 
-<<<<<<< HEAD
-=======
     modifier onlyEscrowParty(bytes32 _invoiceId) {
         Escrow storage escrow = escrows[_invoiceId];
         require(
@@ -87,14 +114,25 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         _;
     }
     
->>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
+    modifier onlyAdminOrArbitrator() {
+        require(msg.sender == admin || isArbitrator[msg.sender], "Not admin or arbitrator");
+        _;
+    }
+    
     constructor(address _complianceManager) {
         require(_complianceManager != address(0), "Invalid compliance manager");
         admin = msg.sender;
         treasury = msg.sender;
         keeper = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        // Admin is default arbitrator
+        isArbitrator[msg.sender] = true;
+        
+        // Initialize multisig: admin is first manager, threshold starts at 1
+        managers[msg.sender] = true;
+        approvalThreshold = 1;
         emit ComplianceManagerUpdated(_complianceManager);
+        emit ArbitratorAdded(msg.sender);
     }
 
     function setInvoiceFactory(address _invoiceFactory) external onlyAdmin {
@@ -103,7 +141,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit InvoiceFactoryUpdated(_invoiceFactory);
     }
     
-<<<<<<< HEAD
     // --- Multi-signature arbitrator management ---
     function proposeAddArbitrator(address _arbitrator) external {
         require(_arbitrator != address(0), "Invalid address");
@@ -150,7 +187,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     }
 
     function _addArbitrator(address _arbitrator) internal {
-=======
     function setKeeper(address _keeper) external onlyAdmin {
         require(_keeper != address(0), "Invalid keeper");
         keeper = _keeper;
@@ -158,7 +194,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     
     function addArbitrator(address _arbitrator) external onlyAdmin {
         require(_arbitrator != address(0), "Invalid arbitrator");
->>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
         arbitrators[_arbitrator] = true;
         emit ArbitratorAdded(_arbitrator);
     }
@@ -180,6 +215,29 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit FeeUpdated(_feeBasisPoints);
     }
 
+    // --- Internal Arbitrator Management ---
+    function _addArbitrator(address arb) internal {
+        require(arb != address(0), "Invalid address");
+        require(!isArbitrator[arb], "Already arbitrator");
+        isArbitrator[arb] = true;
+    }
+
+    function _removeArbitrator(address arb) internal {
+        require(isArbitrator[arb], "Not arbitrator");
+        isArbitrator[arb] = false;
+    }
+
+    // --- External Entry Points for Arbitrator Management ---
+    function addArbitrator(address arb) external onlyAdmin {
+        _addArbitrator(arb);
+        emit ArbitratorAdded(arb);
+    }
+
+    function removeArbitrator(address arb) external onlyAdmin {
+        _removeArbitrator(arb);
+        emit ArbitratorRemoved(arb);
+    }
+
     function createEscrow(
         bytes32 _invoiceId,
         address _seller,
@@ -199,6 +257,9 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
 
         // Default arbitrator to admin if not provided
         address assignedArbitrator = _arbitrator == address(0) ? admin : _arbitrator;
+        
+        // Enforce approved arbitrator
+        require(isArbitrator[assignedArbitrator], "Not approved arbitrator");
 
         escrows[_invoiceId] = Escrow({
             seller: _seller,
@@ -276,6 +337,11 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external nonReentrant onlyAdminOrArbitrator {
         Escrow storage escrow = escrows[_invoiceId];
+        
+        // Double protection for arbitrators
+        require(isArbitrator[msg.sender], "Not approved arbitrator");
+        require(msg.sender == escrow.arbitrator, "Not assigned arbitrator");
+        
         require(escrow.status == EscrowStatus.Disputed, "No dispute raised");
         require(escrow.disputeRaised, "Dispute not active");
         
@@ -367,12 +433,9 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
             IERC20 token = IERC20(escrow.token);
             require(token.transfer(escrow.buyer, escrow.amount), "Refund failed");
         }
-<<<<<<< HEAD
 
         emit EscrowExpired(_invoiceId);
     }
-=======
->>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
 
         emit EscrowCancelled(_invoiceId);
         delete escrows[_invoiceId];
@@ -395,5 +458,83 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     // Emergency function to recover stuck NFTs (admin only)
     function recoverNFT(address _nftContract, uint256 _tokenId) external onlyAdmin {
         IERC721(_nftContract).transferFrom(address(this), admin, _tokenId);
+    }
+    
+    // ================= MULTISIG FUNCTIONS =================
+    
+    /**
+     * @notice Create a proposal to add or remove an arbitrator (manager)
+     * @param _arb The arbitrator address to add or remove
+     * @param _add True to add, false to remove
+     * @return proposalId The ID of the created proposal
+     */
+    function proposeArbitrator(address _arb, bool _add)
+        external
+        onlyManager
+        returns (uint256 proposalId)
+    {
+        require(_arb != address(0), "Invalid address");
+        
+        proposalId = proposalCount++;
+        
+        Proposal storage p = proposals[proposalId];
+        p.arbitrator = _arb;
+        p.action = _add ? Action.AddArbitrator : Action.RemoveArbitrator;
+        
+        emit ProposalCreated(proposalId, _arb, p.action);
+    }
+    
+    /**
+     * @notice Approve an existing proposal
+     * @param _id The proposal ID to approve
+     */
+    function approveProposal(uint256 _id)
+        external
+        onlyManager
+    {
+        Proposal storage p = proposals[_id];
+        
+        require(!p.executed, "Already executed");
+        require(!p.approvedBy[msg.sender], "Already approved");
+        
+        p.approvedBy[msg.sender] = true;
+        p.approvals++;
+        
+        emit ProposalApproved(_id, msg.sender);
+    }
+    
+    /**
+     * @notice Execute a proposal once threshold is reached
+     * @param _id The proposal ID to execute
+     */
+    function executeProposal(uint256 _id)
+        external
+        onlyManager
+    {
+        Proposal storage p = proposals[_id];
+        
+        require(!p.executed, "Already executed");
+        require(p.approvals >= approvalThreshold, "Not enough approvals");
+        
+        p.executed = true;
+        
+        if (p.action == Action.AddArbitrator) {
+            managers[p.arbitrator] = true;
+            emit ManagerAdded(p.arbitrator);
+        } else {
+            managers[p.arbitrator] = false;
+            emit ManagerRemoved(p.arbitrator);
+        }
+        
+        emit ProposalExecuted(_id);
+    }
+    
+    /**
+     * @notice Update the required approval threshold (admin only)
+     * @param _t The new threshold value
+     */
+    function setApprovalThreshold(uint256 _t) external onlyAdmin {
+        require(_t > 0, "Threshold must be > 0");
+        approvalThreshold = _t;
     }
 }
