@@ -16,6 +16,7 @@ import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
+import DisputeDashboard from './pages/DisputeDashboard';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -187,6 +188,18 @@ function App() {
                   : <Navigate to="/" />
               } 
             />
+            
+            {/* ✅ PROTECTED: Dispute Center - Accessible to buyer, seller, admin */}
+            <Route 
+              path="/dispute/:invoiceId" 
+              element={
+                <RequireAuth allowedRoles={['buyer', 'seller', 'admin']}>
+                    {renderDashboard(<DisputeDashboard />)}
+                </RequireAuth>
+              } 
+            />
+            
+            {/* Public: Produce History */}
             <Route 
               path="/produce/:lotId" 
               element={<ProduceHistory />}
