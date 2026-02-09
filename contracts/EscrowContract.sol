@@ -30,6 +30,9 @@ contract EscrowContract is ReentrancyGuard {
     address public treasury;
     uint256 public feeBasisPoints;
     
+    // --- NEW: Arbitrator Registry ---
+    mapping(address => bool) public isArbitrator;
+    
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
@@ -39,6 +42,8 @@ contract EscrowContract is ReentrancyGuard {
     event TreasuryUpdated(address indexed newTreasury);
     event FeeUpdated(uint256 newFeeBasisPoints);
     event FeeTaken(bytes32 indexed invoiceId, uint256 feeAmount);
+    event ArbitratorAdded(address indexed arbitrator);
+    event ArbitratorRemoved(address indexed arbitrator);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
@@ -56,6 +61,9 @@ contract EscrowContract is ReentrancyGuard {
         admin = msg.sender;
         treasury = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        // Admin is default arbitrator
+        isArbitrator[msg.sender] = true;
+        emit ArbitratorAdded(msg.sender);
     }
     
     function setTreasury(address _treasury) external onlyAdmin {
@@ -68,6 +76,29 @@ contract EscrowContract is ReentrancyGuard {
         require(_feeBasisPoints <= 1000, "Fee too high"); // Max 10%
         feeBasisPoints = _feeBasisPoints;
         emit FeeUpdated(_feeBasisPoints);
+    }
+
+    // --- NEW: Internal Arbitrator Management ---
+    function _addArbitrator(address arb) internal {
+        require(arb != address(0), "Invalid address");
+        require(!isArbitrator[arb], "Already arbitrator");
+        isArbitrator[arb] = true;
+    }
+
+    function _removeArbitrator(address arb) internal {
+        require(isArbitrator[arb], "Not arbitrator");
+        isArbitrator[arb] = false;
+    }
+
+    // --- NEW: External Entry Points (Temporary until multisig) ---
+    function addArbitrator(address arb) external onlyAdmin {
+        _addArbitrator(arb);
+        emit ArbitratorAdded(arb);
+    }
+
+    function removeArbitrator(address arb) external onlyAdmin {
+        _removeArbitrator(arb);
+        emit ArbitratorRemoved(arb);
     }
 
     function createEscrow(
@@ -87,6 +118,9 @@ contract EscrowContract is ReentrancyGuard {
 
         // Default arbitrator to admin if not provided
         address assignedArbitrator = _arbitrator == address(0) ? admin : _arbitrator;
+        
+        // --- NEW: Enforce approved arbitrator ---
+        require(isArbitrator[assignedArbitrator], "Not approved arbitrator");
 
         escrows[_invoiceId] = Escrow({
             seller: _seller,
@@ -145,7 +179,11 @@ contract EscrowContract is ReentrancyGuard {
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.arbitrator, "Not arbitrator");
+        
+        // --- NEW: Double protection for arbitrators ---
+        require(isArbitrator[msg.sender], "Not approved arbitrator");
+        require(msg.sender == escrow.arbitrator, "Not assigned arbitrator");
+        
         require(escrow.state == State.Disputed, "No dispute raised");
         
         escrow.disputeResolver = msg.sender;
