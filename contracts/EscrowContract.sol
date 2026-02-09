@@ -186,7 +186,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit ProposalExecuted(_proposalId);
     }
 
-    function _addArbitrator(address _arbitrator) internal {
     function setKeeper(address _keeper) external onlyAdmin {
         require(_keeper != address(0), "Invalid keeper");
         keeper = _keeper;
@@ -435,8 +434,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         }
 
         emit EscrowExpired(_invoiceId);
-    }
-
         emit EscrowCancelled(_invoiceId);
         delete escrows[_invoiceId];
     }
