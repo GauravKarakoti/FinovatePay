@@ -77,3 +77,25 @@ To achieve mass adoption, FinovatePay will evolve into a dedicated L2 for global
 | Tokenized Invoice Financing (v2) | 🔄 Planned       |
 | Fiat On-Ramp Integration         | 🔄 Planned       |
 | Smart Contract Audit             | 🔄 Planned       |
+---
+
+## 🚀 Deployment
+
+### Polygon Amoy Testnet
+
+FinovatePay smart contracts can be deployed to Polygon Amoy testnet using automated CI/CD pipelines or manual scripts.
+
+**Quick Deploy:**
+```bash
+npx hardhat run scripts/deploy.cjs --network amoy
+```
+
+**Environment Variables Required:**
+```bash
+AMOY_RPC_URL=https://rpc-amoy.polygon.technology/
+AMOY_PRIVATE_KEY=your_private_key_here
+```
+
+**Full Guide:** See [Deployment Documentation](docs/DEPLOY.md)
+
+**CI/CD Workflow:** Automatically deploys on push to `contrib` or `main`. View logs in [Actions](../../actions) tab.

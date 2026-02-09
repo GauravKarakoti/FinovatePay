@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+    .email-wrapper { background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; }
+    .content { padding: 30px; }
+    .content p { margin: 15px 0; }
+    .details { background-color: #f9f9f9; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; }
+    .details-row { display: flex; justify-content: space-between; margin: 8px 0; }
+    .details-label { font-weight: bold; color: #666; }
+    .details-value { color: #333; }
+    .button { display: inline-block; background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 20px; font-weight: bold; }
+    .button:hover { background-color: #764ba2; }
+    .footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #ddd; }
+    .footer a { color: #667eea; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="email-wrapper">
+      <div class="header">
+        <h1>📄 Invoice Created</h1>
+      </div>
+      
+      <div class="content">
+        <p>Hi {{userName}},</p>
+        
+        <p>A new invoice has been created successfully on <strong>FinovatePay</strong>. Below are the details:</p>
+        
+        <div class="details">
+          <div class="details-row">
+            <span class="details-label">Invoice ID:</span>
+            <span class="details-value">{{invoiceId}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Amount:</span>
+            <span class="details-value">{{amount}} {{currency}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Due Date:</span>
+            <span class="details-value">{{dueDate}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Buyer:</span>
+            <span class="details-value">{{buyerName}}</span>
+          </div>
+        </div>
+        
+        <p>You can view and manage this invoice from your dashboard:</p>
+        
+        <a href="{{dashboardUrl}}" class="button">View Invoice</a>
+        
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+          If you have any questions or need assistance, please don't hesitate to contact our support team.
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>&copy; 2026 {{companyName}}. All rights reserved.</p>
+        <p><a href="{{unsubscribeUrl}}">Unsubscribe from emails</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
