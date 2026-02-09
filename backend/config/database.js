@@ -12,7 +12,7 @@ const dbConfig = {
     // SSL Configuration for Cloud Providers (Render, Heroku, Neon, etc.)
     ssl: (process.env.NODE_ENV === 'production' || process.env.DB_SSL === 'true') ? {
       rejectUnauthorized: false
-    },
+    } : undefined,
     
     // Enhanced Pool Settings for Maximum Resilience
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 30000,

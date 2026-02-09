@@ -10,6 +10,8 @@ const shipmentRoutes = require('./routes/shipment');
 const listenForTokenization = require('./listeners/contractListener');
 const errorHandler = require('./middleware/errorHandler');
 
+const startComplianceListeners = require('./listeners/complianceListener');
+
 const app = express();
 const server = http.createServer(app);
 
@@ -50,7 +52,6 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 const { pool, getConnection } = require('./config/database');
-const listenForTokenization = require('./listeners/contractListener');
 const testDbConnection = require('./utils/testDbConnection');
 
 testDbConnection();
@@ -103,5 +104,13 @@ server.listen(PORT, () => {
 });
 
 listenForTokenization();
+
+
+// Start compliance/on-chain event listeners to keep wallet KYC mappings in sync
+try {
+  startComplianceListeners();
+} catch (err) {
+  console.error('[server] Failed to start compliance listeners:', err && err.message ? err.message : err);
+}
 
 module.exports = app;
