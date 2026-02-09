@@ -1,0 +1,14 @@
+name: Keep-Alive Ping
+
+on:
+  schedule:
+    # Runs every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the bot's health check endpoint
+        run: curl -s --max-time 30 "https://finovatepay.onrender.com" > /dev/null || true

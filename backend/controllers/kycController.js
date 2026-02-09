@@ -1,8 +1,110 @@
-const pool = require('../config/database');
+const { pool } = require('../config/database');
 const sandboxService = require('../services/sandboxService');
 const { ethers } = require('ethers');
 const { getSigner, contractAddresses } = require('../config/blockchain');
 const ComplianceManagerArtifact = require('../../deployed/ComplianceManager.json');
+
+/**
+ * Verify or upsert a wallet-level KYC mapping
+ * Can manually record a wallet's KYC verification or trigger on-chain verification
+ * Admin-only: Can set onChain: true to execute on-chain tx
+ */
+exports.verifyWallet = async (req, res) => {
+  const { walletAddress, provider, verificationHash, status, riskLevel, onChain } = req.body;
+  const caller = req.user?.id || null;
+
+  if (!walletAddress) {
+    return res.status(400).json({ success: false, error: 'walletAddress is required' });
+  }
+
+  try {
+    // Record wallet KYC mapping in database
+    const kycService = require('../services/kycService');
+    await kycService.upsertWalletMapping({
+      walletAddress,
+      status: status || 'verified',
+      riskLevel: riskLevel || 'low',
+      provider: provider || 'manual',
+      verificationHash: verificationHash || null,
+      onChainVerified: false,
+      verifiedAt: new Date()
+    });
+
+    // Optionally trigger on-chain verification (admin only)
+    if (onChain && req.user && req.user.role === 'admin') {
+      const signer = getSigner();
+      const complianceManager = new ethers.Contract(
+        contractAddresses.complianceManager,
+        ComplianceManagerArtifact.abi,
+        signer
+      );
+
+      console.log(`[kycController] Executing on-chain verifyKYC for: ${walletAddress}`);
+      const tx = await complianceManager.verifyKYC(walletAddress);
+      await tx.wait();
+      
+      // Sync on-chain status back into DB
+      const kycService = require('../services/kycService');
+      await kycService.syncWithBlockchain(walletAddress);
+    }
+
+    // Emit real-time update via Socket.io if available
+    try {
+      const io = req.app.get('io');
+      if (io && caller) {
+        io.to(`user-${caller}`).emit('wallet-kyc-updated', { walletAddress });
+      }
+    } catch (emitErr) {
+      console.warn('[kycController] emit wallet kyc update failed:', emitErr.message || emitErr);
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Wallet KYC mapping recorded successfully',
+      walletAddress 
+    });
+  } catch (error) {
+    console.error('[kycController] verifyWallet error:', error.message || error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Internal server error' 
+    });
+  }
+};
+
+/**
+ * Get wallet-level KYC status
+ * Check if a wallet has been verified and its risk level
+ */
+exports.getWalletStatus = async (req, res, walletParam) => {
+  try {
+    const kycService = require('../services/kycService');
+    
+    // Get wallet address from path param, query param, or body
+    const walletAddress = walletParam || req.params?.wallet || req.query?.wallet || req.body?.wallet;
+    
+    if (!walletAddress) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'wallet address required' 
+      });
+    }
+
+    // Query service for wallet status
+    const status = await kycService.getWalletStatus(walletAddress);
+    
+    res.json({ 
+      success: true, 
+      data: status 
+    });
+  } catch (error) {
+    console.error('[kycController] getWalletStatus error:', error.message || error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Internal server error' 
+    });
+  }
+};
 
 exports.initiateKYC = async (req, res) => {
   const { idNumber } = req.body;

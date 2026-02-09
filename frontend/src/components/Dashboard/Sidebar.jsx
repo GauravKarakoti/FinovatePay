@@ -1,6 +1,8 @@
 import React from 'react';
+import { useStats } from '../../context/StatsContext';
 
-const Sidebar = ({ activeTab, onTabChange, user, stats }) => {
+const Sidebar = ({ activeTab, onTabChange, user }) => {
+  const { stats } = useStats();
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'quotations', label: 'Quotations', icon: '💬' },
@@ -20,11 +22,12 @@ const Sidebar = ({ activeTab, onTabChange, user, stats }) => {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
   }
 
+  const visibleTabs = user?.role === 'investor' ? tabs.filter(tab => !['quotations', 'invoices', 'payments', 'produce', 'escrow'].includes(tab.id)) : tabs;
   return (
     <div className="bg-white shadow-md rounded-lg p-4 h-fit">
       <h2 className="text-lg font-semibold mb-4">Navigation</h2>
       <ul className="space-y-2">
-        {tabs.map(tab => (
+        {visibleTabs.map(tab => (
           <li key={tab.id}>
             <button
               onClick={() => onTabChange(tab.id)}

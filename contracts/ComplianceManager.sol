@@ -3,14 +3,16 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "./interfaces/IComplianceRegistry.sol";
 
 contract ComplianceManager is ERC721, Ownable {
     uint256 private _nextTokenId;
     mapping(address => bool) private frozenAccounts;
     mapping(address => bool) private kycVerified;
     mapping(address => uint256) public userTokenId;
-    
-    event AccountFrozen(address indexed account);
+    IComplianceRegistry public complianceRegistry;
+
+    event AccountFrozen(address indexed account,string reason);
     event AccountUnfrozen(address indexed account);
     event KYCVerified(address indexed account);
     event KYCRevoked(address indexed account);
@@ -21,10 +23,15 @@ contract ComplianceManager is ERC721, Ownable {
      * @dev Sets the contract deployer as the initial owner.
      */
     constructor() ERC721("FinovateVerified", "FVT-ID") Ownable(msg.sender) {}
-    
-    function freezeAccount(address _account) external onlyOwner {
+
+    function setComplianceRegistry(address registry) external onlyOwner {
+        require(registry != address(0), "Invalid registry");
+        complianceRegistry = IComplianceRegistry(registry);
+    }
+
+    function freezeAccount(address _account,string calldata reason) external onlyOwner {
         frozenAccounts[_account] = true;
-        emit AccountFrozen(_account);
+        emit AccountFrozen(_account,reason);
     }
     
     function unfreezeAccount(address _account) external onlyOwner {
@@ -42,17 +49,23 @@ contract ComplianceManager is ERC721, Ownable {
         emit KYCRevoked(_account);
     }
     
-    function isFrozen(address _account) external view returns (bool) {
+    function isFrozen(address _account) public view returns (bool) {
+        if (address(complianceRegistry) != address(0)) {
+            return complianceRegistry.isFrozen(_account);
+        }
         return frozenAccounts[_account];
     }
     
-    function isKYCVerified(address _account) external view returns (bool) {
+    function isKYCVerified(address _account) public view returns (bool) {
+        if (address(complianceRegistry) != address(0)) {
+            return complianceRegistry.isKYCVerified(_account);
+        }
         return kycVerified[_account];
     }
     
     modifier onlyCompliant(address _account) {
-        require(!frozenAccounts[_account], "Account is frozen");
-        require(kycVerified[_account], "KYC not verified");
+        require(!isFrozen(_account), "Account is frozen");
+        require(isKYCVerified(_account), "KYC not verified");
         _;
     }
 
@@ -76,7 +89,10 @@ contract ComplianceManager is ERC721, Ownable {
         emit IdentityRevoked(from, tokenId);
     }
 
-    function hasIdentity(address account) external view returns (bool) {
+    function hasIdentity(address account) public view returns (bool) {
+        if (address(complianceRegistry) != address(0)) {
+            return complianceRegistry.hasIdentity(account);
+        }
         return balanceOf(account) > 0;
     }
 
