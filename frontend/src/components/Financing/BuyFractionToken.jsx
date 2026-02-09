@@ -21,7 +21,7 @@ export const BuyFractionToken = ({
 }) => {
 
   const [amount, setAmount] = useState('');
-  const [allowance, setAllowance] = useState(ethers.BigNumber.from(0));
+  const [allowance, setAllowance] = useState(0n);
   const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingAllowance, setIsCheckingAllowance] = useState(true);
@@ -34,25 +34,29 @@ export const BuyFractionToken = ({
       if (typeof maxAmount === 'string' && maxAmount.includes('.')) {
         return maxAmount;
       }
-      return ethers.utils.formatUnits(maxAmount, tokenDecimals);
-    } catch {
+      // Otherwise, assume it's base units and format it
+      return ethers.formatUnits(maxAmount, tokenDecimals);
+    } catch (error) {
+      // Fallback to displaying as-is if formatting fails
       return maxAmount;
     }
   };
 
   const amountInBaseUnits = () => {
     try {
-      return ethers.utils.parseUnits(amount, tokenDecimals);
+      return ethers.parseUnits(amount || '0', tokenDecimals);
     } catch {
-      return ethers.BigNumber.from(0);
+      console.log("Error parsing amount:", amount, "with decimals:", tokenDecimals);
+      return 0n;
     }
   };
 
   const amountToApprove = () => {
     try {
-      return ethers.utils.parseUnits(amount, stablecoinDecimals);
+      return ethers.parseUnits(amount || '0', stablecoinDecimals);
     } catch {
-      return ethers.BigNumber.from(0);
+      console.log("Error parsing amount for approval:", amount, "with decimals:", stablecoinDecimals);
+      return 0n;
     }
   };
 
@@ -69,7 +73,8 @@ export const BuyFractionToken = ({
       try {
         setIsCheckingAllowance(true);
         const currentAllowance = await checkStablecoinAllowance(stablecoinAddress);
-        setAllowance(currentAllowance);
+        setAllowance(currentAllowance ?? 0n);
+        console.log("Current allowance:", ethers.formatUnits(currentAllowance ?? 0n, stablecoinDecimals));
       } catch (err) {
         console.error(err);
       } finally {
@@ -89,10 +94,9 @@ export const BuyFractionToken = ({
     }
 
     const needed = amountToApprove();
-    setIsApproved(allowance.gte(needed));
-  }, [amount, allowance, useNativeToken]);
-
-  /* ================= APPROVE ================= */
+    setIsApproved(allowance >= needed);
+    console.log("Is approved check:", allowance.toString(), "needed:", needed.toString());
+  }, [amount, allowance, stablecoinDecimals, useNativeToken]);
 
   const handleApprove = async () => {
     setIsLoading(true);

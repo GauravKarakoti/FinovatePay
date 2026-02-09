@@ -53,7 +53,6 @@ To achieve mass adoption, FinovatePay will evolve into a dedicated L2 for global
 
 ## 🔐 Smart Contracts
 
-- `🧾 InvoiceRegistry`: Registers invoice hash, metadata, and emits events
 - `🔐 EscrowContract`: Holds payments, handles release and disputes
 - `🚨 ComplianceManager`: Maps KYC status, handles freeze/flag logic
 - `💸 FractionToken` *(v2)*: ERC-1155 tokens for invoice financing
