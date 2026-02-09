@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_call:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies (root)
+        run: npm install
+      - name: Install dependencies (frontend)
+        run: cd frontend && npm install
+      - name: Install dependencies (backend)
+        run: cd backend && npm install
+      - name: Lint frontend
+        run: cd frontend && npm run lint
+      - name: Lint backend
+        run: cd backend && npm run lint
+      - name: Test backend
+        run: cd backend && npm run test:backend
+      - name: Compile contracts
+        run: npx hardhat compile

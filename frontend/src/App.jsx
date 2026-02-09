@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'; // Added useLocation
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -8,13 +8,13 @@ import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ProduceHistory from './pages/ProduceHistory';
+import InvoiceDetails from './pages/InvoiceDetails'; // <--- 1. ADD IMPORT
 import { connectWallet } from './utils/web3';
 import Web3Modal from 'web3modal';
 import './App.css';
 import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
-// 1. Import the new InvestorDashboard
 import InvestorDashboard from './pages/InvestorDashboard';
 
 function App() {
@@ -22,27 +22,26 @@ function App() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardStats, setDashboardStats] = useState({
-      totalInvoices: 0,
-      activeEscrows: 0,
-      completed: 0,
-      produceLots: 0,
+    totalInvoices: 0,
+    activeEscrows: 0,
+    completed: 0,
+    produceLots: 0,
   });
-  // 2. State to manage chatbot visibility
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    
     if (token && userData) {
-      setUser(JSON.parse(userData));
+      const parsedUser = JSON.parse(userData);
+      setUser({ ...parsedUser, token });
     }
 
     const web3Modal = new Web3Modal({ cacheProvider: true });
     if (web3Modal.cachedProvider) {
       connectWallet()
-        .then(() => {
-          setWalletConnected(true);
-        })
+        .then(() => setWalletConnected(true))
         .catch((error) => {
           console.error("Failed to auto-connect wallet:", error);
           setWalletConnected(false);
@@ -50,15 +49,33 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    const tokenToStore = user.token || localStorage.getItem('token');
+    if (tokenToStore) {
+        localStorage.setItem('token', tokenToStore);
+    }
+    localStorage.setItem('user', JSON.stringify(user));
+    setDashboardStats({
+      totalInvoices: 0,
+      activeEscrows: 0,
+      completed: 0,
+      produceLots: 0,
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (user === null && localStorage.getItem('token')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+  }, [user]);
+
   const handleLogin = (userData, token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
+    setUser({ ...userData, token });
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
     setUser(null);
   };
 
@@ -69,24 +86,38 @@ function App() {
   const renderDashboard = (dashboardComponent) => {
     return (
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9]">
-          <div className="md:w-64 flex-shrink-0 hidden md:block">
-              <Sidebar 
-                  activeTab={activeTab} 
-                  onTabChange={handleTabChange} 
-                  user={user} 
-                  stats={dashboardStats} 
-              />
-          </div>
-          <div className="flex-1 overflow-auto">
-              {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
-          </div>
+        <div className="md:w-64 flex-shrink-0 hidden md:block">
+          <Sidebar 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange} 
+            user={user} 
+            stats={dashboardStats} 
+          />
+        </div>
+        <div className="flex-1 overflow-auto">
+          {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
+        </div>
       </div>
     );
   };
 
-  // Chatbot toggle handler
   const toggleChatbot = () => {
-    setIsChatbotOpen(prevState => !prevState);
+    setIsChatbotOpen(p => !p);
+  };
+
+  // Note: Ensure useLocation is imported from 'react-router-dom' if using this component
+  const RequireAuth = ({ children, allowedRoles }) => {
+    const location = useLocation();
+    
+    if (!user) {
+      return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+    }
+    
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      return <Navigate to="/" replace />;
+    }
+    
+    return children;
   };
 
   return (
@@ -94,68 +125,82 @@ function App() {
       <Toaster position="top" richColors />
       <div className="App">
         <Header 
-            user={user} 
-            onLogout={handleLogout} 
-            walletConnected={walletConnected}
-            onUserUpdate={setUser}
+          user={user} 
+          onLogout={handleLogout} 
+          walletConnected={walletConnected}
+          onUserUpdate={setUser}
         />
-        {console.log('Current user role in App.jsx:', user)}
         <main>
           <Routes>
             <Route 
-                path="/" 
-                element={
-                    user ? (
-                        user.role === 'admin' ? (
-                            renderDashboard(<AdminDashboard activeTab={activeTab} />)
-                        ) : user.role === 'buyer' ? (
-                            <Navigate to="/buyer" />
-                        ) : user.role === 'shipment' || user.role === 'warehouse' ? (
-                            <Navigate to="/shipment" />
-                        // 2. Add redirect for 'investor' role
-                        ) : user.role === 'investor' ? (
-                            <Navigate to="/investor" />
-                        ) : (
-                            renderDashboard(<SellerDashboard activeTab={activeTab} />)
-                        )
-                    ) : (
-                        <Navigate to="/login" />
-                    )
-                } 
+              path="/" 
+              element={
+                user ? (
+                  user.role === 'admin' ? (
+                    renderDashboard(<AdminDashboard activeTab={activeTab} />)
+                  ) : user.role === 'buyer' ? (
+                    <Navigate to="/buyer" />
+                  ) : user.role === 'shipment' || user.role === 'warehouse' ? (
+                    <Navigate to="/shipment" />
+                  ) : user.role === 'investor' ? (
+                    <Navigate to="/investor" />
+                  ) : (
+                    renderDashboard(<SellerDashboard activeTab={activeTab} />)
+                  )
+                ) : (
+                  <Navigate to="/login" />
+                )
+              } 
+            />
+            
+            {/* ... other existing routes ... */}
+            
+            <Route 
+              path="/buyer" 
+              element={
+                user && user.role === 'buyer' 
+                  ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
+                  : <Navigate to="/" />
+              }
             />
             <Route 
-                path="/buyer" 
-                element={
-                    user && user.role === 'buyer' 
-                        ? renderDashboard(<BuyerDashboard activeTab={activeTab} />) 
-                        : <Navigate to="/" />
-                }
-            />
-            {/* 3. Add new route for Investor Dashboard */}
-            <Route 
-                path="/investor" 
-                element={
-                    user && user.role === 'investor' 
-                        ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
-                        : <Navigate to="/" />
-                }
+              path="/investor" 
+              element={
+                user && user.role === 'investor' 
+                  ? renderDashboard(<InvestorDashboard activeTab={activeTab} />) 
+                  : <Navigate to="/" />
+              }
             />
             <Route 
               path="/admin"
               element={
-                user && user.role === 'admin' ? renderDashboard(<AdminDashboard activeTab={activeTab} />) : <Navigate to="/" />
+                user && user.role === 'admin' 
+                  ? renderDashboard(<AdminDashboard activeTab={activeTab} />) 
+                  : <Navigate to="/" />
               } 
             />
             <Route 
               path="/shipment" 
               element={
-                user && (user.role === 'shipment' || user.role === 'warehouse') ? <ShipmentDashboard /> : <Navigate to="/" />
+                user && (user.role === 'shipment' || user.role === 'warehouse') 
+                  ? <ShipmentDashboard /> 
+                  : <Navigate to="/" />
               } 
             />
             <Route 
               path="/produce/:lotId" 
               element={<ProduceHistory />}
             />
+
+            {/* --- 2. ADD THIS NEW ROUTE --- */}
+            <Route 
+              path="/invoices/:id" 
+              element={
+                user ? <InvoiceDetails /> : <Navigate to="/login" />
+              } 
+            />
+            {/* ----------------------------- */}
+
             <Route 
               path="/login" 
               element={
@@ -166,15 +211,13 @@ function App() {
               path="/register" 
               element={
                 user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
-              } 
+              }
             />
           </Routes>
         </main>
         
-        {/* 3. Render Chatbot components only if user is logged in */}
         {user && (
           <>
-            {/* 4. Conditionally render the chatbot in a fixed position */}
             <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
               {isChatbotOpen && <FinovateChatbot />}
             </div>
@@ -184,13 +227,11 @@ function App() {
               aria-label="Toggle Chatbot"
             >
               {isChatbotOpen ? (
-                // Close Icon (X)
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                // Chat Icon
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg " className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               )}
