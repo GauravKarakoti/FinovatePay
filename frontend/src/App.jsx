@@ -15,10 +15,14 @@ import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
+import DisputeDashboard from './pages/DisputeDashboard';
 import { useStatsActions } from './context/StatsContext';
 
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardStats, setDashboardStats] = useState({
@@ -31,12 +35,6 @@ function App() {
   const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    if (token && userData) {
-      setUser(JSON.parse(userData));
-    }
-
     const web3Modal = new Web3Modal({ cacheProvider: true });
     if (web3Modal.cachedProvider) {
       connectWallet()
@@ -185,6 +183,16 @@ function App() {
             <Route 
               path="/produce/:lotId" 
               element={<ProduceHistory />}
+            />
+
+            {/* ✅ PROTECTED: Dispute Dashboard */}
+            <Route
+              path="/dispute/:invoiceId"
+              element={
+                  <RequireAuth>
+                      {renderDashboard(<DisputeDashboard />)}
+                  </RequireAuth>
+              }
             />
             
             {/* Auth Pages */}
