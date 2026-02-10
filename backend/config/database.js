@@ -8,9 +8,11 @@ const dbConfig = {
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    ssl: {
+    
+    // SSL Configuration for Cloud Providers (Render, Heroku, Neon, etc.)
+    ssl: (process.env.NODE_ENV === 'production' || process.env.DB_SSL === 'true') ? {
       rejectUnauthorized: false
-    },
+    } : false,
     
     // Enhanced Pool Settings for Maximum Resilience
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 30000,
