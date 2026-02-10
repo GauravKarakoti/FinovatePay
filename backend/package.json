@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "test": "mocha test/eventSync.test.js --timeout 10000",
+    "test:manual": "node test/manual-event-sync-test.js",
     "test:backend": "jest",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
@@ -25,6 +27,7 @@
     "ethers": "^6.15.0",
     "express": "^5.1.0",
     "groq-sdk": "^0.33.0",
+    "handlebars": "^4.7.8",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "pg": "^8.16.3",
@@ -34,6 +37,8 @@
     "uuid": "^12.0.0"
   },
   "devDependencies": {
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
     "nodemon": "^3.1.10"
   }
 }
