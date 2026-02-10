@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,6 +12,7 @@ import {
   connectWallet, getInvoiceFactoryContract, getProduceTrackingContract, erc20ABI 
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
+import socket from '../utils/socket';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import EscrowStatus from '../components/Escrow/EscrowStatus';
@@ -289,7 +289,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     });
   }, [invoices.length, escrowInvoices.length, completedInvoices.length, produceLots.length, setGlobalStats]);
 
-  // Data Fetching
+  // Data Fetching Definitions
   const loadKYCStatus = useCallback(async () => {
     try {
       const { data } = await getKYCStatus();
@@ -337,6 +337,37 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     }
   }, [walletAddress]);
 
+  // ==============================
+  // REAL-TIME SOCKET LISTENERS
+  // ==============================
+  useEffect(() => {
+    if (!selectedInvoice?.invoice_id) return;
+
+    const invoiceId = selectedInvoice.invoice_id;
+
+    socket.emit("join-invoice", invoiceId);
+
+    const handleRelease = (data) => {
+      toast.success(`Escrow released for invoice ${data.invoiceId}`);
+      loadData();
+    };
+
+    const handleDispute = (data) => {
+      toast.error(`Dispute raised for invoice ${data.invoiceId}`);
+      loadData();
+    };
+
+    socket.on("escrow:released", handleRelease);
+    socket.on("escrow:dispute", handleDispute);
+
+    return () => {
+      socket.off("escrow:released", handleRelease);
+      socket.off("escrow:dispute", handleDispute);
+    };
+
+  }, [selectedInvoice, loadData]);
+
+  // Initialization Effects
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     await Promise.all([loadData(), loadKYCStatus()]);
