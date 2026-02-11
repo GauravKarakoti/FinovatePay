@@ -14,7 +14,7 @@ router.post('/request', authenticateToken, kycValidation, async (req, res) => {
         // ... (existing validation logic)
 
         // Bridge collateral to Katana if needed
-        // const bridgeResult = await bridgeService.bridgeToKatana(collateralTokenId, amount, userId);
+        const bridgeResult = await bridgeService.bridgeToKatana(collateralTokenId, amount, userId);
 
         // Borrow from Katana liquidity
         const borrowResult = await bridgeService.borrowFromKatana(asset, amount, collateralTokenId);
