@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const path = require('path'); // Added for static files
 const socketIo = require('socket.io');
 require('dotenv').config();
 
@@ -51,6 +52,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploads
 
 const { pool, getConnection } = require('./config/database');
 const testDbConnection = require('./utils/testDbConnection');
@@ -108,12 +110,13 @@ app.use('/api/health', require('./routes/health'));
 app.use('/api/auth', require('./routes/auth'));
 
 app.use('/api/invoices', require('./routes/invoice'));
-// app.use('/api/payments', require('./routes/payment'));
-// app.use('/api/admin', require('./routes/admin'));
-// app.use('/api/kyc', require('./routes/kyc'));
-// app.use('/api/produce', require('./routes/produce'));
-// app.use('/api/quotations', require('./routes/quotation'));
-// app.use('/api/market', require('./routes/market'));
+app.use('/api/payments', require('./routes/payment'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/kyc', require('./routes/kyc'));
+app.use('/api/produce', require('./routes/produce'));
+app.use('/api/quotations', require('./routes/quotation'));
+app.use('/api/market', require('./routes/market'));
+app.use('/api/dispute', require('./routes/dispute')); // Dispute Dashboard
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
 app.use('/api/documents', documentRoutes); // ✅ NEW

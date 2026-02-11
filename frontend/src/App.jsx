@@ -1,24 +1,55 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from 'react-router-dom';
+
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
 import Register from './components/Register';
+
 import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import InvestorDashboard from './pages/InvestorDashboard';
+import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
 import InvoiceDetails from './pages/InvoiceDetails';
-import ShipmentDashboard from './pages/ShipmentDashboard';
-import InvestorDashboard from './pages/InvestorDashboard';
+import DisputeDashboard from './pages/DisputeDashboard';
+
+import FinovateChatbot from './components/Chatbot/Chatbot';
+
 import { connectWallet } from './utils/web3';
 import Web3Modal from 'web3modal';
 import { Toaster } from 'sonner';
-import FinovateChatbot from './components/Chatbot/Chatbot';
+
 import './App.css';
 
+function RequireAuth({ children, allowedRoles }) {
+  const location = useLocation();
+  const user = JSON.parse(localStorage.getItem('user'));
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
+
 function App() {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+
   const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
@@ -47,24 +78,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      return;
+    }
 
     localStorage.setItem('token', user.token);
     localStorage.setItem('user', JSON.stringify(user));
-
-    setDashboardStats({
-      totalInvoices: 0,
-      activeEscrows: 0,
-      completed: 0,
-      produceLots: 0,
-    });
-  }, [user]);
-
-  useEffect(() => {
-    if (user === null) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-    }
   }, [user]);
 
   const handleLogin = (userData, token) => {
@@ -91,23 +112,10 @@ function App() {
     </div>
   );
 
-  const RequireAuth = ({ children, allowedRoles }) => {
-    const location = useLocation();
-
-    if (!user) {
-      return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-    }
-
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-      return <Navigate to="/" replace />;
-    }
-
-    return children;
-  };
-
   return (
     <Router>
       <Toaster position="top" richColors />
+
       <Header
         user={user}
         onLogout={handleLogout}
@@ -117,7 +125,7 @@ function App() {
 
       <main>
         <Routes>
-          {/* Root route */}
+          {/* Root */}
           <Route
             path="/"
             element={
@@ -151,9 +159,9 @@ function App() {
           <Route
             path="/buyer"
             element={
-              user?.role === 'buyer'
-                ? renderDashboard(<BuyerDashboard activeTab={activeTab} />)
-                : <Navigate to="/" />
+              <RequireAuth allowedRoles={['buyer']}>
+                {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
+              </RequireAuth>
             }
           />
 
@@ -161,9 +169,9 @@ function App() {
           <Route
             path="/investor"
             element={
-              user?.role === 'investor'
-                ? renderDashboard(<InvestorDashboard activeTab={activeTab} />)
-                : <Navigate to="/" />
+              <RequireAuth allowedRoles={['investor']}>
+                {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
+              </RequireAuth>
             }
           />
 
@@ -171,19 +179,29 @@ function App() {
           <Route
             path="/admin"
             element={
-              user?.role === 'admin'
-                ? renderDashboard(<AdminDashboard activeTab={activeTab} />)
-                : <Navigate to="/" />
+              <RequireAuth allowedRoles={['admin']}>
+                {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
+              </RequireAuth>
             }
           />
 
-          {/* Shipment */}
+          {/* Shipment / Warehouse */}
           <Route
             path="/shipment"
             element={
-              user && (user.role === 'shipment' || user.role === 'warehouse')
-                ? <ShipmentDashboard />
-                : <Navigate to="/" />
+              <RequireAuth allowedRoles={['shipment', 'warehouse']}>
+                <ShipmentDashboard />
+              </RequireAuth>
+            }
+          />
+
+          {/* Dispute Dashboard */}
+          <Route
+            path="/dispute/:invoiceId"
+            element={
+              <RequireAuth>
+                {renderDashboard(<DisputeDashboard />)}
+              </RequireAuth>
             }
           />
 
@@ -194,6 +212,7 @@ function App() {
             element={user ? <InvoiceDetails /> : <Navigate to="/login" />}
           />
 
+          {/* Auth */}
           <Route
             path="/login"
             element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
@@ -206,6 +225,7 @@ function App() {
         </Routes>
       </main>
 
+      {/* Chatbot */}
       {user && (
         <>
           {isChatbotOpen && (
@@ -217,6 +237,7 @@ function App() {
           <button
             onClick={() => setIsChatbotOpen(!isChatbotOpen)}
             className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 z-[1000]"
+            aria-label="Toggle Chatbot"
           >
             {isChatbotOpen ? '✖' : '💬'}
           </button>
