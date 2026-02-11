@@ -1,148 +1,110 @@
-const { pool } = require('../config/database');
-const asyncHandler = require('../utils/asyncHandler');
-const AppError = require('../utils/AppError');
+const  pool  = require('../config/database');
 
-exports.createInvoice = asyncHandler(async (req, res) => {
-  const client = await pool.connect();
-
+// 1. Create a New Invoice
+const createInvoice = async (req, res) => {
   try {
-    const {
-      quotation_id,
-      invoice_id,
-      invoice_hash,
-      contract_address,
-      token_address,
-      due_date,
-    } = req.body;
+    const { client, amount, due_date, seller_address } = req.body;
 
-    if (!quotation_id || !invoice_id || !contract_address) {
-      throw new AppError(
-        'Missing quotation_id or required on-chain data.',
-        400
-      );
-    }
+    // Default APR is 18% if not provided
+    const annual_apr = req.body.annual_apr || 18.00;
 
-    await client.query('BEGIN');
-
-    // 1. Fetch and lock quotation
-    const quotationQuery = `
-      SELECT * FROM quotations
-      WHERE id = $1 AND status = 'approved'
-      FOR UPDATE
+    const query = `
+      INSERT INTO invoices 
+      (client, amount, due_date, seller_address, status, annual_apr, financing_status) 
+      VALUES ($1, $2, $3, $4, 'pending', $5, 'none') 
+      RETURNING *
     `;
-    const quotationResult = await client.query(quotationQuery, [quotation_id]);
+    
+    const values = [client, amount, due_date, seller_address, annual_apr];
+    const result = await pool.query(query, values);
 
-    if (quotationResult.rows.length === 0) {
-      throw new AppError(
-        'Quotation not found, not fully approved, or already invoiced.',
-        404
-      );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 2. Get Early Payment Offer (The "Get Paid Early" Logic)
+const getEarlyPaymentOffer = async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    
+    // Fetch the invoice
+    const result = await pool.query('SELECT * FROM invoices WHERE invoice_id = $1', [invoiceId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Invoice not found" });
     }
 
-    const quotation = quotationResult.rows[0];
+    const invoice = result.rows[0];
 
-    // RBAC check
-    if (quotation.seller_org_id !== req.user.organization_id) {
-      throw new AppError(
-        'Not authorized: Quotation belongs to a different organization.',
-        403
-      );
+    // Calculate Discount
+    // Formula: (Amount * APR * DaysRemaining) / 365
+    const amount = parseFloat(invoice.amount.replace(/[^0-9.-]+/g, "")); // Remove '$' or 'USDC'
+    const apr = parseFloat(invoice.annual_apr) / 100;
+    
+    const today = new Date();
+    const dueDate = new Date(invoice.due_date);
+    const timeDiff = dueDate.getTime() - today.getTime();
+    const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+    // If invoice is overdue or due today, no discount possible
+    if (daysRemaining <= 0) {
+      return res.json({ eligible: false, message: "Invoice is due or overdue" });
     }
 
-    // 2. Handle produce lot inventory
-    if (quotation.lot_id) {
-      const lotQuery = `
-        SELECT current_quantity
-        FROM produce_lots
-        WHERE lot_id = $1
-        FOR UPDATE
-      `;
-      const lotResult = await client.query(lotQuery, [quotation.lot_id]);
+    const discountAmount = (amount * apr * daysRemaining) / 365;
+    const offerAmount = amount - discountAmount;
 
-      if (lotResult.rows.length === 0) {
-        throw new AppError('Produce lot not found.', 404);
-      }
+    res.json({
+      eligible: true,
+      originalAmount: amount,
+      discountAmount: discountAmount.toFixed(2),
+      offerAmount: offerAmount.toFixed(2),
+      daysRemaining,
+      apr: (apr * 100).toFixed(2)
+    });
 
-      const lot = lotResult.rows[0];
+  } catch (error) {
+    console.error("Error generating offer:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
 
-      if (
-        parseFloat(lot.current_quantity) <
-        parseFloat(quotation.quantity)
-      ) {
-        throw new AppError(
-          `Insufficient quantity. Only ${lot.current_quantity}kg available.`,
-          400
-        );
-      }
+// 3. Settle Invoice Early (Accept the offer)
+const settleInvoiceEarly = async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+    
+    // In a real app, this is where you would trigger the Blockchain Transaction.
+    // For now, we update the database to reflect the settlement.
 
-      const updateLotQuery = `
-        UPDATE produce_lots
-        SET current_quantity = current_quantity - $1
-        WHERE lot_id = $2
-      `;
-      await client.query(updateLotQuery, [
-        quotation.quantity,
-        quotation.lot_id,
-      ]);
-    }
-
-    // 3. Insert invoice
-    const insertInvoiceQuery = `
-      INSERT INTO invoices (
-        invoice_id, invoice_hash, seller_address, buyer_address,
-        amount, due_date, description, items, currency,
-        contract_address, token_address, lot_id, quotation_id,
-        escrow_status, financing_status
-      )
-      VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9,
-        $10, $11, $12, $13, 'created', 'none'
-      )
+    const query = `
+      UPDATE invoices 
+      SET status = 'paid', 
+          financing_status = 'early_paid', 
+          settled_at = NOW() 
+      WHERE invoice_id = $1 
       RETURNING *
     `;
 
-    const values = [
-      invoice_id,
-      invoice_hash,
-      quotation.seller_address,
-      quotation.buyer_address,
-      quotation.total_amount,
-      due_date,
-      quotation.description,
-      JSON.stringify([
-        {
-          description: quotation.description,
-          quantity: quotation.quantity,
-          price_per_unit: quotation.price_per_unit / 50.75,
-        },
-      ]),
-      quotation.currency,
-      contract_address,
-      token_address,
-      quotation.lot_id,
-      quotation_id,
-    ];
+    const result = await pool.query(query, [invoiceId]);
 
-    const result = await client.query(insertInvoiceQuery, values);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
 
-    // 4. Update quotation status
-    const updateQuotationQuery = `
-      UPDATE quotations
-      SET status = 'invoiced'
-      WHERE id = $1
-    `;
-    await client.query(updateQuotationQuery, [quotation_id]);
+    res.json({ success: true, message: "Invoice settled early!", invoice: result.rows[0] });
 
-    await client.query('COMMIT');
-
-    res.status(201).json({
-      success: true,
-      invoice: result.rows[0],
-    });
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err; 
-  } finally {
-    client.release();
+  } catch (error) {
+    console.error("Error settling invoice:", error);
+    res.status(500).json({ error: error.message });
   }
-});
+};
+
+module.exports = {
+  createInvoice,
+  getEarlyPaymentOffer,
+  settleInvoiceEarly
+};

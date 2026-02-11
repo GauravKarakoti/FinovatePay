@@ -1,4 +1,4 @@
-
+version: '3.8'
 
 services:
   backend:
@@ -10,7 +10,6 @@ services:
       - "3000:3000"
     env_file:
       - ./backend/.env
-    
     restart: unless-stopped
 
   frontend:
@@ -27,3 +26,19 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: finovate_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: finovate_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
