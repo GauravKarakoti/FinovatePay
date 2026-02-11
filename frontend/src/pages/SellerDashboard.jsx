@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'sonner';
-import { getSellerInvoices, getKYCStatus } from '../utils/api';
-import { connectWallet } from '../utils/web3';
+import { 
+  getSellerInvoices, createInvoice, updateInvoiceStatus,
+  getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
+  createProduceLot as syncProduceLot, api, getKYCStatus
+} from '../utils/api';
+import { 
+  connectWallet, getInvoiceFactoryContract, getProduceTrackingContract, erc20ABI 
+} from '../utils/web3';
+import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
+import socket from '../utils/socket';
 import { useStatsActions } from '../context/StatsContext';
-
-// Components
 import ExportTransactions from '../components/ExportTransactions';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
@@ -33,7 +39,19 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
   const { setStats: setGlobalStats } = useStatsActions();
 
-  // ------------------ LOAD DATA ------------------
+  // Data Fetching Definitions
+  const loadKYCStatus = useCallback(async () => {
+    try {
+      const { data } = await getKYCStatus();
+      setKycData({
+        status: data.status || 'not_started',
+        riskLevel: data.kyc_risk_level || 'unknown',
+        details: data.details || (data.status === 'verified' ? 'Verified' : 'Pending verification')
+      });
+    } catch (error) {
+      console.error('Failed to load KYC:', error);
+    }
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
@@ -41,6 +59,95 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
       const { address } = await connectWallet();
       setWalletAddress(address);
+      const invoicesData = await getSellerInvoices();
+      setInvoices(invoicesData.data || []);
+    } catch (error) {
+      console.error('Failed to load invoices:', error);
+      toast.error("Failed to load dashboard data");
+    }
+  }, []);
+
+  const loadProduceLots = useCallback(async () => {
+    try {
+      const response = await getSellerLots();
+      setProduceLots(response.data || []);
+    } catch (error) {
+      console.error('Failed to load produce:', error);
+      toast.error("Could not load produce lots");
+    }
+  }, []);
+
+  const loadQuotations = useCallback(async (currentAddress) => {
+    try {
+      const response = await getQuotations();
+      const sellerQuotations = response.data.filter(q => 
+        q.seller_address.toLowerCase() === (currentAddress || walletAddress).toLowerCase()
+      );
+      setQuotations(sellerQuotations);
+    } catch (error) {
+      console.error('Failed to load quotations:', error);
+    }
+  }, [walletAddress]);
+
+  // ==============================
+  // REAL-TIME SOCKET LISTENERS
+  // ==============================
+  useEffect(() => {
+    if (!selectedInvoice?.invoice_id) return;
+
+    const invoiceId = selectedInvoice.invoice_id;
+
+    socket.emit("join-invoice", invoiceId);
+
+    const handleRelease = (data) => {
+      toast.success(`Escrow released for invoice ${data.invoiceId}`);
+      loadData();
+    };
+
+    const handleDispute = (data) => {
+      toast.error(`Dispute raised for invoice ${data.invoiceId}`);
+      loadData();
+    };
+
+    socket.on("escrow:released", handleRelease);
+    socket.on("escrow:dispute", handleDispute);
+
+    return () => {
+      socket.off("escrow:released", handleRelease);
+      socket.off("escrow:dispute", handleDispute);
+    };
+
+  }, [selectedInvoice, loadData]);
+
+  // Initialization Effects
+  const loadInitialData = useCallback(async () => {
+    setIsLoading(true);
+    await Promise.all([loadData(), loadKYCStatus()]);
+    setIsLoading(false);
+  }, [loadData, loadKYCStatus]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  useEffect(() => {
+    if (walletAddress) loadQuotations(walletAddress);
+  }, [walletAddress, loadQuotations]);
+
+  // Event Handlers
+  const handleSelectInvoice = useCallback((invoice) => {
+    setSelectedInvoice(invoice);
+    setTimelineEvents(generateTimelineEvents(invoice));
+  }, []);
+
+  const handleShowQRCode = useCallback((invoice) => {
+    setSelectedLotQR({
+      lotId: invoice.lot_id,
+      produceType: invoice.produce_type,
+      origin: invoice.origin,
+    });
+    setShowQRCode(true);
+  }, []);
 
       const [invoiceRes, kycRes] = await Promise.all([
         getSellerInvoices(),
