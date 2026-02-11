@@ -118,6 +118,7 @@ app.use('/api/produce', require('./routes/produce'));
 app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 app.use('/api/dispute', require('./routes/dispute')); // Dispute Dashboard
+app.use('/api/relayer', require('./routes/relayer')); // Gasless Relayer
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
 

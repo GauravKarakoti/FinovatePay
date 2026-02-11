@@ -4,9 +4,11 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "./ComplianceManager.sol";
 
-contract EscrowContract is ReentrancyGuard {
+contract EscrowContract is ReentrancyGuard, EIP712 {
     struct Escrow {
         address seller;
         address buyer;
@@ -26,6 +28,10 @@ contract EscrowContract is ReentrancyGuard {
     mapping(bytes32 => Escrow) public escrows;
     ComplianceManager public complianceManager;
     address public admin;
+
+    // Meta-transaction support
+    mapping(address => uint256) public nonces;
+    bytes32 private constant _TYPEHASH = keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -34,7 +40,7 @@ contract EscrowContract is ReentrancyGuard {
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Not admin");
+        require(_msgSender() == admin, "Not admin");
         _;
     }
     
@@ -45,9 +51,39 @@ contract EscrowContract is ReentrancyGuard {
         _;
     }
     
-    constructor(address _complianceManager) {
+    constructor(address _complianceManager) EIP712("EscrowContract", "1") {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+    }
+
+    // --- Meta-Transaction Support ---
+    function executeMetaTx(
+        address user,
+        bytes calldata functionData,
+        bytes calldata signature
+    ) external returns (bytes memory) {
+        bytes32 structHash = keccak256(
+            abi.encode(_TYPEHASH, nonces[user], user, keccak256(functionData))
+        );
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = ECDSA.recover(hash, signature);
+
+        require(signer == user, "Invalid signature");
+        nonces[user]++;
+
+        // Append user address to the end of call data
+        (bool success, bytes memory returnData) = address(this).call(abi.encodePacked(functionData, user));
+        require(success, "Function call failed");
+
+        return returnData;
+    }
+
+    function _msgSender() internal view virtual returns (address) {
+        if (msg.sender == address(this)) {
+            // Read the last 20 bytes of the calldata to get the original sender
+            return address(bytes20(msg.data[msg.data.length - 20:]));
+        }
+        return msg.sender;
     }
     
     function createEscrow(
@@ -88,23 +124,25 @@ contract EscrowContract is ReentrancyGuard {
         return true;
     }
     
-    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(msg.sender) {
+    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(_msgSender()) {
+        address sender = _msgSender();
         Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.buyer == msg.sender, "Not the buyer");
+        require(escrow.buyer == sender, "Not the buyer");
         require(_amount == escrow.amount, "Incorrect amount");
         
         IERC20 token = IERC20(escrow.token);
-        require(token.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+        require(token.transferFrom(sender, address(this), _amount), "Transfer failed");
 
         escrow.buyerConfirmed = true;
-        emit DepositConfirmed(_invoiceId, msg.sender, _amount);
+        emit DepositConfirmed(_invoiceId, sender, _amount);
     }
     
     function confirmRelease(bytes32 _invoiceId) external nonReentrant {
+        address sender = _msgSender();
         Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.seller || msg.sender == escrow.buyer, "Not a party to this escrow");
+        require(sender == escrow.seller || sender == escrow.buyer, "Not a party to this escrow");
 
-        if (msg.sender == escrow.seller) {
+        if (sender == escrow.seller) {
             escrow.sellerConfirmed = true;
         } else {
             // Since the first require confirms the sender is either buyer or seller
@@ -117,19 +155,20 @@ contract EscrowContract is ReentrancyGuard {
     }
     
     function raiseDispute(bytes32 _invoiceId) external {
+        address sender = _msgSender();
         Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.seller || msg.sender == escrow.buyer, "Not a party to this escrow");
+        require(sender == escrow.seller || sender == escrow.buyer, "Not a party to this escrow");
         require(!escrow.disputeRaised, "Dispute already raised");
         
         escrow.disputeRaised = true;
-        emit DisputeRaised(_invoiceId, msg.sender);
+        emit DisputeRaised(_invoiceId, sender);
     }
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.disputeRaised, "No dispute raised");
         
-        escrow.disputeResolver = msg.sender;
+        escrow.disputeResolver = _msgSender();
         IERC20 token = IERC20(escrow.token);
 
         if (_sellerWins) {
@@ -150,7 +189,7 @@ contract EscrowContract is ReentrancyGuard {
             }
         }
         
-        emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
+        emit DisputeResolved(_invoiceId, _msgSender(), _sellerWins);
     }
     
     function _releaseFunds(bytes32 _invoiceId) internal {

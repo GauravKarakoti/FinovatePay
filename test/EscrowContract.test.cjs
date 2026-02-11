@@ -29,6 +29,14 @@ describe("EscrowContract", function () {
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
     
+    // Mint Identity for seller and buyer
+    try {
+        await compliance.mintIdentity(seller.address);
+        await compliance.mintIdentity(buyer.address);
+    } catch (e) {
+        console.log("Identity mint failed/skipped:", e.message);
+    }
+
     // Transfer tokens to buyer
     await token.transfer(buyer.address, ethers.utils.parseEther("100"));
   });
@@ -55,7 +63,9 @@ describe("EscrowContract", function () {
         buyer.address,
         amount,
         token.address,
-        duration
+        duration,
+        ethers.constants.AddressZero, // rwaNftContract
+        0 // rwaTokenId
       )).to.emit(escrow, "EscrowCreated");
     });
     
@@ -70,7 +80,9 @@ describe("EscrowContract", function () {
         buyer.address,
         amount,
         token.address,
-        duration
+        duration,
+        ethers.constants.AddressZero,
+        0
       )).to.be.revertedWith("Not admin");
     });
   });
@@ -87,7 +99,9 @@ describe("EscrowContract", function () {
         buyer.address,
         amount,
         token.address,
-        duration
+        duration,
+        ethers.constants.AddressZero,
+        0
       );
     });
     
@@ -106,6 +120,12 @@ describe("EscrowContract", function () {
       const invoiceId = ethers.utils.formatBytes32String("INV-001");
       const amount = ethers.utils.parseEther("1");
       
+      // Ensure 'other' is compliant so we hit the "Not the buyer" check
+      await compliance.verifyKYC(other.address);
+      try {
+        await compliance.mintIdentity(other.address);
+      } catch (e) {}
+
       await token.connect(other).approve(escrow.address, amount);
       
       await expect(escrow.connect(other).deposit(invoiceId, amount))
