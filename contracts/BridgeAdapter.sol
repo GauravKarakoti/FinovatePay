@@ -20,13 +20,23 @@ interface IWaltBridge {
     event TokensMinted1155(address indexed token, uint256 tokenId, uint256 amount, bytes32 sourceChain, address recipient);
 }
 
+interface IAggLayer {
+    function sendMessage(bytes32 destinationChain, address destinationContract, bytes calldata data) external;
+    function receiveMessage(bytes32 sourceChain, address sourceContract, bytes calldata data) external;
+    event MessageSent(bytes32 indexed destinationChain, address indexed destinationContract, bytes data);
+    event MessageReceived(bytes32 indexed sourceChain, address indexed sourceContract, bytes data);
+}
+
 contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
     IWaltBridge public waltBridge;
+    IAggLayer public aggLayer;
     ComplianceManager public complianceManager;
 
     // Supported chains: FinovatePay CDK and Katana
     bytes32 public constant FINOVATE_CHAIN = keccak256("finovate-cdk");
     bytes32 public constant KATANA_CHAIN = keccak256("katana");
+    bytes32 public constant POLYGON_POS_CHAIN = keccak256("polygon-pos");
+    bytes32 public constant POLYGON_ZKEVM_CHAIN = keccak256("polygon-zkevm");
 
     // Mapping for locked ERC20 assets
     struct LockedAsset {
@@ -155,6 +165,63 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
     // Update WaltBridge address
     function updateWaltBridge(address _waltBridge) external onlyOwner {
         waltBridge = IWaltBridge(_waltBridge);
+    }
+
+    // Update AggLayer address
+    function updateAggLayer(address _aggLayer) external onlyOwner {
+        aggLayer = IAggLayer(_aggLayer);
+    }
+
+    // AggLayer-compatible cross-chain transfer for ERC20
+    function aggLayerTransferERC20(address token, uint256 amount, bytes32 destinationChain, address destinationContract, address recipient) external onlyCompliant(msg.sender) nonReentrant {
+        require(destinationChain != FINOVATE_CHAIN, "Cannot transfer to same chain");
+        require(amount > 0, "Amount must be positive");
+
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+
+        bytes memory data = abi.encode(token, amount, recipient);
+        aggLayer.sendMessage(destinationChain, destinationContract, data);
+
+        emit AssetBridged(keccak256(abi.encodePacked(token, amount, msg.sender, block.timestamp)), token, amount, recipient, destinationChain);
+    }
+
+    // AggLayer-compatible cross-chain transfer for ERC1155 (FractionTokens)
+    function aggLayerTransferERC1155(address token, uint256 tokenId, uint256 amount, bytes32 destinationChain, address destinationContract, address recipient) external onlyCompliant(msg.sender) nonReentrant {
+        require(destinationChain != FINOVATE_CHAIN, "Cannot transfer to same chain");
+        require(amount > 0, "Amount must be positive");
+
+        IERC1155(token).safeTransferFrom(msg.sender, address(this), tokenId, amount, "");
+
+        bytes memory data = abi.encode(token, tokenId, amount, recipient);
+        aggLayer.sendMessage(destinationChain, destinationContract, data);
+
+        emit ERC1155AssetBridged(keccak256(abi.encodePacked(token, tokenId, amount, msg.sender, block.timestamp)), token, tokenId, amount, recipient, destinationChain);
+    }
+
+    // Receive AggLayer message for ERC20
+    function receiveAggLayerMessageERC20(bytes32 sourceChain, address sourceContract, bytes calldata data) external {
+        require(msg.sender == address(aggLayer), "Only AggLayer can call");
+
+        (address token, uint256 amount, address recipient) = abi.decode(data, (address, uint256, address));
+        require(complianceManager.isKYCVerified(recipient), "Recipient not KYC verified");
+
+        // Mint or transfer equivalent on this chain (assuming AggLayer handles minting)
+        IERC20(token).transfer(recipient, amount);
+
+        emit AssetReceived(keccak256(abi.encodePacked(token, amount, recipient, block.timestamp)), token, amount, recipient, sourceChain);
+    }
+
+    // Receive AggLayer message for ERC1155
+    function receiveAggLayerMessageERC1155(bytes32 sourceChain, address sourceContract, bytes calldata data) external {
+        require(msg.sender == address(aggLayer), "Only AggLayer can call");
+
+        (address token, uint256 tokenId, uint256 amount, address recipient) = abi.decode(data, (address, uint256, uint256, address));
+        require(complianceManager.isKYCVerified(recipient), "Recipient not KYC verified");
+
+        // Mint or transfer equivalent on this chain (assuming AggLayer handles minting)
+        IERC1155(token).safeTransferFrom(address(this), recipient, tokenId, amount, "");
+
+        emit ERC1155AssetReceived(keccak256(abi.encodePacked(token, tokenId, amount, recipient, block.timestamp)), token, tokenId, amount, recipient, sourceChain);
     }
 
     // IERC1155Receiver implementation
