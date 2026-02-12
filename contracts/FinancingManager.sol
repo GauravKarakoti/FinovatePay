@@ -16,6 +16,7 @@ interface IFractionToken is IERC1155 {
         uint256 maturityDate;
         address issuer;
         bool isRedeemed;
+        uint256 yieldBps;
     }
     function tokenDetails(uint256 tokenId) external view returns (TokenDetails memory);
 }
@@ -171,6 +172,11 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         // 1. Calculate required Native Currency
         // Formula: (Token Amount * Price Per Token) / 1e18
         uint256 requiredNative = (_tokenAmount * nativePerToken) / 1e18;
+
+        // Apply yield discount: investors pay less than face value equivalent
+        IFractionToken.TokenDetails memory details = fractionToken.tokenDetails(_tokenId);
+        uint256 discountedNative = requiredNative - (requiredNative * details.yieldBps) / 10000;
+        requiredNative = discountedNative;
         
         require(msg.value >= requiredNative, "Insufficient native currency sent");
 

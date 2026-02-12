@@ -373,7 +373,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   }, [loadKYCStatus]);
 
   // Blockchain Interactions
-  const handleTokenizeInvoice = useCallback(async (invoiceId, { faceValue, maturityDate }) => {
+  const handleTokenizeInvoice = useCallback(async (invoiceId, { faceValue, maturityDate, yieldBps }) => {
     if (!invoiceToTokenize) return;
     setIsSubmitting(true);
     const toastId = toast.loading('Preparing tokenization...');
@@ -381,19 +381,20 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     try {
       const { provider } = await connectWallet();
       const tokenAddress = invoiceToTokenize.token_address;
-      
+
       let decimals = 18;
       if (tokenAddress !== NATIVE_CURRENCY_ADDRESS) {
         const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
         decimals = await tokenContract.decimals();
       }
-      
+
       const faceValueAsUint = ethers.parseUnits(faceValue.toString(), decimals);
-      
+
       const response = await api.post('/financing/tokenize', {
         invoiceId,
         faceValue: faceValueAsUint.toString(),
-        maturityDate
+        maturityDate,
+        yieldBps: parseFloat(yieldBps) * 100 // Convert % to bps
       });
 
       toast.success('Invoice tokenized successfully!', { id: toastId });
