@@ -11,7 +11,8 @@ exports.createInvoice = async (req, res) => {
             invoice_hash,
             contract_address,
             token_address,
-            due_date
+            due_date,
+            tx_hash // <-- Added tx_hash
         } = req.body;
 
         if (!quotation_id || !invoice_id || !contract_address) {
@@ -56,9 +57,9 @@ exports.createInvoice = async (req, res) => {
                 invoice_id, invoice_hash, seller_address, buyer_address,
                 amount, due_date, description, items, currency,
                 contract_address, token_address, lot_id, quotation_id, escrow_status,
-                financing_status
+                financing_status, tx_hash
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none')
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none', $14)
             RETURNING *
         `;
         const values = [
@@ -70,7 +71,7 @@ exports.createInvoice = async (req, res) => {
                 price_per_unit: quotation.price_per_unit / 50.75
             }]),
             quotation.currency, contract_address, token_address,
-            quotation.lot_id, quotation_id
+            quotation.lot_id, quotation_id, tx_hash || null
         ];
 
         const result = await client.query(insertInvoiceQuery, values);

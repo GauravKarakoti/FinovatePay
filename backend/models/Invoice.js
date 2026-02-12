@@ -12,7 +12,8 @@ class Invoice {
       dueDate,
       description,
       items,
-      lot_id // <-- Added lot_id
+      lot_id, // <-- Added lot_id
+      tx_hash // <-- Added tx_hash
     } = invoiceData;
 
     // Default financing status to 'none'
@@ -22,9 +23,9 @@ class Invoice {
       INSERT INTO invoices (
         invoice_id, invoice_hash, seller_address, buyer_address, 
         amount, currency, due_date, description, items, lot_id,
-        financing_status
+        financing_status, tx_hash
       ) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING *
     `;
 
@@ -39,7 +40,8 @@ class Invoice {
       description,
       JSON.stringify(items),
       lot_id, // <-- Added lot_id
-      financing_status // <-- Added financing_status
+      financing_status, // <-- Added financing_status
+      tx_hash || null
     ];
 
     const result = await pool.query(query, values);
@@ -117,15 +119,21 @@ class Invoice {
   }
 
   static async updateStatus(invoiceId, status) {
-    const query = 'UPDATE invoices SET status = $1 WHERE invoice_id = $2 RETURNING *';
+    const query = 'UPDATE invoices SET status = $1, updated_at = NOW() WHERE invoice_id = $2 RETURNING *';
     const result = await pool.query(query, [status, invoiceId]);
+    return result.rows[0];
+  }
+
+  static async updateStatusWithTx(invoiceId, status, txHash) {
+    const query = 'UPDATE invoices SET status = $1, tx_hash = COALESCE($2, tx_hash), updated_at = NOW() WHERE invoice_id = $3 RETURNING *';
+    const result = await pool.query(query, [status, txHash, invoiceId]);
     return result.rows[0];
   }
 
   static async updateEscrowStatus(invoiceId, escrowStatus, txHash = null) {
     const query = `
       UPDATE invoices 
-      SET escrow_status = $1, escrow_tx_hash = COALESCE($2, escrow_tx_hash) 
+      SET escrow_status = $1, escrow_tx_hash = COALESCE($2, escrow_tx_hash), updated_at = NOW()
       WHERE invoice_id = $3 
       RETURNING *
     `;
