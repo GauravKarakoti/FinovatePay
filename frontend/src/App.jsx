@@ -16,6 +16,7 @@ import FinovateChatbot from './components/Chatbot/Chatbot';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import DisputeDashboard from './pages/DisputeDashboard';
+import Invoices from './pages/Invoices';
 import { useStatsActions } from './context/StatsContext';
 
 function App() {
@@ -191,6 +192,16 @@ function App() {
               element={
                   <RequireAuth>
                       {renderDashboard(<DisputeDashboard />)}
+                  </RequireAuth>
+              }
+            />
+
+            {/* ✅ PROTECTED: Invoices Dashboard */}
+            <Route
+              path="/invoices"
+              element={
+                  <RequireAuth>
+                      {renderDashboard(<Invoices />)}
                   </RequireAuth>
               }
             />

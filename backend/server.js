@@ -44,6 +44,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve u
 // --- DATABASE CONNECTION ---
 const { pool, getConnection, getDatabaseHealth } = require('./config/database');
 const listenForTokenization = require('./listeners/contractListener');
+const { startSyncWorker } = require('./services/escrowSyncService');
 
 /**
  * ENHANCED DATABASE CONNECTION TEST WITH EXPONENTIAL BACKOFF
@@ -166,5 +167,6 @@ server.listen(PORT, () => {
 });
 
 listenForTokenization()
+startSyncWorker(); // Start background sync
 
 module.exports = app;
