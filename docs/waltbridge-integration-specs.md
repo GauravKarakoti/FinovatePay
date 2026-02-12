@@ -32,10 +32,11 @@ FinovatePay CDK Chain (L2) <--- WaltBridge ---> Katana (DeFi Liquidity)
 ```
 
 ### Components
-1. **WaltBridge Module**: Handles cross-chain messaging and asset transfers.
-2. **Liquidity Access Service**: Interfaces with Katana pools for borrowing/lending (implemented in bridgeService).
-3. **Financing Manager Contract**: Orchestrates invoice financing using bridged liquidity.
-4. **Compliance Bridge**: Ensures KYC status is verified across chains.
+1. **WaltBridge Module**: Handles cross-chain messaging and asset transfers to Katana.
+2. **AggLayer Module**: Enables unified liquidity and composability across Polygon ecosystem chains (PoS, zkEVM, etc.).
+3. **Liquidity Access Service**: Interfaces with Katana pools for borrowing/lending (implemented in bridgeService).
+4. **Financing Manager Contract**: Orchestrates invoice financing using bridged liquidity from multiple chains.
+5. **Compliance Bridge**: Ensures KYC status is verified across chains.
 5. **Backend API**: Provides endpoints for financing operations (financing.js routes).
 6. **Frontend UI**: BridgeFinancingModal component for user interaction.
 
