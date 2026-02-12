@@ -247,7 +247,7 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     /**
      * @notice Approve financing request (admin only).
      */
-    function approveFinancing(bytes32 _requestId) external onlyOwner {
+    function approveFinancing(bytes32 _requestId, bytes32 _destinationChain, address _destinationContract) external onlyOwner {
         FinancingRequest storage request = financingRequests[_requestId];
         require(request.active, "Request not active");
 
@@ -264,22 +264,38 @@ contract FinancingManager is Ownable, ReentrancyGuard {
             request.tokenId
         );
 
-        // 2. Bridge FractionTokens to Katana as collateral
-        bytes32 lockId = bridgeAdapter.lockERC1155ForBridge(
-            address(fractionToken),
-            request.tokenId,
-            request.collateralAmount,
-            bridgeAdapter.KATANA_CHAIN()
-        );
+        bytes32 loanId;
+        if (_destinationChain == bridgeAdapter.KATANA_CHAIN()) {
+            // 2a. Bridge FractionTokens to Katana as collateral via WaltBridge
+            bytes32 lockId = bridgeAdapter.lockERC1155ForBridge(
+                address(fractionToken),
+                request.tokenId,
+                request.collateralAmount,
+                bridgeAdapter.KATANA_CHAIN()
+            );
 
-        bridgeAdapter.bridgeERC1155Asset(lockId, address(liquidityAdapter));
+            bridgeAdapter.bridgeERC1155Asset(lockId, address(liquidityAdapter));
 
-        // 3. Borrow from Katana liquidity pool
-        bytes32 loanId = liquidityAdapter.borrowFromPool(
-            request.loanAsset,
-            request.loanAmount,
-            request.borrower
-        );
+            // 3a. Borrow from Katana liquidity pool
+            loanId = liquidityAdapter.borrowFromPool(
+                request.loanAsset,
+                request.loanAmount,
+                request.borrower
+            );
+        } else {
+            // 2b. Bridge FractionTokens to other Polygon chains via AggLayer
+            bridgeAdapter.aggLayerTransferERC1155(
+                address(fractionToken),
+                request.tokenId,
+                request.collateralAmount,
+                _destinationChain,
+                _destinationContract,
+                address(liquidityAdapter)
+            );
+
+            // 3b. Borrow from AggLayer liquidity (placeholder, integrate with AggLayer liquidity adapter)
+            loanId = keccak256(abi.encodePacked("aggLayer", _requestId)); // Placeholder
+        }
 
         request.escrowId = escrowId;
         request.loanId = loanId;

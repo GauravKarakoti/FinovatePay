@@ -94,6 +94,16 @@ describe("BridgeAdapter", function () {
       await expect(bridgeAdapter.bridgeERC1155Asset(lockId, user.address))
         .to.emit(bridgeAdapter, "ERC1155AssetBridged");
     });
+
+    it("Should transfer ERC1155 via AggLayer", async function () {
+      const tokenId = 1;
+      const amount = 100;
+
+      await fractionToken.setApprovalForAll(bridgeAdapter.address, true);
+
+      await expect(bridgeAdapter.connect(user).aggLayerTransferERC1155(fractionToken.address, tokenId, amount, bridgeAdapter.POLYGON_POS_CHAIN(), user.address, user.address))
+        .to.emit(bridgeAdapter, "ERC1155AssetBridged");
+    });
   });
 
   describe("Compliance", function () {
