@@ -27,6 +27,7 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         address issuer;
         bool isRedeemed;
         uint256 totalFunded; // TWEAK: Track funded amount for partial funding transparency
+        uint256 yieldBps; // Yield % for investors (basis points, e.g., 500 = 5%)
     }
 
     event Tokenized(bytes32 indexed invoiceId, uint256 tokenId, uint256 totalSupply, uint256 faceValue);
@@ -50,14 +51,16 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 _totalSupply,
         uint256 _faceValue,
         uint256 _maturityDate,
-        address _issuer
+        address _issuer,
+        uint256 _yieldBps
     ) external onlyOwner returns (uint256) {
         require(invoiceToTokenId[_invoiceId] == 0, "Invoice already tokenized");
         require(_totalSupply > 0, "Total supply must be greater than 0");
+        require(_yieldBps <= 10000, "Yield must be <= 100% (10000 bps)");
 
         uint256 tokenId = currentTokenId++;
         invoiceToTokenId[_invoiceId] = tokenId;
-        
+
         tokenDetails[tokenId] = TokenDetails({
             invoiceId: _invoiceId,
             totalSupply: _totalSupply,
@@ -66,9 +69,10 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
             maturityDate: _maturityDate,
             issuer: _issuer,
             isRedeemed: false,
-            totalFunded: 0
+            totalFunded: 0,
+            yieldBps: _yieldBps
         });
-        
+
         _mint(owner(), tokenId, _totalSupply, "");
         emit Tokenized(_invoiceId, tokenId, _totalSupply, _faceValue);
         return tokenId;

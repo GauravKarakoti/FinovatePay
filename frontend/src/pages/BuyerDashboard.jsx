@@ -355,7 +355,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, []);
 
   const handlePayInvoice = useCallback(async (invoice) => {
-    if (!ethers.utils.isAddress(invoice.contract_address)) {
+    if (!ethers.isAddress(invoice.contract_address)) {
       toast.error('Invalid contract address');
       return;
     }
@@ -366,7 +366,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       const { signer } = await connectWallet();
       const { amount, currency, contract_address, token_address } = invoice;
-      const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
+      const amountWei = ethers.parseUnits(amount.toString(), 18);
       
       const invoiceContract = new ethers.Contract(contract_address, InvoiceContractABI.abi, signer);
       let tx;
