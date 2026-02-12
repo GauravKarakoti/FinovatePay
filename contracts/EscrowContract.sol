@@ -4,9 +4,11 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 import "./ComplianceManager.sol";
 
-contract EscrowContract is ReentrancyGuard {
+contract EscrowContract is ReentrancyGuard, ERC2771Context {
     struct Escrow {
         address seller;
         address buyer;
@@ -45,10 +47,17 @@ contract EscrowContract is ReentrancyGuard {
         _;
     }
     
-    constructor(address _complianceManager) {
+    constructor(address _complianceManager, address trustedForwarder) 
+        ERC2771Context(trustedForwarder) 
+    {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
     }
+
+
+    // ERC2771Context handles _msgSender(), _msgData(), and _contextSuffixLength() automatically
+    // No override needed since EscrowContract only inherits from ERC2771Context (not multiple Context sources)
+
     
     function createEscrow(
         bytes32 _invoiceId,
@@ -88,23 +97,23 @@ contract EscrowContract is ReentrancyGuard {
         return true;
     }
     
-    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(msg.sender) {
+    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(_msgSender()) {
         Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.buyer == msg.sender, "Not the buyer");
+        require(escrow.buyer == _msgSender(), "Not the buyer");
         require(_amount == escrow.amount, "Incorrect amount");
         
         IERC20 token = IERC20(escrow.token);
-        require(token.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+        require(token.transferFrom(_msgSender(), address(this), _amount), "Transfer failed");
 
         escrow.buyerConfirmed = true;
-        emit DepositConfirmed(_invoiceId, msg.sender, _amount);
+        emit DepositConfirmed(_invoiceId, _msgSender(), _amount);
     }
     
     function confirmRelease(bytes32 _invoiceId) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.seller || msg.sender == escrow.buyer, "Not a party to this escrow");
+        require(_msgSender() == escrow.seller || _msgSender() == escrow.buyer, "Not a party to this escrow");
 
-        if (msg.sender == escrow.seller) {
+        if (_msgSender() == escrow.seller) {
             escrow.sellerConfirmed = true;
         } else {
             // Since the first require confirms the sender is either buyer or seller
@@ -118,11 +127,11 @@ contract EscrowContract is ReentrancyGuard {
     
     function raiseDispute(bytes32 _invoiceId) external {
         Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.seller || msg.sender == escrow.buyer, "Not a party to this escrow");
+        require(_msgSender() == escrow.seller || _msgSender() == escrow.buyer, "Not a party to this escrow");
         require(!escrow.disputeRaised, "Dispute already raised");
         
         escrow.disputeRaised = true;
-        emit DisputeRaised(_invoiceId, msg.sender);
+        emit DisputeRaised(_invoiceId, _msgSender());
     }
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {

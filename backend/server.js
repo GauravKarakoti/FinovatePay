@@ -117,6 +117,7 @@ app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
+app.use('/api/meta-tx', require('./routes/metaTransaction'));
 
 // --- V2 FINANCING ROUTES ---
 // NOTE: You will need to create 'routes/financing.js' and 'routes/investor.js'

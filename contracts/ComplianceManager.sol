@@ -3,8 +3,10 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
 
-contract ComplianceManager is ERC721, Ownable {
+contract ComplianceManager is ERC721, Ownable, ERC2771Context {
     uint256 private _nextTokenId;
     mapping(address => bool) private frozenAccounts;
     mapping(address => bool) private kycVerified;
@@ -19,8 +21,13 @@ contract ComplianceManager is ERC721, Ownable {
 
     /**
      * @dev Sets the contract deployer as the initial owner.
+     * @param trustedForwarder Address of the MinimalForwarder contract for gasless transactions
      */
-    constructor() ERC721("FinovateVerified", "FVT-ID") Ownable(msg.sender) {}
+    constructor(address trustedForwarder) 
+        ERC721("FinovateVerified", "FVT-ID") 
+        Ownable(msg.sender)
+        ERC2771Context(trustedForwarder) 
+    {}
     
     function freezeAccount(address _account) external onlyOwner {
         frozenAccounts[_account] = true;
@@ -90,5 +97,26 @@ contract ComplianceManager is ERC721, Ownable {
         }
         
         return super._update(to, tokenId, auth);
+    }
+
+    /**
+     * @dev Override to use ERC2771Context for gasless transactions
+     */
+    function _msgSender() internal view virtual override(Context, ERC2771Context) returns (address) {
+        return ERC2771Context._msgSender();
+    }
+
+    /**
+     * @dev Override to use ERC2771Context for gasless transactions
+     */
+    function _msgData() internal view virtual override(Context, ERC2771Context) returns (bytes calldata) {
+        return ERC2771Context._msgData();
+    }
+
+    /**
+     * @dev Override to use ERC2771Context for gasless transactions
+     */
+    function _contextSuffixLength() internal view virtual override(Context, ERC2771Context) returns (uint256) {
+        return ERC2771Context._contextSuffixLength();
     }
 }
