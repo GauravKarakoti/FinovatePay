@@ -26,6 +26,7 @@ import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
 import { useStatsActions } from '../context/StatsContext';
+import FiatOnRamp from '../components/FiatOnRamp';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -370,9 +371,22 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       let tx;
 
       if (currency === 'MATIC') {
+        const balance = await signer.getBalance();
+        if (balance.lt(amountWei)) {
+            toast.error("Insufficient MATIC balance.", { id: toastId });
+            return;
+        }
         tx = await invoiceContract.depositNative({ value: amountWei });
       } else {
         const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
+        const userAddress = await signer.getAddress();
+        const balance = await tokenContract.balanceOf(userAddress);
+
+        if (balance.lt(amountWei)) {
+            toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
+            return;
+        }
+
         toast.loading('Approving tokens...', { id: toastId });
         
         const approveTx = await tokenContract.approve(contract_address, amountWei);
@@ -506,6 +520,8 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         </div>
 
         <div className="space-y-6">
+          <FiatOnRamp walletAddress={walletAddress} />
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <KYCStatus
               status={kycData.status}
