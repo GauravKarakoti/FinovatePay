@@ -8,9 +8,38 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: finovatepay
     ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:3000/api/
+    container_name: finovate-frontend
+    ports:
+      - "5173:80"
+    env_file:
+      - ./frontend/.env
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: finovate_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: finovate_db
+    ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
 
 volumes:
-  pgdata:
+  db_data:
