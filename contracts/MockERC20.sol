@@ -8,7 +8,7 @@ contract MockERC20 is ERC20 {
         _mint(msg.sender, initialSupply);
     }
 
-    function mint(address to, uint256 amount) public {
+    function mint(address to, uint256 amount) public external {
         _mint(to, amount);
     }
 }

@@ -3,9 +3,16 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const Invoice = require('../models/Invoice');
-const { createInvoice } = require('../controllers/invoiceController');
 const { pool } = require("../config/database");
 const { syncInvoiceStatus } = require('../services/escrowSyncService');
+
+// --- UPDATED IMPORT ---
+// Import the new functions you added to the controller
+const { 
+  createInvoice, 
+  getEarlyPaymentOffer, 
+  settleInvoiceEarly 
+} = require('../controllers/invoiceController');
 
 // All invoice routes require authentication
 router.use(authenticateToken);
@@ -40,13 +47,25 @@ router.post('/:id/sync', async (req, res) => {
 // Get buyer's invoices
 router.get('/buyer', async (req, res) => {
   try {
-    console.log("Buyer:",req.user.wallet_address)
+    console.log("Buyer:", req.user.wallet_address);
     const invoices = await Invoice.findByBuyer(req.user.wallet_address);
     res.json(invoices);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// --- NEW DYNAMIC DISCOUNTING ROUTES ---
+
+// 1. Get Early Payment Offer (Check discount details)
+// Note: using :invoiceId to match controller param
+router.get('/:invoiceId/offer', getEarlyPaymentOffer);
+
+// 2. Accept Early Settlement (Process payment)
+// We add requireKYC here because it involves a financial transaction
+router.post('/:invoiceId/settle-early', requireKYC, settleInvoiceEarly);
+
+// --------------------------------------
 
 // Get specific invoice
 router.get('/:id', async (req, res) => {
@@ -69,11 +88,12 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Update Invoice Status (Escrow/Shipping/Dispute)
 router.post('/:invoice_id/status', requireKYC, async (req, res) => {
     try {
         const { invoice_id } = req.params;
-        const { status, tx_hash, dispute_reason } = req.body; // <-- Added dispute_reason
-        console.log(`Updating status for invoice ${invoice_id} to ${status} with tx_hash ${tx_hash} and dispute_reason ${dispute_reason}`);
+        const { status, tx_hash, dispute_reason } = req.body;
+        console.log(`Updating status for invoice ${invoice_id} to ${status} with tx_hash ${tx_hash}`);
 
         const allowedStatus = ['deposited', 'released', 'disputed', 'shipped'];
         if (!allowedStatus.includes(status)) {
@@ -88,7 +108,7 @@ router.post('/:invoice_id/status', requireKYC, async (req, res) => {
         } else if (status === 'shipped') {
             query = `UPDATE invoices SET escrow_status = $1, shipment_proof_hash = $2 WHERE invoice_id = $3 RETURNING *`;
             values = [status, tx_hash, invoice_id];
-        } else if (status === 'disputed') { // <-- Handle disputed status
+        } else if (status === 'disputed') {
             query = `UPDATE invoices SET escrow_status = $1, dispute_reason = $2 WHERE invoice_id = $3 RETURNING *`;
             values = [status, dispute_reason, invoice_id];
         } else { // 'deposited'
@@ -100,13 +120,16 @@ router.post('/:invoice_id/status', requireKYC, async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Invoice not found.' });
         }
-        console.log("Query:",query,values)
-        const io = req.app.get('io');
+        
         const updatedInvoice = result.rows[0];
         
-        io.to(`user-${updatedInvoice.seller_id}`).emit('invoice-update', updatedInvoice);
-        io.to(`user-${updatedInvoice.buyer_id}`).emit('invoice-update', updatedInvoice);
-        console.log(`Emitted invoice-update for invoice ${invoice_id}`);
+        // Socket.io Notification
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`user-${updatedInvoice.seller_address}`).emit('invoice-update', updatedInvoice);
+            io.to(`user-${updatedInvoice.buyer_address}`).emit('invoice-update', updatedInvoice);
+            console.log(`Emitted invoice-update for invoice ${invoice_id}`);
+        }
 
         res.json({ success: true, invoice: updatedInvoice });
     } catch (error) {
