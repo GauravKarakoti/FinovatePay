@@ -66,11 +66,10 @@ function App() {
 
   /* -------------------- Effects -------------------- */
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
 
-    if (token && userData) {
-      setUser({ ...JSON.parse(userData), token });
+    if (userData) {
+      setUser(JSON.parse(userData));
     }
 
     const web3Modal = new Web3Modal({ cacheProvider: true });
@@ -81,20 +80,21 @@ function App() {
     }
   }, []);
 
+
   useEffect(() => {
     if (!user) {
-      localStorage.removeItem('token');
       localStorage.removeItem('user');
       return;
     }
-    localStorage.setItem('token', user.token);
     localStorage.setItem('user', JSON.stringify(user));
   }, [user]);
 
+
   /* -------------------- Handlers -------------------- */
-  const handleLogin = (userData, token) => {
-    setUser({ ...userData, token });
+  const handleLogin = (userData) => {
+    setUser(userData);
   };
+
 
   const handleLogout = () => {
     setUser(null);

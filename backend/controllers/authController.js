@@ -37,7 +37,16 @@ exports.register = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    res.json({ token, user: newUser.rows[0] });
+    // 6. Set HttpOnly cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    res.json({ user: newUser.rows[0] });
+
 
   } catch (err) {
     console.error("❌ Registration Error:", err.message);
@@ -62,14 +71,23 @@ exports.login = async (req, res) => {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // 3. Send Token
+    // 3. Create and set token in HttpOnly cookie
     const token = jwt.sign(
       { id: user.rows[0].id, role: user.rows[0].role }, 
       process.env.JWT_SECRET, 
       { expiresIn: '24h' }
     );
 
-    res.json({ token, user: user.rows[0] });
+    // Set HttpOnly cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    res.json({ user: user.rows[0] });
+
 
   } catch (err) {
     console.error("❌ Login Error:", err.message);

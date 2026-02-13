@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../utils/api';
 import { io } from 'socket.io-client';
 import EvidenceUpload from '../components/Dispute/EvidenceUpload';
 import EvidenceList from '../components/Dispute/EvidenceList';
 import DisputeTimeline from '../components/Dispute/DisputeTimeline';
 import ArbitratorPanel from '../components/Dispute/ArbitratorPanel';
+
 
 const DisputeDashboard = () => {
   const { invoiceId } = useParams();
@@ -20,11 +21,7 @@ const DisputeDashboard = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/auth/profile`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await api.get('/auth/profile');
         setRole(res.data.role);
       } catch (err) {
         console.error('Failed to fetch profile', err);
@@ -33,10 +30,7 @@ const DisputeDashboard = () => {
 
     const fetchStatus = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/dispute/${invoiceId}/status`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await api.get(`/dispute/${invoiceId}/status`);
         setDisputeStatus(res.data.status); // might be null
       } catch (err) {
         console.error('Failed to fetch status', err);
@@ -44,6 +38,7 @@ const DisputeDashboard = () => {
         setLoading(false);
       }
     };
+
 
     fetchProfile();
     fetchStatus();
@@ -68,18 +63,14 @@ const DisputeDashboard = () => {
     if (!confirm('Are you sure you want to raise a dispute? This will alert the arbitrator.')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/dispute/${invoiceId}/raise`,
-        { reason: 'Dispute raised by user' },
-        { headers: { 'Authorization': `Bearer ${token}` } }
+      await api.post(
+        `/dispute/${invoiceId}/raise`,
+        { reason: 'Dispute raised by user' }
       );
       refreshData();
       // Status fetch will happen via socket or we can call it manually
       // But socket might lag slightly, so let's set status optimistically or refetch
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/dispute/${invoiceId}/status`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await api.get(`/dispute/${invoiceId}/status`);
       setDisputeStatus(res.data.status);
 
     } catch (err) {
@@ -87,6 +78,7 @@ const DisputeDashboard = () => {
       alert(err.response?.data?.error || 'Failed to raise dispute');
     }
   };
+
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>;
 

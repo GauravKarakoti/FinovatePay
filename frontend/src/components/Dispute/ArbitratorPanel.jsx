@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { api } from '../../utils/api';
+
 
 const ArbitratorPanel = ({ invoiceId, onResolve }) => {
   const [loading, setLoading] = useState(false);
@@ -16,12 +17,8 @@ const ArbitratorPanel = ({ invoiceId, onResolve }) => {
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/dispute/${invoiceId}/resolve`,
-        { status, notes },
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
+      await api.post(`/dispute/${invoiceId}/resolve`, { status, notes });
+
       if (onResolve) onResolve(status);
       setNotes('');
     } catch (err) {

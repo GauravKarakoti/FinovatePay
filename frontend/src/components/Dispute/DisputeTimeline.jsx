@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from '../../utils/api';
+
 
 const DisputeTimeline = ({ invoiceId }) => {
   const [logs, setLogs] = useState([]);
@@ -8,10 +9,7 @@ const DisputeTimeline = ({ invoiceId }) => {
   useEffect(() => {
     const fetchLogs = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/dispute/${invoiceId}/logs`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await api.get(`/dispute/${invoiceId}/logs`);
         setLogs(res.data);
       } catch (err) {
         console.error('Failed to load logs', err);
@@ -21,6 +19,7 @@ const DisputeTimeline = ({ invoiceId }) => {
     };
     fetchLogs();
   }, [invoiceId]);
+
 
   if (loading) return <div className="text-gray-500 py-4">Loading timeline...</div>;
 
