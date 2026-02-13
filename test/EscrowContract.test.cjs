@@ -4,8 +4,16 @@ const { ethers } = require("hardhat");
 describe("EscrowContract (Merged)", function () {
   let EscrowContract, ComplianceManager, MockERC20;
   let escrow, compliance, token;
-  let owner, seller, buyer, other;
-  let manager1, manager2, manager3, arbitrator;
+
+  let owner,
+    seller,
+    buyer,
+    other,
+    manager1,
+    manager2,
+    manager3,
+    arbitrator;
+
   const THRESHOLD = 2;
 
   beforeEach(async function () {
@@ -20,7 +28,9 @@ describe("EscrowContract (Merged)", function () {
       arbitrator
     ] = await ethers.getSigners();
 
-    // --- Deploy Mock ERC20 ---
+    /*//////////////////////////////////////////////////////////////
+                          TOKEN
+    //////////////////////////////////////////////////////////////*/
     MockERC20 = await ethers.getContractFactory("MockERC20");
     token = await MockERC20.deploy(
       "Test Token",
@@ -29,12 +39,13 @@ describe("EscrowContract (Merged)", function () {
     );
     await token.deployed();
 
-    // --- Deploy ComplianceManager ---
+    /*//////////////////////////////////////////////////////////////
+                      COMPLIANCE MANAGER
+    //////////////////////////////////////////////////////////////*/
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
     compliance = await ComplianceManager.deploy();
     await compliance.deployed();
 
-    // --- Verify KYC ---
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
 
@@ -43,7 +54,9 @@ describe("EscrowContract (Merged)", function () {
       await compliance.mintIdentity(buyer.address);
     } catch (_) {}
 
-    // --- Deploy EscrowContract ---
+    /*//////////////////////////////////////////////////////////////
+                        ESCROW
+    //////////////////////////////////////////////////////////////*/
     EscrowContract = await ethers.getContractFactory("EscrowContract");
     escrow = await EscrowContract.deploy(
       compliance.address,
@@ -52,12 +65,14 @@ describe("EscrowContract (Merged)", function () {
     );
     await escrow.deployed();
 
-    // --- Fund buyer ---
+    /*//////////////////////////////////////////////////////////////
+                        FUND BUYER
+    //////////////////////////////////////////////////////////////*/
     await token.transfer(buyer.address, ethers.utils.parseEther("100"));
   });
 
   /*//////////////////////////////////////////////////////////////
-                            DEPLOYMENT
+                          DEPLOYMENT
   //////////////////////////////////////////////////////////////*/
   describe("Deployment", function () {
     it("Sets admin correctly", async function () {
@@ -68,7 +83,7 @@ describe("EscrowContract (Merged)", function () {
       expect(await escrow.complianceManager()).to.equal(compliance.address);
     });
 
-    it("Initializes managers & threshold", async function () {
+    it("Initializes managers and threshold", async function () {
       expect(await escrow.threshold()).to.equal(THRESHOLD);
       expect(await escrow.isManager(manager1.address)).to.equal(true);
       expect(await escrow.isManager(other.address)).to.equal(false);
@@ -76,7 +91,7 @@ describe("EscrowContract (Merged)", function () {
   });
 
   /*//////////////////////////////////////////////////////////////
-                          ESCROW FLOW
+                        ESCROW LIFECYCLE
   //////////////////////////////////////////////////////////////*/
   describe("Escrow lifecycle", function () {
     const invoiceId = ethers.utils.formatBytes32String("INV-001");
@@ -120,6 +135,7 @@ describe("EscrowContract (Merged)", function () {
       await escrow.connect(buyer).deposit(invoiceId, amount);
 
       await escrow.connect(seller).confirmRelease(invoiceId);
+
       await expect(
         escrow.connect(buyer).confirmRelease(invoiceId)
       ).to.emit(escrow, "EscrowReleased");
@@ -127,7 +143,7 @@ describe("EscrowContract (Merged)", function () {
   });
 
   /*//////////////////////////////////////////////////////////////
-                      MULTI-SIG ARBITRATORS
+                  MULTI-SIG ARBITRATOR GOVERNANCE
   //////////////////////////////////////////////////////////////*/
   describe("Multi-sig arbitrator governance", function () {
     it("Allows manager to propose arbitrator", async function () {
@@ -136,8 +152,9 @@ describe("EscrowContract (Merged)", function () {
       ).to.emit(escrow, "ArbitratorProposed");
     });
 
-    it("Executes proposal when threshold met", async function () {
+    it("Executes proposal when threshold is met", async function () {
       await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+
       await escrow.connect(manager1).approveProposal(0);
       await escrow.connect(manager2).approveProposal(0);
 

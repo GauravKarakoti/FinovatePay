@@ -38,7 +38,7 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            STATE
+                                STATE
     //////////////////////////////////////////////////////////////*/
     mapping(bytes32 => Escrow) public escrows;
 
@@ -46,31 +46,11 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
     ComplianceManager public complianceManager;
 
     /*//////////////////////////////////////////////////////////////
-                        META-TX STATE
+                            META-TX STATE
     //////////////////////////////////////////////////////////////*/
     mapping(address => uint256) public nonces;
     bytes32 private constant _TYPEHASH =
         keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
-
-    /*//////////////////////////////////////////////////////////////
-                        MULTI-SIG ARBITRATORS
-    //////////////////////////////////////////////////////////////*/
-    mapping(address => bool) public isManager;
-    address[] public managers;
-    uint256 public threshold;
-
-    mapping(address => bool) public isArbitrator;
-
-    struct Proposal {
-        address target;
-        bool add;
-        uint256 approvals;
-        bool executed;
-    }
-
-    mapping(uint256 => Proposal) public proposals;
-    mapping(uint256 => mapping(address => bool)) public approved;
-    uint256 public proposalCount;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -81,20 +61,11 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
 
-    event ArbitratorProposed(uint256 id, address target, bool add);
-    event ArbitratorApproved(uint256 id, address manager);
-    event ArbitratorExecuted(uint256 id, address target, bool add);
-
     /*//////////////////////////////////////////////////////////////
-                            MODIFIERS
+                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
-        _;
-    }
-
-    modifier onlyManager() {
-        require(isManager[msg.sender], "Not manager");
         _;
     }
 
@@ -106,21 +77,11 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(
-        address _complianceManager,
-        address[] memory _managers,
-        uint256 _threshold
-    ) EIP712("EscrowContract", "1") {
-        require(_threshold > 0 && _threshold <= _managers.length, "Bad threshold");
-
+    constructor(address _complianceManager)
+        EIP712("EscrowContract", "1")
+    {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
-
-        for (uint256 i; i < _managers.length; i++) {
-            isManager[_managers[i]] = true;
-            managers.push(_managers[i]);
-        }
-        threshold = _threshold;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -136,7 +97,7 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         address rwaNft,
         uint256 rwaTokenId
     ) external onlyAdmin {
-        require(escrows[invoiceId].seller == address(0), "Exists");
+        require(escrows[invoiceId].seller == address(0), "Escrow exists");
 
         if (rwaNft != address(0)) {
             IERC721(rwaNft).transferFrom(seller, address(this), rwaTokenId);
@@ -167,12 +128,14 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         onlyCompliant(msg.sender)
     {
         Escrow storage e = escrows[invoiceId];
+
         require(e.status == EscrowStatus.Created, "Inactive");
         require(msg.sender == e.buyer, "Not buyer");
         require(amount == e.amount, "Bad amount");
         require(block.timestamp < e.expiresAt, "Expired");
 
         IERC20(e.token).transferFrom(msg.sender, address(this), amount);
+
         e.buyerConfirmed = true;
         e.status = EscrowStatus.Funded;
 
@@ -181,12 +144,12 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
 
     function confirmRelease(bytes32 invoiceId) external nonReentrant {
         Escrow storage e = escrows[invoiceId];
+
         require(e.status == EscrowStatus.Funded, "Not funded");
         require(msg.sender == e.seller || msg.sender == e.buyer, "Not party");
 
-        msg.sender == e.seller
-            ? e.sellerConfirmed = true
-            : e.buyerConfirmed = true;
+        if (msg.sender == e.seller) e.sellerConfirmed = true;
+        else e.buyerConfirmed = true;
 
         if (e.sellerConfirmed && e.buyerConfirmed) {
             _release(invoiceId);
@@ -195,6 +158,7 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
 
     function raiseDispute(bytes32 invoiceId) external {
         Escrow storage e = escrows[invoiceId];
+
         require(e.status == EscrowStatus.Funded, "No dispute");
         require(msg.sender == e.seller || msg.sender == e.buyer, "Not party");
 
@@ -204,7 +168,10 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         emit DisputeRaised(invoiceId, msg.sender);
     }
 
-    function resolveDispute(bytes32 invoiceId, bool sellerWins) external onlyAdmin {
+    function resolveDispute(bytes32 invoiceId, bool sellerWins)
+        external
+        onlyAdmin
+    {
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Disputed, "No dispute");
 
@@ -213,12 +180,22 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
 
         if (sellerWins) {
             token.transfer(e.seller, e.amount);
-            if (e.rwaNftContract != address(0))
-                IERC721(e.rwaNftContract).transferFrom(address(this), e.buyer, e.rwaTokenId);
+            if (e.rwaNftContract != address(0)) {
+                IERC721(e.rwaNftContract).transferFrom(
+                    address(this),
+                    e.buyer,
+                    e.rwaTokenId
+                );
+            }
         } else {
             token.transfer(e.buyer, e.amount);
-            if (e.rwaNftContract != address(0))
-                IERC721(e.rwaNftContract).transferFrom(address(this), e.seller, e.rwaTokenId);
+            if (e.rwaNftContract != address(0)) {
+                IERC721(e.rwaNftContract).transferFrom(
+                    address(this),
+                    e.seller,
+                    e.rwaTokenId
+                );
+            }
         }
 
         e.status = EscrowStatus.Released;
@@ -228,10 +205,16 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
 
     function _release(bytes32 invoiceId) internal {
         Escrow storage e = escrows[invoiceId];
+
         IERC20(e.token).transfer(e.seller, e.amount);
 
-        if (e.rwaNftContract != address(0))
-            IERC721(e.rwaNftContract).transferFrom(address(this), e.buyer, e.rwaTokenId);
+        if (e.rwaNftContract != address(0)) {
+            IERC721(e.rwaNftContract).transferFrom(
+                address(this),
+                e.buyer,
+                e.rwaTokenId
+            );
+        }
 
         e.status = EscrowStatus.Released;
         emit EscrowReleased(invoiceId, e.amount);
@@ -247,16 +230,22 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         bytes calldata sig
     ) external returns (bytes memory) {
         bytes32 hash = _hashTypedDataV4(
-            keccak256(abi.encode(_TYPEHASH, nonces[user]++, user, keccak256(data)))
+            keccak256(
+                abi.encode(
+                    _TYPEHASH,
+                    nonces[user]++,
+                    user,
+                    keccak256(data)
+                )
+            )
         );
 
         require(ECDSA.recover(hash, sig) == user, "Bad sig");
 
-        (bool ok, bytes memory res) = address(this).call(
-            abi.encodePacked(data, user)
-        );
-        require(ok, "Call failed");
+        (bool ok, bytes memory res) =
+            address(this).call(abi.encodePacked(data, user));
 
+        require(ok, "Call failed");
         return res;
     }
 
