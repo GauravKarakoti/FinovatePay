@@ -120,7 +120,7 @@ app.use('/api/dispute', require('./routes/dispute')); // Dispute Dashboard
 app.use('/api/relayer', require('./routes/relayer')); // Gasless Relayer
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
-app.use('/api/documents', documentRoutes); // ✅ NEW
+app.use('/api/meta-tx', require('./routes/metaTransaction'));
 
 // Added this line for [Feature]: email notifications 
 app.use('/api/notifications', notificationRoutes);

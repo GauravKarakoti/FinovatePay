@@ -5,11 +5,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
 
-contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
+contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     /*//////////////////////////////////////////////////////////////
                                 TYPES
     //////////////////////////////////////////////////////////////*/
@@ -46,13 +45,6 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
     ComplianceManager public complianceManager;
 
     /*//////////////////////////////////////////////////////////////
-                            META-TX STATE
-    //////////////////////////////////////////////////////////////*/
-    mapping(address => uint256) public nonces;
-    bytes32 private constant _TYPEHASH =
-        keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
-
-    /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
@@ -74,13 +66,23 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         _;
     }
 
+    modifier onlyEscrowParty(bytes32 invoiceId) {
+        Escrow storage e = escrows[invoiceId];
+        require(
+            _msgSender() == e.seller || _msgSender() == e.buyer,
+            "Not party"
+        );
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(address _complianceManager)
-        EIP712("EscrowContract", "1")
-    {
-        admin = msg.sender;
+    constructor(
+        address _complianceManager,
+        address trustedForwarder
+    ) ERC2771Context(trustedForwarder) {
+        admin = _msgSender();
         complianceManager = ComplianceManager(_complianceManager);
     }
 
@@ -122,33 +124,40 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         emit EscrowCreated(invoiceId, seller, buyer, amount);
     }
 
-    function deposit(bytes32 invoiceId, uint256 amount)
+    function deposit(
+        bytes32 invoiceId,
+        uint256 amount
+    )
         external
         nonReentrant
-        onlyCompliant(msg.sender)
+        onlyCompliant(_msgSender())
     {
         Escrow storage e = escrows[invoiceId];
 
         require(e.status == EscrowStatus.Created, "Inactive");
-        require(msg.sender == e.buyer, "Not buyer");
+        require(_msgSender() == e.buyer, "Not buyer");
         require(amount == e.amount, "Bad amount");
         require(block.timestamp < e.expiresAt, "Expired");
 
-        IERC20(e.token).transferFrom(msg.sender, address(this), amount);
+        IERC20(e.token).transferFrom(_msgSender(), address(this), amount);
 
         e.buyerConfirmed = true;
         e.status = EscrowStatus.Funded;
 
-        emit DepositConfirmed(invoiceId, msg.sender, amount);
+        emit DepositConfirmed(invoiceId, _msgSender(), amount);
     }
 
-    function confirmRelease(bytes32 invoiceId) external nonReentrant {
+    function confirmRelease(
+        bytes32 invoiceId
+    )
+        external
+        nonReentrant
+        onlyEscrowParty(invoiceId)
+    {
         Escrow storage e = escrows[invoiceId];
-
         require(e.status == EscrowStatus.Funded, "Not funded");
-        require(msg.sender == e.seller || msg.sender == e.buyer, "Not party");
 
-        if (msg.sender == e.seller) e.sellerConfirmed = true;
+        if (_msgSender() == e.seller) e.sellerConfirmed = true;
         else e.buyerConfirmed = true;
 
         if (e.sellerConfirmed && e.buyerConfirmed) {
@@ -156,26 +165,30 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         }
     }
 
-    function raiseDispute(bytes32 invoiceId) external {
+    function raiseDispute(bytes32 invoiceId)
+        external
+        onlyEscrowParty(invoiceId)
+    {
         Escrow storage e = escrows[invoiceId];
-
         require(e.status == EscrowStatus.Funded, "No dispute");
-        require(msg.sender == e.seller || msg.sender == e.buyer, "Not party");
 
         e.disputeRaised = true;
         e.status = EscrowStatus.Disputed;
 
-        emit DisputeRaised(invoiceId, msg.sender);
+        emit DisputeRaised(invoiceId, _msgSender());
     }
 
-    function resolveDispute(bytes32 invoiceId, bool sellerWins)
+    function resolveDispute(
+        bytes32 invoiceId,
+        bool sellerWins
+    )
         external
         onlyAdmin
     {
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Disputed, "No dispute");
 
-        e.disputeResolver = msg.sender;
+        e.disputeResolver = _msgSender();
         IERC20 token = IERC20(e.token);
 
         if (sellerWins) {
@@ -199,7 +212,7 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         }
 
         e.status = EscrowStatus.Released;
-        emit DisputeResolved(invoiceId, msg.sender, sellerWins);
+        emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
         delete escrows[invoiceId];
     }
 
@@ -219,41 +232,6 @@ contract EscrowContract is ReentrancyGuard, EIP712, IERC721Receiver {
         e.status = EscrowStatus.Released;
         emit EscrowReleased(invoiceId, e.amount);
         delete escrows[invoiceId];
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        META TRANSACTIONS
-    //////////////////////////////////////////////////////////////*/
-    function executeMetaTx(
-        address user,
-        bytes calldata data,
-        bytes calldata sig
-    ) external returns (bytes memory) {
-        bytes32 hash = _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    _TYPEHASH,
-                    nonces[user]++,
-                    user,
-                    keccak256(data)
-                )
-            )
-        );
-
-        require(ECDSA.recover(hash, sig) == user, "Bad sig");
-
-        (bool ok, bytes memory res) =
-            address(this).call(abi.encodePacked(data, user));
-
-        require(ok, "Call failed");
-        return res;
-    }
-
-    function _msgSender() internal view returns (address) {
-        if (msg.sender == address(this)) {
-            return address(bytes20(msg.data[msg.data.length - 20:]));
-        }
-        return msg.sender;
     }
 
     /*//////////////////////////////////////////////////////////////
