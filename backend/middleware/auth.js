@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
-const { pool } = require('../config/database');
+const  pool  = require('../config/database'); // ✅ Correct Import
 
 const authenticateToken = async (req, res, next) => {
+  // 1. Get the token from the header
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -10,26 +11,34 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userResult = await pool.query(
-      'SELECT id, email, wallet_address, role FROM users WHERE id = $1',
-      [decoded.userId]
-    );
+    // 2. Verify Token (Using the correct environment variable)
+    // We use ACCESS_TOKEN_SECRET to match your authController
+    const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
+    const decoded = jwt.verify(token, secret);
+
+    // 3. Find the User
+    // IMPORTANT: We query by 'wallet_address' because that is what is inside the token
+    const query = 'SELECT * FROM users WHERE wallet_address = $1';
+    const { rows } = await pool.query(query, [decoded.wallet_address]);
     
-    if (userResult.rows.length === 0) {
+    if (rows.length === 0) {
       return res.status(403).json({ error: 'User not found' });
     }
     
-    req.user = userResult.rows[0];
+    // 4. Attach user to the request object
+    req.user = rows[0];
     next();
+
   } catch (error) {
-    return res.status(403).json({ error: 'Invalid token' });
+    console.error("Auth Middleware Error:", error.message);
+    return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };
 
 const requireRole = (role) => {
   return (req, res, next) => {
-    if (req.user.role !== role) {
+    // Ensure req.user exists before checking role
+    if (!req.user || req.user.role !== role) {
       return res.status(403).json({ error: `Requires ${role} role` });
     }
     next();

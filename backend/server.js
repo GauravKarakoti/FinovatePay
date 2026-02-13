@@ -1,14 +1,18 @@
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const path = require('path'); // Added for static files
 const socketIo = require('socket.io');
 require('dotenv').config();
 
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
-
 const listenForTokenization = require('./listeners/contractListener');
 const errorHandler = require('./middleware/errorHandler');
+// Added this line for [Feature]: email notifications 
+const notificationRoutes = require('./routes/notifications');
+
+const startComplianceListeners = require('./listeners/complianceListener');
 
 const app = express();
 const server = http.createServer(app);
@@ -48,15 +52,64 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploads
 
 const { pool, getConnection } = require('./config/database');
-const listenForTokenization = require('./listeners/contractListener');
 const testDbConnection = require('./utils/testDbConnection');
+const listenForTokenization = require('./listeners/contractListener');
+const { startSyncWorker } = require('./services/escrowSyncService');
 
+/**
+ * ENHANCED DATABASE CONNECTION TEST
+ */
+const testDbConnection = async () => {
+  const maxRetries = parseInt(process.env.DB_MAX_RETRIES) || 5;
+  const baseDelay = parseInt(process.env.DB_RETRY_BASE_DELAY) || 1000;
+  
+  let retries = 0;
+  
+  while (retries < maxRetries) {
+    try {
+      console.log(`Attempting database connection (${retries + 1}/${maxRetries})...`);
+      
+      // ✅ FIX: Use pool.connect() instead of getConnection()
+      const client = await pool.connect();
+      
+      await client.query('SELECT 1 as test');
+      client.release();
+      
+      console.log('✅ Database connection established successfully');
+      return true;
+      
+    } catch (err) {
+      retries++;
+      
+      console.error(`❌ Database connection attempt ${retries} failed:`, err.message);
+      
+      if (retries >= maxRetries) {
+        console.error('Failed to connect to database after maximum retries.');
+        return false;
+      }
+      
+      // Wait before retrying
+      const delay = baseDelay * Math.pow(2, retries - 1);
+      console.log(`Retrying in ${Math.round(delay)}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  return false;
+};
+
+// Initialize database connection
 testDbConnection();
 
 app.use('/api/health', require('./routes/health'));
+// app.use('/api/auth', require('./routes/auth')); 
+// Note: If you don't have auth.js yet, keep the line above commented or create the file.
+// Assuming you do based on context:
 app.use('/api/auth', require('./routes/auth'));
+
 app.use('/api/invoices', require('./routes/invoice'));
 app.use('/api/payments', require('./routes/payment'));
 app.use('/api/admin', require('./routes/admin'));
@@ -64,10 +117,19 @@ app.use('/api/kyc', require('./routes/kyc'));
 app.use('/api/produce', require('./routes/produce'));
 app.use('/api/quotations', require('./routes/quotation'));
 app.use('/api/market', require('./routes/market'));
+app.use('/api/dispute', require('./routes/dispute')); // Dispute Dashboard
+app.use('/api/relayer', require('./routes/relayer')); // Gasless Relayer
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/shipment', shipmentRoutes);
-app.use('/api/financing', require('./routes/financing'));
-app.use('/api/investor', require('./routes/investor'));
+app.use('/api/meta-tx', require('./routes/metaTransaction'));
+
+// Added this line for [Feature]: email notifications 
+app.use('/api/notifications', notificationRoutes);
+
+// --- V2 FINANCING ROUTES ---
+// Uncomment these only if you have created the files in the routes folder!
+// app.use('/api/financing', require('./routes/financing'));
+// app.use('/api/investor', require('./routes/investor'));
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -103,5 +165,13 @@ server.listen(PORT, () => {
 });
 
 listenForTokenization();
+startSyncWorker();
+
+// Start compliance/on-chain event listeners to keep wallet KYC mappings in sync
+try {
+  startComplianceListeners();
+} catch (err) {
+  console.error('[server] Failed to start compliance listeners:', err && err.message ? err.message : err);
+}
 
 module.exports = app;
