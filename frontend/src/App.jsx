@@ -20,6 +20,7 @@ import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
 import InvoiceDetails from './pages/InvoiceDetails';
 import DisputeDashboard from './pages/DisputeDashboard';
+import Invoices from './pages/Invoices';
 
 import FinovateChatbot from './components/Chatbot/Chatbot';
 
@@ -29,6 +30,7 @@ import { Toaster } from 'sonner';
 
 import './App.css';
 
+/* -------------------- Auth Wrapper -------------------- */
 function RequireAuth({ children, allowedRoles }) {
   const location = useLocation();
   const user = JSON.parse(localStorage.getItem('user'));
@@ -44,10 +46,11 @@ function RequireAuth({ children, allowedRoles }) {
   return children;
 }
 
+/* -------------------- App -------------------- */
 function App() {
   const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
   });
 
   const [walletConnected, setWalletConnected] = useState(false);
@@ -61,6 +64,7 @@ function App() {
     produceLots: 0,
   });
 
+  /* -------------------- Effects -------------------- */
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
@@ -83,11 +87,11 @@ function App() {
       localStorage.removeItem('user');
       return;
     }
-
     localStorage.setItem('token', user.token);
     localStorage.setItem('user', JSON.stringify(user));
   }, [user]);
 
+  /* -------------------- Handlers -------------------- */
   const handleLogin = (userData, token) => {
     setUser({ ...userData, token });
   };
@@ -112,6 +116,7 @@ function App() {
     </div>
   );
 
+  /* -------------------- Routes -------------------- */
   return (
     <Router>
       <Toaster position="top" richColors />
@@ -147,7 +152,7 @@ function App() {
 
           {/* Seller */}
           <Route
-            path="/seller-dashboard"
+            path="/seller"
             element={
               <RequireAuth allowedRoles={['seller']}>
                 {renderDashboard(<SellerDashboard activeTab={activeTab} />)}
@@ -195,7 +200,22 @@ function App() {
             }
           />
 
-          {/* Dispute Dashboard */}
+          {/* Invoices */}
+          <Route
+            path="/invoices"
+            element={
+              <RequireAuth>
+                {renderDashboard(<Invoices />)}
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/invoices/:id"
+            element={user ? <InvoiceDetails /> : <Navigate to="/login" />}
+          />
+
+          {/* Dispute */}
           <Route
             path="/dispute/:invoiceId"
             element={
@@ -205,19 +225,14 @@ function App() {
             }
           />
 
+          {/* Public */}
           <Route path="/produce/:lotId" element={<ProduceHistory />} />
-
-          <Route
-            path="/invoices/:id"
-            element={user ? <InvoiceDetails /> : <Navigate to="/login" />}
-          />
 
           {/* Auth */}
           <Route
             path="/login"
             element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
           />
-
           <Route
             path="/register"
             element={user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />}

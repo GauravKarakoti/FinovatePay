@@ -4,6 +4,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const Invoice = require('../models/Invoice');
 const { pool } = require("../config/database");
+const { syncInvoiceStatus } = require('../services/escrowSyncService');
 
 // --- UPDATED IMPORT ---
 // Import the new functions you added to the controller
@@ -27,6 +28,17 @@ router.get('/seller', async (req, res) => {
   try {
     const invoices = await Invoice.findBySeller(req.user.wallet_address);
     res.json(invoices);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sync invoice status from blockchain
+router.post('/:id/sync', async (req, res) => {
+  try {
+    await syncInvoiceStatus(req.params.id);
+    const invoice = await Invoice.findById(req.params.id);
+    res.json(invoice);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

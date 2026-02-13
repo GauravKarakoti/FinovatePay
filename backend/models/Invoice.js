@@ -1,48 +1,181 @@
-const  pool  = require('../config/database');
+const { pool } = require('../config/database');
 
 class Invoice {
-  // Find all invoices for a specific seller
-  static async findBySeller(address) {
-    try {
-      const query = 'SELECT * FROM invoices WHERE seller_address = $1 ORDER BY created_at DESC';
-      const { rows } = await pool.query(query, [address]);
-      return rows;
-    } catch (error) {
-      throw error;
-    }
-  }
+  /*//////////////////////////////////////////////////////////////
+                          CREATE
+  //////////////////////////////////////////////////////////////*/
+  static async create(invoiceData) {
+    const {
+      invoiceId,
+      invoiceHash,
+      sellerAddress,
+      buyerAddress,
+      amount,
+      currency,
+      dueDate,
+      description,
+      items,
+      lot_id,
+      tx_hash,
+      financing_status = 'none'
+    } = invoiceData;
 
-  // Find all invoices for a specific buyer
-  static async findByBuyer(address) {
-    try {
-      const query = 'SELECT * FROM invoices WHERE buyer_address = $1 ORDER BY created_at DESC';
-      const { rows } = await pool.query(query, [address]);
-      return rows;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Find a single invoice by ID
-  static async findById(id) {
-    try {
-      const query = 'SELECT * FROM invoices WHERE invoice_id = $1';
-      const { rows } = await pool.query(query, [id]);
-      return rows[0];
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  // Create method (Optional, as Controller handles it, but good to have)
-  static async create(data) {
-    const { client, amount, due_date, seller_address } = data;
     const query = `
-      INSERT INTO invoices (client, amount, due_date, seller_address, status)
-      VALUES ($1, $2, $3, $4, 'pending')
+      INSERT INTO invoices (
+        invoice_id,
+        invoice_hash,
+        seller_address,
+        buyer_address,
+        amount,
+        currency,
+        due_date,
+        description,
+        items,
+        lot_id,
+        financing_status,
+        tx_hash
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING *
     `;
-    const { rows } = await pool.query(query, [client, amount, due_date, seller_address]);
+
+    const values = [
+      invoiceId,
+      invoiceHash,
+      sellerAddress,
+      buyerAddress,
+      amount,
+      currency,
+      dueDate,
+      description,
+      JSON.stringify(items),
+      lot_id || null,
+      financing_status,
+      tx_hash || null
+    ];
+
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                    TOKENIZATION / FINANCING
+  //////////////////////////////////////////////////////////////*/
+  static async updateTokenizationStatus(invoiceId, tokenId, financingStatus) {
+    const query = `
+      UPDATE invoices
+      SET
+        is_tokenized = TRUE,
+        token_id = $1,
+        financing_status = $2,
+        remaining_supply = CASE
+          WHEN $2 = 'listed' THEN amount
+          ELSE remaining_supply
+        END,
+        updated_at = NOW()
+      WHERE invoice_id = $3
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, [
+      tokenId,
+      financingStatus,
+      invoiceId
+    ]);
+
+    return result.rows[0];
+  }
+
+  static async decrementRemainingSupply(invoiceId, amountInvested) {
+    const query = `
+      UPDATE invoices
+      SET remaining_supply = remaining_supply - $1,
+          updated_at = NOW()
+      WHERE invoice_id = $2
+      RETURNING *
+    `;
+    const result = await pool.query(query, [amountInvested, invoiceId]);
+    return result.rows[0];
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                        STATUS UPDATES
+  //////////////////////////////////////////////////////////////*/
+  static async updateStatus(invoiceId, status) {
+    const query = `
+      UPDATE invoices
+      SET status = $1, updated_at = NOW()
+      WHERE invoice_id = $2
+      RETURNING *
+    `;
+    const result = await pool.query(query, [status, invoiceId]);
+    return result.rows[0];
+  }
+
+  static async updateStatusWithTx(invoiceId, status, txHash) {
+    const query = `
+      UPDATE invoices
+      SET
+        status = $1,
+        tx_hash = COALESCE($2, tx_hash),
+        updated_at = NOW()
+      WHERE invoice_id = $3
+      RETURNING *
+    `;
+    const result = await pool.query(query, [status, txHash, invoiceId]);
+    return result.rows[0];
+  }
+
+  static async updateEscrowStatus(invoiceId, escrowStatus, txHash = null) {
+    const query = `
+      UPDATE invoices
+      SET
+        escrow_status = $1,
+        escrow_tx_hash = COALESCE($2, escrow_tx_hash),
+        updated_at = NOW()
+      WHERE invoice_id = $3
+      RETURNING *
+    `;
+    const result = await pool.query(query, [
+      escrowStatus,
+      txHash,
+      invoiceId
+    ]);
+    return result.rows[0];
+  }
+
+  /*//////////////////////////////////////////////////////////////
+                          READ QUERIES
+  //////////////////////////////////////////////////////////////*/
+  static async findBySeller(address) {
+    const query = `
+      SELECT *
+      FROM invoices
+      WHERE seller_address = $1
+      ORDER BY created_at DESC
+    `;
+    const { rows } = await pool.query(query, [address]);
+    return rows;
+  }
+
+  static async findByBuyer(address) {
+    const query = `
+      SELECT *
+      FROM invoices
+      WHERE buyer_address = $1
+      ORDER BY created_at DESC
+    `;
+    const { rows } = await pool.query(query, [address]);
+    return rows;
+  }
+
+  static async findById(invoiceId) {
+    const query = `
+      SELECT *
+      FROM invoices
+      WHERE invoice_id = $1
+    `;
+    const { rows } = await pool.query(query, [invoiceId]);
     return rows[0];
   }
 }

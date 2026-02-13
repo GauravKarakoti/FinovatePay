@@ -57,6 +57,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve u
 const { pool, getConnection } = require('./config/database');
 const testDbConnection = require('./utils/testDbConnection');
 const listenForTokenization = require('./listeners/contractListener');
+const { startSyncWorker } = require('./services/escrowSyncService');
 
 /**
  * ENHANCED DATABASE CONNECTION TEST
@@ -164,7 +165,7 @@ server.listen(PORT, () => {
 });
 
 listenForTokenization();
-
+startSyncWorker();
 
 // Start compliance/on-chain event listeners to keep wallet KYC mappings in sync
 try {
