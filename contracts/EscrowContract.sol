@@ -33,9 +33,23 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         address rwaNftContract;
         uint256 rwaTokenId;
     }
+
+    struct Proposal {
+        address arbitrator;
+        bool isAdd;
+        uint256 approvals;
+        bool executed;
+    }
     
     mapping(bytes32 => Escrow) public escrows;
     mapping(address => bool) public arbitrators;
+    
+    // Multi-signature arbitrator management
+    address[] public managers;
+    mapping(address => bool) public isManager;
+    uint256 public threshold;
+    mapping(bytes32 => Proposal) public proposals;
+    mapping(bytes32 => mapping(address => bool)) public approved;
     
     ComplianceManager public complianceManager;
     address public admin;
@@ -57,15 +71,21 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     event InvoiceFactoryUpdated(address indexed newInvoiceFactory);
     event ArbitratorAdded(address indexed arbitrator);
     event ArbitratorRemoved(address indexed arbitrator);
+    
+    // Multi-sig proposal events
+    event ProposalCreated(bytes32 indexed proposalId, address indexed arbitrator, bool isAdd);
+    event ProposalApproved(bytes32 indexed proposalId, address indexed approver);
+    event ProposalExecuted(bytes32 indexed proposalId);
 
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
         _;
     }
-<<<<<<< HEAD
 
-    // --- MINIMAL FIX: Allow admin OR arbitrators to resolve disputes ---
-=======
+    modifier onlyManager() {
+        require(isManager[msg.sender], "Not a manager");
+        _;
+    }
 
     modifier onlyCompliant(address _account) {
         require(!complianceManager.isFrozen(_account), "Account frozen");
@@ -73,8 +93,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         _;
     }
 
-<<<<<<< HEAD
-=======
     modifier onlyEscrowParty(bytes32 _invoiceId) {
         Escrow storage escrow = escrows[_invoiceId];
         require(
@@ -86,14 +104,24 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         );
         _;
     }
+
+    modifier onlyAdminOrArbitrator() {
+        require(msg.sender == admin || arbitrators[msg.sender], "Not admin or arbitrator");
+        _;
+    }
     
->>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
     constructor(address _complianceManager) {
         require(_complianceManager != address(0), "Invalid compliance manager");
         admin = msg.sender;
         treasury = msg.sender;
         keeper = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        
+        // Initialize managers with admin as first manager
+        managers.push(admin);
+        isManager[admin] = true;
+        threshold = 1; // Default threshold
+        
         emit ComplianceManagerUpdated(_complianceManager);
     }
 
@@ -102,10 +130,41 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         invoiceFactory = _invoiceFactory;
         emit InvoiceFactoryUpdated(_invoiceFactory);
     }
-    
-<<<<<<< HEAD
+
+    function setKeeper(address _keeper) external onlyAdmin {
+        require(_keeper != address(0), "Invalid keeper");
+        keeper = _keeper;
+    }
+
+    function addManager(address _manager) external onlyAdmin {
+        require(_manager != address(0), "Invalid manager");
+        require(!isManager[_manager], "Already a manager");
+        managers.push(_manager);
+        isManager[_manager] = true;
+    }
+
+    function removeManager(address _manager) external onlyAdmin {
+        require(isManager[_manager], "Not a manager");
+        require(_manager != admin, "Cannot remove admin");
+        isManager[_manager] = false;
+        // Remove from managers array
+        for (uint256 i = 0; i < managers.length; i++) {
+            if (managers[i] == _manager) {
+                managers[i] = managers[managers.length - 1];
+                managers.pop();
+                break;
+            }
+        }
+    }
+
+    function setThreshold(uint256 _threshold) external onlyAdmin {
+        require(_threshold > 0, "Threshold must be > 0");
+        require(_threshold <= managers.length, "Threshold exceeds managers");
+        threshold = _threshold;
+    }
+
     // --- Multi-signature arbitrator management ---
-    function proposeAddArbitrator(address _arbitrator) external {
+    function proposeAddArbitrator(address _arbitrator) external onlyManager {
         require(_arbitrator != address(0), "Invalid address");
         require(!arbitrators[_arbitrator], "Already an arbitrator");
         bytes32 proposalId = keccak256(abi.encodePacked("add", _arbitrator, block.number));
@@ -116,7 +175,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit ProposalCreated(proposalId, _arbitrator, true);
     }
 
-    function proposeRemoveArbitrator(address _arbitrator) external {
+    function proposeRemoveArbitrator(address _arbitrator) external onlyManager {
         require(arbitrators[_arbitrator], "Not an arbitrator");
         bytes32 proposalId = keccak256(abi.encodePacked("remove", _arbitrator, block.number));
         require(proposals[proposalId].arbitrator == address(0), "Proposal already exists");
@@ -126,7 +185,7 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
         emit ProposalCreated(proposalId, _arbitrator, false);
     }
 
-    function approveProposal(bytes32 _proposalId) external {
+    function approveProposal(bytes32 _proposalId) external onlyManager {
         require(proposals[_proposalId].arbitrator != address(0), "Proposal does not exist");
         require(!proposals[_proposalId].executed, "Proposal already executed");
         require(!approved[_proposalId][msg.sender], "Already approved");
@@ -150,22 +209,23 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
     }
 
     function _addArbitrator(address _arbitrator) internal {
-=======
-    function setKeeper(address _keeper) external onlyAdmin {
-        require(_keeper != address(0), "Invalid keeper");
-        keeper = _keeper;
-    }
-    
-    function addArbitrator(address _arbitrator) external onlyAdmin {
-        require(_arbitrator != address(0), "Invalid arbitrator");
->>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
         arbitrators[_arbitrator] = true;
         emit ArbitratorAdded(_arbitrator);
     }
-    
-    function removeArbitrator(address _arbitrator) external onlyAdmin {
+
+    function _removeArbitrator(address _arbitrator) internal {
         arbitrators[_arbitrator] = false;
         emit ArbitratorRemoved(_arbitrator);
+    }
+    
+    // Admin-only arbitrator functions (for backwards compatibility)
+    function addArbitrator(address _arbitrator) external onlyAdmin {
+        require(_arbitrator != address(0), "Invalid arbitrator");
+        _addArbitrator(_arbitrator);
+    }
+    
+    function removeArbitrator(address _arbitrator) external onlyAdmin {
+        _removeArbitrator(_arbitrator);
     }
     
     function setTreasury(address _treasury) external onlyAdmin {
@@ -367,12 +427,6 @@ contract EscrowContract is ReentrancyGuard, IERC721Receiver {
             IERC20 token = IERC20(escrow.token);
             require(token.transfer(escrow.buyer, escrow.amount), "Refund failed");
         }
-<<<<<<< HEAD
-
-        emit EscrowExpired(_invoiceId);
-    }
-=======
->>>>>>> acd1aa87c9e90671ee6a82e2ef83638e5af2540c
 
         emit EscrowCancelled(_invoiceId);
         delete escrows[_invoiceId];
