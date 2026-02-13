@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@transak/transak-sdk": "^4.0.2",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.13.2",
+    "buffer": "^6.0.3",
     "ethers": "^6.15.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.1.0",
