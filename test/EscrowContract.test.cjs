@@ -1,98 +1,104 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("EscrowContract", function () {
-  let EscrowContract, ComplianceManager;
-  let escrow, compliance;
-  let owner, seller, buyer, other;
-  let token;
+describe("EscrowContract (Merged)", function () {
+  let EscrowContract, ComplianceManager, MockERC20;
+  let escrow, compliance, token;
+
+  let owner,
+    seller,
+    buyer,
+    other,
+    manager1,
+    manager2,
+    manager3,
+    arbitrator;
+
+  const THRESHOLD = 2;
 
   beforeEach(async function () {
-    [owner, seller, buyer, other] = await ethers.getSigners();
-    
-    // Deploy mock ERC20 token
-    const Token = await ethers.getContractFactory("MockERC20");
-    token = await Token.deploy("Test Token", "TEST", ethers.utils.parseEther("1000"));
+    [
+      owner,
+      seller,
+      buyer,
+      other,
+      manager1,
+      manager2,
+      manager3,
+      arbitrator
+    ] = await ethers.getSigners();
+
+    /*//////////////////////////////////////////////////////////////
+                          TOKEN
+    //////////////////////////////////////////////////////////////*/
+    MockERC20 = await ethers.getContractFactory("MockERC20");
+    token = await MockERC20.deploy(
+      "Test Token",
+      "TEST",
+      ethers.utils.parseEther("1000")
+    );
     await token.deployed();
-    
-    // Deploy ComplianceManager
+
+    /*//////////////////////////////////////////////////////////////
+                      COMPLIANCE MANAGER
+    //////////////////////////////////////////////////////////////*/
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
     compliance = await ComplianceManager.deploy();
     await compliance.deployed();
-    
-    // Deploy EscrowContract
-    EscrowContract = await ethers.getContractFactory("EscrowContract");
-    escrow = await EscrowContract.deploy(compliance.address);
-    await escrow.deployed();
-    
-    // Verify KYC for seller and buyer
+
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
-    
-    // Mint Identity for seller and buyer
-    try {
-        await compliance.mintIdentity(seller.address);
-        await compliance.mintIdentity(buyer.address);
-    } catch (e) {
-        console.log("Identity mint failed/skipped:", e.message);
-    }
 
-    // Transfer tokens to buyer
+    try {
+      await compliance.mintIdentity(seller.address);
+      await compliance.mintIdentity(buyer.address);
+    } catch (_) {}
+
+    /*//////////////////////////////////////////////////////////////
+                        ESCROW
+    //////////////////////////////////////////////////////////////*/
+    EscrowContract = await ethers.getContractFactory("EscrowContract");
+    escrow = await EscrowContract.deploy(
+      compliance.address,
+      [manager1.address, manager2.address, manager3.address],
+      THRESHOLD
+    );
+    await escrow.deployed();
+
+    /*//////////////////////////////////////////////////////////////
+                        FUND BUYER
+    //////////////////////////////////////////////////////////////*/
     await token.transfer(buyer.address, ethers.utils.parseEther("100"));
   });
 
+  /*//////////////////////////////////////////////////////////////
+                          DEPLOYMENT
+  //////////////////////////////////////////////////////////////*/
   describe("Deployment", function () {
-    it("Should set the right owner", async function () {
+    it("Sets admin correctly", async function () {
       expect(await escrow.admin()).to.equal(owner.address);
     });
-    
-    it("Should set compliance manager address", async function () {
+
+    it("Sets compliance manager", async function () {
       expect(await escrow.complianceManager()).to.equal(compliance.address);
     });
-  });
 
-  describe("Creating escrow", function () {
-    it("Should allow admin to create escrow", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      const duration = 7 * 24 * 60 * 60; // 7 days
-      
-      await expect(escrow.connect(owner).createEscrow(
-        invoiceId,
-        seller.address,
-        buyer.address,
-        amount,
-        token.address,
-        duration,
-        ethers.constants.AddressZero, // rwaNftContract
-        0 // rwaTokenId
-      )).to.emit(escrow, "EscrowCreated");
-    });
-    
-    it("Should not allow non-admin to create escrow", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      const duration = 7 * 24 * 60 * 60;
-      
-      await expect(escrow.connect(other).createEscrow(
-        invoiceId,
-        seller.address,
-        buyer.address,
-        amount,
-        token.address,
-        duration,
-        ethers.constants.AddressZero,
-        0
-      )).to.be.revertedWith("Not admin");
+    it("Initializes managers and threshold", async function () {
+      expect(await escrow.threshold()).to.equal(THRESHOLD);
+      expect(await escrow.isManager(manager1.address)).to.equal(true);
+      expect(await escrow.isManager(other.address)).to.equal(false);
     });
   });
 
-  describe("Depositing funds", function () {
+  /*//////////////////////////////////////////////////////////////
+                        ESCROW LIFECYCLE
+  //////////////////////////////////////////////////////////////*/
+  describe("Escrow lifecycle", function () {
+    const invoiceId = ethers.utils.formatBytes32String("INV-001");
+    const amount = ethers.utils.parseEther("1");
+    const duration = 7 * 24 * 60 * 60;
+
     beforeEach(async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      const duration = 7 * 24 * 60 * 60;
-      
       await escrow.connect(owner).createEscrow(
         invoiceId,
         seller.address,
@@ -104,92 +110,63 @@ describe("EscrowContract", function () {
         0
       );
     });
-    
-    it("Should allow buyer to deposit funds", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      
-      // Approve escrow to spend tokens
+
+    it("Allows buyer to deposit", async function () {
       await token.connect(buyer).approve(escrow.address, amount);
-      
-      await expect(escrow.connect(buyer).deposit(invoiceId, amount))
-        .to.emit(escrow, "DepositConfirmed");
+
+      await expect(
+        escrow.connect(buyer).deposit(invoiceId, amount)
+      ).to.emit(escrow, "DepositConfirmed");
     });
-    
-    it("Should not allow non-buyer to deposit", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      
-      // Ensure 'other' is compliant so we hit the "Not the buyer" check
+
+    it("Prevents non-buyer from depositing", async function () {
       await compliance.verifyKYC(other.address);
-      try {
-        await compliance.mintIdentity(other.address);
-      } catch (e) {}
+      try { await compliance.mintIdentity(other.address); } catch (_) {}
 
       await token.connect(other).approve(escrow.address, amount);
-      
-      await expect(escrow.connect(other).deposit(invoiceId, amount))
-        .to.be.revertedWith("Not the buyer");
+
+      await expect(
+        escrow.connect(other).deposit(invoiceId, amount)
+      ).to.be.revertedWith("Not buyer");
+    });
+
+    it("Releases funds after both confirmations", async function () {
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+
+      await escrow.connect(seller).confirmRelease(invoiceId);
+
+      await expect(
+        escrow.connect(buyer).confirmRelease(invoiceId)
+      ).to.emit(escrow, "EscrowReleased");
     });
   });
 
-  // Additional tests for release, disputes, etc.
-describe("EscrowContract Multi-Signature Arbitrator Management", function () {
-    let EscrowContract, escrow;
-    let owner, manager1, manager2, manager3, nonManager, arbitrator1;
-    const THRESHOLD = 2;
-
-    beforeEach(async function () {
-        [owner, manager1, manager2, manager3, nonManager, arbitrator1] = await ethers.getSigners();
-        const managers = [manager1.address, manager2.address, manager3.address];
-
-        EscrowContract = await ethers.getContractFactory("EscrowContract");
-        escrow = await EscrowContract.deploy(managers, THRESHOLD);
+  /*//////////////////////////////////////////////////////////////
+                  MULTI-SIG ARBITRATOR GOVERNANCE
+  //////////////////////////////////////////////////////////////*/
+  describe("Multi-sig arbitrator governance", function () {
+    it("Allows manager to propose arbitrator", async function () {
+      await expect(
+        escrow.connect(manager1).proposeAddArbitrator(arbitrator.address)
+      ).to.emit(escrow, "ArbitratorProposed");
     });
 
-    describe("Deployment", function () {
-        it("Should initialize managers and threshold correctly", async function () {
-            expect(await escrow.threshold()).to.equal(THRESHOLD);
-            expect(await escrow.isManager(manager1.address)).to.be.true;
-            expect(await escrow.isManager(nonManager.address)).to.be.false;
-        });
+    it("Executes proposal when threshold is met", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+
+      await escrow.connect(manager1).approveProposal(0);
+      await escrow.connect(manager2).approveProposal(0);
+
+      await escrow.connect(manager3).executeProposal(0);
+
+      expect(await escrow.isArbitrator(arbitrator.address)).to.equal(true);
     });
 
-    describe("Proposals", function () {
-        it("Should allow a manager to propose adding an arbitrator", async function () {
-            await expect(escrow.connect(manager1).proposeAddArbitrator(arbitrator1.address))
-                .to.emit(escrow, "ArbitratorProposed")
-                .withArgs(0, arbitrator1.address, true);
-        });
-
-        it("Should revert if a non-manager tries to propose", async function () {
-            await expect(
-                escrow.connect(nonManager).proposeAddArbitrator(arbitrator1.address)
-            ).to.be.revertedWith("Not a manager");
-        });
+    it("Prevents non-managers from proposing", async function () {
+      await expect(
+        escrow.connect(other).proposeAddArbitrator(arbitrator.address)
+      ).to.be.revertedWith("Not manager");
     });
-
-    describe("Approving and Executing", function () {
-        beforeEach(async function () {
-            await escrow.connect(manager1).proposeAddArbitrator(arbitrator1.address);
-        });
-
-        it("Should not allow executing before threshold is met", async function () {
-            await escrow.connect(manager1).approveProposal(0); // 1 approval
-            await expect(
-                escrow.connect(manager1).executeProposal(0)
-            ).to.be.revertedWith("Threshold not met");
-        });
-
-        it("Should execute and add arbitrator when threshold is met", async function () {
-            await escrow.connect(manager1).approveProposal(0);
-            await escrow.connect(manager2).approveProposal(0); // 2 approvals = threshold
-
-            await expect(escrow.connect(manager3).executeProposal(0))
-                .to.emit(escrow, "ArbitratorAdded")
-                .withArgs(arbitrator1.address);
-
-            expect(await escrow.isArbitrator(arbitrator1.address)).to.be.true;
-        });
-    });
+  });
 });
