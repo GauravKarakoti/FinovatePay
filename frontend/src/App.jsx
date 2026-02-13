@@ -5,7 +5,10 @@ import {
   Route,
   Navigate,
   useLocation,
+  useNavigate,
 } from 'react-router-dom';
+import { setNavigateFunction } from './utils/api';
+
 
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
@@ -30,6 +33,17 @@ import { Toaster } from 'sonner';
 
 import './App.css';
 
+/* -------------------- Navigation Setup -------------------- */
+function NavigationSetup() {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    setNavigateFunction(navigate);
+  }, [navigate]);
+  
+  return null;
+}
+
 /* -------------------- Auth Wrapper -------------------- */
 function RequireAuth({ children, allowedRoles }) {
   const location = useLocation();
@@ -45,6 +59,7 @@ function RequireAuth({ children, allowedRoles }) {
 
   return children;
 }
+
 
 /* -------------------- App -------------------- */
 function App() {
@@ -119,7 +134,9 @@ function App() {
   /* -------------------- Routes -------------------- */
   return (
     <Router>
+      <NavigationSetup />
       <Toaster position="top" richColors />
+
 
       <Header
         user={user}

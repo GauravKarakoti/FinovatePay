@@ -3,6 +3,13 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 console.log("API Base URL:", API_BASE_URL);
 
+// Navigation utility for programmatic navigation outside React components
+let navigateFunction = null;
+
+export const setNavigateFunction = (navigate) => {
+  navigateFunction = navigate;
+};
+
 // Create axios instance with default config
 // withCredentials: true ensures cookies are sent with requests
 export const api = axios.create({
@@ -15,11 +22,19 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      window.location.href = '/login';
+      // Clear user data from localStorage
+      localStorage.removeItem('user');
+      // Use React Router navigation if available, fallback to hard redirect
+      if (navigateFunction) {
+        navigateFunction('/login', { replace: true });
+      } else {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
+
 
 
 // --- Fixed Functions (Now using 'api' instance) ---
