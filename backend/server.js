@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const http = require('http');
 const path = require('path'); // Added for static files
 const socketIo = require('socket.io');
 require('dotenv').config();
+
 
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
@@ -51,7 +53,9 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json());
+
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploads
 
 const { pool, getConnection } = require('./config/database');

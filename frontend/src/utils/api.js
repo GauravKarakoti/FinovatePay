@@ -4,17 +4,10 @@ const API_BASE_URL = import.meta.env.VITE_API_URL;
 console.log("API Base URL:", API_BASE_URL);
 
 // Create axios instance with default config
+// withCredentials: true ensures cookies are sent with requests
 export const api = axios.create({
   baseURL: API_BASE_URL,
-});
-
-// Add token to requests automatically via interceptor
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+  withCredentials: true,
 });
 
 // Handle API errors
@@ -22,12 +15,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
       window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
+
 
 // --- Fixed Functions (Now using 'api' instance) ---
 

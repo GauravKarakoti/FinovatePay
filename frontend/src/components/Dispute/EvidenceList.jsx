@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from '../../utils/api';
+
 
 const EvidenceList = ({ invoiceId }) => {
   const [evidence, setEvidence] = useState([]);
@@ -8,10 +9,7 @@ const EvidenceList = ({ invoiceId }) => {
   useEffect(() => {
     const fetchEvidence = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/dispute/${invoiceId}/evidence`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await api.get(`/dispute/${invoiceId}/evidence`);
         setEvidence(res.data);
       } catch (err) {
         console.error('Failed to load evidence', err);
@@ -21,6 +19,7 @@ const EvidenceList = ({ invoiceId }) => {
     };
     fetchEvidence();
   }, [invoiceId]);
+
 
   if (loading) return <div className="text-gray-500 text-center py-4">Loading evidence...</div>;
 

@@ -32,7 +32,8 @@ const Login = ({ onLogin }) => {
       const response = await login(formData.email, formData.password);
 
       // ✅ Update parent state (sets user in App.jsx)
-      onLogin(response.data.user, response.data.token);
+      onLogin(response.data.user);
+
 
       // ✅ Redirect to original requested page instead of default "/"
       navigate(from, { replace: true });

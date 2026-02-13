@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { api } from '../../utils/api';
+
 
 const EvidenceUpload = ({ invoiceId, onUploadSuccess }) => {
   const [file, setFile] = useState(null);
@@ -19,17 +20,12 @@ const EvidenceUpload = ({ invoiceId, onUploadSuccess }) => {
     formData.append('file', file);
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.post(
-        `${import.meta.env.VITE_API_URL}/dispute/${invoiceId}/evidence`,
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
+      await api.post(`/dispute/${invoiceId}/evidence`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
       setFile(null);
       if (onUploadSuccess) onUploadSuccess();
     } catch (err) {
