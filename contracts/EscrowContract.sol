@@ -2,13 +2,16 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
 
-contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
+
+contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Receiver {
+
     /*//////////////////////////////////////////////////////////////
                                 TYPES
     //////////////////////////////////////////////////////////////*/
@@ -147,8 +150,29 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     }
 
     /*//////////////////////////////////////////////////////////////
+                        CIRCUIT BREAKER (PAUSABLE)
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Pauses the contract. Can only be called by timelock (governance).
+     * @dev Emergency stop mechanism. When paused, critical functions are blocked.
+     */
+    function pause() external onlyTimelock {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses the contract. Can only be called by timelock (governance).
+     * @dev Resumes normal contract operations.
+     */
+    function unpause() external onlyTimelock {
+        _unpause();
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         ESCROW CORE LOGIC
     //////////////////////////////////////////////////////////////*/
+
     function createEscrow(
         bytes32 invoiceId,
         address seller,
@@ -158,7 +182,8 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
         uint256 duration,
         address rwaNft,
         uint256 rwaTokenId
-    ) external onlyAdmin {
+    ) external onlyAdmin whenNotPaused {
+
         require(escrows[invoiceId].seller == address(0), "Escrow exists");
 
         if (rwaNft != address(0)) {
@@ -190,8 +215,10 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     )
         external
         nonReentrant
+        whenNotPaused
         onlyCompliant(_msgSender())
     {
+
         Escrow storage e = escrows[invoiceId];
 
         require(e.status == EscrowStatus.Created, "Inactive");
@@ -212,8 +239,10 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     )
         external
         nonReentrant
+        whenNotPaused
         onlyEscrowParty(invoiceId)
     {
+
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Funded, "Not funded");
 
@@ -227,8 +256,10 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
 
     function raiseDispute(bytes32 invoiceId)
         external
+        whenNotPaused
         onlyEscrowParty(invoiceId)
     {
+
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Funded, "No dispute");
 
@@ -243,8 +274,10 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
         bool sellerWins
     )
         external
+        whenNotPaused
         onlyAdmin
     {
+
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Disputed, "No dispute");
 
