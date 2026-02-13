@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
@@ -8,8 +8,6 @@ import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ProduceHistory from './pages/ProduceHistory';
-import { connectWallet } from './utils/web3';
-import Web3Modal from 'web3modal';
 import './App.css';
 import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
@@ -33,41 +31,30 @@ function App() {
       produceLots: 0,
   });
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
+  const { resetStats } = useStatsActions();
 
-  useEffect(() => {
-    const web3Modal = new Web3Modal({ cacheProvider: true });
-    if (web3Modal.cachedProvider) {
-      connectWallet()
-        .then(() => {
-          setWalletConnected(true);
-        })
-        .catch((error) => {
-          console.error("Failed to auto-connect wallet:", error);
-          setWalletConnected(false);
-        });
-    }
-  }, []);
+  // ✅ Web3Modal v3 handles connection automatically via WagmiConfig in main.jsx
+  // No manual connectWallet needed anymore - <w3m-button /> manages everything
 
-  const handleLogin = (userData, token) => {
+  const handleLogin = useCallback((userData, token) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     resetStats();
     setUser(userData);
-  };
+  }, [resetStats]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     resetStats();
-  };
+  }, [resetStats]);
 
-  const handleTabChange = (tab) => {
+  const handleTabChange = useCallback((tab) => {
     setActiveTab(tab);
-  };
+  }, []);
 
-  const renderDashboard = (dashboardComponent) => {
+  const renderDashboard = useCallback((dashboardComponent) => {
     return (
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9]">
           <div className="md:w-64 flex-shrink-0 hidden md:block">
@@ -82,23 +69,21 @@ function App() {
           </div>
       </div>
     );
-  };
+  }, [activeTab, handleTabChange, user]);
 
-  const toggleChatbot = () => {
+  const toggleChatbot = useCallback(() => {
     setIsChatbotOpen(prevState => !prevState);
-  };
+  }, []);
 
   // ✅ AUTH GUARD: Saves intended route in location state
   const RequireAuth = ({ children, allowedRoles }) => {
     const location = useLocation();
     
     if (!user) {
-      // Not logged in: redirect to login, remembering where they came from
       return <Navigate to="/login" state={{ from: location.pathname }} replace />;
     }
     
     if (allowedRoles && !allowedRoles.includes(user.role)) {
-      // Logged in but wrong role: send to home (which handles role-based landing)
       return <Navigate to="/" replace />;
     }
     
@@ -115,7 +100,6 @@ function App() {
             walletConnected={walletConnected}
             onUserUpdate={setUser}
         />
-        {console.log('Current user role in App.jsx:', user)}
         <main>
           <Routes>
             {/* Home route - keeps existing role-based logic */}
