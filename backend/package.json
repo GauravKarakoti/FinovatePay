@@ -4,13 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
-    "start": "node server.js",
-    "test:backend": "jest",
-    "lint": "eslint . --ext .js,.ts",
-    "lint:fix": "eslint . --ext .js,.ts --fix",
-    "migrate:db": "node scripts/migrate-db.js",
-    "seed:db": "node scripts/seed-db.js"
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
