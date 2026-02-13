@@ -2,13 +2,16 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
 
-contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
+contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP712 {
+    using ECDSA for bytes32;
     /*//////////////////////////////////////////////////////////////
                                 TYPES
     //////////////////////////////////////////////////////////////*/
@@ -44,6 +47,26 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     address public admin;
     ComplianceManager public complianceManager;
 
+    address[] public managers;
+    mapping(address => bool) public isManager;
+    uint256 public threshold;
+
+    struct Proposal {
+        address arbitrator;
+        bool add;
+        uint256 approvals;
+        bool executed;
+    }
+
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => mapping(address => bool)) public approved;
+    mapping(address => bool) public isArbitrator;
+    mapping(address => uint256) public nonces;
+
+    bytes32 private constant META_TX_TYPEHASH =
+        keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
+
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -52,6 +75,12 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event ArbitratorProposed(uint256 indexed proposalId, address arbitrator, bool add);
+    event ProposalApproved(uint256 indexed proposalId, address manager);
+    event ProposalExecuted(uint256 indexed proposalId, address arbitrator, bool add);
+    event ArbitratorAdded(address indexed arbitrator);
+    event ArbitratorRemoved(address indexed arbitrator);
+    event MetaTransactionExecuted(address indexed user, address indexed relayer, bytes functionSignature);
 
     /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
@@ -63,6 +92,11 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
 
     modifier onlyCompliant(address user) {
         require(complianceManager.isCompliant(user), "Not compliant");
+        _;
+    }
+
+    modifier onlyManager() {
+        require(isManager[_msgSender()], "Not manager");
         _;
     }
 
@@ -80,10 +114,25 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     //////////////////////////////////////////////////////////////*/
     constructor(
         address _complianceManager,
-        address trustedForwarder
-    ) ERC2771Context(trustedForwarder) {
+        address trustedForwarder,
+        address[] memory _managers,
+        uint256 _threshold
+    ) ERC2771Context(trustedForwarder) EIP712("EscrowContract", "1") {
         admin = _msgSender();
         complianceManager = ComplianceManager(_complianceManager);
+
+        require(_managers.length > 0, "No managers");
+        require(_threshold > 0 && _threshold <= _managers.length, "Bad threshold");
+
+        for (uint256 i = 0; i < _managers.length; i++) {
+            address manager = _managers[i];
+            require(manager != address(0), "Bad manager");
+            require(!isManager[manager], "Duplicate manager");
+            isManager[manager] = true;
+            managers.push(manager);
+        }
+
+        threshold = _threshold;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -232,6 +281,141 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
         e.status = EscrowStatus.Released;
         emit EscrowReleased(invoiceId, e.amount);
         delete escrows[invoiceId];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        META-TRANSACTIONS
+    //////////////////////////////////////////////////////////////*/
+    function executeMetaTx(
+        address user,
+        bytes calldata functionSignature,
+        bytes calldata signature
+    ) external returns (bytes memory) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                META_TX_TYPEHASH,
+                nonces[user],
+                user,
+                keccak256(functionSignature)
+            )
+        );
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = hash.recover(signature);
+        require(signer == user, "Invalid signature");
+
+        nonces[user] += 1;
+
+        (bool success, bytes memory returnData) =
+            address(this).call(abi.encodePacked(functionSignature, user));
+        require(success, "Meta-tx failed");
+
+        emit MetaTransactionExecuted(user, _msgSender(), functionSignature);
+        return returnData;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    MULTI-SIG ARBITRATOR MANAGEMENT
+    //////////////////////////////////////////////////////////////*/
+    function proposeAddArbitrator(address arbitrator) external onlyManager {
+        require(arbitrator != address(0), "Bad arbitrator");
+        require(!isArbitrator[arbitrator], "Already arbitrator");
+
+        uint256 proposalId = proposalCount;
+        proposals[proposalId] = Proposal({
+            arbitrator: arbitrator,
+            add: true,
+            approvals: 0,
+            executed: false
+        });
+
+        proposalCount += 1;
+        emit ArbitratorProposed(proposalId, arbitrator, true);
+    }
+
+    function proposeRemoveArbitrator(address arbitrator) external onlyManager {
+        require(arbitrator != address(0), "Bad arbitrator");
+        require(isArbitrator[arbitrator], "Not arbitrator");
+
+        uint256 proposalId = proposalCount;
+        proposals[proposalId] = Proposal({
+            arbitrator: arbitrator,
+            add: false,
+            approvals: 0,
+            executed: false
+        });
+
+        proposalCount += 1;
+        emit ArbitratorProposed(proposalId, arbitrator, false);
+    }
+
+    function approveProposal(uint256 proposalId) external onlyManager {
+        Proposal storage proposal = proposals[proposalId];
+        require(proposal.arbitrator != address(0), "Bad proposal");
+        require(!proposal.executed, "Executed");
+        require(!approved[proposalId][_msgSender()], "Already approved");
+
+        approved[proposalId][_msgSender()] = true;
+        proposal.approvals += 1;
+
+        emit ProposalApproved(proposalId, _msgSender());
+    }
+
+    function executeProposal(uint256 proposalId) external onlyManager {
+        Proposal storage proposal = proposals[proposalId];
+        require(proposal.arbitrator != address(0), "Bad proposal");
+        require(!proposal.executed, "Executed");
+        require(proposal.approvals >= threshold, "Insufficient approvals");
+
+        proposal.executed = true;
+
+        if (proposal.add) {
+            addArbitrator(proposal.arbitrator);
+        } else {
+            removeArbitrator(proposal.arbitrator);
+        }
+
+        emit ProposalExecuted(proposalId, proposal.arbitrator, proposal.add);
+    }
+
+    function addArbitrator(address arbitrator) internal {
+        require(arbitrator != address(0), "Bad arbitrator");
+        require(!isArbitrator[arbitrator], "Already arbitrator");
+        isArbitrator[arbitrator] = true;
+        emit ArbitratorAdded(arbitrator);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        CONTEXT OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+    function _msgSender() internal view virtual override(ERC2771Context) returns (address) {
+        if (msg.sender == address(this) && msg.data.length >= 20) {
+            address sender;
+            assembly {
+                sender := shr(96, calldataload(sub(calldatasize(), 20)))
+            }
+            return sender;
+        }
+        return ERC2771Context._msgSender();
+    }
+
+    function _msgData() internal view virtual override(ERC2771Context) returns (bytes calldata) {
+        if (msg.sender == address(this) && msg.data.length >= 20) {
+            return msg.data[:msg.data.length - 20];
+        }
+        return ERC2771Context._msgData();
+    }
+
+    function _contextSuffixLength() internal view virtual override(ERC2771Context) returns (uint256) {
+        if (msg.sender == address(this)) {
+            return 20;
+        }
+        return ERC2771Context._contextSuffixLength();
+    }
+
+    function removeArbitrator(address arbitrator) internal {
+        require(isArbitrator[arbitrator], "Not arbitrator");
+        isArbitrator[arbitrator] = false;
+        emit ArbitratorRemoved(arbitrator);
     }
 
     /*//////////////////////////////////////////////////////////////

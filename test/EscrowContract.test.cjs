@@ -43,7 +43,7 @@ describe("EscrowContract (Merged)", function () {
                       COMPLIANCE MANAGER
     //////////////////////////////////////////////////////////////*/
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
-    compliance = await ComplianceManager.deploy();
+    compliance = await ComplianceManager.deploy(ethers.constants.AddressZero);
     await compliance.deployed();
 
     await compliance.verifyKYC(seller.address);
@@ -60,6 +60,7 @@ describe("EscrowContract (Merged)", function () {
     EscrowContract = await ethers.getContractFactory("EscrowContract");
     escrow = await EscrowContract.deploy(
       compliance.address,
+      ethers.constants.AddressZero,
       [manager1.address, manager2.address, manager3.address],
       THRESHOLD
     );
@@ -134,10 +135,8 @@ describe("EscrowContract (Merged)", function () {
       await token.connect(buyer).approve(escrow.address, amount);
       await escrow.connect(buyer).deposit(invoiceId, amount);
 
-      await escrow.connect(seller).confirmRelease(invoiceId);
-
       await expect(
-        escrow.connect(buyer).confirmRelease(invoiceId)
+        escrow.connect(seller).confirmRelease(invoiceId)
       ).to.emit(escrow, "EscrowReleased");
     });
   });
@@ -167,6 +166,40 @@ describe("EscrowContract (Merged)", function () {
       await expect(
         escrow.connect(other).proposeAddArbitrator(arbitrator.address)
       ).to.be.revertedWith("Not manager");
+    });
+
+    it("Prevents duplicate approvals", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(0);
+
+      await expect(
+        escrow.connect(manager1).approveProposal(0)
+      ).to.be.revertedWith("Already approved");
+    });
+
+    it("Prevents execution before threshold", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(0);
+
+      await expect(
+        escrow.connect(manager2).executeProposal(0)
+      ).to.be.revertedWith("Insufficient approvals");
+    });
+
+    it("Allows removing arbitrator via proposal", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(0);
+      await escrow.connect(manager2).approveProposal(0);
+      await escrow.connect(manager3).executeProposal(0);
+
+      expect(await escrow.isArbitrator(arbitrator.address)).to.equal(true);
+
+      await escrow.connect(manager1).proposeRemoveArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(1);
+      await escrow.connect(manager2).approveProposal(1);
+      await escrow.connect(manager3).executeProposal(1);
+
+      expect(await escrow.isArbitrator(arbitrator.address)).to.equal(false);
     });
   });
 });

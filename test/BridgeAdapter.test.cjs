@@ -2,18 +2,22 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("BridgeAdapter", function () {
-  let bridgeAdapter, waltBridge, complianceManager, owner, user, token, fractionToken;
+  let bridgeAdapter, waltBridge, aggLayer, complianceManager, owner, user, nonCompliant, token, fractionToken;
 
   beforeEach(async function () {
-    [owner, user] = await ethers.getSigners();
+    [owner, user, nonCompliant] = await ethers.getSigners();
 
     // Deploy mock WaltBridge
     const WaltBridge = await ethers.getContractFactory("MockWaltBridge");
     waltBridge = await WaltBridge.deploy();
 
+    // Deploy mock AggLayer
+    const MockAggLayer = await ethers.getContractFactory("MockAggLayer");
+    aggLayer = await MockAggLayer.deploy();
+
     // Deploy ComplianceManager
     const ComplianceManager = await ethers.getContractFactory("ComplianceManager");
-    complianceManager = await ComplianceManager.deploy();
+    complianceManager = await ComplianceManager.deploy(ethers.constants.AddressZero);
 
     // Deploy mock ERC20 token
     const MockERC20 = await ethers.getContractFactory("MockERC20");
@@ -27,9 +31,11 @@ describe("BridgeAdapter", function () {
     const BridgeAdapter = await ethers.getContractFactory("BridgeAdapter");
     bridgeAdapter = await BridgeAdapter.deploy(waltBridge.address, complianceManager.address);
 
+    await bridgeAdapter.updateAggLayer(aggLayer.address);
+
     // Set up compliance
-    await complianceManager.addIdentity(user.address, "test");
     await complianceManager.verifyKYC(user.address);
+    await complianceManager.verifyKYC(owner.address);
   });
 
   describe("ERC20 Bridging", function () {
@@ -47,7 +53,14 @@ describe("BridgeAdapter", function () {
       await token.mint(user.address, ethers.utils.parseEther("100"));
       await token.connect(user).approve(bridgeAdapter.address, ethers.utils.parseEther("50"));
 
-      const lockId = await bridgeAdapter.connect(user).lockForBridge(token.address, ethers.utils.parseEther("50"), bridgeAdapter.KATANA_CHAIN());
+      const tx = await bridgeAdapter.connect(user).lockForBridge(
+        token.address,
+        ethers.utils.parseEther("50"),
+        bridgeAdapter.KATANA_CHAIN()
+      );
+      const receipt = await tx.wait();
+      const lockEvent = receipt.events.find(e => e.event === "AssetLocked");
+      const lockId = lockEvent.args.lockId;
 
       await expect(bridgeAdapter.bridgeAsset(lockId, user.address))
         .to.emit(bridgeAdapter, "AssetBridged");
@@ -64,7 +77,8 @@ describe("BridgeAdapter", function () {
         amount,
         ethers.utils.parseEther("100"),
         Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
-        owner.address
+        owner.address,
+        0
       );
 
       await fractionToken.setApprovalForAll(bridgeAdapter.address, true);
@@ -84,12 +98,21 @@ describe("BridgeAdapter", function () {
         amount,
         ethers.utils.parseEther("100"),
         Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
-        owner.address
+        owner.address,
+        0
       );
 
       await fractionToken.setApprovalForAll(bridgeAdapter.address, true);
 
-      const lockId = await bridgeAdapter.lockERC1155ForBridge(fractionToken.address, tokenId, amount, bridgeAdapter.KATANA_CHAIN());
+      const lockTx = await bridgeAdapter.lockERC1155ForBridge(
+        fractionToken.address,
+        tokenId,
+        amount,
+        bridgeAdapter.KATANA_CHAIN()
+      );
+      const lockReceipt = await lockTx.wait();
+      const lockEvent = lockReceipt.events.find(e => e.event === "ERC1155AssetLocked");
+      const lockId = lockEvent.args.lockId;
 
       await expect(bridgeAdapter.bridgeERC1155Asset(lockId, user.address))
         .to.emit(bridgeAdapter, "ERC1155AssetBridged");
@@ -99,17 +122,31 @@ describe("BridgeAdapter", function () {
       const tokenId = 1;
       const amount = 100;
 
+      await fractionToken.tokenizeInvoice(
+        ethers.utils.formatBytes32String("invoice2"),
+        amount,
+        ethers.utils.parseEther("100"),
+        Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+        owner.address,
+        0
+      );
+
       await fractionToken.setApprovalForAll(bridgeAdapter.address, true);
 
-      await expect(bridgeAdapter.connect(user).aggLayerTransferERC1155(fractionToken.address, tokenId, amount, bridgeAdapter.POLYGON_POS_CHAIN(), user.address, user.address))
+      await expect(bridgeAdapter.aggLayerTransferERC1155(
+        fractionToken.address,
+        tokenId,
+        amount,
+        bridgeAdapter.POLYGON_POS_CHAIN(),
+        user.address,
+        user.address
+      ))
         .to.emit(bridgeAdapter, "ERC1155AssetBridged");
     });
   });
 
   describe("Compliance", function () {
     it("Should reject operations for non-compliant users", async function () {
-      const nonCompliant = owner; // owner is not verified
-
       await token.mint(nonCompliant.address, ethers.utils.parseEther("100"));
       await token.connect(nonCompliant).approve(bridgeAdapter.address, ethers.utils.parseEther("50"));
 

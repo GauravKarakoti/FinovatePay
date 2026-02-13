@@ -50,7 +50,7 @@ describe("EscrowContract Meta-Transactions", function () {
 
     // Deploy ComplianceManager
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
-    compliance = await ComplianceManager.deploy();
+    compliance = await ComplianceManager.deploy(ethers.constants.AddressZero);
     await compliance.deployed();
 
     // Setup compliance
@@ -69,7 +69,12 @@ describe("EscrowContract Meta-Transactions", function () {
 
     // Deploy EscrowContract
     EscrowContract = await ethers.getContractFactory("EscrowContract");
-    escrow = await EscrowContract.deploy(compliance.address);
+    escrow = await EscrowContract.deploy(
+      compliance.address,
+      ethers.constants.AddressZero,
+      [owner.address],
+      1
+    );
     await escrow.deployed();
 
     // Distribute tokens

@@ -3,6 +3,8 @@ const fs = require("fs");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
+  const managers = [deployer.address];
+  const threshold = 1;
 
   console.log("Deploying contracts with gasless transaction support...");
   console.log("Deploying with account:", deployer.address);
@@ -42,7 +44,9 @@ async function main() {
   const EscrowContract = await ethers.getContractFactory("EscrowContract");
   const escrowContract = await EscrowContract.deploy(
     complianceManager.address,
-    minimalForwarder.address
+    minimalForwarder.address,
+    managers,
+    threshold
   );
   await escrowContract.deployed();
   console.log("EscrowContract deployed to:", escrowContract.address);
