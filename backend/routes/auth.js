@@ -1,10 +1,6 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { pool } = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
-const User = require('../models/User');
 const router = express.Router();
+const { register, login } = require('../controllers/authController');
 
 router.put('/role', authenticateToken, async (req, res) => {
   const { role } = req.body;
