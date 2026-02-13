@@ -2,13 +2,19 @@ const jwt = require('jsonwebtoken');
 const  pool  = require('../config/database'); // ✅ Correct Import
 
 const authenticateToken = async (req, res, next) => {
-  // 1. Get the token from the header
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  // 1. Get the token from cookies first, then fall back to Authorization header
+  let token = req.cookies?.token;
+  
+  if (!token) {
+    // Fallback to Authorization header for backward compatibility
+    const authHeader = req.headers['authorization'];
+    token = authHeader && authHeader.split(' ')[1];
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Access token required' });
   }
+
 
   try {
     // 2. Verify Token (Using the correct environment variable)

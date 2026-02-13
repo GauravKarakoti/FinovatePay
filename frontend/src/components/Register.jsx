@@ -37,7 +37,8 @@ const Register = ({ onLogin }) => {
     try {
       const { confirmPassword, ...registerData } = formData;
       const response = await register(registerData);
-      onLogin(response.data.user, response.data.token);
+      onLogin(response.data.user);
+
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {

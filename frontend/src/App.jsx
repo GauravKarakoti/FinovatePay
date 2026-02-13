@@ -5,7 +5,10 @@ import {
   Route,
   Navigate,
   useLocation,
+  useNavigate,
 } from 'react-router-dom';
+import { setNavigateFunction } from './utils/api';
+
 
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
@@ -30,6 +33,17 @@ import { Toaster } from 'sonner';
 
 import './App.css';
 
+/* -------------------- Navigation Setup -------------------- */
+function NavigationSetup() {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    setNavigateFunction(navigate);
+  }, [navigate]);
+  
+  return null;
+}
+
 /* -------------------- Auth Wrapper -------------------- */
 function RequireAuth({ children, allowedRoles }) {
   const location = useLocation();
@@ -45,6 +59,7 @@ function RequireAuth({ children, allowedRoles }) {
 
   return children;
 }
+
 
 /* -------------------- App -------------------- */
 function App() {
@@ -66,11 +81,10 @@ function App() {
 
   /* -------------------- Effects -------------------- */
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
 
-    if (token && userData) {
-      setUser({ ...JSON.parse(userData), token });
+    if (userData) {
+      setUser(JSON.parse(userData));
     }
 
     const web3Modal = new Web3Modal({ cacheProvider: true });
@@ -81,20 +95,21 @@ function App() {
     }
   }, []);
 
+
   useEffect(() => {
     if (!user) {
-      localStorage.removeItem('token');
       localStorage.removeItem('user');
       return;
     }
-    localStorage.setItem('token', user.token);
     localStorage.setItem('user', JSON.stringify(user));
   }, [user]);
 
+
   /* -------------------- Handlers -------------------- */
-  const handleLogin = (userData, token) => {
-    setUser({ ...userData, token });
+  const handleLogin = (userData) => {
+    setUser(userData);
   };
+
 
   const handleLogout = () => {
     setUser(null);
@@ -119,7 +134,9 @@ function App() {
   /* -------------------- Routes -------------------- */
   return (
     <Router>
+      <NavigationSetup />
       <Toaster position="top" richColors />
+
 
       <Header
         user={user}
