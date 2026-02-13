@@ -28,8 +28,6 @@ async function main() {
   // Verify EscrowContract with its constructor argument
   await verify(addresses.EscrowContract, [addresses.ComplianceManager]);
   
-  // Verify InvoiceRegistry
-  await verify(addresses.InvoiceRegistry, []);
   
   // Verify FractionToken
   await verify(addresses.FractionToken, []);
