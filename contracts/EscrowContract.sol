@@ -36,12 +36,11 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
         uint256 rwaTokenId;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                STATE
-    //////////////////////////////////////////////////////////////*/
     mapping(bytes32 => Escrow) public escrows;
-    mapping(address => bool) public arbitrators;
-    
+    mapping(bytes32 => mapping(address => bool)) public disputeVoted;
+    mapping(bytes32 => uint256) public sellerVotes;
+    mapping(bytes32 => uint256) public buyerVotes;
+
     ComplianceManager public complianceManager;
 
     /*//////////////////////////////////////////////////////////////
@@ -51,20 +50,19 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
-    event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event DisputeResolved(
+        bytes32 indexed invoiceId,
+        address resolver,
+        bool sellerWins
+    );
+    event EscrowCancelled(bytes32 indexed invoiceId);
+    event EscrowExpired(bytes32 indexed invoiceId);
+    event TreasuryUpdated(address indexed newTreasury);
+    event FeeUpdated(uint256 newFeeBasisPoints);
+    event FeeTaken(bytes32 indexed invoiceId, uint256 feeAmount);
 
-    /*//////////////////////////////////////////////////////////////
-                                MODIFIERS
-    //////////////////////////////////////////////////////////////*/
-    modifier onlyAdmin() {
-        require(_msgSender() == admin, "Not admin");
-        _;
-    }
-
-    modifier onlyCompliant(address user) {
-        require(complianceManager.isCompliant(user), "Not compliant");
-        _;
-    }
+    event ComplianceManagerUpdated(address indexed newComplianceManager);
+    event InvoiceFactoryUpdated(address indexed newInvoiceFactory);
 
     modifier onlyEscrowParty(bytes32 invoiceId) {
         Escrow storage e = escrows[invoiceId];
@@ -75,15 +73,77 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
         _;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
+    modifier onlyEscrowParty(bytes32 _invoiceId) {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(
+            msg.sender == escrow.seller ||
+                msg.sender == escrow.buyer ||
+                msg.sender == invoiceFactory,
+            "Not authorized"
+        );
+        _;
+    }
+
+    modifier onlyArbitrator() {
+        require(arbitratorsRegistry.isArbitrator(msg.sender), "Not arbitrator");
+        _;
+    }
+
+    modifier onlyTimelock() {
+        require(msg.sender == timelock, "only Governance");
+        _;
+    }
+
     constructor(
         address _complianceManager,
-        address trustedForwarder
-    ) ERC2771Context(trustedForwarder) {
-        admin = _msgSender();
+        address _timelock,
+        address _arbitratorsRegistry
+    ) {
+        require(_complianceManager != address(0), "Invalid compliance manager");
+        require(_arbitratorsRegistry != address(0), "Invalid registry");
+        treasury = msg.sender;
+        keeper = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
+
+        timelock = _timelock;
+        emit ComplianceManagerUpdated(_complianceManager);
+    }
+
+    function setTimelock(address _timelock) external virtual onlyTimelock {
+        require(_timelock != address(0), "Invalid timelock");
+        timelock = _timelock;
+    }
+
+    function setArbitratorsRegistry(
+        address _arbitratorsRegistry
+    ) external onlyTimelock {
+        require(_arbitratorsRegistry != address(0), "Invalid registry");
+        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
+    }
+
+    function setInvoiceFactory(address _invoiceFactory) external onlyTimelock {
+        require(_invoiceFactory != address(0), "Invalid invoice factory");
+        invoiceFactory = _invoiceFactory;
+        emit InvoiceFactoryUpdated(_invoiceFactory);
+    }
+
+
+    function setKeeper(address _keeper) external onlyTimelock {
+        require(_keeper != address(0), "Invalid keeper");
+        keeper = _keeper;
+    }
+
+    function setTreasury(address _treasury) external onlyTimelock {
+        require(_treasury != address(0), "Invalid treasury");
+        treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
+    }
+
+    function setFeeBasisPoints(uint256 _feeBasisPoints) external onlyTimelock {
+        require(_feeBasisPoints <= 1000, "Fee too high"); // Max 10%
+        feeBasisPoints = _feeBasisPoints;
+        emit FeeUpdated(_feeBasisPoints);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -229,9 +289,54 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
             );
         }
 
-        e.status = EscrowStatus.Released;
-        emit EscrowReleased(invoiceId, e.amount);
-        delete escrows[invoiceId];
+        emit EscrowReleased(_invoiceId, escrow.amount);
+        delete escrows[_invoiceId];
+    }
+
+    function expireEscrow(bytes32 _invoiceId) external nonReentrant {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.seller != address(0), "Escrow does not exist");
+        require(
+            msg.sender == escrow.seller ||
+                msg.sender == escrow.buyer ||
+                msg.sender == keeper ||
+                msg.sender == invoiceFactory,
+            "Not authorized"
+        );
+        require(block.timestamp >= escrow.expiresAt, "Escrow not expired");
+        require(
+            escrow.status == EscrowStatus.Created ||
+                escrow.status == EscrowStatus.Funded,
+            "Already finalized"
+        );
+
+        EscrowStatus oldStatus = escrow.status;
+        escrow.status = EscrowStatus.Expired;
+
+        // Return NFT to Seller
+        if (escrow.rwaNftContract != address(0)) {
+            IERC721(escrow.rwaNftContract).transferFrom(
+                address(this),
+                escrow.seller,
+                escrow.rwaTokenId
+            );
+        }
+
+        // Refund Buyer if they deposited
+        if (oldStatus == EscrowStatus.Funded) {
+            IERC20 token = IERC20(escrow.token);
+            require(
+                token.transfer(escrow.buyer, escrow.amount),
+                "Refund failed"
+            );
+        }
+
+        emit EscrowExpired(_invoiceId);
+        emit EscrowCancelled(_invoiceId);
+        delete disputeVoted[_invoiceId];
+        delete sellerVotes[_invoiceId];
+        delete buyerVotes[_invoiceId];
+        delete escrows[_invoiceId];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -255,4 +360,5 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver {
     function recoverNFT(address _nftContract, uint256 _tokenId) external onlyAdmin {
         IERC721(_nftContract).transferFrom(address(this), admin, _tokenId);
     }
+
 }
