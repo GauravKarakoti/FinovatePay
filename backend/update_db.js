@@ -2,85 +2,62 @@ const { Pool } = require('pg');
 require('dotenv').config();
 
 const pool = new Pool({
-  user: process.env.DB_USER || 'user',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'finovatepay',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
 });
 
-const createTables = async () => {
+// 1. Basic Table Schema (Create this if it doesn't exist)
+const createTableQuery = `
+  CREATE TABLE IF NOT EXISTS invoices (
+    invoice_id SERIAL PRIMARY KEY,
+    client VARCHAR(255),
+    amount VARCHAR(255),
+    due_date DATE,
+    status VARCHAR(50) DEFAULT 'pending',
+    seller_address VARCHAR(255),
+    buyer_address VARCHAR(255),
+    escrow_status VARCHAR(50) DEFAULT 'created',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  );
+`;
+
+// 2. The New Columns you want to add
+const alterTableQuery = `
+  ALTER TABLE invoices 
+  ADD COLUMN IF NOT EXISTS lot_id VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS financing_status VARCHAR(50) DEFAULT 'none',
+  ADD COLUMN IF NOT EXISTS is_tokenized BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS token_id VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS remaining_supply NUMERIC(20, 2),
+  ADD COLUMN IF NOT EXISTS is_discountable BOOLEAN DEFAULT TRUE,
+  ADD COLUMN IF NOT EXISTS annual_apr NUMERIC(5, 2) DEFAULT 18.00,
+  ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(20, 2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS early_paid_amount NUMERIC(20, 2),
+  ADD COLUMN IF NOT EXISTS settled_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS release_tx_hash VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS shipment_proof_hash VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS dispute_reason TEXT,
+  ADD COLUMN IF NOT EXISTS escrow_tx_hash VARCHAR(255);
+`;
+
+(async () => {
   try {
-    // 1. Users Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        wallet_address VARCHAR(255) UNIQUE NOT NULL,
-        role VARCHAR(50) NOT NULL, -- 'buyer', 'seller', 'investor'
-        kyc_status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'verified', 'rejected'
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+    console.log("🔌 Connecting to database...");
+    
+    // Step 1: Create Table
+    await pool.query(createTableQuery);
+    console.log("✅ Verified 'invoices' table exists.");
 
-    // 2. Invoices Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS invoices (
-        invoice_id VARCHAR(255) PRIMARY KEY, -- UUID from frontend
-        user_id INTEGER REFERENCES users(id),
-        amount DECIMAL(18, 2) NOT NULL,
-        client VARCHAR(255),
-        status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'approved', 'paid'
-        due_date TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        escrow_status VARCHAR(50) DEFAULT 'created', -- 'created', 'deposited', 'shipped', 'released', 'disputed'
-        shipment_proof TEXT, -- Hash or Link to proof
-        produce_type VARCHAR(255),
-        quantity VARCHAR(255),
-        origin VARCHAR(255),
-        contract_address VARCHAR(255),
-        invoice_hash VARCHAR(255),
-        token_address VARCHAR(255)
-      );
-    `);
+    // Step 2: Add Columns
+    await pool.query(alterTableQuery);
+    console.log("✅ SUCCESS! Database columns added.");
 
-    // 3. Produce Lots Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS produce_lots (
-        lot_id SERIAL PRIMARY KEY,
-        seller_address VARCHAR(255) NOT NULL,
-        produce_type VARCHAR(255) NOT NULL,
-        quantity DECIMAL(18,2) NOT NULL,
-        current_quantity DECIMAL(18,2) NOT NULL,
-        quality_metrics JSONB, -- Store JSON data like { "grade": "A", "moisture": "12%" }
-        harvest_date TIMESTAMP,
-        origin VARCHAR(255),
-        status VARCHAR(50) DEFAULT 'available',
-        tx_hash VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    // 4. Quotations Table
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS quotations (
-        id SERIAL PRIMARY KEY,
-        seller_address VARCHAR(255) NOT NULL,
-        buyer_address VARCHAR(255) NOT NULL,
-        produce_type VARCHAR(255) NOT NULL,
-        quantity DECIMAL(18,2) NOT NULL,
-        price_per_unit DECIMAL(18,2) NOT NULL,
-        total_amount DECIMAL(18,2) NOT NULL,
-        status VARCHAR(50) DEFAULT 'pending', -- pending, accepted, rejected, converted
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    console.log("✅ All Database Tables Created Successfully!");
   } catch (err) {
-    console.error("❌ Error creating tables:", err);
+    console.error("❌ ERROR DETAILS:", err); 
   } finally {
-    pool.end();
+    await pool.end();
   }
-};
-
-createTables();
+})();
