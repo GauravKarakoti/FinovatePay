@@ -25,7 +25,9 @@ import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApprov
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
+import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { useStatsActions } from '../context/StatsContext';
+import FiatOnRamp from '../components/FiatOnRamp';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -141,6 +143,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
   const [showKYCVerification, setShowKYCVerification] = useState(false);
+  const [showFiatModal, setShowFiatModal] = useState(false);
   const { setStats: setGlobalStats } = useStatsActions();
 
   // Load Initial Data
@@ -353,7 +356,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, []);
 
   const handlePayInvoice = useCallback(async (invoice) => {
-    if (!ethers.utils.isAddress(invoice.contract_address)) {
+    if (!ethers.isAddress(invoice.contract_address)) {
       toast.error('Invalid contract address');
       return;
     }
@@ -364,15 +367,28 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       const { signer } = await connectWallet();
       const { amount, currency, contract_address, token_address } = invoice;
-      const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
+      const amountWei = ethers.parseUnits(amount.toString(), 18);
       
       const invoiceContract = new ethers.Contract(contract_address, InvoiceContractABI.abi, signer);
       let tx;
 
       if (currency === 'MATIC') {
+        const balance = await signer.getBalance();
+        if (balance.lt(amountWei)) {
+            toast.error("Insufficient MATIC balance.", { id: toastId });
+            return;
+        }
         tx = await invoiceContract.depositNative({ value: amountWei });
       } else {
         const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
+        const userAddress = await signer.getAddress();
+        const balance = await tokenContract.balanceOf(userAddress);
+
+        if (balance.lt(amountWei)) {
+            toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
+            return;
+        }
+
         toast.loading('Approving tokens...', { id: toastId });
         
         const approveTx = await tokenContract.approve(contract_address, amountWei);
@@ -506,6 +522,8 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         </div>
 
         <div className="space-y-6">
+          <FiatOnRamp walletAddress={walletAddress} />
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <KYCStatus
               status={kycData.status}
@@ -684,12 +702,23 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
               Wallet: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
             </p>
           </div>
-          {kycData.status !== 'verified' && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 flex items-center gap-2">
-              <span className="text-yellow-600">⚠️</span>
-              <span className="text-sm text-yellow-800">Complete KYC to unlock all features</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowFiatModal(true)}
+              className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              Buy Crypto
+            </button>
+            {kycData.status !== 'verified' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 flex items-center gap-2">
+                <span className="text-yellow-600">⚠️</span>
+                <span className="text-sm text-yellow-800">Complete KYC to unlock all features</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Main Content */}
@@ -728,6 +757,21 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
           </div>
         )}
       </Modal>
+
+      {/* Fiat On-Ramp Modal */}
+      {showFiatModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="relative">
+            <FiatOnRampModal 
+              onClose={() => setShowFiatModal(false)}
+              onSuccess={(amount) => {
+                toast.success(`Successfully purchased ${amount} USDC`);
+                setShowFiatModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

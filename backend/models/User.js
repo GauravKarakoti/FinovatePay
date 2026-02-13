@@ -1,4 +1,4 @@
-const { pool } = require('../config/database');
+const pool  = require('../config/database');
 
 class User {
   static async create(userData) {
@@ -59,21 +59,33 @@ class User {
     return result.rows[0];
   }
 
-  static async updateKYCStatus(userId, status, riskLevel, details = null) {
-    const query = `
-      UPDATE users 
-      SET kyc_status = $1, kyc_risk_level = $2, kyc_details = $3 
-      WHERE id = $4 
-      RETURNING id, email, wallet_address, kyc_status, kyc_risk_level
-    `;
-    const result = await pool.query(query, [status, riskLevel, details, userId]);
-    return result.rows[0];
+  // Create new User
+  static async create(userData) {
+    const { wallet_address, role, name, email } = userData;
+    try {
+      const query = `
+        INSERT INTO users (wallet_address, role, name, email)
+        VALUES ($1, $2, $3, $4)
+        RETURNING *
+      `;
+      const { rows } = await pool.query(query, [wallet_address, role, name, email]);
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
   }
-
-  static async updateRole(userId, role) {
-    const query = 'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, email, role';
-    const result = await pool.query(query, [role, userId]);
-    return result.rows[0];
+  
+  // Update KYC Status
+  static async updateKYCStatus(walletAddress, status) {
+    try {
+      const query = `
+        UPDATE users SET kyc_status = $1 WHERE wallet_address = $2 RETURNING *
+      `;
+      const { rows } = await pool.query(query, [status, walletAddress]);
+      return rows[0];
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
