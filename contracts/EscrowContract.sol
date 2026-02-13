@@ -127,45 +127,75 @@ contract EscrowContract is ReentrancyGuard {
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
         Escrow storage escrow = escrows[_invoiceId];
+        
+        // CHECKS: Validate dispute state
         require(escrow.disputeRaised, "No dispute raised");
         
+        // EFFECTS: Update all state variables BEFORE external calls
         escrow.disputeResolver = msg.sender;
-        IERC20 token = IERC20(escrow.token);
+        escrow.disputeRaised = false; // Mark dispute as resolved
+        
+        // Cache values for external calls to avoid multiple SLOAD operations
+        address seller = escrow.seller;
+        address buyer = escrow.buyer;
+        uint256 amount = escrow.amount;
+        address tokenAddress = escrow.token;
+        address nftContract = escrow.rwaNftContract;
+        uint256 nftTokenId = escrow.rwaTokenId;
+        
+        // Emit event BEFORE external interactions (part of Effects)
+        emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
+        
+        // INTERACTIONS: Perform external calls LAST
+        IERC20 token = IERC20(tokenAddress);
 
         if (_sellerWins) {
             // Seller wins: Get paid. Buyer gets the goods (NFT).
-            require(token.transfer(escrow.seller, escrow.amount), "Transfer to seller failed");
+            require(token.transfer(seller, amount), "Transfer to seller failed");
             
             // Release NFT to Buyer (Ownership Transfer)
-            if (escrow.rwaNftContract != address(0)) {
-                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
+            if (nftContract != address(0)) {
+                IERC721(nftContract).transferFrom(address(this), buyer, nftTokenId);
             }
         } else {
             // Buyer wins: Get refund. Seller gets the goods (NFT) back.
-            require(token.transfer(escrow.buyer, escrow.amount), "Transfer to buyer failed");
+            require(token.transfer(buyer, amount), "Transfer to buyer failed");
 
             // Return NFT to Seller
-            if (escrow.rwaNftContract != address(0)) {
-                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.seller, escrow.rwaTokenId); //
+            if (nftContract != address(0)) {
+                IERC721(nftContract).transferFrom(address(this), seller, nftTokenId);
             }
         }
-        
-        emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
     }
     
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
-        IERC20 token = IERC20(escrow.token);
+        
+        // EFFECTS: Cache values and emit event BEFORE external calls
+        address seller = escrow.seller;
+        address buyer = escrow.buyer;
+        uint256 amount = escrow.amount;
+        address tokenAddress = escrow.token;
+        address nftContract = escrow.rwaNftContract;
+        uint256 nftTokenId = escrow.rwaTokenId;
+        
+        // Mark escrow as completed (state update before interactions)
+        escrow.sellerConfirmed = true;
+        escrow.buyerConfirmed = true;
+        
+        // Emit event BEFORE external interactions
+        emit EscrowReleased(_invoiceId, amount);
+        
+        // INTERACTIONS: Perform external calls LAST
+        IERC20 token = IERC20(tokenAddress);
         
         // Transfer funds to Seller
-        require(token.transfer(escrow.seller, escrow.amount), "Transfer failed");
+        require(token.transfer(seller, amount), "Transfer failed");
         
-        // --- NEW: Release RWA NFT to Buyer ---
-        if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
+        // Release RWA NFT to Buyer
+        if (nftContract != address(0)) {
+            IERC721(nftContract).transferFrom(address(this), buyer, nftTokenId);
         }
-        
-        emit EscrowReleased(_invoiceId, escrow.amount);
     }
     
     function expireEscrow(bytes32 _invoiceId) external nonReentrant {
