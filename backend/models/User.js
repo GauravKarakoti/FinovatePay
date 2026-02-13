@@ -26,14 +26,29 @@ class User {
   }
 
   static async findByEmail(email) {
-    const query = 'SELECT * FROM users WHERE email = $1';
+    const query = `
+      SELECT id, email, wallet_address, company_name, 
+             first_name, last_name, role, created_at 
+      FROM users WHERE email = $1
+    `;
     const result = await pool.query(query, [email]);
     return result.rows[0];
   }
 
   static async findByWalletAddress(walletAddress) {
-    const query = 'SELECT * FROM users WHERE wallet_address = $1';
+    const query = `
+      SELECT id, email, wallet_address, company_name, 
+             first_name, last_name, role, created_at 
+      FROM users WHERE wallet_address = $1
+    `;
     const result = await pool.query(query, [walletAddress]);
+    return result.rows[0];
+  }
+
+  // Helper method to get user with password for authentication
+  static async findByEmailWithPassword(email) {
+    const query = 'SELECT * FROM users WHERE email = $1';
+    const result = await pool.query(query, [email]);
     return result.rows[0];
   }
 
