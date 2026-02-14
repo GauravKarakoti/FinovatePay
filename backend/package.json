@@ -4,10 +4,9 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test": "mocha test/eventSync.test.js --timeout 10000",
     "test:manual": "node test/manual-event-sync-test.js",
     "test:backend": "jest",
     "lint": "eslint . --ext .js,.ts",
