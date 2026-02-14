@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EXCHANGE_RATE } = require('../config/constants');
 
 exports.createInvoice = async (req, res) => {
     const client = await pool.connect();
@@ -12,7 +13,9 @@ exports.createInvoice = async (req, res) => {
             contract_address,
             token_address,
             due_date,
-            tx_hash // <-- Added tx_hash
+            tx_hash, // <-- Added tx_hash
+            discount_rate,
+            discount_deadline
         } = req.body;
 
         if (!quotation_id || !invoice_id || !contract_address) {
@@ -57,9 +60,10 @@ exports.createInvoice = async (req, res) => {
                 invoice_id, invoice_hash, seller_address, buyer_address,
                 amount, due_date, description, items, currency,
                 contract_address, token_address, lot_id, quotation_id, escrow_status,
-                financing_status, tx_hash
+                financing_status, tx_hash,
+                discount_rate, discount_deadline
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none', $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none', $14, $15, $16)
             RETURNING *
         `;
         const values = [
@@ -68,10 +72,12 @@ exports.createInvoice = async (req, res) => {
             JSON.stringify([{
                 description: quotation.description,
                 quantity: quotation.quantity,
-                price_per_unit: quotation.price_per_unit / 50.75
+                price_per_unit: quotation.price_per_unit / EXCHANGE_RATE
             }]),
             quotation.currency, contract_address, token_address,
-            quotation.lot_id, quotation_id, tx_hash || null
+            quotation.lot_id, quotation_id, tx_hash || null,
+            discount_rate || 0,
+            discount_deadline || 0
         ];
 
         const result = await client.query(insertInvoiceQuery, values);
@@ -86,7 +92,9 @@ exports.createInvoice = async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error creating invoice from quotation:', error);
-        res.status(500).json({ error: error.message || 'Internal server error.' });
+        // In production, avoid leaking internal error details
+        const errorMessage = process.env.NODE_ENV === 'development' ? error.message : 'Internal server error.';
+        res.status(500).json({ error: errorMessage });
     } finally {
         client.release();
     }
