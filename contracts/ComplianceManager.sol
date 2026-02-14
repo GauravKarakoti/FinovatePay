@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interfaces/IComplianceRegistry.sol";
 
 contract ComplianceManager is ERC721, Ownable, ERC2771Context {
     uint256 private _nextTokenId;
@@ -11,6 +13,7 @@ contract ComplianceManager is ERC721, Ownable, ERC2771Context {
     mapping(address => bool) private kycVerified;
     mapping(address => uint256) public userTokenId;
     IComplianceRegistry public complianceRegistry;
+    address public timelock;
 
     event AccountFrozen(address indexed account,string reason);
     event AccountUnfrozen(address indexed account);
@@ -28,9 +31,23 @@ contract ComplianceManager is ERC721, Ownable, ERC2771Context {
         ERC721("FinovateVerified", "FVT-ID") 
         Ownable(msg.sender)
         ERC2771Context(trustedForwarder) 
-    {}
+    {
+        timelock = _msgSender();
+        emit TimelockUpdated(timelock);
+    }
+
+    modifier onlyTimelock() {
+        require(_msgSender() == timelock, "only Governance");
+        _;
+    }
+
+    function setTimelock(address _timelock) external onlyTimelock {
+        require(_timelock != address(0), "Invalid timelock");
+        timelock = _timelock;
+        emit TimelockUpdated(_timelock);
+    }
     
-    function freezeAccount(address _account) external onlyOwner {
+    function freezeAccount(address _account, string memory reason) external onlyOwner {
         frozenAccounts[_account] = true;
         emit AccountFrozen(_account,reason);
     }
@@ -62,6 +79,10 @@ contract ComplianceManager is ERC721, Ownable, ERC2771Context {
             return complianceRegistry.isKYCVerified(_account);
         }
         return kycVerified[_account];
+    }
+
+    function isCompliant(address _account) public view returns (bool) {
+        return !isFrozen(_account) && isKYCVerified(_account);
     }
     
     modifier onlyCompliant(address _account) {
