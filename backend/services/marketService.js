@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { EXCHANGE_RATE } = require('../config/constants');
 
 // NOTE: Add these to your .env file
 const MARKET_API_KEY = process.env.MARKET_API_KEY;
@@ -46,7 +47,7 @@ async function fetchLivePrices(crop, state) {
                 unit: 'quintal',
                 location: [r?.market, r?.district, r?.state].filter(Boolean).join(', ') || 'N/A',
             };
-        }).filter(p => p.price / 50.75 > 0); // Filter out records with no valid price
+        }).filter(p => p.price / EXCHANGE_RATE > 0); // Filter out records with no valid price
 
         if (mapped.length === 0) throw new Error(`Could not determine a valid price for ${crop}`);
         
@@ -69,7 +70,7 @@ async function getPricePerKg(crop) {
     if (prices.length === 0) return null;
 
     // Calculate the average price from all available records
-    const total = prices.reduce((acc, p) => acc + (p.price / 50.75), 0);
+    const total = prices.reduce((acc, p) => acc + (p.price / EXCHANGE_RATE), 0);
     const averagePricePerQuintal = total / prices.length;
     
     // Convert from quintal (100kg) to kg and format to 2 decimal places

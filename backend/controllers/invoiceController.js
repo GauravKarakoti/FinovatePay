@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EXCHANGE_RATE } = require('../config/constants');
 
 /*//////////////////////////////////////////////////////////////
                     CREATE INVOICE (FROM QUOTATION)
@@ -137,34 +138,45 @@ exports.createInvoice = async (req, res) => {
 
     await client.query('COMMIT');
 
-    res.status(201).json({
-      success: true,
-      invoice: result.rows[0]
-    });
+        const insertInvoiceQuery = `
+            INSERT INTO invoices (
+                invoice_id, invoice_hash, seller_address, buyer_address,
+                amount, due_date, description, items, currency,
+                contract_address, token_address, lot_id, quotation_id, escrow_status,
+                financing_status, tx_hash
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none', $14)
+            RETURNING *
+        `;
+        const values = [
+            invoice_id, invoice_hash, quotation.seller_address, quotation.buyer_address,
+            quotation.total_amount, due_date, quotation.description,
+            JSON.stringify([{
+                description: quotation.description,
+                quantity: quotation.quantity,
+                price_per_unit: quotation.price_per_unit / EXCHANGE_RATE
+            }]),
+            quotation.currency, contract_address, token_address,
+            quotation.lot_id, quotation_id, tx_hash || null
+        ];
 
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Create invoice error:', error);
-    res.status(500).json({ error: error.message });
-  } finally {
-    client.release();
-  }
-};
+        const result = await client.query(insertInvoiceQuery, values);
 
-/*//////////////////////////////////////////////////////////////
-              EARLY PAYMENT OFFER (FINANCING LOGIC)
-//////////////////////////////////////////////////////////////*/
-exports.getEarlyPaymentOffer = async (req, res) => {
-  try {
-    const { invoiceId } = req.params;
+        // 4. Update the quotation status to 'invoiced' to prevent reuse
+        const updateQuotationQuery = `UPDATE quotations SET status = 'invoiced' WHERE id = $1`;
+        await client.query(updateQuotationQuery, [quotation_id]);
 
-    const result = await pool.query(
-      'SELECT * FROM invoices WHERE invoice_id = $1',
-      [invoiceId]
-    );
+        await client.query('COMMIT');
+        res.status(201).json({ success: true, invoice: result.rows[0] });
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invoice not found' });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error('Error creating invoice from quotation:', error);
+        // In production, avoid leaking internal error details
+        const errorMessage = process.env.NODE_ENV === 'development' ? error.message : 'Internal server error.';
+        res.status(500).json({ error: errorMessage });
+    } finally {
+        client.release();
     }
 
     const invoice = result.rows[0];
