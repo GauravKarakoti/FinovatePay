@@ -106,9 +106,10 @@ describe("EscrowContract (Merged)", function () {
         buyer.address,
         amount,
         token.address,
-        duration,
+        86400,
         ethers.constants.AddressZero,
-        0
+        0,
+        0, 0
       );
     });
 
