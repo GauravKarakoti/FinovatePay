@@ -10,8 +10,14 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
 
-contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP712 {
+contract EscrowContract is
+    ReentrancyGuard,
+    ERC2771Context,
+    IERC721Receiver,
+    EIP712
+{
     using ECDSA for bytes32;
+
     /*//////////////////////////////////////////////////////////////
                                 TYPES
     //////////////////////////////////////////////////////////////*/
@@ -39,18 +45,6 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
         uint256 rwaTokenId;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                STATE
-    //////////////////////////////////////////////////////////////*/
-    mapping(bytes32 => Escrow) public escrows;
-
-    address public admin;
-    ComplianceManager public complianceManager;
-
-    address[] public managers;
-    mapping(address => bool) public isManager;
-    uint256 public threshold;
-
     struct Proposal {
         address arbitrator;
         bool add;
@@ -58,14 +52,35 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
         bool executed;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                            STORAGE
+    //////////////////////////////////////////////////////////////*/
+    address public admin;
+    address public treasury;
+    address public keeper;
+    address public timelock;
+    uint256 public feeBasisPoints;
+
+    ComplianceManager public complianceManager;
+
+    mapping(bytes32 => Escrow) public escrows;
+
+    // Meta-tx
+    mapping(address => uint256) public nonces;
+    bytes32 private constant META_TX_TYPEHASH =
+        keccak256(
+            "MetaTransaction(uint256 nonce,address from,bytes functionSignature)"
+        );
+
+    // Multi-sig arbitrator governance
+    address[] public managers;
+    mapping(address => bool) public isManager;
+    uint256 public threshold;
+
     uint256 public proposalCount;
     mapping(uint256 => Proposal) public proposals;
     mapping(uint256 => mapping(address => bool)) public approved;
     mapping(address => bool) public isArbitrator;
-    mapping(address => uint256) public nonces;
-
-    bytes32 private constant META_TX_TYPEHASH =
-        keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -75,23 +90,26 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event EscrowExpired(bytes32 indexed invoiceId);
+    event EscrowCancelled(bytes32 indexed invoiceId);
+
     event ArbitratorProposed(uint256 indexed proposalId, address arbitrator, bool add);
     event ProposalApproved(uint256 indexed proposalId, address manager);
     event ProposalExecuted(uint256 indexed proposalId, address arbitrator, bool add);
     event ArbitratorAdded(address indexed arbitrator);
     event ArbitratorRemoved(address indexed arbitrator);
+
     event MetaTransactionExecuted(address indexed user, address indexed relayer, bytes functionSignature);
+
+    event TreasuryUpdated(address indexed newTreasury);
+    event FeeUpdated(uint256 newFeeBasisPoints);
+    event ComplianceManagerUpdated(address indexed newComplianceManager);
 
     /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
     //////////////////////////////////////////////////////////////*/
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
-        _;
-    }
-
-    modifier onlyCompliant(address user) {
-        require(complianceManager.isCompliant(user), "Not compliant");
         _;
     }
 
@@ -110,33 +128,45 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
     }
 
     /*//////////////////////////////////////////////////////////////
-                            CONSTRUCTOR
+                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     constructor(
         address _complianceManager,
         address trustedForwarder,
         address[] memory _managers,
         uint256 _threshold
-    ) ERC2771Context(trustedForwarder) EIP712("EscrowContract", "1") {
+    )
+        ERC2771Context(trustedForwarder)
+        EIP712("EscrowContract", "1")
+    {
+        require(_complianceManager != address(0), "Bad compliance manager");
+        require(_managers.length > 0, "No managers");
+        require(
+            _threshold > 0 && _threshold <= _managers.length,
+            "Bad threshold"
+        );
+
         admin = _msgSender();
+        treasury = admin;
+        keeper = admin;
+
         complianceManager = ComplianceManager(_complianceManager);
 
-        require(_managers.length > 0, "No managers");
-        require(_threshold > 0 && _threshold <= _managers.length, "Bad threshold");
-
         for (uint256 i = 0; i < _managers.length; i++) {
-            address manager = _managers[i];
-            require(manager != address(0), "Bad manager");
-            require(!isManager[manager], "Duplicate manager");
-            isManager[manager] = true;
-            managers.push(manager);
+            address m = _managers[i];
+            require(m != address(0), "Bad manager");
+            require(!isManager[m], "Duplicate manager");
+            isManager[m] = true;
+            managers.push(m);
         }
 
         threshold = _threshold;
+
+        emit ComplianceManagerUpdated(_complianceManager);
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ESCROW CORE LOGIC
+                            ESCROW LOGIC
     //////////////////////////////////////////////////////////////*/
     function createEscrow(
         bytes32 invoiceId,
@@ -173,32 +203,21 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
         emit EscrowCreated(invoiceId, seller, buyer, amount);
     }
 
-    function deposit(
-        bytes32 invoiceId,
-        uint256 amount
-    )
-        external
-        nonReentrant
-        onlyCompliant(_msgSender())
-    {
+    function deposit(bytes32 invoiceId) external nonReentrant {
         Escrow storage e = escrows[invoiceId];
-
         require(e.status == EscrowStatus.Created, "Inactive");
         require(_msgSender() == e.buyer, "Not buyer");
-        require(amount == e.amount, "Bad amount");
         require(block.timestamp < e.expiresAt, "Expired");
 
-        IERC20(e.token).transferFrom(_msgSender(), address(this), amount);
+        IERC20(e.token).transferFrom(_msgSender(), address(this), e.amount);
 
         e.buyerConfirmed = true;
         e.status = EscrowStatus.Funded;
 
-        emit DepositConfirmed(invoiceId, _msgSender(), amount);
+        emit DepositConfirmed(invoiceId, _msgSender(), e.amount);
     }
 
-    function confirmRelease(
-        bytes32 invoiceId
-    )
+    function confirmRelease(bytes32 invoiceId)
         external
         nonReentrant
         onlyEscrowParty(invoiceId)
@@ -221,16 +240,13 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Funded, "No dispute");
 
-        e.disputeRaised = true;
         e.status = EscrowStatus.Disputed;
+        e.disputeRaised = true;
 
         emit DisputeRaised(invoiceId, _msgSender());
     }
 
-    function resolveDispute(
-        bytes32 invoiceId,
-        bool sellerWins
-    )
+    function resolveDispute(bytes32 invoiceId, bool sellerWins)
         external
         onlyAdmin
     {
@@ -238,29 +254,21 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
         require(e.status == EscrowStatus.Disputed, "No dispute");
 
         e.disputeResolver = _msgSender();
-        IERC20 token = IERC20(e.token);
 
         if (sellerWins) {
-            token.transfer(e.seller, e.amount);
-            if (e.rwaNftContract != address(0)) {
-                IERC721(e.rwaNftContract).transferFrom(
-                    address(this),
-                    e.buyer,
-                    e.rwaTokenId
-                );
-            }
+            IERC20(e.token).transfer(e.seller, e.amount);
         } else {
-            token.transfer(e.buyer, e.amount);
-            if (e.rwaNftContract != address(0)) {
-                IERC721(e.rwaNftContract).transferFrom(
-                    address(this),
-                    e.seller,
-                    e.rwaTokenId
-                );
-            }
+            IERC20(e.token).transfer(e.buyer, e.amount);
         }
 
-        e.status = EscrowStatus.Released;
+        if (e.rwaNftContract != address(0)) {
+            IERC721(e.rwaNftContract).transferFrom(
+                address(this),
+                sellerWins ? e.buyer : e.seller,
+                e.rwaTokenId
+            );
+        }
+
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
         delete escrows[invoiceId];
     }
@@ -278,13 +286,64 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
             );
         }
 
-        e.status = EscrowStatus.Released;
         emit EscrowReleased(invoiceId, e.amount);
         delete escrows[invoiceId];
     }
 
     /*//////////////////////////////////////////////////////////////
-                        META-TRANSACTIONS
+                    MULTI-SIG ARBITRATORS
+    //////////////////////////////////////////////////////////////*/
+    function proposeAddArbitrator(address arbitrator) external onlyManager {
+        proposals[proposalCount] = Proposal(
+            arbitrator,
+            true,
+            0,
+            false
+        );
+        emit ArbitratorProposed(proposalCount++, arbitrator, true);
+    }
+
+    function proposeRemoveArbitrator(address arbitrator) external onlyManager {
+        proposals[proposalCount] = Proposal(
+            arbitrator,
+            false,
+            0,
+            false
+        );
+        emit ArbitratorProposed(proposalCount++, arbitrator, false);
+    }
+
+    function approveProposal(uint256 proposalId) external onlyManager {
+        Proposal storage p = proposals[proposalId];
+        require(!p.executed, "Executed");
+        require(!approved[proposalId][_msgSender()], "Approved");
+
+        approved[proposalId][_msgSender()] = true;
+        p.approvals++;
+
+        emit ProposalApproved(proposalId, _msgSender());
+    }
+
+    function executeProposal(uint256 proposalId) external onlyManager {
+        Proposal storage p = proposals[proposalId];
+        require(!p.executed, "Executed");
+        require(p.approvals >= threshold, "Insufficient approvals");
+
+        p.executed = true;
+
+        if (p.add) {
+            isArbitrator[p.arbitrator] = true;
+            emit ArbitratorAdded(p.arbitrator);
+        } else {
+            isArbitrator[p.arbitrator] = false;
+            emit ArbitratorRemoved(p.arbitrator);
+        }
+
+        emit ProposalExecuted(proposalId, p.arbitrator, p.add);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        META TX
     //////////////////////////////////////////////////////////////*/
     function executeMetaTx(
         address user,
@@ -299,127 +358,43 @@ contract EscrowContract is ReentrancyGuard, ERC2771Context, IERC721Receiver, EIP
                 keccak256(functionSignature)
             )
         );
-        bytes32 hash = _hashTypedDataV4(structHash);
-        address signer = hash.recover(signature);
-        require(signer == user, "Invalid signature");
 
-        nonces[user] += 1;
+        address signer = _hashTypedDataV4(structHash).recover(signature);
+        require(signer == user, "Bad signature");
 
-        (bool success, bytes memory returnData) =
+        nonces[user]++;
+
+        (bool success, bytes memory data) =
             address(this).call(abi.encodePacked(functionSignature, user));
         require(success, "Meta-tx failed");
 
         emit MetaTransactionExecuted(user, _msgSender(), functionSignature);
-        return returnData;
+        return data;
     }
 
     /*//////////////////////////////////////////////////////////////
-                    MULTI-SIG ARBITRATOR MANAGEMENT
+                    ERC2771 OVERRIDES
     //////////////////////////////////////////////////////////////*/
-    function proposeAddArbitrator(address arbitrator) external onlyManager {
-        require(arbitrator != address(0), "Bad arbitrator");
-        require(!isArbitrator[arbitrator], "Already arbitrator");
-
-        uint256 proposalId = proposalCount;
-        proposals[proposalId] = Proposal({
-            arbitrator: arbitrator,
-            add: true,
-            approvals: 0,
-            executed: false
-        });
-
-        proposalCount += 1;
-        emit ArbitratorProposed(proposalId, arbitrator, true);
-    }
-
-    function proposeRemoveArbitrator(address arbitrator) external onlyManager {
-        require(arbitrator != address(0), "Bad arbitrator");
-        require(isArbitrator[arbitrator], "Not arbitrator");
-
-        uint256 proposalId = proposalCount;
-        proposals[proposalId] = Proposal({
-            arbitrator: arbitrator,
-            add: false,
-            approvals: 0,
-            executed: false
-        });
-
-        proposalCount += 1;
-        emit ArbitratorProposed(proposalId, arbitrator, false);
-    }
-
-    function approveProposal(uint256 proposalId) external onlyManager {
-        Proposal storage proposal = proposals[proposalId];
-        require(proposal.arbitrator != address(0), "Bad proposal");
-        require(!proposal.executed, "Executed");
-        require(!approved[proposalId][_msgSender()], "Already approved");
-
-        approved[proposalId][_msgSender()] = true;
-        proposal.approvals += 1;
-
-        emit ProposalApproved(proposalId, _msgSender());
-    }
-
-    function executeProposal(uint256 proposalId) external onlyManager {
-        Proposal storage proposal = proposals[proposalId];
-        require(proposal.arbitrator != address(0), "Bad proposal");
-        require(!proposal.executed, "Executed");
-        require(proposal.approvals >= threshold, "Insufficient approvals");
-
-        proposal.executed = true;
-
-        if (proposal.add) {
-            addArbitrator(proposal.arbitrator);
-        } else {
-            removeArbitrator(proposal.arbitrator);
-        }
-
-        emit ProposalExecuted(proposalId, proposal.arbitrator, proposal.add);
-    }
-
-    function addArbitrator(address arbitrator) internal {
-        require(arbitrator != address(0), "Bad arbitrator");
-        require(!isArbitrator[arbitrator], "Already arbitrator");
-        isArbitrator[arbitrator] = true;
-        emit ArbitratorAdded(arbitrator);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        CONTEXT OVERRIDES
-    //////////////////////////////////////////////////////////////*/
-    function _msgSender() internal view virtual override(ERC2771Context) returns (address) {
-        if (msg.sender == address(this) && msg.data.length >= 20) {
-            address sender;
-            assembly {
-                sender := shr(96, calldataload(sub(calldatasize(), 20)))
-            }
-            return sender;
-        }
+    function _msgSender()
+        internal
+        view
+        override(ERC2771Context)
+        returns (address)
+    {
         return ERC2771Context._msgSender();
     }
 
-    function _msgData() internal view virtual override(ERC2771Context) returns (bytes calldata) {
-        if (msg.sender == address(this) && msg.data.length >= 20) {
-            return msg.data[:msg.data.length - 20];
-        }
+    function _msgData()
+        internal
+        view
+        override(ERC2771Context)
+        returns (bytes calldata)
+    {
         return ERC2771Context._msgData();
     }
 
-    function _contextSuffixLength() internal view virtual override(ERC2771Context) returns (uint256) {
-        if (msg.sender == address(this)) {
-            return 20;
-        }
-        return ERC2771Context._contextSuffixLength();
-    }
-
-    function removeArbitrator(address arbitrator) internal {
-        require(isArbitrator[arbitrator], "Not arbitrator");
-        isArbitrator[arbitrator] = false;
-        emit ArbitratorRemoved(arbitrator);
-    }
-
     /*//////////////////////////////////////////////////////////////
-                        ERC721 RECEIVER
+                    ERC721 RECEIVER
     //////////////////////////////////////////////////////////////*/
     function onERC721Received(
         address,
