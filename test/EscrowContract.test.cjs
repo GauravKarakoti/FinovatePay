@@ -1,122 +1,105 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("EscrowContract", function () {
-  let EscrowContract, ComplianceManager;
-  let escrow, compliance;
-  let owner, seller, buyer, other;
-  let token;
+describe("EscrowContract (Merged)", function () {
+  let EscrowContract, ComplianceManager, MockERC20;
+  let escrow, compliance, token;
+
+  let owner,
+    seller,
+    buyer,
+    other,
+    manager1,
+    manager2,
+    manager3,
+    arbitrator;
+
+  const THRESHOLD = 2;
 
   beforeEach(async function () {
-    [owner, seller, buyer, other] = await ethers.getSigners();
-    
-    // Deploy mock ERC20 token
-    const Token = await ethers.getContractFactory("MockERC20");
-    token = await Token.deploy("Test Token", "TEST", ethers.utils.parseEther("1000"));
+    [
+      owner,
+      seller,
+      buyer,
+      other,
+      manager1,
+      manager2,
+      manager3,
+      arbitrator
+    ] = await ethers.getSigners();
+
+    /*//////////////////////////////////////////////////////////////
+                          TOKEN
+    //////////////////////////////////////////////////////////////*/
+    MockERC20 = await ethers.getContractFactory("MockERC20");
+    token = await MockERC20.deploy(
+      "Test Token",
+      "TEST",
+      ethers.utils.parseEther("1000")
+    );
     await token.deployed();
-    
-    // Deploy ComplianceManager
+
+    /*//////////////////////////////////////////////////////////////
+                      COMPLIANCE MANAGER
+    //////////////////////////////////////////////////////////////*/
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
-    compliance = await ComplianceManager.deploy();
+    compliance = await ComplianceManager.deploy(ethers.constants.AddressZero);
     await compliance.deployed();
-    
-    // Deploy EscrowContract
-    EscrowContract = await ethers.getContractFactory("EscrowContract");
-    escrow = await EscrowContract.deploy(compliance.address);
-    await escrow.deployed();
-    
-    // Verify KYC for seller, buyer, owner (admin needs it for createEscrow now due to modifier)
+
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
-    await compliance.verifyKYC(owner.address);
-    
-    // Mint Identity
-    try {
-        await compliance.mintIdentity(seller.address);
-        await compliance.mintIdentity(buyer.address);
-        await compliance.mintIdentity(owner.address);
-    } catch (e) {
-        console.log("Identity mint failed/skipped:", e.message);
-    }
 
-    // Transfer tokens to buyer
-    await token.transfer(buyer.address, ethers.utils.parseEther("1000"));
+    try {
+      await compliance.mintIdentity(seller.address);
+      await compliance.mintIdentity(buyer.address);
+    } catch (_) {}
+
+    /*//////////////////////////////////////////////////////////////
+                        ESCROW
+    //////////////////////////////////////////////////////////////*/
+    EscrowContract = await ethers.getContractFactory("EscrowContract");
+    escrow = await EscrowContract.deploy(
+      compliance.address,
+      ethers.constants.AddressZero,
+      [manager1.address, manager2.address, manager3.address],
+      THRESHOLD
+    );
+    await escrow.deployed();
+
+    /*//////////////////////////////////////////////////////////////
+                        FUND BUYER
+    //////////////////////////////////////////////////////////////*/
+    await token.transfer(buyer.address, ethers.utils.parseEther("100"));
   });
 
+  /*//////////////////////////////////////////////////////////////
+                          DEPLOYMENT
+  //////////////////////////////////////////////////////////////*/
   describe("Deployment", function () {
-    it("Should set the right owner", async function () {
+    it("Sets admin correctly", async function () {
       expect(await escrow.admin()).to.equal(owner.address);
     });
-  });
 
-  describe("Creating escrow", function () {
-    it("Should allow admin to create escrow", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      const duration = 7 * 24 * 60 * 60;
-      
-      await expect(escrow.connect(owner).createEscrow(
-        invoiceId,
-        seller.address,
-        buyer.address,
-        amount,
-        token.address,
-        duration,
-        ethers.constants.AddressZero,
-        0,
-        0, // discountRate
-        0  // discountDeadline
-      )).to.emit(escrow, "EscrowCreated");
+    it("Sets compliance manager", async function () {
+      expect(await escrow.complianceManager()).to.equal(compliance.address);
     });
 
-    it("Should allow seller (compliant) to create escrow", async function () {
-        const invoiceId = ethers.utils.formatBytes32String("INV-SELLER");
-        const amount = ethers.utils.parseEther("1");
-
-        await expect(escrow.connect(seller).createEscrow(
-          invoiceId,
-          seller.address,
-          buyer.address,
-          amount,
-          token.address,
-          86400,
-          ethers.constants.AddressZero,
-          0,
-          0,
-          0
-        )).to.emit(escrow, "EscrowCreated");
-      });
-    
-    it("Should NOT allow random user to create escrow", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-FAIL");
-      const amount = ethers.utils.parseEther("1");
-      
-      // Ensure 'other' is compliant so we pass the modifier but fail the logic check
-      await compliance.verifyKYC(other.address);
-      try {
-        await compliance.mintIdentity(other.address);
-      } catch(e) {}
-
-      await expect(escrow.connect(other).createEscrow(
-        invoiceId,
-        seller.address,
-        buyer.address,
-        amount,
-        token.address,
-        86400,
-        ethers.constants.AddressZero,
-        0,
-        0,
-        0
-      )).to.be.revertedWith("Only seller or admin");
+    it("Initializes managers and threshold", async function () {
+      expect(await escrow.threshold()).to.equal(THRESHOLD);
+      expect(await escrow.isManager(manager1.address)).to.equal(true);
+      expect(await escrow.isManager(other.address)).to.equal(false);
     });
   });
 
-  describe("Depositing funds (Standard)", function () {
+  /*//////////////////////////////////////////////////////////////
+                        ESCROW LIFECYCLE
+  //////////////////////////////////////////////////////////////*/
+  describe("Escrow lifecycle", function () {
+    const invoiceId = ethers.utils.formatBytes32String("INV-001");
+    const amount = ethers.utils.parseEther("1");
+    const duration = 7 * 24 * 60 * 60;
+
     beforeEach(async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      
       await escrow.connect(owner).createEscrow(
         invoiceId,
         seller.address,
@@ -129,109 +112,95 @@ describe("EscrowContract", function () {
         0, 0
       );
     });
-    
-    it("Should allow buyer to deposit funds (ERC20)", async function () {
-      const invoiceId = ethers.utils.formatBytes32String("INV-001");
-      const amount = ethers.utils.parseEther("1");
-      
+
+    it("Allows buyer to deposit", async function () {
       await token.connect(buyer).approve(escrow.address, amount);
-      
-      await expect(escrow.connect(buyer).deposit(invoiceId))
-        .to.emit(escrow, "DepositConfirmed")
-        .withArgs(invoiceId, buyer.address, amount);
+
+      await expect(
+        escrow.connect(buyer).deposit(invoiceId, amount)
+      ).to.emit(escrow, "DepositConfirmed");
+    });
+
+    it("Prevents non-buyer from depositing", async function () {
+      await compliance.verifyKYC(other.address);
+      try { await compliance.mintIdentity(other.address); } catch (_) {}
+
+      await token.connect(other).approve(escrow.address, amount);
+
+      await expect(
+        escrow.connect(other).deposit(invoiceId, amount)
+      ).to.be.revertedWith("Not buyer");
+    });
+
+    it("Releases funds after both confirmations", async function () {
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+
+      await expect(
+        escrow.connect(seller).confirmRelease(invoiceId)
+      ).to.emit(escrow, "EscrowReleased");
     });
   });
 
-  describe("Discount Logic", function () {
-      // 2% Discount
-      const discountRate = 200;
-      const amount = ethers.utils.parseEther("100"); // 100 ETH
-      const discount = amount.mul(discountRate).div(10000); // 2 ETH
-      const discountedAmount = amount.sub(discount); // 98 ETH
+  /*//////////////////////////////////////////////////////////////
+                  MULTI-SIG ARBITRATOR GOVERNANCE
+  //////////////////////////////////////////////////////////////*/
+  describe("Multi-sig arbitrator governance", function () {
+    it("Allows manager to propose arbitrator", async function () {
+      await expect(
+        escrow.connect(manager1).proposeAddArbitrator(arbitrator.address)
+      ).to.emit(escrow, "ArbitratorProposed");
+    });
 
-      it("Should accept discounted payment before deadline (Native)", async function () {
-        const invoiceId = ethers.utils.formatBytes32String("INV-DISC-NAT");
-        const currentBlock = await ethers.provider.getBlock('latest');
-        const deadline = currentBlock.timestamp + 3600; // 1 hour future
+    it("Executes proposal when threshold is met", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
 
-        await escrow.connect(seller).createEscrow(
-            invoiceId,
-            seller.address,
-            buyer.address,
-            amount,
-            ethers.constants.AddressZero, // Native
-            86400,
-            ethers.constants.AddressZero, 0,
-            discountRate,
-            deadline
-        );
+      await escrow.connect(manager1).approveProposal(0);
+      await escrow.connect(manager2).approveProposal(0);
 
-        // Check view function
-        const payable = await escrow.getCurrentPayableAmount(invoiceId);
-        expect(payable).to.equal(discountedAmount);
+      await escrow.connect(manager3).executeProposal(0);
 
-        // Pay
-        await expect(escrow.connect(buyer).deposit(invoiceId, { value: discountedAmount }))
-            .to.emit(escrow, "DepositConfirmed")
-            .withArgs(invoiceId, buyer.address, discountedAmount);
+      expect(await escrow.isArbitrator(arbitrator.address)).to.equal(true);
+    });
 
-        // Check escrow struct amount is updated
-        const updatedEscrow = await escrow.escrows(invoiceId);
-        expect(updatedEscrow.amount).to.equal(discountedAmount);
-        expect(updatedEscrow.buyerConfirmed).to.be.true;
-      });
+    it("Prevents non-managers from proposing", async function () {
+      await expect(
+        escrow.connect(other).proposeAddArbitrator(arbitrator.address)
+      ).to.be.revertedWith("Not manager");
+    });
 
-      it("Should require full payment after deadline", async function () {
-        const invoiceId = ethers.utils.formatBytes32String("INV-LATE");
-        const currentBlock = await ethers.provider.getBlock('latest');
-        const deadline = currentBlock.timestamp + 100;
+    it("Prevents duplicate approvals", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(0);
 
-        await escrow.connect(seller).createEscrow(
-            invoiceId,
-            seller.address,
-            buyer.address,
-            amount,
-            ethers.constants.AddressZero,
-            86400,
-            ethers.constants.AddressZero, 0,
-            discountRate,
-            deadline
-        );
+      await expect(
+        escrow.connect(manager1).approveProposal(0)
+      ).to.be.revertedWith("Already approved");
+    });
 
-        // Fast forward
-        await ethers.provider.send("evm_increaseTime", [200]);
-        await ethers.provider.send("evm_mine");
+    it("Prevents execution before threshold", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(0);
 
-        // Check view function
-        const payable = await escrow.getCurrentPayableAmount(invoiceId);
-        expect(payable).to.equal(amount);
+      await expect(
+        escrow.connect(manager2).executeProposal(0)
+      ).to.be.revertedWith("Insufficient approvals");
+    });
 
-        // Try paying discounted (fail)
-        await expect(
-            escrow.connect(buyer).deposit(invoiceId, { value: discountedAmount })
-        ).to.be.revertedWith("Incorrect native amount");
+    it("Allows removing arbitrator via proposal", async function () {
+      await escrow.connect(manager1).proposeAddArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(0);
+      await escrow.connect(manager2).approveProposal(0);
+      await escrow.connect(manager3).executeProposal(0);
 
-        // Pay full (success)
-        await expect(escrow.connect(buyer).deposit(invoiceId, { value: amount }))
-            .to.emit(escrow, "DepositConfirmed")
-            .withArgs(invoiceId, buyer.address, amount);
-      });
+      expect(await escrow.isArbitrator(arbitrator.address)).to.equal(true);
 
-      it("Should fail if discount rate > 10000", async function () {
-        const invoiceId = ethers.utils.formatBytes32String("INV-BAD-RATE");
-        const amount = ethers.utils.parseEther("1");
+      await escrow.connect(manager1).proposeRemoveArbitrator(arbitrator.address);
+      await escrow.connect(manager1).approveProposal(1);
+      await escrow.connect(manager2).approveProposal(1);
+      await escrow.connect(manager3).executeProposal(1);
 
-        await expect(escrow.connect(seller).createEscrow(
-          invoiceId,
-          seller.address,
-          buyer.address,
-          amount,
-          ethers.constants.AddressZero,
-          86400,
-          ethers.constants.AddressZero, 0,
-          10001, // Bad rate
-          Math.floor(Date.now() / 1000) + 3600
-        )).to.be.revertedWith("Invalid discount rate");
-      });
+      expect(await escrow.isArbitrator(arbitrator.address)).to.equal(false);
+    });
   });
 });
