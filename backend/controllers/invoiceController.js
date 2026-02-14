@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EXCHANGE_RATE } = require('../config/constants');
 
 exports.createInvoice = async (req, res) => {
     const client = await pool.connect();
@@ -68,7 +69,7 @@ exports.createInvoice = async (req, res) => {
             JSON.stringify([{
                 description: quotation.description,
                 quantity: quotation.quantity,
-                price_per_unit: quotation.price_per_unit / 50.75
+                price_per_unit: quotation.price_per_unit / EXCHANGE_RATE
             }]),
             quotation.currency, contract_address, token_address,
             quotation.lot_id, quotation_id, tx_hash || null
@@ -86,7 +87,9 @@ exports.createInvoice = async (req, res) => {
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error creating invoice from quotation:', error);
-        res.status(500).json({ error: error.message || 'Internal server error.' });
+        // In production, avoid leaking internal error details
+        const errorMessage = process.env.NODE_ENV === 'development' ? error.message : 'Internal server error.';
+        res.status(500).json({ error: errorMessage });
     } finally {
         client.release();
     }
