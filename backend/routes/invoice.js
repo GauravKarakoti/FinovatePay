@@ -72,29 +72,30 @@ router.get('/:id', async (req, res) => {
 router.post('/:invoice_id/status', requireKYC, async (req, res) => {
     try {
         const { invoice_id } = req.params;
-        const { status, tx_hash, dispute_reason } = req.body; // <-- Added dispute_reason
+        const { status, tx_hash, dispute_reason } = req.body;
         console.log(`Updating status for invoice ${invoice_id} to ${status} with tx_hash ${tx_hash} and dispute_reason ${dispute_reason}`);
 
-        const allowedStatus = ['deposited', 'released', 'disputed', 'shipped'];
-        if (!allowedStatus.includes(status)) {
+        // Status configuration: field to update and required parameter
+        const statusConfig = {
+            'released': { field: 'release_tx_hash', requiredParam: tx_hash, paramName: 'tx_hash' },
+            'shipped': { field: 'shipment_proof_hash', requiredParam: tx_hash, paramName: 'tx_hash' },
+            'disputed': { field: 'dispute_reason', requiredParam: dispute_reason, paramName: 'dispute_reason' },
+            'deposited': { field: 'escrow_tx_hash', requiredParam: tx_hash, paramName: 'tx_hash' }
+        };
+
+        if (!statusConfig[status]) {
             return res.status(400).json({ error: 'Invalid status provided.' });
         }
 
-        let query, values;
+        const config = statusConfig[status];
 
-        if (status === 'released') {
-            query = `UPDATE invoices SET escrow_status = $1, release_tx_hash = $2 WHERE invoice_id = $3 RETURNING *`;
-            values = [status, tx_hash, invoice_id];
-        } else if (status === 'shipped') {
-            query = `UPDATE invoices SET escrow_status = $1, shipment_proof_hash = $2 WHERE invoice_id = $3 RETURNING *`;
-            values = [status, tx_hash, invoice_id];
-        } else if (status === 'disputed') { // <-- Handle disputed status
-            query = `UPDATE invoices SET escrow_status = $1, dispute_reason = $2 WHERE invoice_id = $3 RETURNING *`;
-            values = [status, dispute_reason, invoice_id];
-        } else { // 'deposited'
-            query = `UPDATE invoices SET escrow_status = $1, escrow_tx_hash = $2 WHERE invoice_id = $3 RETURNING *`;
-            values = [status, tx_hash, invoice_id];
+        // Validation: Ensure the required parameter for the status is present
+        if (!config.requiredParam) {
+            return res.status(400).json({ error: `Missing required parameter: ${config.paramName} for status ${status}.` });
         }
+
+        const query = `UPDATE invoices SET escrow_status = $1, ${config.field} = $2 WHERE invoice_id = $3 RETURNING *`;
+        const values = [status, config.requiredParam, invoice_id];
         
         const result = await pool.query(query, values);
         if (result.rows.length === 0) {
