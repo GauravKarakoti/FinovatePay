@@ -4,6 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
+    "test": "jest"
     "dev": "nodemon server.js",
     "start": "node server.js",
     "test": "mocha test/eventSync.test.js --timeout 10000",
