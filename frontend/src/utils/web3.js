@@ -40,11 +40,55 @@ const AMOY_NETWORK_CONFIG = {
         decimals: 18,
     },
     rpcUrls: ['https://rpc-amoy.polygon.technology/'], // Public RPC
-    blockExplorerUrls: ['https://www.oklink.com/amoy'],
+    blockExplorerUrls: ['https://www.oklink.com/amoy '],
 };
+
+// Step 1 — Helper function to attach provider event listeners
+function attachProviderListeners(rawProvider) {
+    if (!rawProvider) return;
+
+    // Handler for account changes
+    const handleAccountsChanged = (accounts) => {
+        if (accounts.length === 0) {
+            // User disconnected their wallet
+            console.log('Wallet disconnected');
+            if (web3Modal) {
+                web3Modal.clearCachedProvider();
+            }
+            provider = null;
+        } else {
+            // Account switched - reload to refresh state
+            console.log('Account changed:', accounts[0]);
+            window.location.reload();
+        }
+    };
+
+    // Handler for chain changes
+    const handleChainChanged = (chainId) => {
+        console.log('Network changed:', chainId);
+        window.location.reload();
+    };
+
+    // Handler for disconnect
+    const handleDisconnect = (error) => {
+        console.log('Provider disconnected:', error);
+        if (web3Modal) {
+            web3Modal.clearCachedProvider();
+        }
+        provider = null;
+    };
+
+    // Attach events to raw provider (MetaMask)
+    rawProvider.on('accountsChanged', handleAccountsChanged);
+    rawProvider.on('chainChanged', handleChainChanged);
+    rawProvider.on('disconnect', handleDisconnect);
+}
 
 export async function connectWallet() {
     provider = await web3Modal.connect();
+    
+    // Step 4 — Attach provider listeners after connection
+    attachProviderListeners(provider);
     
     // --- Enforce Network Switch to Amoy ---
     try {
@@ -69,8 +113,8 @@ export async function connectWallet() {
     }
     // --------------------------------------
 
-    const web3Provider = new ethers.providers.Web3Provider(provider);
-    const signer = web3Provider.getSigner();
+    const web3Provider = new ethers.BrowserProvider(provider);
+    const signer = await web3Provider.getSigner();
     const address = await signer.getAddress();
     return { signer, address, provider: web3Provider };
 }
