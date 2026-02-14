@@ -8,7 +8,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+
 import "./ComplianceManager.sol";
+import "./ArbitratorsRegistry.sol";
 
 contract EscrowContract is
     ReentrancyGuard,
@@ -33,7 +35,7 @@ contract EscrowContract is
         address seller;
         address buyer;
         uint256 amount;
-        address token;
+        address token; // address(0) = native
         EscrowStatus status;
         bool sellerConfirmed;
         bool buyerConfirmed;
@@ -41,47 +43,31 @@ contract EscrowContract is
         address disputeResolver;
         uint256 createdAt;
         uint256 expiresAt;
-        // --- NEW: RWA Collateral Link ---
-        address rwaNftContract; // Address of the ProduceTracking contract
-        uint256 rwaTokenId;     // The tokenId of the produce lot
-        // --- NEW: Discount Logic ---
-        uint256 discountRate;     // In basis points (e.g., 200 = 2%)
-        uint256 discountDeadline; // Unix timestamp
-    }
 
-    struct Proposal {
-        address arbitrator;
-        bool add;
-        uint256 approvals;
-        bool executed;
+        // RWA Collateral
+        address rwaNftContract;
+        uint256 rwaTokenId;
+
+        // Dispute voting
+        uint256 snapshotArbitratorCount;
+        uint256 votesForSeller;
+        uint256 votesForBuyer;
+
+        // Early payment discount
+        uint256 discountRate;      // basis points
+        uint256 discountDeadline;
     }
 
     /*//////////////////////////////////////////////////////////////
-                            STORAGE
+                                STORAGE
     //////////////////////////////////////////////////////////////*/
-    address public admin;
-    address public treasury;
-    address public keeper;
-    uint256 public feeBasisPoints;
+    mapping(bytes32 => Escrow) public escrows;
+    mapping(bytes32 => mapping(address => bool)) public hasVoted;
 
     ComplianceManager public complianceManager;
+    ArbitratorsRegistry public arbitratorsRegistry;
 
-    mapping(bytes32 => Escrow) public escrows;
-
-    // Meta-tx
-    mapping(address => uint256) public nonces;
-    bytes32 private constant META_TX_TYPEHASH =
-        keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
-
-    // Multi-sig arbitrator governance
-    address[] public managers;
-    mapping(address => bool) public isManager;
-    uint256 public threshold;
-
-    uint256 public proposalCount;
-    mapping(uint256 => Proposal) public proposals;
-    mapping(uint256 => mapping(address => bool)) public approved;
-    mapping(address => bool) public isArbitrator;
+    address public admin;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -89,16 +75,14 @@ contract EscrowContract is
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
-    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
-    event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
-
-    event ArbitratorProposed(uint256 indexed proposalId, address arbitrator, bool add);
-    event ProposalApproved(uint256 indexed proposalId, address manager);
-    event ProposalExecuted(uint256 indexed proposalId, address arbitrator, bool add);
-    event ArbitratorAdded(address indexed arbitrator);
-    event ArbitratorRemoved(address indexed arbitrator);
-
-    event MetaTransactionExecuted(address indexed user, address indexed relayer, bytes functionSignature);
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 snapshotArbitratorCount);
+    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool votedForSeller);
+    event DisputeResolved(
+        bytes32 indexed invoiceId,
+        bool sellerWins,
+        uint256 votesForSeller,
+        uint256 votesForBuyer
+    );
 
     /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
@@ -108,14 +92,15 @@ contract EscrowContract is
         _;
     }
 
-    modifier onlyManager() {
-        require(isManager[_msgSender()], "Not manager");
+    modifier onlyArbitrator() {
+        require(arbitratorsRegistry.isArbitrator(_msgSender()), "Not arbitrator");
         _;
     }
 
-    modifier onlyEscrowParty(bytes32 invoiceId) {
-        Escrow storage e = escrows[invoiceId];
-        require(_msgSender() == e.seller || _msgSender() == e.buyer, "Not party");
+    modifier onlyCompliant(address account) {
+        require(!complianceManager.isFrozen(account), "Account frozen");
+        require(complianceManager.isKYCVerified(account), "KYC not verified");
+        require(complianceManager.hasIdentity(account), "No identity SBT");
         _;
     }
 
@@ -123,29 +108,16 @@ contract EscrowContract is
                                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     constructor(
+        address _trustedForwarder,
         address _complianceManager,
-        address trustedForwarder,
-        address[] memory _managers,
-        uint256 _threshold
+        address _arbitratorsRegistry
     )
-        ERC2771Context(trustedForwarder)
+        ERC2771Context(_trustedForwarder)
         EIP712("EscrowContract", "1")
     {
-        require(_managers.length > 0, "No managers");
-        require(_threshold > 0 && _threshold <= _managers.length, "Bad threshold");
-
-        admin = _msgSender();
-        treasury = admin;
-        keeper = admin;
-
+        admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
-
-        for (uint256 i; i < _managers.length; i++) {
-            isManager[_managers[i]] = true;
-            managers.push(_managers[i]);
-        }
-
-        threshold = _threshold;
+        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -158,35 +130,37 @@ contract EscrowContract is
         uint256 _amount,
         address _token,
         uint256 _duration,
-        // --- NEW: RWA Parameters ---
         address _rwaNftContract,
         uint256 _rwaTokenId,
-        // --- NEW: Discount Parameters ---
         uint256 _discountRate,
         uint256 _discountDeadline
     ) external onlyCompliant(_msgSender()) returns (bool) {
-        require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
-        require(_amount > 0, "Amount must be > 0");
-        require(_discountRate <= 10000, "Invalid discount rate");
+        require(escrows[_invoiceId].seller == address(0), "Escrow exists");
+        require(_amount > 0, "Invalid amount");
+        require(_discountRate <= 10_000, "Invalid discount");
 
-        // Ensure the caller is the seller or the admin
-        require(_seller == _msgSender() || _msgSender() == admin, "Only seller or admin");
+        require(
+            _msgSender() == _seller || _msgSender() == admin,
+            "Only seller or admin"
+        );
 
         if (_discountRate > 0) {
-            require(_discountDeadline > block.timestamp, "Deadline must be future");
+            require(_discountDeadline > block.timestamp, "Bad deadline");
         }
 
-        // --- NEW: Lock the Produce NFT as Collateral ---
-        // The seller must have approved the EscrowContract to spend this NFT beforehand.
         if (_rwaNftContract != address(0)) {
-            IERC721(_rwaNftContract).transferFrom(_seller, address(this), _rwaTokenId); //
+            IERC721(_rwaNftContract).transferFrom(
+                _seller,
+                address(this),
+                _rwaTokenId
+            );
         }
 
-        escrows[invoiceId] = Escrow({
-            seller: seller,
-            buyer: buyer,
-            amount: amount,
-            token: token,
+        escrows[_invoiceId] = Escrow({
+            seller: _seller,
+            buyer: _buyer,
+            amount: _amount,
+            token: _token,
             status: EscrowStatus.Created,
             sellerConfirmed: false,
             buyerConfirmed: false,
@@ -196,6 +170,9 @@ contract EscrowContract is
             expiresAt: block.timestamp + _duration,
             rwaNftContract: _rwaNftContract,
             rwaTokenId: _rwaTokenId,
+            snapshotArbitratorCount: 0,
+            votesForSeller: 0,
+            votesForBuyer: 0,
             discountRate: _discountRate,
             discountDeadline: _discountDeadline
         });
@@ -203,158 +180,188 @@ contract EscrowContract is
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
         return true;
     }
-    
-    function deposit(bytes32 _invoiceId) external payable nonReentrant onlyCompliant(_msgSender()) {
-        address sender = _msgSender();
+
+    function deposit(bytes32 _invoiceId)
+        external
+        payable
+        nonReentrant
+        onlyCompliant(_msgSender())
+    {
         Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.buyer == sender, "Not the buyer");
+        require(_msgSender() == escrow.buyer, "Not buyer");
         require(!escrow.buyerConfirmed, "Already paid");
-        
+
         uint256 payableAmount = _getPayableAmount(escrow);
 
         if (escrow.token == address(0)) {
-             require(msg.value == payableAmount, "Incorrect native amount");
+            require(msg.value == payableAmount, "Bad ETH amount");
         } else {
-             IERC20 token = IERC20(escrow.token);
-             require(token.transferFrom(sender, address(this), payableAmount), "Transfer failed");
+            IERC20(escrow.token).transferFrom(
+                _msgSender(),
+                address(this),
+                payableAmount
+            );
         }
 
-        // Update amount to what was actually paid so release/refund works correctly with the balance held
         escrow.amount = payableAmount;
         escrow.buyerConfirmed = true;
+        escrow.status = EscrowStatus.Funded;
 
-        emit DepositConfirmed(_invoiceId, sender, payableAmount);
+        emit DepositConfirmed(_invoiceId, escrow.buyer, payableAmount);
     }
 
-    function _getPayableAmount(Escrow storage escrow) internal view returns (uint256) {
-        if (escrow.discountRate > 0 && block.timestamp <= escrow.discountDeadline) {
-             uint256 discount = (escrow.amount * escrow.discountRate) / 10000;
-             return escrow.amount - discount;
-        }
-        return escrow.amount;
-    }
-
-    function getCurrentPayableAmount(bytes32 _invoiceId) external view returns (uint256) {
-        Escrow storage escrow = escrows[_invoiceId];
-        return _getPayableAmount(escrow);
-    }
-    
     function confirmRelease(bytes32 _invoiceId) external nonReentrant {
-        address sender = _msgSender();
         Escrow storage escrow = escrows[_invoiceId];
-        require(sender == escrow.seller || sender == escrow.buyer, "Not a party to this escrow");
+        require(
+            _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
+            "Not party"
+        );
 
-        if (sender == escrow.seller) {
+        if (_msgSender() == escrow.seller) {
             escrow.sellerConfirmed = true;
         } else {
-            // Since the first require confirms the sender is either buyer or seller
             escrow.buyerConfirmed = true;
         }
-        
+
         if (escrow.sellerConfirmed && escrow.buyerConfirmed) {
             _releaseFunds(_invoiceId);
         }
     }
 
-    function deposit(bytes32 invoiceId) external nonReentrant {
-        Escrow storage e = escrows[invoiceId];
-        require(e.status == EscrowStatus.Created, "Inactive");
-        require(_msgSender() == e.buyer, "Not buyer");
+    function raiseDispute(bytes32 _invoiceId) external {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(
+            _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
+            "Not party"
+        );
+        require(!escrow.disputeRaised, "Already disputed");
 
-        IERC20(e.token).transferFrom(_msgSender(), address(this), e.amount);
+        escrow.snapshotArbitratorCount = arbitratorsRegistry.arbitratorCount();
+        require(escrow.snapshotArbitratorCount > 0, "No arbitrators");
 
-        e.buyerConfirmed = true;
-        e.status = EscrowStatus.Funded;
+        escrow.disputeRaised = true;
+        escrow.status = EscrowStatus.Disputed;
 
-        emit DepositConfirmed(invoiceId, _msgSender(), e.amount);
+        emit DisputeRaised(
+            _invoiceId,
+            _msgSender(),
+            escrow.snapshotArbitratorCount
+        );
     }
 
-    function confirmRelease(bytes32 invoiceId)
+    function voteOnDispute(bytes32 _invoiceId, bool _forSeller)
         external
-        nonReentrant
-        onlyEscrowParty(invoiceId)
+        onlyArbitrator
     {
-        Escrow storage e = escrows[invoiceId];
-        require(e.status == EscrowStatus.Funded, "Not funded");
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.disputeRaised, "No dispute");
+        require(!hasVoted[_invoiceId][_msgSender()], "Voted");
 
-        if (_msgSender() == e.seller) e.sellerConfirmed = true;
-        else e.buyerConfirmed = true;
+        hasVoted[_invoiceId][_msgSender()] = true;
 
-        if (e.sellerConfirmed && e.buyerConfirmed) {
-            _releaseFunds(invoiceId);
+        if (_forSeller) {
+            escrow.votesForSeller++;
+        } else {
+            escrow.votesForBuyer++;
+        }
+
+        emit ArbitratorVoted(_invoiceId, _msgSender(), _forSeller);
+
+        uint256 quorum = (escrow.snapshotArbitratorCount / 2) + 1;
+
+        if (escrow.votesForSeller >= quorum) {
+            _resolveDispute(_invoiceId, true);
+        } else if (escrow.votesForBuyer >= quorum) {
+            _resolveDispute(_invoiceId, false);
         }
     }
 
-    function raiseDispute(bytes32 invoiceId) external onlyEscrowParty(invoiceId) {
-        Escrow storage e = escrows[invoiceId];
-        require(e.status == EscrowStatus.Funded, "No dispute");
+    function _resolveDispute(bytes32 _invoiceId, bool sellerWins)
+        internal
+        nonReentrant
+    {
+        Escrow storage escrow = escrows[_invoiceId];
+        escrow.disputeRaised = false;
 
-        e.status = EscrowStatus.Disputed;
-        e.disputeRaised = true;
+        emit DisputeResolved(
+            _invoiceId,
+            sellerWins,
+            escrow.votesForSeller,
+            escrow.votesForBuyer
+        );
 
-        emit DisputeRaised(invoiceId, _msgSender());
+        if (sellerWins) {
+            _payout(escrow.seller, escrow.token, escrow.amount);
+            _transferNFT(address(this), escrow.buyer, escrow);
+        } else {
+            _payout(escrow.buyer, escrow.token, escrow.amount);
+            _transferNFT(address(this), escrow.seller, escrow);
+        }
+
+        escrow.status = EscrowStatus.Released;
+    }
+
+    function expireEscrow(bytes32 _invoiceId) external nonReentrant {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(block.timestamp >= escrow.expiresAt, "Not expired");
+
+        if (escrow.buyerConfirmed) {
+            _payout(escrow.buyer, escrow.token, escrow.amount);
+        }
+
+        _transferNFT(address(this), escrow.seller, escrow);
+        delete escrows[_invoiceId];
     }
 
     /*//////////////////////////////////////////////////////////////
-                        DISPUTE RESOLUTION (CEI)
+                            INTERNAL HELPERS
     //////////////////////////////////////////////////////////////*/
-    function resolveDispute(bytes32 invoiceId, bool sellerWins)
-        external
-        onlyAdmin
-        nonReentrant
-    {
-        Escrow storage e = escrows[invoiceId];
-        require(e.status == EscrowStatus.Disputed, "No dispute");
+    function _releaseFunds(bytes32 _invoiceId) internal {
+        Escrow storage escrow = escrows[_invoiceId];
 
-        // EFFECTS
-        e.disputeResolver = _msgSender();
-        e.status = EscrowStatus.Released;
+        _payout(escrow.seller, escrow.token, escrow.amount);
+        _transferNFT(address(this), escrow.buyer, escrow);
 
-        address seller = e.seller;
-        address buyer = e.buyer;
-        uint256 amount = e.amount;
-        address token = e.token;
-        address nft = e.rwaNftContract;
-        uint256 nftId = e.rwaTokenId;
-
-        emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
-
-        // INTERACTIONS
-        IERC20(token).transfer(sellerWins ? seller : buyer, amount);
-
-        if (nft != address(0)) {
-            IERC721(nft).transferFrom(
-                address(this),
-                sellerWins ? buyer : seller,
-                nftId
-            );
-        }
-
-        delete escrows[invoiceId];
+        escrow.status = EscrowStatus.Released;
+        emit EscrowReleased(_invoiceId, escrow.amount);
     }
 
-    function _releaseFunds(bytes32 invoiceId) internal {
-        Escrow storage e = escrows[invoiceId];
+    function _getPayableAmount(Escrow storage escrow)
+        internal
+        view
+        returns (uint256)
+    {
+        if (
+            escrow.discountRate > 0 &&
+            block.timestamp <= escrow.discountDeadline
+        ) {
+            uint256 discount =
+                (escrow.amount * escrow.discountRate) / 10_000;
+            return escrow.amount - discount;
+        }
+        return escrow.amount;
+    }
 
-        e.status = EscrowStatus.Released;
+    function _payout(address to, address token, uint256 amount) internal {
+        if (token == address(0)) {
+            payable(to).transfer(amount);
+        } else {
+            IERC20(token).transfer(to, amount);
+        }
+    }
 
-        address seller = e.seller;
-        address buyer = e.buyer;
-        uint256 amount = e.amount;
-
-        emit EscrowReleased(invoiceId, amount);
-
-        IERC20(e.token).transfer(seller, amount);
-
-        if (e.rwaNftContract != address(0)) {
-            IERC721(e.rwaNftContract).transferFrom(
-                address(this),
-                buyer,
-                e.rwaTokenId
+    function _transferNFT(
+        address from,
+        address to,
+        Escrow storage escrow
+    ) internal {
+        if (escrow.rwaNftContract != address(0)) {
+            IERC721(escrow.rwaNftContract).transferFrom(
+                from,
+                to,
+                escrow.rwaTokenId
             );
         }
-
-        delete escrows[invoiceId];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -379,7 +386,7 @@ contract EscrowContract is
     }
 
     /*//////////////////////////////////////////////////////////////
-                    ERC721 RECEIVER
+                        ERC721 RECEIVER
     //////////////////////////////////////////////////////////////*/
     function onERC721Received(
         address,
