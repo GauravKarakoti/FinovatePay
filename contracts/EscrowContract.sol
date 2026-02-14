@@ -2,17 +2,40 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
 
-contract EscrowContract is ReentrancyGuard {
+contract EscrowContract is
+    ReentrancyGuard,
+    ERC2771Context,
+    IERC721Receiver,
+    EIP712
+{
+    using ECDSA for bytes32;
+
+    /*//////////////////////////////////////////////////////////////
+                                TYPES
+    //////////////////////////////////////////////////////////////*/
+    enum EscrowStatus {
+        Created,
+        Funded,
+        Disputed,
+        Released,
+        Expired
+    }
+
     struct Escrow {
         address seller;
         address buyer;
         uint256 amount;
-        address token; // The ERC20 payment token
+        address token;
+        EscrowStatus status;
         bool sellerConfirmed;
         bool buyerConfirmed;
         bool disputeRaised;
@@ -34,7 +57,32 @@ contract EscrowContract is ReentrancyGuard {
     ComplianceManager public complianceManager;
     ArbitratorsRegistry public arbitratorsRegistry;
     address public admin;
-    
+    address public treasury;
+    address public keeper;
+    uint256 public feeBasisPoints;
+
+    ComplianceManager public complianceManager;
+
+    mapping(bytes32 => Escrow) public escrows;
+
+    // Meta-tx
+    mapping(address => uint256) public nonces;
+    bytes32 private constant META_TX_TYPEHASH =
+        keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
+
+    // Multi-sig arbitrator governance
+    address[] public managers;
+    mapping(address => bool) public isManager;
+    uint256 public threshold;
+
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => mapping(address => bool)) public approved;
+    mapping(address => bool) public isArbitrator;
+
+    /*//////////////////////////////////////////////////////////////
+                                EVENTS
+    //////////////////////////////////////////////////////////////*/
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
@@ -42,8 +90,24 @@ contract EscrowContract is ReentrancyGuard {
     event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool votedForSeller);
     event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 finalVotesForSeller, uint256 finalVotesForBuyer);
 
+    event ArbitratorProposed(uint256 indexed proposalId, address arbitrator, bool add);
+    event ProposalApproved(uint256 indexed proposalId, address manager);
+    event ProposalExecuted(uint256 indexed proposalId, address arbitrator, bool add);
+    event ArbitratorAdded(address indexed arbitrator);
+    event ArbitratorRemoved(address indexed arbitrator);
+
+    event MetaTransactionExecuted(address indexed user, address indexed relayer, bytes functionSignature);
+
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Not admin");
+        require(_msgSender() == admin, "Not admin");
+        _;
+    }
+
+    modifier onlyManager() {
+        require(isManager[_msgSender()], "Not manager");
         _;
     }
     
@@ -64,7 +128,10 @@ contract EscrowContract is ReentrancyGuard {
         complianceManager = ComplianceManager(_complianceManager);
         arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
     }
-    
+
+    /*//////////////////////////////////////////////////////////////
+                            ESCROW LOGIC
+    //////////////////////////////////////////////////////////////*/
     function createEscrow(
         bytes32 _invoiceId,
         address _seller,
@@ -84,11 +151,12 @@ contract EscrowContract is ReentrancyGuard {
             IERC721(_rwaNftContract).transferFrom(_seller, address(this), _rwaTokenId);
         }
 
-        escrows[_invoiceId] = Escrow({
-            seller: _seller,
-            buyer: _buyer,
-            amount: _amount,
-            token: _token,
+        escrows[invoiceId] = Escrow({
+            seller: seller,
+            buyer: buyer,
+            amount: amount,
+            token: token,
+            status: EscrowStatus.Created,
             sellerConfirmed: false,
             buyerConfirmed: false,
             disputeRaised: false,
@@ -102,36 +170,7 @@ contract EscrowContract is ReentrancyGuard {
             votesForBuyer: 0
         });
 
-        emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
-        return true;
-    }
-    
-    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(msg.sender) {
-        Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.buyer == msg.sender, "Not the buyer");
-        require(_amount == escrow.amount, "Incorrect amount");
-        
-        IERC20 token = IERC20(escrow.token);
-        require(token.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
-
-        escrow.buyerConfirmed = true;
-        emit DepositConfirmed(_invoiceId, msg.sender, _amount);
-    }
-    
-    function confirmRelease(bytes32 _invoiceId) external nonReentrant {
-        Escrow storage escrow = escrows[_invoiceId];
-        require(msg.sender == escrow.seller || msg.sender == escrow.buyer, "Not a party to this escrow");
-
-        if (msg.sender == escrow.seller) {
-            escrow.sellerConfirmed = true;
-        } else {
-            // Since the first require confirms the sender is either buyer or seller
-            escrow.buyerConfirmed = true;
-        }
-        
-        if (escrow.sellerConfirmed && escrow.buyerConfirmed) {
-            _releaseFunds(_invoiceId);
-        }
+        emit EscrowCreated(invoiceId, seller, buyer, amount);
     }
     
     function raiseDispute(bytes32 _invoiceId) external {
@@ -249,5 +288,40 @@ contract EscrowContract is ReentrancyGuard {
             IERC20 token = IERC20(escrow.token);
             require(token.transfer(escrow.buyer, escrow.amount), "Refund failed");
         }
+
+        delete escrows[invoiceId];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        ERC2771 OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+    function _msgSender()
+        internal
+        view
+        override(ERC2771Context)
+        returns (address)
+    {
+        return ERC2771Context._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        override(ERC2771Context)
+        returns (bytes calldata)
+    {
+        return ERC2771Context._msgData();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    ERC721 RECEIVER
+    //////////////////////////////////////////////////////////////*/
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
     }
 }
