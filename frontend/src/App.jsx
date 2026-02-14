@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useWeb3ModalAccount } from '@web3modal/ethers/react';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -8,8 +9,6 @@ import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ProduceHistory from './pages/ProduceHistory';
-import { connectWallet } from './utils/web3';
-import Web3Modal from 'web3modal';
 import './App.css';
 import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
@@ -19,7 +18,6 @@ import { useStatsActions } from './context/StatsContext';
 
 function App() {
   const [user, setUser] = useState(null);
-  const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardStats, setDashboardStats] = useState({
       totalInvoices: 0,
@@ -28,25 +26,16 @@ function App() {
       produceLots: 0,
   });
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
+  const { resetStats } = useStatsActions();
+  
+  // Use Web3Modal v3 hooks for wallet connection state
+  const { isConnected } = useWeb3ModalAccount();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
     if (token && userData) {
       setUser(JSON.parse(userData));
-    }
-
-    const web3Modal = new Web3Modal({ cacheProvider: true });
-    if (web3Modal.cachedProvider) {
-      connectWallet()
-        .then(() => {
-          setWalletConnected(true);
-        })
-        .catch((error) => {
-          console.error("Failed to auto-connect wallet:", error);
-          setWalletConnected(false);
-        });
     }
   }, []);
 
@@ -113,7 +102,7 @@ function App() {
         <Header 
             user={user} 
             onLogout={handleLogout} 
-            walletConnected={walletConnected}
+            walletConnected={isConnected}
             onUserUpdate={setUser}
         />
         {console.log('Current user role in App.jsx:', user)}
