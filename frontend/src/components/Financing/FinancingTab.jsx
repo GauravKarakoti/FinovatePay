@@ -1,27 +1,49 @@
 import { useState, useEffect } from 'react';
-import { approveFinancingManager, checkFinancingManagerApproval } from '../../utils/web3';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { toast } from 'react-hot-toast';
+import FractionTokenArtifact from '../../../../deployed/FractionToken.json';
+import contractAddresses from '../../../../deployed/contract-addresses.json';
+
+const FRACTION_TOKEN_ADDRESS = contractAddresses.FractionToken;
+const FINANCING_MANAGER_ADDRESS = contractAddresses.FinancingManager;
 
 const FinancingTab = ({ invoices, onTokenizeClick }) => {
-    const [isFinancingApproved, setIsFinancingApproved] = useState(false);
-    const [isApprovalLoading, setIsApprovalLoading] = useState(false);
-    const [isCheckingApproval, setIsCheckingApproval] = useState(true);
+    const { address } = useAccount();
+    const { writeContract, isPending: isApprovalLoading, data: hash, error: writeError } = useWriteContract();
+    const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmError } = useWaitForTransactionReceipt({ hash });
+
+    // Check approval
+    const { data: isFinancingApproved, isLoading: isCheckingApproval, refetch: checkApproval } = useReadContract({
+        address: FRACTION_TOKEN_ADDRESS,
+        abi: FractionTokenArtifact.abi,
+        functionName: 'isApprovedForAll',
+        args: [address, FINANCING_MANAGER_ADDRESS],
+        query: {
+            enabled: !!address,
+        }
+    });
+
+    const handleEnableFinancing = () => {
+        toast.loading("Waiting for approval transaction...");
+        writeContract({
+            address: FRACTION_TOKEN_ADDRESS,
+            abi: FractionTokenArtifact.abi,
+            functionName: 'setApprovalForAll',
+            args: [FINANCING_MANAGER_ADDRESS, true],
+        });
+    };
 
     useEffect(() => {
-        const checkApproval = async () => {
-            try {
-                setIsCheckingApproval(true);
-                const approved = await checkFinancingManagerApproval();
-                setIsFinancingApproved(approved);
-            } catch (err) {
-                console.error("Failed to check approval", err);
-                toast.error("Failed to check financing approval status.");
-            } finally {
-                setIsCheckingApproval(false);
-            }
-        };
-        checkApproval();
-    }, []);
+        if (isConfirmed) {
+            toast.dismiss();
+            toast.success("Automated financing enabled!");
+            checkApproval();
+        }
+        if (confirmError || writeError) {
+             toast.dismiss();
+             toast.error("Transaction failed or rejected.");
+        }
+    }, [isConfirmed, confirmError, writeError, checkApproval]);
 
     // Invoices eligible for tokenization (must be deposited, not yet tokenized)
     const eligibleInvoices = invoices.filter(
@@ -32,23 +54,6 @@ const FinancingTab = ({ invoices, onTokenizeClick }) => {
     const listedInvoices = invoices.filter(
         inv => inv.is_tokenized && inv.financing_status === 'listed'
     );
-
-    const handleEnableFinancing = async () => {
-        setIsApprovalLoading(true);
-        toast.loading("Waiting for approval transaction...");
-        try {
-            await approveFinancingManager();
-            toast.dismiss();
-            toast.success("Automated financing enabled!");
-            setIsFinancingApproved(true);
-        } catch (err) {
-            toast.dismiss();
-            toast.error("Transaction failed or rejected.");
-            console.error(err);
-        } finally {
-            setIsApprovalLoading(false);
-        }
-    };
 
     return (
         <div>
@@ -61,18 +66,18 @@ const FinancingTab = ({ invoices, onTokenizeClick }) => {
                 </p>
                 <button
                     onClick={handleEnableFinancing}
-                    disabled={isFinancingApproved || isApprovalLoading || isCheckingApproval}
+                    disabled={isFinancingApproved || isApprovalLoading || isConfirming || isCheckingApproval}
                     className={`px-4 py-2 rounded-md text-white ${
                         isFinancingApproved
                         ? 'bg-green-600 cursor-not-allowed'
-                        : isApprovalLoading || isCheckingApproval
+                        : isApprovalLoading || isConfirming || isCheckingApproval
                         ? 'bg-gray-400 cursor-wait'
                         : 'bg-blue-600 hover:bg-blue-700'
                     }`}
                 >
                     {isFinancingApproved
                         ? '✓ Financing Enabled'
-                        : isApprovalLoading
+                        : isApprovalLoading || isConfirming
                         ? 'Approving...'
                         : isCheckingApproval
                         ? 'Checking Status...'

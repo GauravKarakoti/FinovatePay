@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.21",
     "@transak/transak-sdk": "^4.0.2",
+    "@web3modal/wagmi": "^5.1.11",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.13.2",
     "buffer": "^6.0.3",
@@ -27,7 +29,8 @@
     "socket.io-client": "^4.8.1",
     "sonner": "^2.0.7",
     "uuid": "^12.0.0",
-    "web3modal": "^1.9.12"
+    "viem": "^2.45.3",
+    "wagmi": "^3.4.3"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

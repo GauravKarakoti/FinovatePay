@@ -1,154 +1,129 @@
 import { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
-import {
-  approveStablecoin,
-  checkStablecoinAllowance,
-  buyFractions,
-  buyFractionsNative
-} from '../../utils/web3';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseUnits, formatUnits } from 'viem';
 import { toast } from 'react-hot-toast';
+
+import FinancingManagerArtifact from '../../../../deployed/FinancingManager.json';
+import ERC20Artifact from '../../../../deployed/ERC20.json';
+import contractAddresses from '../../../../deployed/contract-addresses.json';
+
+const FINANCING_MANAGER_ADDRESS = contractAddresses.FinancingManager;
 
 export const BuyFractionToken = ({
   tokenId,
   stablecoinAddress,
   stablecoinDecimals,
   tokenDecimals,
-  maxAmount // Can be base units (BigNumber) or formatted string
+  maxAmount
 }) => {
-  console.log("BuyFractionToken mounted with tokenId:", tokenId, "stablecoinAddress:", stablecoinAddress);
+  const { address } = useAccount();
+  const { writeContract, isPending: isWriting, data: hash, error: writeError } = useWriteContract();
   
+  const { isLoading: isConfirming, isSuccess: isConfirmed, error: confirmError } = useWaitForTransactionReceipt({
+    hash,
+  });
+
   const [amount, setAmount] = useState('');
-  const [allowance, setAllowance] = useState(ethers.BigNumber.from(0));
-  const [isApproved, setIsApproved] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCheckingAllowance, setIsCheckingAllowance] = useState(true);
-  
-  // State to toggle payment method
   const [useNativeToken, setUseNativeToken] = useState(false);
-  console.log("Using native token for payment:", useNativeToken);
+
+  // Read allowance
+  const { data: allowance, refetch: refetchAllowance, isLoading: isCheckingAllowance } = useReadContract({
+    address: stablecoinAddress,
+    abi: ERC20Artifact.abi,
+    functionName: 'allowance',
+    args: [address, FINANCING_MANAGER_ADDRESS],
+    query: {
+      enabled: !!address && !useNativeToken,
+    }
+  });
+
+  // Calculate needed amount
+  // We handle parsing carefully. If amount is empty, 0.
+  const getAmountToApprove = () => {
+    try {
+      if (!amount) return 0n;
+      return parseUnits(amount, stablecoinDecimals);
+    } catch (e) {
+      return 0n;
+    }
+  };
+
+  const amountToApprove = getAmountToApprove();
+  const currentAllowance = allowance ? BigInt(allowance) : 0n;
+  const isApproved = !useNativeToken ? (currentAllowance >= amountToApprove) : true;
 
   // Helper to safely format the max amount for display
   const formatMaxAmount = () => {
+    if (!maxAmount) return '0';
     try {
       // If it's already a decimal string (e.g. "0.48"), return it as is
       if (typeof maxAmount === 'string' && maxAmount.includes('.')) {
         return maxAmount;
       }
-      // Otherwise, assume it's base units and format it
-      return ethers.utils.formatUnits(maxAmount, tokenDecimals);
+      // If it's bigint or string integer
+      return formatUnits(BigInt(maxAmount.toString()), tokenDecimals);
     } catch (error) {
-      // Fallback to displaying as-is if formatting fails
-      return maxAmount;
+      // Fallback
+      return maxAmount.toString();
     }
   };
 
-  const amountInBaseUnits = () => {
-    console.log("Converting amount to base units:", amount, "with decimals:", tokenDecimals);
-    try {
-      return ethers.utils.parseUnits(amount, tokenDecimals);
-    } catch {
-      console.log("Error parsing amount:", amount, "with decimals:", tokenDecimals);
-      return ethers.BigNumber.from(0);
-    }
+  const handleApprove = () => {
+     if (!amount) return;
+     toast.loading("Waiting for approval...");
+     writeContract({
+       address: stablecoinAddress,
+       abi: ERC20Artifact.abi,
+       functionName: 'approve',
+       args: [FINANCING_MANAGER_ADDRESS, amountToApprove],
+     });
   };
 
-  const amountToApprove = () => {
-    console.log("Calculating amount to approve:", amount, "with decimals:", stablecoinDecimals);
+  const handleBuy = () => {
+    if (!amount) return;
     try {
-      return ethers.utils.parseUnits(amount, stablecoinDecimals);
-    } catch {
-      console.log("Error parsing amount for approval:", amount, "with decimals:", stablecoinDecimals);
-      return ethers.BigNumber.from(0);
-    }
-  };
+        const amountToBuy = parseUnits(amount, tokenDecimals);
+        toast.loading("Processing purchase...");
 
-  useEffect(() => {
-    console.log("Checking stablecoin allowance...");
-    // If using native token, we don't need to check stablecoin allowance
-    if (useNativeToken) {
-      setIsCheckingAllowance(false);
-      setIsApproved(true); // Native tokens don't need approval
-      console.log("Skipping stablecoin allowance check due to native token payment.");
-      return;
-    }
-
-    console.log("Checking allowance for stablecoin:", stablecoinAddress);
-    const checkAllowance = async () => {
-      try {
-        setIsCheckingAllowance(true);
-        const currentAllowance = await checkStablecoinAllowance(stablecoinAddress);
-        setAllowance(currentAllowance);
-        console.log("Current allowance:", ethers.utils.formatUnits(currentAllowance, stablecoinDecimals));
-      } catch (err) {
-        console.error("Failed to check allowance", err);
-      } finally {
-        setIsCheckingAllowance(false);
-      }
-    };
-    checkAllowance();
-  }, [stablecoinAddress, useNativeToken]);
-
-  useEffect(() => {
-    console.log("Re-evaluating approval status...");
-    if (useNativeToken) return; // Skip logic if native
-
-    if (!amount || isNaN(Number(amount))) {
-      setIsApproved(false);
-      console.log("Amount is invalid:", amount);
-      return;
-    }
-    const needed = amountToApprove();
-    setIsApproved(allowance.gte(needed));
-    console.log("Is approved check:", allowance.toString(), "needed:", needed.toString());
-  }, [amount, allowance, stablecoinDecimals, useNativeToken]);
-
-  const handleApprove = async () => {
-    console.log("Handling stablecoin approval for amount:", amount);
-    setIsLoading(true);
-    toast.loading("Waiting for approval...");
-    try {
-      const needed = amountToApprove();
-      await approveStablecoin(stablecoinAddress, needed);
-      setAllowance(needed); 
-      setIsApproved(true);
-      toast.dismiss();
-      toast.success("Approved! You can now buy.");
+        if (useNativeToken) {
+        writeContract({
+            address: FINANCING_MANAGER_ADDRESS,
+            abi: FinancingManagerArtifact.abi,
+            functionName: 'buyFractionsNative',
+            args: [tokenId, amountToBuy],
+            value: amountToBuy
+        });
+        } else {
+        writeContract({
+            address: FINANCING_MANAGER_ADDRESS,
+            abi: FinancingManagerArtifact.abi,
+            functionName: 'buyFractions',
+            args: [tokenId, amountToBuy],
+        });
+        }
     } catch (err) {
-      toast.dismiss();
-      toast.error("Approval failed or rejected.");
-    } finally {
-      setIsLoading(false);
+        console.error("Error parsing amount:", err);
+        toast.error("Invalid amount");
     }
   };
 
-  const handleBuy = async () => {
-    console.log("Handling buy for tokenId:", tokenId, "amount:", amount, "using native token:", useNativeToken);
-    setIsLoading(true);
-    toast.loading("Processing purchase...");
-    try {
-      const amountToBuy = amountInBaseUnits();
-      
-      if (useNativeToken) {
-        console.log("Purchased using native token.");
-        await buyFractionsNative(tokenId, amountToBuy);
-        console.log("buyFractionsNative called with tokenId:", tokenId, "amount:", amountToBuy.toString());
-      } else {
-        console.log("Purchased using stablecoin.");
-        await buyFractions(tokenId, amountToBuy);
-        console.log("buyFractions called with tokenId:", tokenId, "amount:", amountToBuy.toString());
-      }
-
-      toast.dismiss();
-      toast.success("Purchase successful!");
-      setAmount(''); 
-    } catch (err) {
-      toast.dismiss();
-      toast.error("Purchase failed.");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
+  // Handle confirmation toasts and refetches
+  useEffect(() => {
+    if (isConfirmed) {
+       toast.dismiss();
+       toast.success("Transaction confirmed!");
+       refetchAllowance();
+       setAmount('');
     }
-  };
+    if (confirmError || writeError) {
+        toast.dismiss();
+        toast.error("Transaction failed or rejected.");
+        console.error(confirmError || writeError);
+    }
+  }, [isConfirmed, confirmError, writeError, refetchAllowance]);
+
+  // Handle loading state for toast dismissal if needed or generic loading
+  const isLoading = isWriting || isConfirming;
 
   return (
     <div className="mt-4 p-3 bg-gray-50 rounded-md border">
@@ -181,7 +156,6 @@ export const BuyFractionToken = ({
           type="number"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          // FIX: Use the helper function here instead of calling formatUnits directly
           placeholder={`Amount (max ${formatMaxAmount()})`}
           className="flex-1 p-2 border rounded-md"
           disabled={isLoading}

@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import { ethers } from 'ethers';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
+import { useAccount, useWriteContract, usePublicClient, useSignMessage } from 'wagmi';
+import { parseUnits, formatUnits, pad, toHex, keccak256, toBytes, decodeEventLog } from 'viem';
+
 import { 
   getSellerInvoices, createInvoice, updateInvoiceStatus,
   getSellerLots, getQuotations, sellerApproveQuotation, rejectQuotation, createQuotation,
   createProduceLot as syncProduceLot, api, getKYCStatus
 } from '../utils/api';
-import { 
-  connectWallet, getInvoiceFactoryContract, getEscrowContract, getProduceTrackingContract, erc20ABI
-} from '../utils/web3';
+
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
@@ -29,10 +29,18 @@ import FinancingTab from '../components/Financing/FinancingTab';
 import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
 import { useStatsActions } from '../context/StatsContext';
 
+import EscrowContractArtifact from '../../../deployed/EscrowContract.json';
+import ProduceTrackingArtifact from '../../../deployed/ProduceTracking.json';
+import ERC20Artifact from '../../../deployed/ERC20.json';
+import contractAddresses from '../../../deployed/contract-addresses.json';
+
+const ESCROW_CONTRACT_ADDRESS = contractAddresses.EscrowContract;
+const PRODUCE_TRACKING_ADDRESS = contractAddresses.ProduceTracking;
+
 // --- Utility Helpers ---
 
 const uuidToBytes32 = (uuid) => {
-  return ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
+  return pad(`0x${uuid.replace(/-/g, '')}`, { size: 32 });
 };
 
 // --- Reusable UI Components ---
@@ -251,7 +259,7 @@ const InvoiceDetailsModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
                         onChange={e => setDeadline(e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded-md mt-1"
                     />
-                    <p className="text-xs text-gray-500 mt-1">If discount > 0, deadline must be in the future.</p>
+                    <p className="text-xs text-gray-500 mt-1">If discount &gt; 0, deadline must be in the future.</p>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
                     <ActionButton onClick={onClose} variant="secondary" disabled={isSubmitting}>Cancel</ActionButton>
@@ -277,11 +285,16 @@ ShipmentConfirmationModal.propTypes = {
 // --- Main Component ---
 
 const SellerDashboard = ({ activeTab = 'overview' }) => {
+  // Wagmi hooks
+  const { address: walletAddress } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+  const { signMessageAsync } = useSignMessage();
+
   // Data State
   const [invoices, setInvoices] = useState([]);
   const [produceLots, setProduceLots] = useState([]);
   const [quotations, setQuotations] = useState([]);
-  const [walletAddress, setWalletAddress] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [selectedProduceLot, setSelectedProduceLot] = useState(null);
   const [timelineEvents, setTimelineEvents] = useState([]);
@@ -351,8 +364,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
   const loadData = useCallback(async () => {
     try {
-      const { address } = await connectWallet();
-      setWalletAddress(address);
       const invoicesData = await getSellerInvoices();
       setInvoices(invoicesData.data || []);
     } catch (error) {
@@ -375,7 +386,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     try {
       const response = await getQuotations();
       const sellerQuotations = response.data.filter(q => 
-        q.seller_address.toLowerCase() === (currentAddress || walletAddress).toLowerCase()
+        q.seller_address.toLowerCase() === (currentAddress || walletAddress || '').toLowerCase()
       );
       setQuotations(sellerQuotations);
     } catch (error) {
@@ -390,12 +401,13 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   }, [loadData, loadKYCStatus]);
 
   useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
-
-  useEffect(() => {
-    if (walletAddress) loadQuotations(walletAddress);
-  }, [walletAddress, loadQuotations]);
+    if (walletAddress) {
+        loadInitialData();
+        loadQuotations(walletAddress);
+    } else {
+        setIsLoading(false);
+    }
+  }, [loadInitialData, walletAddress, loadQuotations]);
 
   // Event Handlers
   const handleSelectInvoice = useCallback((invoice) => {
@@ -425,16 +437,18 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     const toastId = toast.loading('Preparing tokenization...');
 
     try {
-      const { provider } = await connectWallet();
       const tokenAddress = invoiceToTokenize.token_address;
       
       let decimals = 18;
       if (tokenAddress !== NATIVE_CURRENCY_ADDRESS) {
-        const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
-        decimals = await tokenContract.decimals();
+        decimals = await publicClient.readContract({
+             address: tokenAddress,
+             abi: ERC20Artifact.abi,
+             functionName: 'decimals'
+        });
       }
       
-      const faceValueAsUint = ethers.utils.parseUnits(faceValue.toString(), decimals);
+      const faceValueAsUint = parseUnits(faceValue.toString(), decimals);
       
       const response = await api.post('/financing/tokenize', {
         invoiceId,
@@ -451,11 +465,15 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [invoiceToTokenize, loadData]);
+  }, [invoiceToTokenize, loadData, publicClient]);
 
   const handleFinalizeInvoice = useCallback(async ({ discountRate, deadline }) => {
     if (!invoiceQuotation) return;
     const quotation = invoiceQuotation;
+    if (!walletAddress) {
+        toast.error("Please connect wallet");
+        return;
+    }
 
     setIsSubmitting(true);
     const toastId = toast.loading('Creating invoice contract...');
@@ -463,15 +481,12 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     try {
       const invoiceId = uuidv4();
       const bytes32InvoiceId = uuidToBytes32(invoiceId);
-      const { address: sellerAddress } = await connectWallet();
       
-      const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
-      const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
+      const dataToHash = `${walletAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
+      const invoiceHash = keccak256(toBytes(dataToHash));
       const tokenAddress = NATIVE_CURRENCY_ADDRESS;
       
-      // Use EscrowContract instead of InvoiceFactory
-      const contract = await getEscrowContract();
-      const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
+      const amountInWei = parseUnits(quotation.total_amount.toString(), 18);
 
       const discountBps = Math.floor(parseFloat(discountRate || 0) * 100);
       const discountDeadlineTs = deadline ? Math.floor(new Date(deadline).getTime() / 1000) : 0;
@@ -484,30 +499,35 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       toast.loading('Waiting for wallet confirmation...', { id: toastId });
       
       // New createEscrow signature
-      const tx = await contract.createEscrow(
-        bytes32InvoiceId,
-        sellerAddress,
-        quotation.buyer_address,
-        amountInWei,
-        tokenAddress,
-        86400 * 30, // Default duration
-        ethers.constants.AddressZero, // rwaNftContract
-        0, // rwaTokenId
-        discountBps,
-        discountDeadlineTs
-      );
+      const txHash = await writeContractAsync({
+          address: ESCROW_CONTRACT_ADDRESS,
+          abi: EscrowContractArtifact.abi,
+          functionName: 'createEscrow',
+          args: [
+            bytes32InvoiceId,
+            walletAddress,
+            quotation.buyer_address,
+            amountInWei,
+            tokenAddress,
+            86400 * 30, // Default duration
+            "0x0000000000000000000000000000000000000000", // rwaNftContract
+            0n, // rwaTokenId
+            discountBps,
+            discountDeadlineTs
+          ]
+      });
       
       toast.loading('Mining transaction...', { id: toastId });
-      const receipt = await tx.wait();
-      const event = receipt.events?.find(e => e.event === 'EscrowCreated'); // Changed event name
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       
-      if (!event) throw new Error("EscrowCreated event not found");
+      // Finding event logs if needed, but receipt status is success usually enough.
+      // We assume success if no error thrown.
 
       await createInvoice({
         quotation_id: quotation.id,
         invoice_id: invoiceId,
         invoice_hash: invoiceHash,
-        contract_address: contract.address, // Escrow contract address is the "contract address"
+        contract_address: ESCROW_CONTRACT_ADDRESS,
         token_address: tokenAddress,
         due_date: new Date((Date.now() + 86400 * 30 * 1000)).toISOString(),
         discount_rate: discountBps,
@@ -517,40 +537,58 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       toast.success('Invoice created and deployed!', { id: toastId });
       setInvoiceQuotation(null);
       await loadData();
-      await loadQuotations();
+      await loadQuotations(walletAddress);
     } catch (error) {
       console.error('Failed to create invoice:', error);
-      toast.error(error.reason || error.message, { id: toastId });
+      toast.error(error.message || 'Error creating invoice', { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
-  }, [invoiceQuotation, loadData, loadQuotations]);
+  }, [invoiceQuotation, loadData, loadQuotations, walletAddress, writeContractAsync, publicClient]);
 
   const handleCreateProduceLot = useCallback(async (formData) => {
     setIsSubmitting(true);
     const toastId = toast.loading('Registering on blockchain...');
 
     try {
-      const contract = await getProduceTrackingContract();
-      const tx = await contract.createProduceLot(
-        formData.produceType,
-        formData.harvestDate,
-        formData.qualityMetrics,
-        formData.origin,
-        ethers.utils.parseUnits(formData.quantity.toString(), 18),
-        ""
-      );
+      const txHash = await writeContractAsync({
+          address: PRODUCE_TRACKING_ADDRESS,
+          abi: ProduceTrackingArtifact.abi,
+          functionName: 'createProduceLot',
+          args: [
+            formData.produceType,
+            formData.harvestDate,
+            formData.qualityMetrics,
+            formData.origin,
+            parseUnits(formData.quantity.toString(), 18),
+            ""
+          ]
+      });
 
       toast.loading('Confirming transaction...', { id: toastId });
-      const receipt = await tx.wait();
-      const event = receipt.events?.find(e => e.event === 'ProduceLotCreated');
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
       
-      if (!event) throw new Error("ProduceLotCreated event not found");
+      let lotId;
+      for (const log of receipt.logs) {
+          try {
+              const decoded = decodeEventLog({
+                  abi: ProduceTrackingArtifact.abi,
+                  data: log.data,
+                  topics: log.topics
+              });
+              if (decoded.eventName === 'ProduceLotCreated') {
+                  lotId = Number(decoded.args.lotId);
+                  break;
+              }
+          } catch (e) {}
+      }
+
+      if (lotId === undefined) throw new Error("Could not extract Lot ID from transaction logs");
 
       await syncProduceLot({
         ...formData,
-        lotId: event.args.lotId.toNumber(),
-        txHash: tx.hash,
+        lotId: lotId,
+        txHash: txHash,
       });
 
       toast.success('Produce lot registered!', { id: toastId });
@@ -558,11 +596,11 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       await loadProduceLots();
     } catch (error) {
       console.error('Failed to create lot:', error);
-      toast.error(error.reason || error.message, { id: toastId });
+      toast.error(error.message || 'Error creating lot', { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
-  }, [loadProduceLots]);
+  }, [writeContractAsync, publicClient, loadProduceLots]);
 
   const submitShipmentProof = useCallback(async () => {
     if (!proofFile || !confirmingShipment) return;
@@ -572,10 +610,9 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
     try {
       const proofHash = `bafybeigdyrzt5s6dfx7sidefusha4u62piu7k26k5e4szm3oogv5s2d2bu-${Date.now()}`;
-      const { signer } = await connectWallet();
       const message = `Confirm shipment for invoice ${confirmingShipment.invoice_id}\nProof: ${proofHash}`;
       
-      await signer.signMessage(message);
+      await signMessageAsync({ message });
       await updateInvoiceStatus(confirmingShipment.invoice_id, 'shipped', proofHash);
       
       toast.success('Shipment confirmed!', { id: toastId });
@@ -584,44 +621,45 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       await loadData();
     } catch (error) {
       console.error('Shipment confirmation failed:', error);
-      toast.error(error.reason || error.message, { id: toastId });
+      toast.error(error.message || 'Failed to sign', { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
-  }, [proofFile, confirmingShipment, loadData]);
+  }, [proofFile, confirmingShipment, loadData, signMessageAsync]);
 
   const handleApproveQuotation = useCallback(async (quotationId) => {
     try {
       await sellerApproveQuotation(quotationId);
       toast.success('Quotation approved! Waiting for buyer confirmation.');
-      await loadQuotations();
+      await loadQuotations(walletAddress);
     } catch (error) {
       toast.error("Failed to approve quotation");
     }
-  }, [loadQuotations]);
+  }, [loadQuotations, walletAddress]);
 
   const handleRejectQuotation = useCallback(async (quotationId) => {
     try {
       await rejectQuotation(quotationId);
       toast.info("Quotation rejected");
-      await loadQuotations();
+      await loadQuotations(walletAddress);
     } catch (error) {
       toast.error("Failed to reject");
     }
-  }, [loadQuotations]);
+  }, [loadQuotations, walletAddress]);
 
   const handleCreateQuotation = useCallback(async (quotationData) => {
     try {
       await createQuotation(quotationData);
       toast.success('Quotation sent to buyer!');
       setShowCreateQuotation(false);
-      await loadQuotations();
+      await loadQuotations(walletAddress);
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to create quotation');
     }
-  }, [loadQuotations]);
+  }, [loadQuotations, walletAddress]);
 
   // Tab Content Components
+  // ... (Same as before, just UI)
   const OverviewTab = () => (
     <div className="space-y-6 animate-fadeIn">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

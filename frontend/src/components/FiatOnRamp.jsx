@@ -1,45 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
+import { useAccount, useReadContract } from 'wagmi';
+import { formatUnits } from 'viem';
 import { Transak } from '@transak/transak-sdk';
-import { stablecoinAddresses, erc20ABI, connectWallet } from '../utils/web3';
+import { TOKEN_ADDRESSES } from '../utils/constants';
+import ERC20Artifact from '../../../deployed/ERC20.json';
 import { toast } from 'sonner';
 
-const FiatOnRamp = ({ walletAddress }) => {
-  const [amount, setAmount] = useState('100'); // Default 100
-  const [balance, setBalance] = useState('0.00');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+const FiatOnRamp = () => {
+  const { address: walletAddress } = useAccount();
+  const [amount, setAmount] = useState('100');
 
   // Fetch USDC Balance
-  const fetchBalance = async () => {
-    if (!walletAddress) return;
-
-    setIsRefreshing(true);
-    try {
-      const { provider } = await connectWallet();
-      // Use the USDC address from web3 utils
-      const usdcAddress = stablecoinAddresses['USDC'];
-      const contract = new ethers.Contract(usdcAddress, erc20ABI, provider);
-
-      const rawBalance = await contract.balanceOf(walletAddress);
-      const formattedBalance = ethers.utils.formatUnits(rawBalance, 6); // USDC has 6 decimals
-
-      setBalance(formattedBalance);
-    } catch (error) {
-      console.error('Error fetching balance:', error);
-      // specific error handling if needed
-    } finally {
-      setIsRefreshing(false);
+  const { data: balanceData, refetch: fetchBalance, isLoading: isRefreshing } = useReadContract({
+    address: TOKEN_ADDRESSES.USDC,
+    abi: ERC20Artifact.abi,
+    functionName: 'balanceOf',
+    args: [walletAddress],
+    query: {
+        enabled: !!walletAddress,
+        refetchInterval: 15000,
     }
-  };
+  });
 
-  useEffect(() => {
-    fetchBalance();
-
-    // Set up an interval to refresh balance occasionally
-    const interval = setInterval(fetchBalance, 15000);
-    return () => clearInterval(interval);
-  }, [walletAddress]);
+  const balance = balanceData ? formatUnits(balanceData, 6) : '0.00';
 
   const handleBuyCrypto = () => {
     if (!walletAddress) {
@@ -48,19 +31,19 @@ const FiatOnRamp = ({ walletAddress }) => {
     }
 
     const transakConfig = {
-      apiKey: import.meta.env.VITE_TRANSAK_API_KEY || '4fcd6904-706b-4009-8bb2-91f8071f727c', // Fallback to a public staging key for demo if env missing
-      environment: 'STAGING', // STAGING/PRODUCTION
+      apiKey: import.meta.env.VITE_TRANSAK_API_KEY || '4fcd6904-706b-4009-8bb2-91f8071f727c',
+      environment: 'STAGING',
       defaultCryptoCurrency: 'USDC',
       walletAddress: walletAddress,
-      themeColor: '2563EB', // Blue-600
+      themeColor: '2563EB',
       fiatAmount: amount,
       defaultFiatCurrency: 'USD',
-      email: '', // Can pre-fill if available
+      email: '',
       redirectURL: '',
       hostURL: window.location.origin,
       widgetHeight: '625px',
       widgetWidth: '500px',
-      network: 'polygon' // Amoy is Polygon testnet, Transak Staging usually maps 'polygon' to Amoy/Mumbai
+      network: 'polygon'
     };
 
     const transak = new Transak(transakConfig);
@@ -91,7 +74,7 @@ const FiatOnRamp = ({ walletAddress }) => {
           <p className="text-sm text-gray-500">Manage your stablecoins</p>
         </div>
         <button
-            onClick={fetchBalance}
+            onClick={() => fetchBalance()}
             className={`p-1.5 rounded-full hover:bg-gray-100 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
             title="Refresh Balance"
         >

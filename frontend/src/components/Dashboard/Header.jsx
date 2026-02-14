@@ -1,23 +1,9 @@
-import { connectWallet, disconnectWallet } from '../../utils/web3';
 import { updateCurrentUserRole } from '../../utils/api';
 import { useNavigate } from 'react-router-dom';
 
 // FIX: Receive the onToggleRole prop
-const Header = ({ user, onLogout, walletConnected, onUserUpdate }) => {
+const Header = ({ user, onLogout, onUserUpdate }) => {
   const navigate = useNavigate();
-  const handleWalletConnect = async () => {
-    try {
-      await connectWallet();
-      window.location.reload();
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
-    }
-  };
-
-  const handleWalletDisconnect = async () => {
-    await disconnectWallet();
-    window.location.reload();
-  };
 
   const handleRoleSwitch = async (newRole) => {
     try {
@@ -50,22 +36,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate }) => {
         </div>
 
         <div className="flex items-center space-x-4">
-          {/* Wallet connect/disconnect buttons... */}
-          {walletConnected ? (
-              <button
-                  onClick={handleWalletDisconnect}
-                  className="bg-finovate-blue-600 hover:bg-finovate-blue-700 px-4 py-2 rounded-full transition-all duration-300 hover:scale-105 text-sm text-white shadow-sm hover:shadow-md"
-              >
-                  Disconnect Wallet
-              </button>
-          ) : (
-              <button
-                  onClick={handleWalletConnect}
-                  className="bg-green-600 hover:bg-green-700 px-3 py-2 rounded-full transition-all duration-300 hover:scale-105 text-sm text-white shadow-sm hover:shadow-md"
-              >
-                  Connect Wallet
-              </button>
-          )}
+          <w3m-button />
           {console.log('User in Header.jsx:', user)}
           {user && (
             <div className="flex items-center space-x-2">

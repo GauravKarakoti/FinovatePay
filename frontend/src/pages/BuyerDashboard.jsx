@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { ethers } from 'ethers';
+import { useAccount, useWriteContract, usePublicClient, useBalance } from 'wagmi';
+import { parseUnits, formatUnits, pad, toHex } from 'viem';
+import { toast } from 'sonner';
+
 import {
   getBuyerInvoices,
   updateInvoiceStatus,
@@ -11,15 +14,13 @@ import {
   rejectQuotation,
   getKYCStatus
 } from '../utils/api';
-import { connectWallet, erc20ABI, getEscrowContract } from '../utils/web3';
+
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import EscrowStatus from '../components/Escrow/EscrowStatus';
 import EscrowTimeline from '../components/Escrow/EscrowTimeline';
 import KYCStatus from '../components/KYC/KYCStatus';
-// import InvoiceContractABI from '../../../deployed/Invoice.json';
 import { generateTimelineEvents } from '../utils/timeline';
-import { toast } from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApproval';
 import AmountDisplay from '../components/common/AmountDisplay';
@@ -27,6 +28,12 @@ import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
 import { useStatsActions } from '../context/StatsContext';
 import FiatOnRamp from '../components/FiatOnRamp';
+
+import EscrowContractArtifact from '../../../deployed/EscrowContract.json';
+import ERC20Artifact from '../../../deployed/ERC20.json';
+import contractAddresses from '../../../deployed/contract-addresses.json';
+
+const ESCROW_CONTRACT_ADDRESS = contractAddresses.EscrowContract;
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -127,6 +134,8 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
     const [timeLeft, setTimeLeft] = useState(null);
     const [discountBps, setDiscountBps] = useState(0);
 
+    const publicClient = usePublicClient();
+
     useEffect(() => {
         if (isOpen && invoice) {
             fetchPayableAmount();
@@ -136,18 +145,37 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
     const fetchPayableAmount = async () => {
         setLoading(true);
         try {
-            const contract = await getEscrowContract();
-            const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
-            const amount = await contract.getCurrentPayableAmount(bytes32Id);
+            const bytes32Id = pad(`0x${invoice.invoice_id.replace(/-/g, '')}`, { size: 32 });
+            const amount = await publicClient.readContract({
+                address: ESCROW_CONTRACT_ADDRESS,
+                abi: EscrowContractArtifact.abi,
+                functionName: 'getCurrentPayableAmount',
+                args: [bytes32Id]
+            });
             setPayableAmount(amount);
 
-            const escrow = await contract.escrows(bytes32Id);
-            const rate = escrow.discountRate ? escrow.discountRate.toNumber() : 0;
+            const escrow = await publicClient.readContract({
+                address: ESCROW_CONTRACT_ADDRESS,
+                abi: EscrowContractArtifact.abi,
+                functionName: 'escrows',
+                args: [bytes32Id]
+            });
+
+            // escrow returns struct array/object. Need to check return format.
+            // Usually wagmi/viem returns array or object if ABI defines names.
+            // Assuming object or array: [..., discountRate, discountDeadline]
+            // Let's assume object if names are present in ABI, otherwise array.
+            // Safe to access if we know index or name.
+            // Using `escrow` as object usually works with viem if ABI has names.
+            // Let's assume property names match contract struct.
+
+            const rate = Number(escrow.discountRate || escrow[7]); // Adjust index if needed
+            const deadline = Number(escrow.discountDeadline || escrow[8]);
+
             setDiscountBps(rate);
 
             if (rate > 0) {
                  const now = Math.floor(Date.now() / 1000);
-                 const deadline = escrow.discountDeadline.toNumber();
                  if (deadline > now) {
                      setTimeLeft(deadline - now);
                  } else {
@@ -170,8 +198,8 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
 
     if (!isOpen || !invoice) return null;
 
-    const formatEth = (bn) => bn ? ethers.utils.formatEther(bn) : '0';
-    const originalAmountEth = invoice.amount; // Assuming invoice.amount is string/number from DB
+    const formatEth = (bn) => bn ? formatUnits(bn, 18) : '0';
+    const originalAmountEth = invoice.amount;
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Confirm Payment">
@@ -181,7 +209,7 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
                      <span className="font-medium text-lg">{originalAmountEth} {invoice.currency}</span>
                  </div>
 
-                 {loading ? <LoadingSpinner /> : payableAmount && (
+                 {loading ? <LoadingSpinner /> : payableAmount !== null && (
                      <>
                         {discountBps > 0 && (
                             <div className="flex justify-between items-center text-sm">
@@ -218,7 +246,7 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
                      <ActionButton
                         onClick={() => onConfirm(invoice, payableAmount)}
                         loading={isProcessing}
-                        disabled={loading || !payableAmount}
+                        disabled={loading || payableAmount === null}
                      >
                          Pay Now
                      </ActionButton>
@@ -230,10 +258,13 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
 
 const BuyerDashboard = ({ activeTab = 'overview' }) => {
   // State Management
+  const { address: walletAddress } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+
   const [invoices, setInvoices] = useState([]);
   const [availableLots, setAvailableLots] = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
-  const [walletAddress, setWalletAddress] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [timelineEvents, setTimelineEvents] = useState([]);
   const [kycData, setKycData] = useState({
@@ -252,38 +283,26 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   const [paymentInvoice, setPaymentInvoice] = useState(null); // For modal
   const { setStats: setGlobalStats } = useStatsActions();
 
-  // Load Initial Data
-  const loadInitialData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { address } = await connectWallet();
-      setWalletAddress(address);
-      
-      // Load KYC status in parallel with tab-specific data
-      const kycPromise = loadKYCStatus();
-      
-      await Promise.all([
-        kycPromise,
-        loadTabData(activeTab)
-      ]);
-    } catch (error) {
-      console.error('Failed to load initial data:', error);
-      toast.error("Please connect your wallet to access the dashboard");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeTab]);
-
   useEffect(() => {
     const init = async () => {
       if (!walletAddress) {
-        await loadInitialData();
-      } else {
-        await loadTabData(activeTab);
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          loadKYCStatus(),
+          loadTabData(activeTab)
+        ]);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
       }
     };
     init();
-  }, [activeTab, walletAddress, loadInitialData]);
+  }, [activeTab, walletAddress]);
 
   const loadTabData = async (tab) => {
     switch (tab) {
@@ -314,7 +333,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       });
     } catch (error) {
       console.error('Failed to load KYC status:', error);
-      // Silent fail - user might not have started KYC yet
     }
   };
 
@@ -395,7 +413,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       produceLots: availableLots.length
     };
 
-    // Only update if data is loaded and actually different
     if (!isLoading) {
       setGlobalStats(nextStats);
     }
@@ -466,8 +483,8 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, []);
 
   const handleConfirmPayment = useCallback(async (invoice, payableAmount) => {
-    if (!ethers.utils.isAddress(invoice.contract_address)) {
-      toast.error('Invalid contract address');
+    if (!walletAddress) {
+      toast.error('Connect wallet first');
       return;
     }
 
@@ -475,79 +492,99 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     const toastId = toast.loading('Processing payment...');
 
     try {
-      const { signer } = await connectWallet();
-      const { currency, contract_address, token_address } = invoice;
-      const amountWei = payableAmount; // Already BigNumber from modal fetch
-      
-      // Use EscrowContract
-      const contract = await getEscrowContract();
-      // Need bytes32 ID
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const { currency, token_address } = invoice;
+      const amountWei = payableAmount; // BigInt from modal
 
-      let tx;
+      const bytes32Id = pad(`0x${invoice.invoice_id.replace(/-/g, '')}`, { size: 32 });
+
+      let txHash;
 
       if (currency === 'MATIC') {
-        const balance = await signer.getBalance();
-        if (balance.lt(amountWei)) {
+        const balance = await publicClient.getBalance({ address: walletAddress });
+        if (balance < amountWei) {
             toast.error("Insufficient MATIC balance.", { id: toastId });
             return;
         }
-        // New deposit signature: deposit(bytes32) payable
-        tx = await contract.deposit(bytes32Id, { value: amountWei });
-      } else {
-        const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
-        const userAddress = await signer.getAddress();
-        const balance = await tokenContract.balanceOf(userAddress);
 
-        if (balance.lt(amountWei)) {
+        txHash = await writeContractAsync({
+            address: ESCROW_CONTRACT_ADDRESS,
+            abi: EscrowContractArtifact.abi,
+            functionName: 'deposit',
+            args: [bytes32Id],
+            value: amountWei
+        });
+      } else {
+        const balance = await publicClient.readContract({
+             address: token_address,
+             abi: ERC20Artifact.abi,
+             functionName: 'balanceOf',
+             args: [walletAddress]
+        });
+
+        if (balance < amountWei) {
             toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
             return;
         }
 
         toast.loading('Approving tokens...', { id: toastId });
         
-        const approveTx = await tokenContract.approve(contract.address, amountWei);
-        await approveTx.wait();
+        const approveHash = await writeContractAsync({
+             address: token_address,
+             abi: ERC20Artifact.abi,
+             functionName: 'approve',
+             args: [ESCROW_CONTRACT_ADDRESS, amountWei]
+        });
+
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
         
         toast.loading('Confirming deposit...', { id: toastId });
-        tx = await contract.deposit(bytes32Id);
+        txHash = await writeContractAsync({
+            address: ESCROW_CONTRACT_ADDRESS,
+            abi: EscrowContractArtifact.abi,
+            functionName: 'deposit',
+            args: [bytes32Id]
+        });
       }
       
-      await tx.wait();
-      await updateInvoiceStatus(invoice.invoice_id, 'deposited', tx.hash);
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      await updateInvoiceStatus(invoice.invoice_id, 'deposited', txHash);
       
-      toast.success(`Payment successful! ${tx.hash.slice(0, 10)}...`, { id: toastId });
+      toast.success(`Payment successful! ${txHash.slice(0, 10)}...`, { id: toastId });
       setPaymentInvoice(null);
       await loadInvoices();
     } catch (error) {
       console.error('Payment failed:', error);
-      toast.error(error.reason || error.message || 'Payment failed', { id: toastId });
+      toast.error(error.message || 'Payment failed', { id: toastId });
     } finally {
       setLoadingInvoiceId(null);
     }
-  }, []);
+  }, [walletAddress, publicClient, writeContractAsync]);
 
   const handleReleaseFunds = useCallback(async (invoice) => {
     if (!window.confirm("Release funds to seller? This cannot be undone.")) return;
 
     setLoadingInvoiceId(invoice.invoice_id);
     try {
-      // Use EscrowContract
-      const contract = await getEscrowContract();
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = pad(`0x${invoice.invoice_id.replace(/-/g, '')}`, { size: 32 });
 
-      const tx = await contract.confirmRelease(bytes32Id);
-      await tx.wait();
+      const txHash = await writeContractAsync({
+          address: ESCROW_CONTRACT_ADDRESS,
+          abi: EscrowContractArtifact.abi,
+          functionName: 'confirmRelease',
+          args: [bytes32Id]
+      });
       
-      await updateInvoiceStatus(invoice.invoice_id, 'released', tx.hash);
-      toast.success(`Funds released! ${tx.hash.slice(0, 10)}...`);
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      await updateInvoiceStatus(invoice.invoice_id, 'released', txHash);
+      toast.success(`Funds released! ${txHash.slice(0, 10)}...`);
       await loadInvoices();
     } catch (error) {
-      toast.error(error.reason || 'Failed to release funds');
+      toast.error(error.message || 'Failed to release funds');
     } finally {
       setLoadingInvoiceId(null);
     }
-  }, []);
+  }, [writeContractAsync, publicClient]);
 
   const handleRaiseDispute = useCallback(async (invoice) => {
     const reason = prompt('Enter reason for dispute:');
@@ -555,22 +592,26 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
     setLoadingInvoiceId(invoice.invoice_id);
     try {
-      // Use EscrowContract
-      const contract = await getEscrowContract();
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = pad(`0x${invoice.invoice_id.replace(/-/g, '')}`, { size: 32 });
 
-      const tx = await contract.raiseDispute(bytes32Id);
-      await tx.wait();
+      const txHash = await writeContractAsync({
+          address: ESCROW_CONTRACT_ADDRESS,
+          abi: EscrowContractArtifact.abi,
+          functionName: 'raiseDispute',
+          args: [bytes32Id]
+      });
+
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
       
-      await updateInvoiceStatus(invoice.invoice_id, 'disputed', tx.hash, reason);
+      await updateInvoiceStatus(invoice.invoice_id, 'disputed', txHash, reason);
       toast.success('Dispute raised successfully');
       await loadInvoices();
     } catch (error) {
-      toast.error(error.reason || 'Failed to raise dispute');
+      toast.error(error.message || 'Failed to raise dispute');
     } finally {
       setLoadingInvoiceId(null);
     }
-  }, []);
+  }, [writeContractAsync, publicClient]);
 
   const handleSelectInvoice = useCallback((invoice) => {
     setSelectedInvoice(invoice);
@@ -642,7 +683,8 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         </div>
 
         <div className="space-y-6">
-          <FiatOnRamp walletAddress={walletAddress} />
+          {/* FiatOnRamp is now self-contained, no props needed */}
+          <FiatOnRamp />
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <KYCStatus
@@ -819,7 +861,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Buyer Dashboard</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Wallet: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
+              Wallet: {walletAddress ? <span className="font-mono bg-gray-100 px-2 py-1 rounded">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span> : 'Not Connected'}
             </p>
           </div>
           {kycData.status !== 'verified' && (

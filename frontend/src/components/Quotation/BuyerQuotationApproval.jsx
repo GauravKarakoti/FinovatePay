@@ -1,44 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
-import { erc20ABI } from '../../utils/web3'; // Import the updated ABI
+import React from 'react';
+import { useReadContract } from 'wagmi';
+import { isAddress } from 'viem';
+import ERC20Artifact from '../../../../deployed/ERC20.json';
 
-// A helper to get the symbol if it's an address
-const useTokenSymbol = (tokenAddress) => {
-    const [symbol, setSymbol] = useState(tokenAddress);
-
-    useEffect(() => {
-        if (ethers.utils.isAddress(tokenAddress)) {
-            const fetchSymbol = async () => {
-                try {
-                    // Use a generic provider for read-only calls
-                    const provider = new ethers.providers.JsonRpcProvider(process.env.REACT_APP_POLYGON_RPC_URL); 
-                    const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
-                    const tokenSymbol = await tokenContract.symbol();
-                    setSymbol(tokenSymbol);
-                } catch (err) {
-                    console.error("Error fetching token symbol:", err);
-                    setSymbol("UNKNOWN");
-                }
-            };
-            fetchSymbol();
-        } else {
-            setSymbol(tokenAddress); // It's already a symbol like 'MATIC'
-        }
-    }, [tokenAddress]);
-
-    return symbol;
-};
-
-// New component to display amount with symbol
 const TokenAmount = ({ amount, tokenAddress }) => {
-    const symbol = useTokenSymbol(tokenAddress);
+    const isAddr = tokenAddress && isAddress(tokenAddress);
+
+    const { data: symbol } = useReadContract({
+        address: tokenAddress,
+        abi: ERC20Artifact.abi,
+        functionName: 'symbol',
+        query: {
+            enabled: !!isAddr,
+            staleTime: Infinity,
+        }
+    });
+
+    const displaySymbol = isAddr ? (symbol || '...') : tokenAddress;
+
     return (
         <span>
-            {parseFloat(amount).toFixed(2)} <strong>{symbol}</strong>
+            {parseFloat(amount).toFixed(2)} <strong>{displaySymbol}</strong>
         </span>
     );
 };
-
 
 const BuyerQuotationApproval = ({ quotations, onApprove, onReject }) => {
     return (
@@ -52,7 +37,7 @@ const BuyerQuotationApproval = ({ quotations, onApprove, onReject }) => {
                     <p><strong>Amount:</strong> 
                         <TokenAmount 
                             amount={quotation.total_amount} 
-                            tokenAddress={quotation.token_address} // <-- Assumes your API now returns this
+                            tokenAddress={quotation.token_address}
                         />
                     </p>
                     {/* --- End of update --- */}

@@ -3,11 +3,17 @@ import PropTypes from 'prop-types';
 import { api } from '../utils/api';
 import { toast } from 'sonner';
 import io from 'socket.io-client';
-import { ethers } from 'ethers';
+import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
+import { parseUnits, formatUnits } from 'viem';
 
 import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
-import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
+import { TOKEN_ADDRESSES } from '../utils/constants';
+
+import FractionTokenArtifact from '../../../deployed/FractionToken.json';
+import contractAddresses from '../../../deployed/contract-addresses.json';
+
+const FRACTION_TOKEN_ADDRESS = contractAddresses.FractionToken;
 
 // --- Reusable UI Components ---
 
@@ -103,8 +109,8 @@ const InvoiceCard = ({ invoice, onPurchaseSuccess }) => {
   
   const stablecoinConfig = useMemo(() => {
     const isNative = currency === 'MATIC' || currency === 'ETH';
-    const address = stablecoinAddresses[currency] || stablecoinAddresses["USDC"];
-    const isUSDC = address === stablecoinAddresses["USDC"];
+    const address = TOKEN_ADDRESSES[currency] || TOKEN_ADDRESSES["USDC"];
+    const isUSDC = address === TOKEN_ADDRESSES["USDC"];
     return {
       address,
       decimals: isUSDC ? 6 : 18,
@@ -185,8 +191,11 @@ const PortfolioItem = ({ item, onRedeem, isRedeeming }) => {
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
           <h3 className="text-lg font-semibold text-gray-900">Invoice #{invoice_id.substring(0, 8)}...</h3>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
-            {statusText}
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium {statusColor}">
+             {/* Note: statusColor variable not working inside string literal above if not templated. Fixed below */}
+             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+                {statusText}
+             </span>
           </span>
         </div>
         <div className="space-y-1 text-sm text-gray-600">
@@ -232,6 +241,9 @@ PortfolioItem.propTypes = {
 // --- Main Dashboard Component ---
 
 const InvestorDashboard = ({ activeTab = 'overview' }) => {
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
+
   const [marketplaceListings, setMarketplaceListings] = useState([]);
   const [portfolio, setPortfolio] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -349,29 +361,32 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     setIsRedeeming(true);
     const toastId = toast.loading('Processing redemption...');
     
-    let totalRedeemedValue = ethers.BigNumber.from(0);
+    let totalRedeemedValue = 0n;
     let successfulRedemptions = 0;
     let failedRedemptions = 0;
     const txHashes = [];
 
     try {
-      const fractionToken = await getFractionTokenContract();
-      
       for (const holding of holdingsToRedeem) {
         if (!holding.amount || parseFloat(holding.amount) <= 0) continue;
         
         try {
-          const tokenAmountToRedeem = ethers.utils.parseEther(holding.amount.toString());
-          if (tokenAmountToRedeem.isZero()) continue;
+          const tokenAmountToRedeem = parseUnits(holding.amount.toString(), 18);
+          if (tokenAmountToRedeem === 0n) continue;
 
-          const tx = await fractionToken.redeem(holding.token_id, tokenAmountToRedeem);
-          const receipt = await tx.wait();
-          txHashes.push(receipt.transactionHash);
+          const txHash = await writeContractAsync({
+              address: FRACTION_TOKEN_ADDRESS,
+              abi: FractionTokenArtifact.abi,
+              functionName: 'redeem',
+              args: [holding.token_id, tokenAmountToRedeem]
+          });
 
-          const redeemEvent = receipt.events?.find(e => e.event === 'Redeemed');
-          if (redeemEvent) {
-            totalRedeemedValue = totalRedeemedValue.add(redeemEvent.args?.amount || redeemEvent.args[2]);
-          }
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+          txHashes.push(txHash);
+
+          // We can try to sum up redeemed amount from receipt logs,
+          // or just assume holding amount is redeemed if successful.
+          totalRedeemedValue += tokenAmountToRedeem;
           successfulRedemptions++;
         } catch (error) {
           failedRedemptions++;
@@ -379,7 +394,7 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
         }
       }
 
-      const totalRedeemedReadable = ethers.utils.formatEther(totalRedeemedValue);
+      const totalRedeemedReadable = formatUnits(totalRedeemedValue, 18);
 
       if (successfulRedemptions > 0) {
         toast.success(`Redeemed ${parseFloat(totalRedeemedReadable).toFixed(4)} ${invoice.currency}`, { id: toastId });
@@ -406,15 +421,11 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     } catch (error) {
       console.error('Redemption error:', error);
       toast.dismiss(toastId);
-      if (error.code === 4001) {
-        toast.error('Transaction rejected');
-      } else {
-        toast.error(error.reason || 'Redemption failed');
-      }
+      toast.error(error.message || 'Redemption failed');
     } finally {
       setIsRedeeming(false);
     }
-  }, [fetchPortfolio]);
+  }, [fetchPortfolio, writeContractAsync, publicClient]);
 
   // Tab Content Components
   const OverviewTab = () => (

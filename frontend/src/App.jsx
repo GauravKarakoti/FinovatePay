@@ -8,8 +8,6 @@ import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ProduceHistory from './pages/ProduceHistory';
-import { connectWallet } from './utils/web3';
-import Web3Modal from 'web3modal';
 import './App.css';
 import { Toaster } from 'sonner';
 import FinovateChatbot from './components/Chatbot/Chatbot';
@@ -24,7 +22,6 @@ function App() {
     const savedUser = localStorage.getItem('user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
-  const [walletConnected, setWalletConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardStats, setDashboardStats] = useState({
       totalInvoices: 0,
@@ -34,20 +31,6 @@ function App() {
   });
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
-
-  useEffect(() => {
-    const web3Modal = new Web3Modal({ cacheProvider: true });
-    if (web3Modal.cachedProvider) {
-      connectWallet()
-        .then(() => {
-          setWalletConnected(true);
-        })
-        .catch((error) => {
-          console.error("Failed to auto-connect wallet:", error);
-          setWalletConnected(false);
-        });
-    }
-  }, []);
 
   const handleLogin = (userData, token) => {
     localStorage.setItem('token', token);
@@ -112,7 +95,6 @@ function App() {
         <Header 
             user={user} 
             onLogout={handleLogout} 
-            walletConnected={walletConnected}
             onUserUpdate={setUser}
         />
         {console.log('Current user role in App.jsx:', user)}
