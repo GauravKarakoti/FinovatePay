@@ -23,6 +23,9 @@ contract EscrowContract is ReentrancyGuard, EIP712 {
         // --- NEW: RWA Collateral Link ---
         address rwaNftContract; // Address of the ProduceTracking contract
         uint256 rwaTokenId;     // The tokenId of the produce lot
+        // --- NEW: Discount Logic ---
+        uint256 discountRate;     // In basis points (e.g., 200 = 2%)
+        uint256 discountDeadline; // Unix timestamp
     }
     
     mapping(bytes32 => Escrow) public escrows;
@@ -95,9 +98,21 @@ contract EscrowContract is ReentrancyGuard, EIP712 {
         uint256 _duration,
         // --- NEW: RWA Parameters ---
         address _rwaNftContract,
-        uint256 _rwaTokenId
-    ) external onlyAdmin returns (bool) {
+        uint256 _rwaTokenId,
+        // --- NEW: Discount Parameters ---
+        uint256 _discountRate,
+        uint256 _discountDeadline
+    ) external onlyCompliant(_msgSender()) returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
+        require(_amount > 0, "Amount must be > 0");
+        require(_discountRate <= 10000, "Invalid discount rate");
+
+        // Ensure the caller is the seller or the admin
+        require(_seller == _msgSender() || _msgSender() == admin, "Only seller or admin");
+
+        if (_discountRate > 0) {
+            require(_discountDeadline > block.timestamp, "Deadline must be future");
+        }
 
         // --- NEW: Lock the Produce NFT as Collateral ---
         // The seller must have approved the EscrowContract to spend this NFT beforehand.
@@ -117,24 +132,48 @@ contract EscrowContract is ReentrancyGuard, EIP712 {
             createdAt: block.timestamp,
             expiresAt: block.timestamp + _duration,
             rwaNftContract: _rwaNftContract,
-            rwaTokenId: _rwaTokenId
+            rwaTokenId: _rwaTokenId,
+            discountRate: _discountRate,
+            discountDeadline: _discountDeadline
         });
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
         return true;
     }
     
-    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(_msgSender()) {
+    function deposit(bytes32 _invoiceId) external payable nonReentrant onlyCompliant(_msgSender()) {
         address sender = _msgSender();
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.buyer == sender, "Not the buyer");
-        require(_amount == escrow.amount, "Incorrect amount");
+        require(!escrow.buyerConfirmed, "Already paid");
         
-        IERC20 token = IERC20(escrow.token);
-        require(token.transferFrom(sender, address(this), _amount), "Transfer failed");
+        uint256 payableAmount = _getPayableAmount(escrow);
 
+        if (escrow.token == address(0)) {
+             require(msg.value == payableAmount, "Incorrect native amount");
+        } else {
+             IERC20 token = IERC20(escrow.token);
+             require(token.transferFrom(sender, address(this), payableAmount), "Transfer failed");
+        }
+
+        // Update amount to what was actually paid so release/refund works correctly with the balance held
+        escrow.amount = payableAmount;
         escrow.buyerConfirmed = true;
-        emit DepositConfirmed(_invoiceId, sender, _amount);
+
+        emit DepositConfirmed(_invoiceId, sender, payableAmount);
+    }
+
+    function _getPayableAmount(Escrow storage escrow) internal view returns (uint256) {
+        if (escrow.discountRate > 0 && block.timestamp <= escrow.discountDeadline) {
+             uint256 discount = (escrow.amount * escrow.discountRate) / 10000;
+             return escrow.amount - discount;
+        }
+        return escrow.amount;
+    }
+
+    function getCurrentPayableAmount(bytes32 _invoiceId) external view returns (uint256) {
+        Escrow storage escrow = escrows[_invoiceId];
+        return _getPayableAmount(escrow);
     }
     
     function confirmRelease(bytes32 _invoiceId) external nonReentrant {
