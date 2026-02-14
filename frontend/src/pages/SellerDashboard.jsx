@@ -10,7 +10,7 @@ import {
   createProduceLot as syncProduceLot, api, getKYCStatus
 } from '../utils/api';
 import { 
-  connectWallet, getInvoiceFactoryContract, getProduceTrackingContract, erc20ABI 
+  connectWallet, getInvoiceFactoryContract, getEscrowContract, getProduceTrackingContract, erc20ABI
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
@@ -219,6 +219,51 @@ const ShipmentConfirmationModal = ({
   </Modal>
 );
 
+const InvoiceDetailsModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
+    const [discountRate, setDiscountRate] = useState(0);
+    const [deadline, setDeadline] = useState('');
+
+    if (!isOpen) return null;
+
+    const handleSubmit = () => {
+        onSubmit({ discountRate, deadline });
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Finalize Invoice Terms">
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Early Payment Discount (%)</label>
+                    <input
+                        type="number"
+                        value={discountRate}
+                        onChange={e => setDiscountRate(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md mt-1"
+                        min="0" max="100"
+                        placeholder="e.g., 2"
+                    />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700">Discount Deadline</label>
+                    <input
+                        type="datetime-local"
+                        value={deadline}
+                        onChange={e => setDeadline(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md mt-1"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">If discount > 0, deadline must be in the future.</p>
+                </div>
+                <div className="flex justify-end gap-3 pt-4">
+                    <ActionButton onClick={onClose} variant="secondary" disabled={isSubmitting}>Cancel</ActionButton>
+                    <ActionButton onClick={handleSubmit} loading={isSubmitting} variant="primary">
+                        Create Invoice
+                    </ActionButton>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 ShipmentConfirmationModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
@@ -259,6 +304,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [proofFile, setProofFile] = useState(null);
   const [invoiceToTokenize, setInvoiceToTokenize] = useState(null);
   const [selectedLotQR, setSelectedLotQR] = useState(null);
+  const [invoiceQuotation, setInvoiceQuotation] = useState(null); // For modal
   const { setStats: setGlobalStats } = useStatsActions();
 
   // Memoized Derived State
@@ -407,7 +453,10 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     }
   }, [invoiceToTokenize, loadData]);
 
-  const handleCreateInvoiceFromQuotation = useCallback(async (quotation) => {
+  const handleFinalizeInvoice = useCallback(async ({ discountRate, deadline }) => {
+    if (!invoiceQuotation) return;
+    const quotation = invoiceQuotation;
+
     setIsSubmitting(true);
     const toastId = toast.loading('Creating invoice contract...');
 
@@ -420,33 +469,53 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
       const tokenAddress = NATIVE_CURRENCY_ADDRESS;
       
-      const contract = await getInvoiceFactoryContract();
+      // Use EscrowContract instead of InvoiceFactory
+      const contract = await getEscrowContract();
       const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
-      const dueDateTimestamp = Math.floor(Date.now() / 1000) + 86400 * 30;
+
+      const discountBps = Math.floor(parseFloat(discountRate || 0) * 100);
+      const discountDeadlineTs = deadline ? Math.floor(new Date(deadline).getTime() / 1000) : 0;
+
+      // Validation on frontend
+      if (discountBps > 0 && discountDeadlineTs <= Math.floor(Date.now() / 1000)) {
+          throw new Error("Discount deadline must be in the future");
+      }
 
       toast.loading('Waiting for wallet confirmation...', { id: toastId });
       
-      const tx = await contract.createInvoice(
-        bytes32InvoiceId, invoiceHash, quotation.buyer_address,
-        amountInWei, dueDateTimestamp, tokenAddress
+      // New createEscrow signature
+      const tx = await contract.createEscrow(
+        bytes32InvoiceId,
+        sellerAddress,
+        quotation.buyer_address,
+        amountInWei,
+        tokenAddress,
+        86400 * 30, // Default duration
+        ethers.constants.AddressZero, // rwaNftContract
+        0, // rwaTokenId
+        discountBps,
+        discountDeadlineTs
       );
       
       toast.loading('Mining transaction...', { id: toastId });
       const receipt = await tx.wait();
-      const event = receipt.events?.find(e => e.event === 'InvoiceCreated');
+      const event = receipt.events?.find(e => e.event === 'EscrowCreated'); // Changed event name
       
-      if (!event) throw new Error("InvoiceCreated event not found");
+      if (!event) throw new Error("EscrowCreated event not found");
 
       await createInvoice({
         quotation_id: quotation.id,
         invoice_id: invoiceId,
         invoice_hash: invoiceHash,
-        contract_address: event.args.invoiceContractAddress,
+        contract_address: contract.address, // Escrow contract address is the "contract address"
         token_address: tokenAddress,
-        due_date: new Date(dueDateTimestamp * 1000).toISOString(),
+        due_date: new Date((Date.now() + 86400 * 30 * 1000)).toISOString(),
+        discount_rate: discountBps,
+        discount_deadline: discountDeadlineTs
       });
 
       toast.success('Invoice created and deployed!', { id: toastId });
+      setInvoiceQuotation(null);
       await loadData();
       await loadQuotations();
     } catch (error) {
@@ -455,7 +524,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, [loadData, loadQuotations]);
+  }, [invoiceQuotation, loadData, loadQuotations]);
 
   const handleCreateProduceLot = useCallback(async (formData) => {
     setIsSubmitting(true);
@@ -741,7 +810,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
             userRole="seller"
             onApprove={handleApproveQuotation}
             onReject={handleRejectQuotation}
-            onCreateInvoice={handleCreateInvoiceFromQuotation}
+              onCreateInvoice={setInvoiceQuotation} // Open modal
           />
         ) : (
           <EmptyState message="No active quotations" icon="📋" />
@@ -825,6 +894,13 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
           setProofFile={setProofFile}
           onSubmit={submitShipmentProof}
           isSubmitting={isSubmitting}
+        />
+
+        <InvoiceDetailsModal
+            isOpen={!!invoiceQuotation}
+            onClose={() => setInvoiceQuotation(null)}
+            onSubmit={handleFinalizeInvoice}
+            isSubmitting={isSubmitting}
         />
       </div>
     </div>
