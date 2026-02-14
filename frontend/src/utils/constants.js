@@ -1,4 +1,4 @@
-import { ethers } from 'ethers';
+import { ZeroAddress } from 'ethers';
 
 // Synchronized with web3.js and Polygon Amoy deployments
 export const TOKEN_ADDRESSES = {
@@ -8,4 +8,5 @@ export const TOKEN_ADDRESSES = {
     "DAI": "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063",   // Legacy/Other
 };
 
-export const NATIVE_CURRENCY_ADDRESS = ethers.ZeroAddress;
+// In ethers v6, AddressZero is now ZeroAddress
+export const NATIVE_CURRENCY_ADDRESS = ZeroAddress;
