@@ -208,4 +208,122 @@ describe("EscrowContract", function () {
       expect(buyerBalanceAfter.sub(buyerBalanceBefore)).to.equal(amount);
     });
   });
+
+  describe("ETH Payouts", function () {
+    it("Should successfully pay out ETH to seller", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-ETH-001");
+      const amount = ethers.utils.parseEther("1");
+      const duration = 7 * 24 * 60 * 60;
+
+      // Create escrow with ETH (token = AddressZero)
+      await escrow.connect(owner).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        amount,
+        ethers.constants.AddressZero,
+        duration,
+        ethers.constants.AddressZero,
+        0
+      );
+
+      // Buyer deposits ETH
+      await expect(escrow.connect(buyer).deposit(invoiceId, amount, { value: amount }))
+        .to.emit(escrow, "DepositConfirmed")
+        .withArgs(invoiceId, buyer.address, amount);
+
+      // Check seller balance before
+      const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
+
+      // Seller confirms release
+      const tx = await escrow.connect(seller).confirmRelease(invoiceId);
+      const receipt = await tx.wait();
+      const gasUsed = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+      // Check seller balance after
+      const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
+
+      // Seller balance should increase by amount - gasUsed
+      expect(sellerBalanceAfter).to.equal(sellerBalanceBefore.add(amount).sub(gasUsed));
+    });
+
+    it("Should revert if receiver reverts", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-ETH-REVERT");
+      const amount = ethers.utils.parseEther("1");
+      const duration = 7 * 24 * 60 * 60;
+
+      // Deploy RevertingReceiver
+      const RevertingReceiver = await ethers.getContractFactory("RevertingReceiver");
+      const revertingReceiver = await RevertingReceiver.deploy();
+      await revertingReceiver.deployed();
+
+      // Setup KYC for receiver
+      await compliance.verifyKYC(revertingReceiver.address);
+      await compliance.mintIdentity(revertingReceiver.address);
+
+      // Create escrow
+      await escrow.connect(owner).createEscrow(
+        invoiceId,
+        revertingReceiver.address, // Seller is reverting receiver
+        buyer.address,
+        amount,
+        ethers.constants.AddressZero,
+        duration,
+        ethers.constants.AddressZero,
+        0
+      );
+
+      // Buyer deposits
+      await escrow.connect(buyer).deposit(invoiceId, amount, { value: amount });
+
+      // Trigger release via dispute resolution
+      await escrow.connect(buyer).raiseDispute(invoiceId);
+
+      // Admin resolves in favor of seller -> triggers payout to seller
+      await expect(escrow.connect(owner).resolveDispute(invoiceId, true))
+        .to.be.revertedWith("ETH transfer failed");
+    });
+
+    it("Should work with smart contract receiver", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-ETH-SMART");
+      const amount = ethers.utils.parseEther("1");
+      const duration = 7 * 24 * 60 * 60;
+
+      // Deploy ReceiverWithLogic
+      const ReceiverWithLogic = await ethers.getContractFactory("ReceiverWithLogic");
+      const receiverWithLogic = await ReceiverWithLogic.deploy();
+      await receiverWithLogic.deployed();
+
+      // Setup KYC
+      await compliance.verifyKYC(receiverWithLogic.address);
+      await compliance.mintIdentity(receiverWithLogic.address);
+
+      // Create escrow
+      await escrow.connect(owner).createEscrow(
+        invoiceId,
+        receiverWithLogic.address,
+        buyer.address,
+        amount,
+        ethers.constants.AddressZero,
+        duration,
+        ethers.constants.AddressZero,
+        0
+      );
+
+      // Buyer deposits
+      await escrow.connect(buyer).deposit(invoiceId, amount, { value: amount });
+
+      // Trigger release via dispute resolution
+      await escrow.connect(buyer).raiseDispute(invoiceId);
+
+      // Admin resolves in favor of seller
+      await expect(escrow.connect(owner).resolveDispute(invoiceId, true))
+        .to.emit(escrow, "DisputeResolved")
+        .withArgs(invoiceId, owner.address, true);
+
+      // Check balance of receiver
+      const balance = await ethers.provider.getBalance(receiverWithLogic.address);
+      expect(balance).to.equal(amount);
+    });
+  });
 });

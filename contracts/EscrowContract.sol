@@ -91,13 +91,17 @@ contract EscrowContract is ReentrancyGuard {
         return true;
     }
     
-    function deposit(bytes32 _invoiceId, uint256 _amount) external nonReentrant onlyCompliant(msg.sender) {
+    function deposit(bytes32 _invoiceId, uint256 _amount) external payable nonReentrant onlyCompliant(msg.sender) {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.buyer == msg.sender, "Not the buyer");
         require(_amount == escrow.amount, "Incorrect amount");
         
-        IERC20 token = IERC20(escrow.token);
-        token.safeTransferFrom(msg.sender, address(this), _amount);
+        if (escrow.token == address(0)) {
+            require(msg.value == _amount, "Incorrect ETH amount");
+        } else {
+            require(msg.value == 0, "ETH not expected");
+            IERC20(escrow.token).safeTransferFrom(msg.sender, address(this), _amount);
+        }
 
         escrow.buyerConfirmed = true;
         emit DepositConfirmed(_invoiceId, msg.sender, _amount);
@@ -131,13 +135,15 @@ contract EscrowContract is ReentrancyGuard {
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.disputeRaised, "No dispute raised");
+        require(escrow.amount > 0, "Already resolved");
         
         escrow.disputeResolver = msg.sender;
-        IERC20 token = IERC20(escrow.token);
+        uint256 amount = escrow.amount;
+        escrow.amount = 0;
 
         if (_sellerWins) {
             // Seller wins: Get paid. Buyer gets the goods (NFT).
-            token.safeTransfer(escrow.seller, escrow.amount);
+            _payout(escrow.seller, amount, escrow.token);
             
             // Release NFT to Buyer (Ownership Transfer)
             if (escrow.rwaNftContract != address(0)) {
@@ -145,7 +151,7 @@ contract EscrowContract is ReentrancyGuard {
             }
         } else {
             // Buyer wins: Get refund. Seller gets the goods (NFT) back.
-            token.safeTransfer(escrow.buyer, escrow.amount);
+            _payout(escrow.buyer, amount, escrow.token);
 
             // Return NFT to Seller
             if (escrow.rwaNftContract != address(0)) {
@@ -158,23 +164,39 @@ contract EscrowContract is ReentrancyGuard {
     
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
-        IERC20 token = IERC20(escrow.token);
+        require(escrow.amount > 0, "Already released");
+
+        uint256 amount = escrow.amount;
+        escrow.amount = 0;
         
         // Transfer funds to Seller
-        token.safeTransfer(escrow.seller, escrow.amount);
+        _payout(escrow.seller, amount, escrow.token);
         
         // --- NEW: Release RWA NFT to Buyer ---
         if (escrow.rwaNftContract != address(0)) {
             IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
         }
         
-        emit EscrowReleased(_invoiceId, escrow.amount);
+        emit EscrowReleased(_invoiceId, amount);
+    }
+
+    function _payout(address to, uint256 amount, address token) internal {
+        if (token == address(0)) {
+            (bool success, ) = payable(to).call{value: amount}("");
+            require(success, "ETH transfer failed");
+        } else {
+            IERC20(token).safeTransfer(to, amount);
+        }
     }
     
     function expireEscrow(bytes32 _invoiceId) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
         require(block.timestamp >= escrow.expiresAt, "Escrow not expired");
         require(!escrow.sellerConfirmed || !escrow.buyerConfirmed, "Already confirmed");
+        require(escrow.amount > 0, "Already expired/released");
+
+        uint256 amount = escrow.amount;
+        escrow.amount = 0;
         
         // Return NFT to Seller (Default action on expiry)
         if (escrow.rwaNftContract != address(0)) {
@@ -183,8 +205,7 @@ contract EscrowContract is ReentrancyGuard {
 
         // Refund Buyer ONLY if they actually deposited
         if (escrow.buyerConfirmed) {
-            IERC20 token = IERC20(escrow.token);
-            token.safeTransfer(escrow.buyer, escrow.amount);
+            _payout(escrow.buyer, amount, escrow.token);
         }
     }
 }
