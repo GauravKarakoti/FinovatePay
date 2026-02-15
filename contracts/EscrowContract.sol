@@ -3,10 +3,13 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "./ComplianceManager.sol";
 
 contract EscrowContract is ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     struct Escrow {
         address seller;
         address buyer;
@@ -94,7 +97,7 @@ contract EscrowContract is ReentrancyGuard {
         require(_amount == escrow.amount, "Incorrect amount");
         
         IERC20 token = IERC20(escrow.token);
-        require(token.transferFrom(msg.sender, address(this), _amount), "Transfer failed");
+        token.safeTransferFrom(msg.sender, address(this), _amount);
 
         escrow.buyerConfirmed = true;
         emit DepositConfirmed(_invoiceId, msg.sender, _amount);
@@ -134,7 +137,7 @@ contract EscrowContract is ReentrancyGuard {
 
         if (_sellerWins) {
             // Seller wins: Get paid. Buyer gets the goods (NFT).
-            require(token.transfer(escrow.seller, escrow.amount), "Transfer to seller failed");
+            token.safeTransfer(escrow.seller, escrow.amount);
             
             // Release NFT to Buyer (Ownership Transfer)
             if (escrow.rwaNftContract != address(0)) {
@@ -142,7 +145,7 @@ contract EscrowContract is ReentrancyGuard {
             }
         } else {
             // Buyer wins: Get refund. Seller gets the goods (NFT) back.
-            require(token.transfer(escrow.buyer, escrow.amount), "Transfer to buyer failed");
+            token.safeTransfer(escrow.buyer, escrow.amount);
 
             // Return NFT to Seller
             if (escrow.rwaNftContract != address(0)) {
@@ -158,7 +161,7 @@ contract EscrowContract is ReentrancyGuard {
         IERC20 token = IERC20(escrow.token);
         
         // Transfer funds to Seller
-        require(token.transfer(escrow.seller, escrow.amount), "Transfer failed");
+        token.safeTransfer(escrow.seller, escrow.amount);
         
         // --- NEW: Release RWA NFT to Buyer ---
         if (escrow.rwaNftContract != address(0)) {
@@ -181,7 +184,7 @@ contract EscrowContract is ReentrancyGuard {
         // Refund Buyer ONLY if they actually deposited
         if (escrow.buyerConfirmed) {
             IERC20 token = IERC20(escrow.token);
-            require(token.transfer(escrow.buyer, escrow.amount), "Refund failed");
+            token.safeTransfer(escrow.buyer, escrow.amount);
         }
     }
 }
