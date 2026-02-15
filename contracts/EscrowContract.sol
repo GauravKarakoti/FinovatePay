@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -12,12 +13,15 @@ import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
 
+
 contract EscrowContract is
     ReentrancyGuard,
+    Pausable,
     ERC2771Context,
     IERC721Receiver,
     EIP712
 {
+
     using ECDSA for bytes32;
 
     /*//////////////////////////////////////////////////////////////
@@ -371,7 +375,7 @@ contract EscrowContract is
     function _msgSender()
         internal
         view
-        override(ERC2771Context)
+        override(ERC2771Context, Context)
         returns (address)
     {
         return ERC2771Context._msgSender();
@@ -380,11 +384,21 @@ contract EscrowContract is
     function _msgData()
         internal
         view
-        override(ERC2771Context)
+        override(ERC2771Context, Context)
         returns (bytes calldata)
     {
         return ERC2771Context._msgData();
     }
+
+    function _contextSuffixLength()
+        internal
+        view
+        override(ERC2771Context, Context)
+        returns (uint256)
+    {
+        return ERC2771Context._contextSuffixLength();
+    }
+
 
     /*//////////////////////////////////////////////////////////////
                         ERC721 RECEIVER

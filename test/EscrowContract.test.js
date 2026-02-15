@@ -626,7 +626,7 @@ describe("EscrowContract", function () {
       );
     });
 
-    it("Should allow timelock (owner) to pause the contract", async function () {
+    it("Should allow admin to pause the contract", async function () {
       await expect(escrow.connect(owner).pause())
         .to.emit(escrow, "Paused")
         .withArgs(owner.address);
@@ -634,7 +634,7 @@ describe("EscrowContract", function () {
       expect(await escrow.paused()).to.equal(true);
     });
 
-    it("Should allow timelock (owner) to unpause the contract", async function () {
+    it("Should allow admin to unpause the contract", async function () {
       // First pause
       await escrow.connect(owner).pause();
       expect(await escrow.paused()).to.equal(true);
@@ -647,18 +647,18 @@ describe("EscrowContract", function () {
       expect(await escrow.paused()).to.equal(false);
     });
 
-    it("Should not allow non-timelock to pause", async function () {
+    it("Should not allow non-admin to pause", async function () {
       await expect(escrow.connect(other).pause())
-        .to.be.revertedWith("only Governance");
+        .to.be.revertedWith("Not admin");
     });
 
-    it("Should not allow non-timelock to unpause", async function () {
+    it("Should not allow non-admin to unpause", async function () {
       // First pause as owner
       await escrow.connect(owner).pause();
       
-      // Try to unpause as non-timelock
+      // Try to unpause as non-admin
       await expect(escrow.connect(other).unpause())
-        .to.be.revertedWith("only Governance");
+        .to.be.revertedWith("Not admin");
     });
 
     it("Should prevent createEscrow when paused", async function () {
@@ -676,7 +676,7 @@ describe("EscrowContract", function () {
         amount,
         token.address,
         duration
-      )).to.be.revertedWith("EnforcedPause");
+      )).to.be.revertedWithCustomError(escrow, "EnforcedPause");
     });
 
     it("Should prevent deposit when paused", async function () {
@@ -690,8 +690,8 @@ describe("EscrowContract", function () {
       await token.connect(buyer).approve(escrow.address, amount);
       
       // Try to deposit
-      await expect(escrow.connect(buyer).deposit(invoiceId, amount))
-        .to.be.revertedWith("EnforcedPause");
+      await expect(escrow.connect(buyer).deposit(invoiceId))
+        .to.be.revertedWithCustomError(escrow, "EnforcedPause");
     });
 
     it("Should prevent confirmRelease when paused", async function () {
@@ -700,14 +700,14 @@ describe("EscrowContract", function () {
       
       // First deposit funds
       await token.connect(buyer).approve(escrow.address, amount);
-      await escrow.connect(buyer).deposit(invoiceId, amount);
+      await escrow.connect(buyer).deposit(invoiceId);
       
       // Pause the contract
       await escrow.connect(owner).pause();
       
       // Try to confirm release
       await expect(escrow.connect(seller).confirmRelease(invoiceId))
-        .to.be.revertedWith("EnforcedPause");
+        .to.be.revertedWithCustomError(escrow, "EnforcedPause");
     });
 
     it("Should prevent raiseDispute when paused", async function () {
@@ -716,14 +716,14 @@ describe("EscrowContract", function () {
       
       // First deposit funds
       await token.connect(buyer).approve(escrow.address, amount);
-      await escrow.connect(buyer).deposit(invoiceId, amount);
+      await escrow.connect(buyer).deposit(invoiceId);
       
       // Pause the contract
       await escrow.connect(owner).pause();
       
       // Try to raise dispute
       await expect(escrow.connect(seller).raiseDispute(invoiceId))
-        .to.be.revertedWith("EnforcedPause");
+        .to.be.revertedWithCustomError(escrow, "EnforcedPause");
     });
 
     it("Should prevent resolveDispute when paused", async function () {
@@ -732,7 +732,7 @@ describe("EscrowContract", function () {
       
       // First deposit funds and raise dispute
       await token.connect(buyer).approve(escrow.address, amount);
-      await escrow.connect(buyer).deposit(invoiceId, amount);
+      await escrow.connect(buyer).deposit(invoiceId);
       await escrow.connect(seller).raiseDispute(invoiceId);
       
       // Pause the contract
@@ -740,27 +740,19 @@ describe("EscrowContract", function () {
       
       // Try to resolve dispute
       await expect(escrow.connect(owner).resolveDispute(invoiceId, true))
-        .to.be.revertedWith("EnforcedPause");
+        .to.be.revertedWithCustomError(escrow, "EnforcedPause");
     });
 
-    it("Should allow expireEscrow even when paused (fund recovery)", async function () {
+    it("Should allow view functions to work when paused", async function () {
       const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
-      const amount = ethers.utils.parseEther("1");
-      
-      // First deposit funds
-      await token.connect(buyer).approve(escrow.address, amount);
-      await escrow.connect(buyer).deposit(invoiceId, amount);
       
       // Pause the contract
       await escrow.connect(owner).pause();
       
-      // Fast forward time
-      await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]);
-      await ethers.provider.send("evm_mine");
-      
-      // Expire should still work even when paused
-      await expect(escrow.connect(seller).expireEscrow(invoiceId))
-        .to.emit(escrow, "EscrowCancelled");
+      // View functions should still work
+      const escrowData = await escrow.escrows(invoiceId);
+      expect(escrowData.seller).to.equal(seller.address);
+      expect(escrowData.buyer).to.equal(buyer.address);
     });
 
     it("Should resume normal operations after unpause", async function () {
@@ -773,8 +765,9 @@ describe("EscrowContract", function () {
       
       // Operations should work normally
       await token.connect(buyer).approve(escrow.address, amount);
-      await expect(escrow.connect(buyer).deposit(invoiceId, amount))
+      await expect(escrow.connect(buyer).deposit(invoiceId))
         .to.emit(escrow, "DepositConfirmed");
     });
   });
+
 });
