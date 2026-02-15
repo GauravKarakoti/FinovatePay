@@ -5,6 +5,7 @@ require('dotenv').config();
 const FractionTokenABI = require('../../deployed/FractionToken.json').abi;
 const ComplianceManagerABI = require('../../deployed/ComplianceManager.json').abi;
 const FinancingManagerABI = require('../../deployed/FinancingManager.json').abi;
+const EscrowContractABI = require('../../deployed/EscrowContract.json').abi;
 const deployedAddresses = require('../../deployed/contract-addresses.json');
 
 // --- Validation ---
@@ -72,6 +73,15 @@ const getFinancingManagerContract = (signerOrProvider) => {
   );
 };
 
+const getEscrowContract = (signerOrProvider) => {
+  const provider = getProvider();
+  return new ethers.Contract(
+    contractAddresses.escrowContract,
+    EscrowContractABI,
+    signerOrProvider || provider
+  );
+};
+
 module.exports = {
   getProvider,
   getSigner,
@@ -79,5 +89,7 @@ module.exports = {
   getComplianceManagerContract,
   getFractionTokenContract,
   getFinancingManagerContract,
-  FractionTokenABI
+  getEscrowContract,
+  FractionTokenABI,
+  EscrowContractABI
 };

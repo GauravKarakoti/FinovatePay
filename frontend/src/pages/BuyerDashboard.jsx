@@ -11,13 +11,13 @@ import {
   rejectQuotation,
   getKYCStatus
 } from '../utils/api';
-import { connectWallet, erc20ABI } from '../utils/web3';
+import { connectWallet, erc20ABI, getEscrowContract } from '../utils/web3';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import EscrowStatus from '../components/Escrow/EscrowStatus';
 import EscrowTimeline from '../components/Escrow/EscrowTimeline';
 import KYCStatus from '../components/KYC/KYCStatus';
-import InvoiceContractABI from '../../../deployed/Invoice.json';
+// import InvoiceContractABI from '../../../deployed/Invoice.json';
 import { generateTimelineEvents } from '../utils/timeline';
 import { toast } from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
@@ -25,7 +25,9 @@ import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApprov
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
+import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { useStatsActions } from '../context/StatsContext';
+import FiatOnRamp from '../components/FiatOnRamp';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -120,6 +122,113 @@ Modal.propTypes = {
   children: PropTypes.node
 };
 
+const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => {
+    const [payableAmount, setPayableAmount] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(null);
+    const [discountBps, setDiscountBps] = useState(0);
+
+    useEffect(() => {
+        if (isOpen && invoice) {
+            fetchPayableAmount();
+        }
+    }, [isOpen, invoice]);
+
+    const fetchPayableAmount = async () => {
+        setLoading(true);
+        try {
+            const contract = await getEscrowContract();
+            const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+            const amount = await contract.getCurrentPayableAmount(bytes32Id);
+            setPayableAmount(amount);
+
+            const escrow = await contract.escrows(bytes32Id);
+            const rate = escrow.discountRate ? escrow.discountRate.toNumber() : 0;
+            setDiscountBps(rate);
+
+            if (rate > 0) {
+                 const now = Math.floor(Date.now() / 1000);
+                 const deadline = escrow.discountDeadline.toNumber();
+                 if (deadline > now) {
+                     setTimeLeft(deadline - now);
+                 } else {
+                     setTimeLeft(0);
+                 }
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to fetch payable amount");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (timeLeft === null || timeLeft <= 0) return;
+        const timer = setInterval(() => setTimeLeft(t => t > 0 ? t - 1 : 0), 1000);
+        return () => clearInterval(timer);
+    }, [timeLeft]);
+
+    if (!isOpen || !invoice) return null;
+
+    const formatEth = (bn) => bn ? ethers.utils.formatEther(bn) : '0';
+    const originalAmountEth = invoice.amount; // Assuming invoice.amount is string/number from DB
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Confirm Payment">
+             <div className="space-y-4">
+                 <div className="flex justify-between items-center border-b pb-2">
+                     <span className="text-gray-600">Original Amount</span>
+                     <span className="font-medium text-lg">{originalAmountEth} {invoice.currency}</span>
+                 </div>
+
+                 {loading ? <LoadingSpinner /> : payableAmount && (
+                     <>
+                        {discountBps > 0 && (
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-gray-600">Discount Rate</span>
+                                <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">{discountBps / 100}%</span>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between items-center text-xl font-bold text-green-600 mt-2">
+                             <span>You Pay</span>
+                             <span>{formatEth(payableAmount)} {invoice.currency}</span>
+                        </div>
+
+                        {discountBps > 0 && (
+                            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 mt-2 text-center">
+                                {timeLeft > 0 ? (
+                                    <>
+                                        <p className="text-orange-800 font-medium">Early Payment Discount Active!</p>
+                                        <p className="text-2xl font-mono text-orange-600 mt-1">
+                                            {new Date(timeLeft * 1000).toISOString().substr(11, 8)}
+                                        </p>
+                                        <p className="text-xs text-orange-500 mt-1">Time remaining</p>
+                                    </>
+                                ) : (
+                                    <p className="text-gray-500">Discount expired.</p>
+                                )}
+                            </div>
+                        )}
+                     </>
+                 )}
+
+                 <div className="flex justify-end gap-3 mt-6">
+                     <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                     <ActionButton
+                        onClick={() => onConfirm(invoice, payableAmount)}
+                        loading={isProcessing}
+                        disabled={loading || !payableAmount}
+                     >
+                         Pay Now
+                     </ActionButton>
+                 </div>
+             </div>
+        </Modal>
+    );
+};
+
 const BuyerDashboard = ({ activeTab = 'overview' }) => {
   // State Management
   const [invoices, setInvoices] = useState([]);
@@ -141,6 +250,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
   const [showKYCVerification, setShowKYCVerification] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState(null); // For modal
   const { setStats: setGlobalStats } = useStatsActions();
 
   // Load Initial Data
@@ -352,7 +462,11 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     }
   }, []);
 
-  const handlePayInvoice = useCallback(async (invoice) => {
+  const handlePayInvoice = useCallback((invoice) => {
+      setPaymentInvoice(invoice);
+  }, []);
+
+  const handleConfirmPayment = useCallback(async (invoice, payableAmount) => {
     if (!ethers.utils.isAddress(invoice.contract_address)) {
       toast.error('Invalid contract address');
       return;
@@ -363,29 +477,48 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
     try {
       const { signer } = await connectWallet();
-      const { amount, currency, contract_address, token_address } = invoice;
-      const amountWei = ethers.utils.parseUnits(amount.toString(), 18);
+      const { currency, contract_address, token_address } = invoice;
+      const amountWei = payableAmount; // Already BigNumber from modal fetch
       
-      const invoiceContract = new ethers.Contract(contract_address, InvoiceContractABI.abi, signer);
+      // Use EscrowContract
+      const contract = await getEscrowContract();
+      // Need bytes32 ID
+      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+
       let tx;
 
       if (currency === 'MATIC') {
-        tx = await invoiceContract.depositNative({ value: amountWei });
+        const balance = await signer.getBalance();
+        if (balance.lt(amountWei)) {
+            toast.error("Insufficient MATIC balance.", { id: toastId });
+            return;
+        }
+        // New deposit signature: deposit(bytes32) payable
+        tx = await contract.deposit(bytes32Id, { value: amountWei });
       } else {
         const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
+        const userAddress = await signer.getAddress();
+        const balance = await tokenContract.balanceOf(userAddress);
+
+        if (balance.lt(amountWei)) {
+            toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
+            return;
+        }
+
         toast.loading('Approving tokens...', { id: toastId });
         
-        const approveTx = await tokenContract.approve(contract_address, amountWei);
+        const approveTx = await tokenContract.approve(contract.address, amountWei);
         await approveTx.wait();
         
         toast.loading('Confirming deposit...', { id: toastId });
-        tx = await invoiceContract.depositToken();
+        tx = await contract.deposit(bytes32Id);
       }
       
       await tx.wait();
       await updateInvoiceStatus(invoice.invoice_id, 'deposited', tx.hash);
       
       toast.success(`Payment successful! ${tx.hash.slice(0, 10)}...`, { id: toastId });
+      setPaymentInvoice(null);
       await loadInvoices();
     } catch (error) {
       console.error('Payment failed:', error);
@@ -400,9 +533,11 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
     setLoadingInvoiceId(invoice.invoice_id);
     try {
-      const { signer } = await connectWallet();
-      const contract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
-      const tx = await contract.releaseFunds();
+      // Use EscrowContract
+      const contract = await getEscrowContract();
+      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+
+      const tx = await contract.confirmRelease(bytes32Id);
       await tx.wait();
       
       await updateInvoiceStatus(invoice.invoice_id, 'released', tx.hash);
@@ -421,9 +556,11 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
     setLoadingInvoiceId(invoice.invoice_id);
     try {
-      const { signer } = await connectWallet();
-      const contract = new ethers.Contract(invoice.contract_address, InvoiceContractABI.abi, signer);
-      const tx = await contract.raiseDispute();
+      // Use EscrowContract
+      const contract = await getEscrowContract();
+      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+
+      const tx = await contract.raiseDispute(bytes32Id);
       await tx.wait();
       
       await updateInvoiceStatus(invoice.invoice_id, 'disputed', tx.hash, reason);
@@ -506,6 +643,8 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         </div>
 
         <div className="space-y-6">
+          <FiatOnRamp walletAddress={walletAddress} />
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <KYCStatus
               status={kycData.status}
@@ -684,12 +823,23 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
               Wallet: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
             </p>
           </div>
-          {kycData.status !== 'verified' && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 flex items-center gap-2">
-              <span className="text-yellow-600">⚠️</span>
-              <span className="text-sm text-yellow-800">Complete KYC to unlock all features</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowFiatModal(true)}
+              className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              Buy Crypto
+            </button>
+            {kycData.status !== 'verified' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 flex items-center gap-2">
+                <span className="text-yellow-600">⚠️</span>
+                <span className="text-sm text-yellow-800">Complete KYC to unlock all features</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Main Content */}
@@ -728,6 +878,14 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
           </div>
         )}
       </Modal>
+
+      <PaymentModal
+        isOpen={!!paymentInvoice}
+        onClose={() => setPaymentInvoice(null)}
+        invoice={paymentInvoice}
+        onConfirm={handleConfirmPayment}
+        isProcessing={loadingInvoiceId === (paymentInvoice?.invoice_id)}
+      />
     </div>
   );
 };

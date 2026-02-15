@@ -5,7 +5,9 @@ const CreateQuotation = ({ onSubmit, onCancel }) => {
         buyer_address: '',
         quantity: '1',
         price_per_unit: '',
-        description: ''
+        description: '',
+        discount_rate: '',
+        discount_deadline: ''
     });
 
     const handleChange = (e) => {
@@ -46,6 +48,32 @@ const CreateQuotation = ({ onSubmit, onCancel }) => {
                             required
                             min="0.000001"
                             step="0.000001"
+                        />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Discount (%)</label>
+                        <input
+                            type="number"
+                            name="discount_rate"
+                            value={formData.discount_rate}
+                            onChange={handleChange}
+                            className="w-full p-2 border border-gray-300 rounded-md"
+                            min="0"
+                            max="100"
+                            placeholder="Optional"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Discount Deadline</label>
+                        <input
+                            type="datetime-local"
+                            name="discount_deadline"
+                            value={formData.discount_deadline}
+                            onChange={handleChange}
+                            className="w-full p-2 border border-gray-300 rounded-md"
                         />
                     </div>
                 </div>
