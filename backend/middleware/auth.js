@@ -20,15 +20,16 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userResult = await pool.query(
       'SELECT id, email, wallet_address, role, organization_id FROM users WHERE id = $1',
-      [decoded.userId]
+      [decoded.id]
     );
     
-    if (rows.length === 0) {
+    if (userResult.rows.length === 0) {
       return res.status(403).json({ error: 'User not found' });
     }
     
     // 4. Attach user to the request object
-    req.user = rows[0];
+    req.user = userResult.rows[0];
+
     next();
 
   } catch (error) {
