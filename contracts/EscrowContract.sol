@@ -63,12 +63,7 @@ contract EscrowContract is ReentrancyGuard {
     ) external onlyAdmin returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
 
-        // --- NEW: Lock the Produce NFT as Collateral ---
-        // The seller must have approved the EscrowContract to spend this NFT beforehand.
-        if (_rwaNftContract != address(0)) {
-            IERC721(_rwaNftContract).transferFrom(_seller, address(this), _rwaTokenId); //
-        }
-
+        // Effects: Update state BEFORE external calls (Checks-Effects-Interactions pattern)
         escrows[_invoiceId] = Escrow({
             seller: _seller,
             buyer: _buyer,
@@ -83,6 +78,13 @@ contract EscrowContract is ReentrancyGuard {
             rwaNftContract: _rwaNftContract,
             rwaTokenId: _rwaTokenId
         });
+
+        // Interactions: External calls AFTER state updates
+        // --- NEW: Lock the Produce NFT as Collateral ---
+        // The seller must have approved the EscrowContract to spend this NFT beforehand.
+        if (_rwaNftContract != address(0)) {
+            IERC721(_rwaNftContract).transferFrom(_seller, address(this), _rwaTokenId);
+        }
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
         return true;
