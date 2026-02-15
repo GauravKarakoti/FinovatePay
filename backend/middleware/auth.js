@@ -11,15 +11,11 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
-    // 2. Verify Token (Using the correct environment variable)
-    // We use ACCESS_TOKEN_SECRET to match your authController
-    const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET;
-    const decoded = jwt.verify(token, secret);
-
-    // 3. Find the User
-    // IMPORTANT: We query by 'wallet_address' because that is what is inside the token
-    const query = 'SELECT * FROM users WHERE wallet_address = $1';
-    const { rows } = await pool.query(query, [decoded.wallet_address]);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userResult = await pool.query(
+      'SELECT id, email, wallet_address, role, organization_id FROM users WHERE id = $1',
+      [decoded.userId]
+    );
     
     if (rows.length === 0) {
       return res.status(403).json({ error: 'User not found' });

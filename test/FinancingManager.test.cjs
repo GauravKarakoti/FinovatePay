@@ -29,8 +29,8 @@ describe("FinancingManager", function () {
     const MockLiquidityAdapter = await ethers.getContractFactory("MockLiquidityAdapter");
     liquidityAdapter = await MockLiquidityAdapter.deploy();
 
-    const EscrowContract = await ethers.getContractFactory("EscrowContract");
-    escrowContract = await EscrowContract.deploy(owner.address); // Mock compliance manager
+    const MockEscrowContract = await ethers.getContractFactory("MockEscrowContract");
+    escrowContract = await MockEscrowContract.deploy();
 
     // Set adapters
     await financingManager.setAdapters(bridgeAdapter.address, liquidityAdapter.address, escrowContract.address);
@@ -48,11 +48,17 @@ describe("FinancingManager", function () {
         collateralAmount,
         ethers.utils.parseEther("100"),
         Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
-        user.address
+        user.address,
+        0
       );
 
-      await expect(financingManager.connect(user).requestFinancing(tokenId, collateralAmount, loanAmount, stablecoin.address))
-        .to.emit(financingManager, "FinancingRequested");
+      const tx = await financingManager.connect(user).requestFinancing(
+        tokenId,
+        collateralAmount,
+        loanAmount,
+        stablecoin.address
+      );
+      await expect(tx).to.emit(financingManager, "FinancingRequested");
     });
 
     it("Should reject financing request for non-issuer", async function () {
@@ -77,12 +83,25 @@ describe("FinancingManager", function () {
         collateralAmount,
         ethers.utils.parseEther("100"),
         Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
-        user.address
+        user.address,
+        0
       );
 
-      const requestId = await financingManager.connect(user).requestFinancing(tokenId, collateralAmount, loanAmount, stablecoin.address);
+      const tx = await financingManager.connect(user).requestFinancing(
+        tokenId,
+        collateralAmount,
+        loanAmount,
+        stablecoin.address
+      );
+      const receipt = await tx.wait();
+      const requestEvent = receipt.events.find(e => e.event === "FinancingRequested");
+      const requestId = requestEvent.args.requestId;
 
-      await expect(financingManager.approveFinancing(requestId))
+      await expect(financingManager.approveFinancing(
+        requestId,
+        await bridgeAdapter.KATANA_CHAIN(),
+        liquidityAdapter.address
+      ))
         .to.emit(financingManager, "FinancingApproved");
     });
   });
@@ -99,11 +118,24 @@ describe("FinancingManager", function () {
         collateralAmount,
         ethers.utils.parseEther("100"),
         Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
-        user.address
+        user.address,
+        0
       );
 
-      const requestId = await financingManager.connect(user).requestFinancing(tokenId, collateralAmount, loanAmount, stablecoin.address);
-      await financingManager.approveFinancing(requestId);
+      const tx = await financingManager.connect(user).requestFinancing(
+        tokenId,
+        collateralAmount,
+        loanAmount,
+        stablecoin.address
+      );
+      const receipt = await tx.wait();
+      const requestEvent = receipt.events.find(e => e.event === "FinancingRequested");
+      const requestId = requestEvent.args.requestId;
+      await financingManager.approveFinancing(
+        requestId,
+        await bridgeAdapter.KATANA_CHAIN(),
+        liquidityAdapter.address
+      );
 
       await expect(financingManager.connect(user).repayFinancing(requestId))
         .to.emit(financingManager, "FinancingRepaid");

@@ -21,6 +21,33 @@ interface IFractionToken is IERC1155 {
     function tokenDetails(uint256 tokenId) external view returns (TokenDetails memory);
 }
 
+interface IBridgeAdapter {
+    function KATANA_CHAIN() external view returns (bytes32);
+    function lockERC1155ForBridge(address token, uint256 tokenId, uint256 amount, bytes32 destinationChain) external returns (bytes32);
+    function bridgeERC1155Asset(bytes32 lockId, address recipient) external;
+    function aggLayerTransferERC1155(address token, uint256 tokenId, uint256 amount, bytes32 destinationChain, address destinationContract, address recipient) external;
+}
+
+interface ILiquidityAdapter {
+    function getAvailableLiquidity(address asset) external view returns (uint256);
+    function borrowFromPool(address asset, uint256 amount, address borrower) external returns (bytes32);
+    function repayToPool(bytes32 loanId) external;
+}
+
+interface IEscrowContract {
+    function createEscrow(
+        bytes32 invoiceId,
+        address seller,
+        address buyer,
+        uint256 amount,
+        address token,
+        uint256 duration,
+        address rwaNft,
+        uint256 rwaTokenId
+    ) external;
+    function confirmRelease(bytes32 invoiceId) external;
+}
+
 /**
  * @title FinancingManager
  * @author FinovatePay Team
@@ -43,9 +70,9 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     mapping(uint256 => uint256) public invoiceSpreadBps;
 
     // Bridge integration
-    BridgeAdapter public bridgeAdapter;
-    LiquidityAdapter public liquidityAdapter;
-    EscrowContract public escrowContract;
+    IBridgeAdapter public bridgeAdapter;
+    ILiquidityAdapter public liquidityAdapter;
+    IEscrowContract public escrowContract;
 
     // Financing requests
     struct FinancingRequest {
@@ -181,7 +208,6 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         require(msg.value >= requiredNative, "Insufficient native currency sent");
 
         // 2. Get Details
-        IFractionToken.TokenDetails memory details = fractionToken.tokenDetails(_tokenId);
         address seller = details.issuer;
         uint256 spreadBps = invoiceSpreadBps[_tokenId];
 
@@ -258,11 +284,11 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         require(request.active, "Request not active");
 
         // 1. Lock FractionTokens in escrow
-        bytes32 escrowId = escrowContract.createEscrow(
-            keccak256(abi.encodePacked("financing", _requestId)),
+        bytes32 escrowId = keccak256(abi.encodePacked("financing", _requestId));
+        escrowContract.createEscrow(
+            escrowId,
             request.borrower,
             address(this), // buyer is this contract
-            address(0), // no arbitrator
             request.loanAmount,
             request.loanAsset,
             30 days, // 30 day duration
@@ -332,8 +358,8 @@ contract FinancingManager is Ownable, ReentrancyGuard {
      */
     function setAdapters(address _bridgeAdapter, address _liquidityAdapter, address _escrowContract) external onlyOwner {
         require(_bridgeAdapter != address(0) && _liquidityAdapter != address(0) && _escrowContract != address(0), "Invalid addresses");
-        bridgeAdapter = BridgeAdapter(_bridgeAdapter);
-        liquidityAdapter = LiquidityAdapter(_liquidityAdapter);
-        escrowContract = EscrowContract(_escrowContract);
+        bridgeAdapter = IBridgeAdapter(_bridgeAdapter);
+        liquidityAdapter = ILiquidityAdapter(_liquidityAdapter);
+        escrowContract = IEscrowContract(_escrowContract);
     }
 }
