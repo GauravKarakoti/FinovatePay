@@ -107,20 +107,15 @@ export async function buildMetaTransaction(
  */
 export async function submitMetaTransaction(request, signature) {
   try {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-    
     const response = await fetch('/api/meta-tx/submit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
       },
+      credentials: 'include',
       body: JSON.stringify({ request, signature }),
     });
+
     
     const data = await response.json();
     
@@ -193,22 +188,15 @@ export async function executeGaslessTransaction(
  */
 export async function getGasCosts(options = {}) {
   try {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      throw new Error('Authentication required');
-    }
-    
     const params = new URLSearchParams();
     if (options.startDate) params.append('startDate', options.startDate);
     if (options.endDate) params.append('endDate', options.endDate);
     if (options.limit) params.append('limit', options.limit);
     
     const response = await fetch(`/api/meta-tx/gas-costs?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      credentials: 'include',
     });
+
     
     const data = await response.json();
     

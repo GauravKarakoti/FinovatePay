@@ -123,6 +123,7 @@ contract EscrowContract is
     /*//////////////////////////////////////////////////////////////
                             ESCROW LOGIC
     //////////////////////////////////////////////////////////////*/
+
     function createEscrow(
         bytes32 _invoiceId,
         address _seller,

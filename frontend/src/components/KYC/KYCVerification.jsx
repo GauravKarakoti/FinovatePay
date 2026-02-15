@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import axios from 'axios';
+import { api } from '../../utils/api';
+
 
 const KYCVerification = ({ user, onVerificationComplete }) => {
   const [step, setStep] = useState(1); // 1: Input Aadhaar, 2: Input OTP
@@ -9,13 +10,9 @@ const KYCVerification = ({ user, onVerificationComplete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  
-  const getAuthHeader = () => {
-    const token = localStorage.getItem('token'); 
-    return { headers: { Authorization: `Bearer ${token}` } };
-  };
 
   const handleSendOTP = async (e) => {
+
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -28,11 +25,8 @@ const KYCVerification = ({ user, onVerificationComplete }) => {
 
     try {
       // Step 1: Initiate - Send Aadhaar Number
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/kyc/initiate`, 
-        { idNumber },
-        getAuthHeader()
-      );
+      const response = await api.post('/kyc/initiate', { idNumber });
+
       
       if (response.data.success) {
         setReferenceId(response.data.referenceId);
@@ -53,11 +47,8 @@ const KYCVerification = ({ user, onVerificationComplete }) => {
     
     try {
       // Step 2: Verify - Send OTP and Reference ID
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/kyc/verify-otp`,
-        { otp, referenceId },
-        getAuthHeader()
-      );
+      const response = await api.post('/kyc/verify-otp', { otp, referenceId });
+
 
       if (response.data.success) {
         setSuccessMsg('Verification Successful!');

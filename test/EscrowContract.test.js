@@ -608,4 +608,173 @@ describe("EscrowContract", function () {
       expect(await escrow.arbitrators(seller.address)).to.equal(true);
     });
   });
+
+  describe("Circuit Breaker (Pausable)", function () {
+    beforeEach(async function () {
+      // Create an escrow for testing
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
+      const amount = ethers.utils.parseEther("1");
+      const duration = 7 * 24 * 60 * 60;
+      
+      await escrow.connect(owner).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        amount,
+        token.address,
+        duration
+      );
+    });
+
+    it("Should allow timelock (owner) to pause the contract", async function () {
+      await expect(escrow.connect(owner).pause())
+        .to.emit(escrow, "Paused")
+        .withArgs(owner.address);
+      
+      expect(await escrow.paused()).to.equal(true);
+    });
+
+    it("Should allow timelock (owner) to unpause the contract", async function () {
+      // First pause
+      await escrow.connect(owner).pause();
+      expect(await escrow.paused()).to.equal(true);
+      
+      // Then unpause
+      await expect(escrow.connect(owner).unpause())
+        .to.emit(escrow, "Unpaused")
+        .withArgs(owner.address);
+      
+      expect(await escrow.paused()).to.equal(false);
+    });
+
+    it("Should not allow non-timelock to pause", async function () {
+      await expect(escrow.connect(other).pause())
+        .to.be.revertedWith("only Governance");
+    });
+
+    it("Should not allow non-timelock to unpause", async function () {
+      // First pause as owner
+      await escrow.connect(owner).pause();
+      
+      // Try to unpause as non-timelock
+      await expect(escrow.connect(other).unpause())
+        .to.be.revertedWith("only Governance");
+    });
+
+    it("Should prevent createEscrow when paused", async function () {
+      // Pause the contract
+      await escrow.connect(owner).pause();
+      
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-002");
+      const amount = ethers.utils.parseEther("1");
+      const duration = 7 * 24 * 60 * 60;
+      
+      await expect(escrow.connect(owner).createEscrow(
+        invoiceId,
+        seller.address,
+        buyer.address,
+        amount,
+        token.address,
+        duration
+      )).to.be.revertedWith("EnforcedPause");
+    });
+
+    it("Should prevent deposit when paused", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // Pause the contract
+      await escrow.connect(owner).pause();
+      
+      // Approve tokens
+      await token.connect(buyer).approve(escrow.address, amount);
+      
+      // Try to deposit
+      await expect(escrow.connect(buyer).deposit(invoiceId, amount))
+        .to.be.revertedWith("EnforcedPause");
+    });
+
+    it("Should prevent confirmRelease when paused", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // First deposit funds
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      
+      // Pause the contract
+      await escrow.connect(owner).pause();
+      
+      // Try to confirm release
+      await expect(escrow.connect(seller).confirmRelease(invoiceId))
+        .to.be.revertedWith("EnforcedPause");
+    });
+
+    it("Should prevent raiseDispute when paused", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // First deposit funds
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      
+      // Pause the contract
+      await escrow.connect(owner).pause();
+      
+      // Try to raise dispute
+      await expect(escrow.connect(seller).raiseDispute(invoiceId))
+        .to.be.revertedWith("EnforcedPause");
+    });
+
+    it("Should prevent resolveDispute when paused", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // First deposit funds and raise dispute
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      await escrow.connect(seller).raiseDispute(invoiceId);
+      
+      // Pause the contract
+      await escrow.connect(owner).pause();
+      
+      // Try to resolve dispute
+      await expect(escrow.connect(owner).resolveDispute(invoiceId, true))
+        .to.be.revertedWith("EnforcedPause");
+    });
+
+    it("Should allow expireEscrow even when paused (fund recovery)", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // First deposit funds
+      await token.connect(buyer).approve(escrow.address, amount);
+      await escrow.connect(buyer).deposit(invoiceId, amount);
+      
+      // Pause the contract
+      await escrow.connect(owner).pause();
+      
+      // Fast forward time
+      await ethers.provider.send("evm_increaseTime", [8 * 24 * 60 * 60]);
+      await ethers.provider.send("evm_mine");
+      
+      // Expire should still work even when paused
+      await expect(escrow.connect(seller).expireEscrow(invoiceId))
+        .to.emit(escrow, "EscrowCancelled");
+    });
+
+    it("Should resume normal operations after unpause", async function () {
+      const invoiceId = ethers.utils.formatBytes32String("INV-PAUSE-001");
+      const amount = ethers.utils.parseEther("1");
+      
+      // Pause then unpause
+      await escrow.connect(owner).pause();
+      await escrow.connect(owner).unpause();
+      
+      // Operations should work normally
+      await token.connect(buyer).approve(escrow.address, amount);
+      await expect(escrow.connect(buyer).deposit(invoiceId, amount))
+        .to.emit(escrow, "DepositConfirmed");
+    });
+  });
 });
