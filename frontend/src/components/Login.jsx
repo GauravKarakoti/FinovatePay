@@ -13,6 +13,7 @@ const Login = ({ onLogin }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -34,6 +35,9 @@ const Login = ({ onLogin }) => {
       setLoading(false);
     }
   };
+
+  const inputBase =
+    'block w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-200 focus:border-finovate-blue-500 focus:ring-2 focus:ring-finovate-blue-500/20 focus:outline-none sm:text-sm';
 
   return (
     <div className="min-h-screen flex">
@@ -58,6 +62,20 @@ const Login = ({ onLogin }) => {
           <p className="text-finovate-blue-300 text-sm">
             © FinovatePay. Built for trust and transparency.
           </p>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-6">
+            {[
+              { value: '$2.4M+', label: 'Trade Volume' },
+              { value: '1,200+', label: 'Transactions' },
+              { value: '99.9%', label: 'Uptime' },
+            ].map((s) => (
+              <div key={s.label} className="text-center bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <p className="text-2xl font-bold">{s.value}</p>
+                <p className="text-finovate-blue-200 text-xs mt-1">{s.label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
