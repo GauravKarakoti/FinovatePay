@@ -2,15 +2,21 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
 
-
-contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Receiver {
+contract EscrowContract is
+    ReentrancyGuard,
+    ERC2771Context,
+    IERC721Receiver,
+    EIP712
+{
+    using ECDSA for bytes32;
 
     /*//////////////////////////////////////////////////////////////
                                 TYPES
@@ -39,12 +45,39 @@ contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Rec
         uint256 rwaTokenId;
     }
 
-    mapping(bytes32 => Escrow) public escrows;
-    mapping(bytes32 => mapping(address => bool)) public disputeVoted;
-    mapping(bytes32 => uint256) public sellerVotes;
-    mapping(bytes32 => uint256) public buyerVotes;
+    struct Proposal {
+        address arbitrator;
+        bool add;
+        uint256 approvals;
+        bool executed;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            STORAGE
+    //////////////////////////////////////////////////////////////*/
+    address public admin;
+    address public treasury;
+    address public keeper;
+    uint256 public feeBasisPoints;
 
     ComplianceManager public complianceManager;
+
+    mapping(bytes32 => Escrow) public escrows;
+
+    // Meta-tx
+    mapping(address => uint256) public nonces;
+    bytes32 private constant META_TX_TYPEHASH =
+        keccak256("MetaTransaction(uint256 nonce,address from,bytes functionSignature)");
+
+    // Multi-sig arbitrator governance
+    address[] public managers;
+    mapping(address => bool) public isManager;
+    uint256 public threshold;
+
+    uint256 public proposalCount;
+    mapping(uint256 => Proposal) public proposals;
+    mapping(uint256 => mapping(address => bool)) public approved;
+    mapping(address => bool) public isArbitrator;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
@@ -53,124 +86,66 @@ contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Rec
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
-    event DisputeResolved(
-        bytes32 indexed invoiceId,
-        address resolver,
-        bool sellerWins
-    );
-    event EscrowCancelled(bytes32 indexed invoiceId);
-    event EscrowExpired(bytes32 indexed invoiceId);
-    event TreasuryUpdated(address indexed newTreasury);
-    event FeeUpdated(uint256 newFeeBasisPoints);
-    event FeeTaken(bytes32 indexed invoiceId, uint256 feeAmount);
+    event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
 
-    event ComplianceManagerUpdated(address indexed newComplianceManager);
-    event InvoiceFactoryUpdated(address indexed newInvoiceFactory);
+    event ArbitratorProposed(uint256 indexed proposalId, address arbitrator, bool add);
+    event ProposalApproved(uint256 indexed proposalId, address manager);
+    event ProposalExecuted(uint256 indexed proposalId, address arbitrator, bool add);
+    event ArbitratorAdded(address indexed arbitrator);
+    event ArbitratorRemoved(address indexed arbitrator);
+
+    event MetaTransactionExecuted(address indexed user, address indexed relayer, bytes functionSignature);
+
+    /*//////////////////////////////////////////////////////////////
+                                MODIFIERS
+    //////////////////////////////////////////////////////////////*/
+    modifier onlyAdmin() {
+        require(_msgSender() == admin, "Not admin");
+        _;
+    }
+
+    modifier onlyManager() {
+        require(isManager[_msgSender()], "Not manager");
+        _;
+    }
 
     modifier onlyEscrowParty(bytes32 invoiceId) {
         Escrow storage e = escrows[invoiceId];
-        require(
-            _msgSender() == e.seller || _msgSender() == e.buyer,
-            "Not party"
-        );
+        require(_msgSender() == e.seller || _msgSender() == e.buyer, "Not party");
         _;
     }
 
-    modifier onlyEscrowParty(bytes32 _invoiceId) {
-        Escrow storage escrow = escrows[_invoiceId];
-        require(
-            msg.sender == escrow.seller ||
-                msg.sender == escrow.buyer ||
-                msg.sender == invoiceFactory,
-            "Not authorized"
-        );
-        _;
-    }
-
-    modifier onlyArbitrator() {
-        require(arbitratorsRegistry.isArbitrator(msg.sender), "Not arbitrator");
-        _;
-    }
-
-    modifier onlyTimelock() {
-        require(msg.sender == timelock, "only Governance");
-        _;
-    }
-
+    /*//////////////////////////////////////////////////////////////
+                                CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
     constructor(
         address _complianceManager,
-        address _timelock,
-        address _arbitratorsRegistry
-    ) {
-        require(_complianceManager != address(0), "Invalid compliance manager");
-        require(_arbitratorsRegistry != address(0), "Invalid registry");
-        treasury = msg.sender;
-        keeper = msg.sender;
+        address trustedForwarder,
+        address[] memory _managers,
+        uint256 _threshold
+    )
+        ERC2771Context(trustedForwarder)
+        EIP712("EscrowContract", "1")
+    {
+        require(_managers.length > 0, "No managers");
+        require(_threshold > 0 && _threshold <= _managers.length, "Bad threshold");
+
+        admin = _msgSender();
+        treasury = admin;
+        keeper = admin;
+
         complianceManager = ComplianceManager(_complianceManager);
-        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
 
-        timelock = _timelock;
-        emit ComplianceManagerUpdated(_complianceManager);
-    }
+        for (uint256 i; i < _managers.length; i++) {
+            isManager[_managers[i]] = true;
+            managers.push(_managers[i]);
+        }
 
-    function setTimelock(address _timelock) external virtual onlyTimelock {
-        require(_timelock != address(0), "Invalid timelock");
-        timelock = _timelock;
-    }
-
-    function setArbitratorsRegistry(
-        address _arbitratorsRegistry
-    ) external onlyTimelock {
-        require(_arbitratorsRegistry != address(0), "Invalid registry");
-        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
-    }
-
-    function setInvoiceFactory(address _invoiceFactory) external onlyTimelock {
-        require(_invoiceFactory != address(0), "Invalid invoice factory");
-        invoiceFactory = _invoiceFactory;
-        emit InvoiceFactoryUpdated(_invoiceFactory);
-    }
-
-
-    function setKeeper(address _keeper) external onlyTimelock {
-        require(_keeper != address(0), "Invalid keeper");
-        keeper = _keeper;
-    }
-
-    function setTreasury(address _treasury) external onlyTimelock {
-        require(_treasury != address(0), "Invalid treasury");
-        treasury = _treasury;
-        emit TreasuryUpdated(_treasury);
-    }
-
-    function setFeeBasisPoints(uint256 _feeBasisPoints) external onlyTimelock {
-        require(_feeBasisPoints <= 1000, "Fee too high"); // Max 10%
-        feeBasisPoints = _feeBasisPoints;
-        emit FeeUpdated(_feeBasisPoints);
+        threshold = _threshold;
     }
 
     /*//////////////////////////////////////////////////////////////
-                        CIRCUIT BREAKER (PAUSABLE)
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Pauses the contract. Can only be called by timelock (governance).
-     * @dev Emergency stop mechanism. When paused, critical functions are blocked.
-     */
-    function pause() external onlyTimelock {
-        _pause();
-    }
-
-    /**
-     * @notice Unpauses the contract. Can only be called by timelock (governance).
-     * @dev Resumes normal contract operations.
-     */
-    function unpause() external onlyTimelock {
-        _unpause();
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        ESCROW CORE LOGIC
+                            ESCROW LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function createEscrow(
@@ -182,9 +157,8 @@ contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Rec
         uint256 duration,
         address rwaNft,
         uint256 rwaTokenId
-    ) external onlyAdmin whenNotPaused {
-
-        require(escrows[invoiceId].seller == address(0), "Escrow exists");
+    ) external onlyAdmin {
+        require(escrows[invoiceId].seller == address(0), "Exists");
 
         if (rwaNft != address(0)) {
             IERC721(rwaNft).transferFrom(seller, address(this), rwaTokenId);
@@ -209,34 +183,20 @@ contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Rec
         emit EscrowCreated(invoiceId, seller, buyer, amount);
     }
 
-    function deposit(
-        bytes32 invoiceId,
-        uint256 amount
-    )
-        external
-        nonReentrant
-        whenNotPaused
-        onlyCompliant(_msgSender())
-    {
-
+    function deposit(bytes32 invoiceId) external nonReentrant {
         Escrow storage e = escrows[invoiceId];
-
         require(e.status == EscrowStatus.Created, "Inactive");
         require(_msgSender() == e.buyer, "Not buyer");
-        require(amount == e.amount, "Bad amount");
-        require(block.timestamp < e.expiresAt, "Expired");
 
-        IERC20(e.token).transferFrom(_msgSender(), address(this), amount);
+        IERC20(e.token).transferFrom(_msgSender(), address(this), e.amount);
 
         e.buyerConfirmed = true;
         e.status = EscrowStatus.Funded;
 
-        emit DepositConfirmed(invoiceId, _msgSender(), amount);
+        emit DepositConfirmed(invoiceId, _msgSender(), e.amount);
     }
 
-    function confirmRelease(
-        bytes32 invoiceId
-    )
+    function confirmRelease(bytes32 invoiceId)
         external
         nonReentrant
         whenNotPaused
@@ -250,130 +210,107 @@ contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Rec
         else e.buyerConfirmed = true;
 
         if (e.sellerConfirmed && e.buyerConfirmed) {
-            _release(invoiceId);
+            _releaseFunds(invoiceId);
         }
     }
 
-    function raiseDispute(bytes32 invoiceId)
-        external
-        whenNotPaused
-        onlyEscrowParty(invoiceId)
-    {
-
+    function raiseDispute(bytes32 invoiceId) external onlyEscrowParty(invoiceId) {
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Funded, "No dispute");
 
-        e.disputeRaised = true;
         e.status = EscrowStatus.Disputed;
+        e.disputeRaised = true;
 
         emit DisputeRaised(invoiceId, _msgSender());
     }
 
-    function resolveDispute(
-        bytes32 invoiceId,
-        bool sellerWins
-    )
+    /*//////////////////////////////////////////////////////////////
+                        DISPUTE RESOLUTION (CEI)
+    //////////////////////////////////////////////////////////////*/
+    function resolveDispute(bytes32 invoiceId, bool sellerWins)
         external
         whenNotPaused
         onlyAdmin
+        nonReentrant
     {
 
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Disputed, "No dispute");
 
+        // EFFECTS
         e.disputeResolver = _msgSender();
-        IERC20 token = IERC20(e.token);
+        e.status = EscrowStatus.Released;
 
-        if (sellerWins) {
-            token.transfer(e.seller, e.amount);
-            if (e.rwaNftContract != address(0)) {
-                IERC721(e.rwaNftContract).transferFrom(
-                    address(this),
-                    e.buyer,
-                    e.rwaTokenId
-                );
-            }
-        } else {
-            token.transfer(e.buyer, e.amount);
-            if (e.rwaNftContract != address(0)) {
-                IERC721(e.rwaNftContract).transferFrom(
-                    address(this),
-                    e.seller,
-                    e.rwaTokenId
-                );
-            }
+        address seller = e.seller;
+        address buyer = e.buyer;
+        uint256 amount = e.amount;
+        address token = e.token;
+        address nft = e.rwaNftContract;
+        uint256 nftId = e.rwaTokenId;
+
+        emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
+
+        // INTERACTIONS
+        IERC20(token).transfer(sellerWins ? seller : buyer, amount);
+
+        if (nft != address(0)) {
+            IERC721(nft).transferFrom(
+                address(this),
+                sellerWins ? buyer : seller,
+                nftId
+            );
         }
 
-        e.status = EscrowStatus.Released;
-        emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
         delete escrows[invoiceId];
     }
 
-    function _release(bytes32 invoiceId) internal {
+    function _releaseFunds(bytes32 invoiceId) internal {
         Escrow storage e = escrows[invoiceId];
 
-        IERC20(e.token).transfer(e.seller, e.amount);
+        e.status = EscrowStatus.Released;
+
+        address seller = e.seller;
+        address buyer = e.buyer;
+        uint256 amount = e.amount;
+
+        emit EscrowReleased(invoiceId, amount);
+
+        IERC20(e.token).transfer(seller, amount);
 
         if (e.rwaNftContract != address(0)) {
             IERC721(e.rwaNftContract).transferFrom(
                 address(this),
-                e.buyer,
+                buyer,
                 e.rwaTokenId
             );
         }
 
-        emit EscrowReleased(_invoiceId, escrow.amount);
-        delete escrows[_invoiceId];
-    }
-
-    function expireEscrow(bytes32 _invoiceId) external nonReentrant {
-        Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.seller != address(0), "Escrow does not exist");
-        require(
-            msg.sender == escrow.seller ||
-                msg.sender == escrow.buyer ||
-                msg.sender == keeper ||
-                msg.sender == invoiceFactory,
-            "Not authorized"
-        );
-        require(block.timestamp >= escrow.expiresAt, "Escrow not expired");
-        require(
-            escrow.status == EscrowStatus.Created ||
-                escrow.status == EscrowStatus.Funded,
-            "Already finalized"
-        );
-
-        EscrowStatus oldStatus = escrow.status;
-        escrow.status = EscrowStatus.Expired;
-
-        // Return NFT to Seller
-        if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(
-                address(this),
-                escrow.seller,
-                escrow.rwaTokenId
-            );
-        }
-
-        // Refund Buyer if they deposited
-        if (oldStatus == EscrowStatus.Funded) {
-            IERC20 token = IERC20(escrow.token);
-            require(
-                token.transfer(escrow.buyer, escrow.amount),
-                "Refund failed"
-            );
-        }
-
-        emit EscrowExpired(_invoiceId);
-        emit EscrowCancelled(_invoiceId);
-        delete disputeVoted[_invoiceId];
-        delete sellerVotes[_invoiceId];
-        delete buyerVotes[_invoiceId];
-        delete escrows[_invoiceId];
+        delete escrows[invoiceId];
     }
 
     /*//////////////////////////////////////////////////////////////
-                        ERC721 RECEIVER
+                        ERC2771 OVERRIDES
+    //////////////////////////////////////////////////////////////*/
+    function _msgSender()
+        internal
+        view
+        override(ERC2771Context)
+        returns (address)
+    {
+        return ERC2771Context._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        override(ERC2771Context)
+        returns (bytes calldata)
+    {
+        return ERC2771Context._msgData();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    ERC721 RECEIVER
     //////////////////////////////////////////////////////////////*/
     function onERC721Received(
         address,
@@ -383,15 +320,4 @@ contract EscrowContract is ReentrancyGuard, Pausable, ERC2771Context, IERC721Rec
     ) external pure override returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
     }
-    
-    // Emergency function to recover stuck tokens (admin only)
-    function recoverTokens(address _token, uint256 _amount) external onlyAdmin {
-        IERC20(_token).transfer(admin, _amount);
-    }
-    
-    // Emergency function to recover stuck NFTs (admin only)
-    function recoverNFT(address _nftContract, uint256 _tokenId) external onlyAdmin {
-        IERC721(_nftContract).transferFrom(address(this), admin, _tokenId);
-    }
-
 }

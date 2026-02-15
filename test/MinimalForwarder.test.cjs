@@ -24,7 +24,9 @@ describe("MinimalForwarder", function () {
     const EscrowContract = await ethers.getContractFactory("EscrowContract");
     escrowContract = await EscrowContract.deploy(
       complianceManager.address,
-      minimalForwarder.address
+      minimalForwarder.address,
+      [owner.address],
+      1
     );
     await escrowContract.deployed();
   });
@@ -246,10 +248,11 @@ describe("MinimalForwarder", function () {
       };
 
       const signature = await user1._signTypedData(domain, types, request);
+      const returnData = ethers.utils.defaultAbiCoder.encode(["bool"], [true]);
 
       await expect(minimalForwarder.execute(request, signature))
         .to.emit(minimalForwarder, "MetaTransactionExecuted")
-        .withArgs(user1.address, complianceManager.address, 0, true, "0x");
+        .withArgs(user1.address, complianceManager.address, 0, true, returnData);
     });
   });
 });
