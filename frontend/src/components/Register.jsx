@@ -17,6 +17,8 @@ const Register = ({ onLogin }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -38,13 +40,17 @@ const Register = ({ onLogin }) => {
     try {
       const { confirmPassword, ...registerData } = formData;
       const response = await register(registerData);
-      onLogin(response.data.user, response.data.token);
+      onLogin(response.data.user);
+
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const inputBase =
+    'block w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-200 focus:border-finovate-blue-500 focus:ring-2 focus:ring-finovate-blue-500/20 focus:outline-none sm:text-sm';
 
   return (
     <div className="min-h-screen flex">
@@ -69,6 +75,23 @@ const Register = ({ onLogin }) => {
           <p className="text-finovate-blue-300 text-sm">
             © FinovatePay. Built for trust and transparency.
           </p>
+
+          {/* Feature cards */}
+          <div className="space-y-4">
+            {[
+              { icon: '🔒', title: 'Secure Escrow', desc: 'Smart-contract powered payment protection' },
+              { icon: '⚡', title: 'Instant Settlement', desc: 'Real-time cross-border transactions' },
+              { icon: '📊', title: 'Full Transparency', desc: 'On-chain audit trail for every trade' },
+            ].map((f) => (
+              <div key={f.title} className="flex items-start gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
+                <span className="text-2xl">{f.icon}</span>
+                <div>
+                  <p className="font-semibold text-sm">{f.title}</p>
+                  <p className="text-finovate-blue-200 text-sm">{f.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
