@@ -42,15 +42,15 @@ export const getMarketplaceListings = () => {
 
 // --- Auth API ---
 export const login = (email, password) => {
-  return api.post('auth/login', { email, password });
+  return api.post('/auth/login', { email, password });
 };
 
 export const register = (userData) => {
-  return api.post('auth/register', userData);
+  return api.post('/auth/register', userData);
 };
 
 export const updateCurrentUserRole = (role) => {
-  return api.put('auth/role', { role });
+  return api.put('/auth/role', { role });
 };
 
 // --- Invoice API ---

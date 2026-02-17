@@ -158,4 +158,16 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         // 4. Emit Event
         emit FractionsPurchased(_tokenId, msg.sender, seller, _tokenAmount, platformFee);
     }
+
+    /**
+     * @notice Allows the owner to withdraw any accumulated native currency.
+     * Protected against reentrancy.
+     */
+    function withdraw() external onlyOwner nonReentrant {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+
+        (bool success, ) = payable(msg.sender).call{value: balance}("");
+        require(success, "Transfer failed");
+    }
 }
