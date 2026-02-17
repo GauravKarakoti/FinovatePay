@@ -37,6 +37,7 @@ contract EscrowContract is
         address seller;
         address buyer;
         uint256 amount;
+        uint256 feeAmount;
         address token;
         EscrowStatus status;
         bool sellerConfirmed;
@@ -48,6 +49,7 @@ contract EscrowContract is
         address rwaNftContract;
         uint256 rwaTokenId;
     }
+
 
     struct Proposal {
         address arbitrator;
@@ -87,10 +89,12 @@ contract EscrowContract is
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
-    event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
-    event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
+    event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount, uint256 fee);
+    event EscrowReleased(bytes32 indexed invoiceId, uint256 amount, uint256 fee);
+    event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+
 
     event ArbitratorProposed(uint256 indexed proposalId, address arbitrator, bool add);
     event ProposalApproved(uint256 indexed proposalId, address manager);
@@ -193,14 +197,32 @@ contract EscrowContract is
         require(e.status == EscrowStatus.Created, "Inactive");
         require(_msgSender() == e.buyer, "Not buyer");
 
+        uint256 fee = calculateFee(e.amount);
+        uint256 totalAmount = e.amount + fee;
 
-        IERC20(e.token).transferFrom(_msgSender(), address(this), e.amount);
+        IERC20(e.token).transferFrom(_msgSender(), address(this), totalAmount);
 
+        e.feeAmount = fee;
         e.buyerConfirmed = true;
         e.status = EscrowStatus.Funded;
 
-        emit DepositConfirmed(invoiceId, _msgSender(), e.amount);
+        emit DepositConfirmed(invoiceId, _msgSender(), e.amount, fee);
     }
+
+    function calculateFee(uint256 amount) public view returns (uint256) {
+        return (amount * feeBasisPoints) / 10000;
+    }
+
+    function setFeeBasisPoints(uint256 newFeeBasisPoints) external onlyAdmin {
+        require(newFeeBasisPoints <= 50, "Fee too high"); // Max 0.5%
+        feeBasisPoints = newFeeBasisPoints;
+    }
+
+    function setTreasury(address newTreasury) external onlyAdmin {
+        require(newTreasury != address(0), "Invalid treasury");
+        treasury = newTreasury;
+    }
+
 
     function confirmRelease(bytes32 invoiceId)
         external
@@ -262,6 +284,7 @@ contract EscrowContract is
         address seller = e.seller;
         address buyer = e.buyer;
         uint256 amount = e.amount;
+        uint256 fee = e.feeAmount;
         address token = e.token;
         address nft = e.rwaNftContract;
         uint256 nftId = e.rwaTokenId;
@@ -269,7 +292,15 @@ contract EscrowContract is
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
         // INTERACTIONS
+        // Transfer fee to treasury first
+        if (fee > 0) {
+            IERC20(token).transfer(treasury, fee);
+            emit FeeCollected(invoiceId, fee);
+        }
+
+        // Transfer remaining amount to winner
         IERC20(token).transfer(sellerWins ? seller : buyer, amount);
+
 
         if (nft != address(0)) {
             IERC721(nft).transferFrom(
@@ -290,9 +321,17 @@ contract EscrowContract is
         address seller = e.seller;
         address buyer = e.buyer;
         uint256 amount = e.amount;
+        uint256 fee = e.feeAmount;
 
-        emit EscrowReleased(invoiceId, amount);
+        emit EscrowReleased(invoiceId, amount, fee);
 
+        // Transfer fee to treasury
+        if (fee > 0) {
+            IERC20(e.token).transfer(treasury, fee);
+            emit FeeCollected(invoiceId, fee);
+        }
+
+        // Transfer remaining amount to seller
         IERC20(e.token).transfer(seller, amount);
 
         if (e.rwaNftContract != address(0)) {
@@ -305,6 +344,7 @@ contract EscrowContract is
 
         delete escrows[invoiceId];
     }
+
 
     /*//////////////////////////////////////////////////////////////
                         ERC2771 OVERRIDES

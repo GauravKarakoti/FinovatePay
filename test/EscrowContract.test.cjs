@@ -89,7 +89,66 @@ describe("EscrowContract (Merged)", function () {
       expect(await escrow.isManager(manager1.address)).to.equal(true);
       expect(await escrow.isManager(other.address)).to.equal(false);
     });
+
+    it("Sets initial fee to 0", async function () {
+      expect(await escrow.feeBasisPoints()).to.equal(0);
+    });
+
+    it("Sets treasury to admin", async function () {
+      expect(await escrow.treasury()).to.equal(owner.address);
+    });
   });
+
+  describe("Fee Management", function () {
+    it("Allows admin to set fee basis points", async function () {
+      await escrow.connect(owner).setFeeBasisPoints(50); // 0.5%
+      expect(await escrow.feeBasisPoints()).to.equal(50);
+    });
+
+    it("Prevents setting fee above 0.5%", async function () {
+      await expect(
+        escrow.connect(owner).setFeeBasisPoints(51)
+      ).to.be.revertedWith("Fee too high");
+    });
+
+    it("Prevents non-admin from setting fee", async function () {
+      await expect(
+        escrow.connect(other).setFeeBasisPoints(50)
+      ).to.be.revertedWith("Not admin");
+    });
+
+    it("Allows admin to set treasury", async function () {
+      await escrow.connect(owner).setTreasury(other.address);
+      expect(await escrow.treasury()).to.equal(other.address);
+    });
+
+    it("Prevents setting treasury to zero address", async function () {
+      await expect(
+        escrow.connect(owner).setTreasury(ethers.constants.AddressZero)
+      ).to.be.revertedWith("Invalid treasury");
+    });
+
+    it("Prevents non-admin from setting treasury", async function () {
+      await expect(
+        escrow.connect(other).setTreasury(other.address)
+      ).to.be.revertedWith("Not admin");
+    });
+
+    it("Calculates fee correctly", async function () {
+      await escrow.connect(owner).setFeeBasisPoints(50); // 0.5%
+      const testAmount = ethers.utils.parseEther("100");
+      const fee = await escrow.calculateFee(testAmount);
+      // 100 * 0.5% = 0.5 tokens
+      expect(fee).to.equal(ethers.utils.parseEther("0.5"));
+    });
+
+    it("Calculates zero fee when basis points is 0", async function () {
+      const testAmount = ethers.utils.parseEther("100");
+      const fee = await escrow.calculateFee(testAmount);
+      expect(fee).to.equal(0);
+    });
+  });
+
 
   /*//////////////////////////////////////////////////////////////
                         ESCROW LIFECYCLE
@@ -112,12 +171,19 @@ describe("EscrowContract (Merged)", function () {
       );
     });
 
-    it("Allows buyer to deposit", async function () {
-      await token.connect(buyer).approve(escrow.address, amount);
+    it("Allows buyer to deposit with fee", async function () {
+      // Set fee to 0.5% (50 basis points)
+      await escrow.connect(owner).setFeeBasisPoints(50);
+      
+      const fee = await escrow.calculateFee(amount);
+      const totalAmount = amount.add(fee);
+      
+      await token.connect(buyer).approve(escrow.address, totalAmount);
 
       await expect(
-        escrow.connect(buyer).deposit(invoiceId, amount)
-      ).to.emit(escrow, "DepositConfirmed");
+        escrow.connect(buyer).deposit(invoiceId)
+      ).to.emit(escrow, "DepositConfirmed")
+        .withArgs(invoiceId, buyer.address, amount, fee);
     });
 
     it("Prevents non-buyer from depositing", async function () {
@@ -127,18 +193,32 @@ describe("EscrowContract (Merged)", function () {
       await token.connect(other).approve(escrow.address, amount);
 
       await expect(
-        escrow.connect(other).deposit(invoiceId, amount)
+        escrow.connect(other).deposit(invoiceId)
       ).to.be.revertedWith("Not buyer");
     });
 
-    it("Releases funds after both confirmations", async function () {
-      await token.connect(buyer).approve(escrow.address, amount);
-      await escrow.connect(buyer).deposit(invoiceId, amount);
+    it("Releases funds after both confirmations with fee to treasury", async function () {
+      // Set fee to 0.5% (50 basis points)
+      await escrow.connect(owner).setFeeBasisPoints(50);
+      
+      const fee = await escrow.calculateFee(amount);
+      const totalAmount = amount.add(fee);
+      
+      await token.connect(buyer).approve(escrow.address, totalAmount);
+      await escrow.connect(buyer).deposit(invoiceId);
 
+      const treasuryBalanceBefore = await token.balanceOf(await escrow.treasury());
+      
       await expect(
         escrow.connect(seller).confirmRelease(invoiceId)
-      ).to.emit(escrow, "EscrowReleased");
+      ).to.emit(escrow, "EscrowReleased")
+        .withArgs(invoiceId, amount, fee);
+
+      // Verify fee was transferred to treasury
+      const treasuryBalanceAfter = await token.balanceOf(await escrow.treasury());
+      expect(treasuryBalanceAfter.sub(treasuryBalanceBefore)).to.equal(fee);
     });
+
   });
 
   /*//////////////////////////////////////////////////////////////
