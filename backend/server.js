@@ -6,7 +6,6 @@ const path = require('path'); // Added for static files
 const socketIo = require('socket.io');
 require('dotenv').config();
 
-
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
 const listenForTokenization = require('./listeners/contractListener');
@@ -58,52 +57,8 @@ app.use(express.json());
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploads
 
-const { pool, getConnection } = require('./config/database');
 const testDbConnection = require('./utils/testDbConnection');
-const listenForTokenization = require('./listeners/contractListener');
 const { startSyncWorker } = require('./services/escrowSyncService');
-
-/**
- * ENHANCED DATABASE CONNECTION TEST
- */
-const testDbConnection = async () => {
-  const maxRetries = parseInt(process.env.DB_MAX_RETRIES) || 5;
-  const baseDelay = parseInt(process.env.DB_RETRY_BASE_DELAY) || 1000;
-  
-  let retries = 0;
-  
-  while (retries < maxRetries) {
-    try {
-      console.log(`Attempting database connection (${retries + 1}/${maxRetries})...`);
-      
-      // ✅ FIX: Use pool.connect() instead of getConnection()
-      const client = await pool.connect();
-      
-      await client.query('SELECT 1 as test');
-      client.release();
-      
-      console.log('✅ Database connection established successfully');
-      return true;
-      
-    } catch (err) {
-      retries++;
-      
-      console.error(`❌ Database connection attempt ${retries} failed:`, err.message);
-      
-      if (retries >= maxRetries) {
-        console.error('Failed to connect to database after maximum retries.');
-        return false;
-      }
-      
-      // Wait before retrying
-      const delay = baseDelay * Math.pow(2, retries - 1);
-      console.log(`Retrying in ${Math.round(delay)}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  
-  return false;
-};
 
 // Initialize database connection
 testDbConnection();
@@ -131,9 +86,8 @@ app.use('/api/meta-tx', require('./routes/metaTransaction'));
 app.use('/api/notifications', notificationRoutes);
 
 // --- V2 FINANCING ROUTES ---
-// Uncomment these only if you have created the files in the routes folder!
-// app.use('/api/financing', require('./routes/financing'));
-// app.use('/api/investor', require('./routes/investor'));
+app.use('/api/financing', require('./routes/financing'));
+app.use('/api/investor', require('./routes/investor'));
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);

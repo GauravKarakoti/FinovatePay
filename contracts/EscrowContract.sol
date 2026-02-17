@@ -186,13 +186,6 @@ contract EscrowContract is ReentrancyGuard {
             discountDeadline: _discountDeadline
         });
 
-        // Interactions: External calls AFTER state updates
-        // --- NEW: Lock the Produce NFT as Collateral ---
-        // The seller must have approved the EscrowContract to spend this NFT beforehand.
-        if (_rwaNftContract != address(0)) {
-            IERC721(_rwaNftContract).transferFrom(_seller, address(this), _rwaTokenId);
-        }
-
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
         return true;
     }
