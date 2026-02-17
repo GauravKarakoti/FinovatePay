@@ -27,6 +27,19 @@ const updateSchema = async () => {
     `);
     console.log('✅ Set default value for status to CREATED.');
 
+    // Add discount columns
+    await client.query(`
+      ALTER TABLE invoices
+      ADD COLUMN IF NOT EXISTS discount_rate INTEGER DEFAULT 0;
+    `);
+    console.log('✅ Added discount_rate column.');
+
+    await client.query(`
+      ALTER TABLE invoices
+      ADD COLUMN IF NOT EXISTS discount_deadline BIGINT DEFAULT 0;
+    `);
+    console.log('✅ Added discount_deadline column.');
+
     console.log('🚀 Schema update complete!');
   } catch (err) {
     console.error('❌ Error updating schema:', err);

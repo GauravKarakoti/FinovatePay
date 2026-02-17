@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom';
-import { setNavigateFunction } from './utils/api';
-
-
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useWeb3ModalAccount } from '@web3modal/ethers/react';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -21,14 +12,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
-import InvoiceDetails from './pages/InvoiceDetails';
-import DisputeDashboard from './pages/DisputeDashboard';
-import Invoices from './pages/Invoices';
-
-import FinovateChatbot from './components/Chatbot/Chatbot';
-
-import { connectWallet } from './utils/web3';
-import Web3Modal from 'web3modal';
+import './App.css';
 import { Toaster } from 'sonner';
 
 import './App.css';
@@ -63,12 +47,7 @@ function RequireAuth({ children, allowedRoles }) {
 
 /* -------------------- App -------------------- */
 function App() {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  const [walletConnected, setWalletConnected] = useState(false);
+  const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
@@ -78,6 +57,11 @@ function App() {
     completed: 0,
     produceLots: 0,
   });
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const { resetStats } = useStatsActions();
+  
+  // Use Web3Modal v3 hooks for wallet connection state
+  const { isConnected } = useWeb3ModalAccount();
 
   /* -------------------- Effects -------------------- */
   useEffect(() => {
@@ -85,13 +69,6 @@ function App() {
 
     if (userData) {
       setUser(JSON.parse(userData));
-    }
-
-    const web3Modal = new Web3Modal({ cacheProvider: true });
-    if (web3Modal.cachedProvider) {
-      connectWallet()
-        .then(() => setWalletConnected(true))
-        .catch(() => setWalletConnected(false));
     }
   }, []);
 
@@ -136,31 +113,115 @@ function App() {
     <Router>
       <NavigationSetup />
       <Toaster position="top" richColors />
-
-
-      <Header
-        user={user}
-        onLogout={handleLogout}
-        walletConnected={walletConnected}
-        onUserUpdate={setUser}
-      />
-
-      <main>
-        <Routes>
-          {/* Root */}
-          <Route
-            path="/"
-            element={
-              user ? (
-                user.role === 'admin'
-                  ? renderDashboard(<AdminDashboard activeTab={activeTab} />)
-                  : user.role === 'buyer'
-                  ? <Navigate to="/buyer" />
-                  : user.role === 'shipment' || user.role === 'warehouse'
-                  ? <Navigate to="/shipment" />
-                  : user.role === 'investor'
-                  ? <Navigate to="/investor" />
-                  : renderDashboard(<SellerDashboard activeTab={activeTab} />)
+      <div className="App">
+        <Header 
+            user={user} 
+            onLogout={handleLogout} 
+            walletConnected={isConnected}
+            onUserUpdate={setUser}
+        />
+        {console.log('Current user role in App.jsx:', user)}
+        <main>
+          <Routes>
+            {/* Home route - keeps existing role-based logic */}
+            <Route 
+                path="/" 
+                element={
+                    user ? (
+                        user.role === 'admin' ? (
+                            renderDashboard(<AdminDashboard activeTab={activeTab} />)
+                        ) : user.role === 'buyer' ? (
+                            <Navigate to="/buyer" />
+                        ) : user.role === 'shipment' || user.role === 'warehouse' ? (
+                            <Navigate to="/shipment" />
+                        ) : user.role === 'investor' ? (
+                            <Navigate to="/investor" />
+                        ) : (
+                            renderDashboard(<SellerDashboard activeTab={activeTab} />)
+                        )
+                    ) : (
+                        <Navigate to="/login" />
+                    )
+                } 
+            />
+            
+            {/* ✅ PROTECTED: Buyer */}
+            <Route 
+                path="/buyer" 
+                element={
+                    <RequireAuth allowedRoles={['buyer']}>
+                        {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
+                    </RequireAuth>
+                }
+            />
+            
+            {/* ✅ PROTECTED: Investor */}
+            <Route 
+                path="/investor" 
+                element={
+                    <RequireAuth allowedRoles={['investor']}>
+                        {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
+                    </RequireAuth>
+                }
+            />
+            
+            {/* ✅ PROTECTED: Admin */}
+            <Route 
+              path="/admin"
+              element={
+                <RequireAuth allowedRoles={['admin']}>
+                    {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
+                </RequireAuth>
+              } 
+            />
+            
+            {/* ✅ PROTECTED: Shipment/Warehouse */}
+            <Route 
+              path="/shipment" 
+              element={
+                <RequireAuth allowedRoles={['shipment', 'warehouse']}>
+                    <ShipmentDashboard />
+                </RequireAuth>
+              } 
+            />
+            
+            {/* Public: Produce History */}
+            <Route 
+              path="/produce/:lotId" 
+              element={<ProduceHistory />}
+            />
+            
+            {/* Auth Pages */}
+            <Route 
+              path="/login" 
+              element={
+                user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
+              } 
+            />
+            <Route 
+              path="/register" 
+              element={
+                user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
+              } 
+            />
+          </Routes>
+        </main>
+        
+        {/* Chatbot UI */}
+        {user && (
+          <>
+            <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
+              {isChatbotOpen && <FinovateChatbot />}
+            </div>
+            <button
+              onClick={toggleChatbot}
+              className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-opacity-50 transition-transform transform hover:scale-110 z-[1000]"
+              aria-label="Toggle Chatbot"
+            >
+              {isChatbotOpen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               ) : (
                 <Navigate to="/login" />
               )

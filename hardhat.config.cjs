@@ -4,14 +4,20 @@ require("dotenv").config();
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: {
-    compilers: [
-      {
+    solidity: {
         version: "0.8.20",
         settings: {
-          evmVersion: "cancun",
-          optimizer: { enabled: true, runs: 200 },
-          viaIR: true
+            optimizer: {
+                enabled: true,
+                runs: 200
+            },
+            viaIR: true
+        }
+    },
+    networks: {
+        amoy: {
+            url: process.env.ALCHEMY_AMOY_URL,
+            accounts: [process.env.PRIVATE_KEY]
         }
       },
       {
