@@ -28,3 +28,5 @@ jobs:
         run: cd backend && npm run test:backend
       - name: Compile contracts
         run: npx hardhat compile
+      - name: Test contracts
+        run: npx hardhat test
