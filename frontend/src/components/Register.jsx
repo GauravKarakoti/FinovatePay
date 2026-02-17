@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { register } from '../utils/api';
 
+const inputClass =
+  'block w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50/50 text-gray-900 placeholder-gray-400 transition-all duration-200 focus:bg-white focus:border-finovate-blue-500 focus:ring-2 focus:ring-finovate-blue-500/20 focus:outline-none sm:text-sm';
+
 const Register = ({ onLogin }) => {
   const [formData, setFormData] = useState({
     firstName: '',
@@ -50,30 +53,27 @@ const Register = ({ onLogin }) => {
     'block w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-200 focus:border-finovate-blue-500 focus:ring-2 focus:ring-finovate-blue-500/20 focus:outline-none sm:text-sm';
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
-      {/* Left branding panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-finovate-blue-700 via-finovate-blue-600 to-finovate-blue-800 relative overflow-hidden">
-        {/* Decorative shapes */}
-        <div className="absolute -top-24 -left-24 w-96 h-96 bg-white/5 rounded-full" />
-        <div className="absolute bottom-12 -right-20 w-80 h-80 bg-white/5 rounded-full" />
-        <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-white/5 rounded-full" />
-
-        <div className="relative z-10 flex flex-col justify-center px-16 text-white max-w-lg mx-auto">
-          {/* Logo */}
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="text-2xl font-bold tracking-tight">FinovatePay</span>
+    <div className="min-h-screen flex">
+      {/* Left: Brand panel (hidden on small screens) */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-finovate-blue-700 via-finovate-blue-800 to-finovate-blue-900">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-72 h-72 rounded-full bg-white blur-3xl" />
+          <div className="absolute bottom-32 right-16 w-96 h-96 rounded-full bg-finovate-green-400 blur-3xl" />
+        </div>
+        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">FinovatePay</h1>
           </div>
-
-          <h1 className="text-4xl font-extrabold leading-tight mb-4">
-            Start trading with<br />confidence today
-          </h1>
-          <p className="text-finovate-blue-100 text-lg leading-relaxed mb-12">
-            Join the next-generation trade finance platform and unlock seamless cross-border payments, smart invoicing, and blockchain-backed escrow.
+          <div className="space-y-6">
+            <h2 className="text-3xl xl:text-4xl font-bold leading-tight">
+              Join the platform built for supply chain payments.
+            </h2>
+            <p className="text-finovate-blue-200 text-lg max-w-md">
+              Create your account to connect with buyers and sellers, manage escrows, and grow your business with confidence.
+            </p>
+          </div>
+          <p className="text-finovate-blue-300 text-sm">
+            © FinovatePay. Built for trust and transparency.
           </p>
 
           {/* Feature cards */}
@@ -95,254 +95,185 @@ const Register = ({ onLogin }) => {
         </div>
       </div>
 
-      {/* Right form panel */}
-      <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8 lg:px-12">
-        <div className="w-full max-w-md">
-          {/* Mobile logo */}
-          <div className="flex lg:hidden items-center gap-2 mb-8 justify-center">
-            <div className="w-9 h-9 rounded-lg bg-finovate-blue-600 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-gray-900">FinovatePay</span>
+      {/* Right: Register form */}
+      <div className="w-full lg:w-1/2 flex flex-col bg-gray-50/80 px-6 py-8 sm:px-12 lg:px-16 overflow-y-auto">
+        <div className="mx-auto w-full max-w-md flex flex-col min-h-full justify-center py-8">
+          {/* Mobile brand */}
+          <div className="lg:hidden text-center mb-6">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-finovate-blue-600 to-finovate-blue-800 bg-clip-text text-transparent">
+              FinovatePay
+            </h1>
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-              Create your account
-            </h2>
-            <p className="mt-2 text-sm text-gray-500">
-              Already have an account?{' '}
-              <Link to="/login" className="font-semibold text-finovate-blue-600 hover:text-finovate-blue-500 transition-colors">
-                Sign in
-              </Link>
-            </p>
-          </div>
-
-          {/* Error alert */}
-          {error && (
-            <div className="mb-6 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 animate-in fade-in">
-              <svg className="h-5 w-5 flex-shrink-0 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <p className="text-sm font-medium text-red-700">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name row */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  First name
-                </label>
-                <input
-                  id="firstName"
-                  name="firstName"
-                  type="text"
-                  autoComplete="given-name"
-                  required
-                  className={inputBase}
-                  placeholder="John"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                />
-              </div>
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Last name
-                </label>
-                <input
-                  id="lastName"
-                  name="lastName"
-                  type="text"
-                  autoComplete="family-name"
-                  required
-                  className={inputBase}
-                  placeholder="Doe"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                />
-              </div>
+          <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/60 border border-gray-100 p-8 sm:p-10">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                Create your account
+              </h2>
+              <p className="mt-1.5 text-gray-500 text-sm">
+                Get started with FinovatePay in a few steps.
+              </p>
             </div>
 
-            {/* Company */}
-            <div>
-              <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Company name
-              </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
+            <form className="space-y-5" onSubmit={handleSubmit}>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    First name
+                  </label>
+                  <input
+                    id="firstName"
+                    name="firstName"
+                    type="text"
+                    autoComplete="given-name"
+                    required
+                    className={inputClass}
+                    placeholder="Jane"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                  />
                 </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Last name
+                  </label>
+                  <input
+                    id="lastName"
+                    name="lastName"
+                    type="text"
+                    autoComplete="family-name"
+                    required
+                    className={inputClass}
+                    placeholder="Doe"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Company name
+                </label>
                 <input
                   id="companyName"
                   name="companyName"
                   type="text"
                   autoComplete="organization"
                   required
-                  className={`${inputBase} pl-10`}
-                  placeholder="Acme Inc."
+                  className={inputClass}
+                  placeholder="Acme Trading Co."
                   value={formData.companyName}
                   onChange={handleChange}
                 />
               </div>
-            </div>
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Email address
-              </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
-                  </svg>
-                </div>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Email address
+                </label>
                 <input
                   id="email"
                   name="email"
                   type="email"
                   autoComplete="email"
                   required
-                  className={`${inputBase} pl-10`}
-                  placeholder="you@company.com"
+                  className={inputClass}
+                  placeholder="you@example.com"
                   value={formData.email}
                   onChange={handleChange}
                 />
               </div>
-            </div>
 
-            {/* Wallet */}
-            <div>
-              <label htmlFor="walletAddress" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Wallet address
-              </label>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 013 6v3" />
-                  </svg>
-                </div>
+              <div>
+                <label htmlFor="walletAddress" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Wallet address
+                </label>
                 <input
                   id="walletAddress"
                   name="walletAddress"
                   type="text"
                   required
-                  className={`${inputBase} pl-10 font-mono text-xs`}
-                  placeholder="0x1234...abcd"
+                  className={inputClass}
+                  placeholder="0x..."
                   value={formData.walletAddress}
                   onChange={handleChange}
                 />
               </div>
-            </div>
 
-            {/* Password fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Password
-                </label>
-                <div className="relative">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Password
+                  </label>
                   <input
                     id="password"
                     name="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type="password"
                     autoComplete="new-password"
                     required
-                    className={`${inputBase} pr-10`}
+                    className={inputClass}
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleChange}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                      </svg>
-                    ) : (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
                 </div>
-              </div>
-
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Confirm
-                </label>
-                <div className="relative">
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Confirm password
+                  </label>
                   <input
                     id="confirmPassword"
                     name="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
+                    type="password"
                     autoComplete="new-password"
                     required
-                    className={`${inputBase} pr-10`}
+                    className={inputClass}
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={handleChange}
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
-                    tabIndex={-1}
-                  >
-                    {showConfirmPassword ? (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                      </svg>
-                    ) : (
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    )}
-                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="relative w-full rounded-lg bg-finovate-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-finovate-blue-700 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-finovate-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              {error && (
+                <div className="rounded-xl bg-red-50 border border-red-100 p-4 flex gap-3">
+                  <svg className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
-                  Creating account...
-                </span>
-              ) : (
-                'Create account'
+                  <p className="text-sm font-medium text-red-800">{error}</p>
+                </div>
               )}
-            </button>
-          </form>
 
-          {/* Footer */}
-          <p className="mt-8 text-center text-xs text-gray-400">
-            By creating an account you agree to our{' '}
-            <a href="#" className="underline hover:text-gray-600 transition-colors">Terms of Service</a>{' '}
-            and{' '}
-            <a href="#" className="underline hover:text-gray-600 transition-colors">Privacy Policy</a>
-          </p>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex justify-center items-center gap-2 py-3.5 px-4 rounded-xl text-sm font-semibold text-white bg-finovate-blue-600 hover:bg-finovate-blue-700 active:bg-finovate-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-finovate-blue-500 disabled:opacity-60 disabled:pointer-events-none transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                {loading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Creating account...
+                  </>
+                ) : (
+                  'Create account'
+                )}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-sm text-gray-500">
+              Already have an account?{' '}
+              <Link
+                to="/login"
+                className="font-semibold text-finovate-blue-600 hover:text-finovate-blue-700 transition-colors"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>
