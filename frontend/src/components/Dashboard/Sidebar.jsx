@@ -2,6 +2,7 @@ import React from 'react';
 import { useStats } from '../../context/StatsContext';
 import { updateCurrentUserRole } from '../../utils/api';
 import { disconnectWallet } from '../../utils/web3';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onClose }) => {
   const { stats } = useStats();
@@ -22,6 +23,8 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
     await disconnectWallet();
     window.location.reload();
   };
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
@@ -43,6 +46,30 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
   }
 
   const visibleTabs = user?.role === 'investor' ? tabs.filter(tab => !['quotations', 'invoices', 'payments', 'produce', 'escrow'].includes(tab.id)) : tabs;
+
+  const isInvoicesPage = location.pathname === '/invoices';
+  // If on invoices page, force activeTab to 'invoices' regardless of prop
+  const currentTab = isInvoicesPage ? 'invoices' : activeTab;
+
+  const handleTabClick = (tabId) => {
+    if (tabId === 'invoices') {
+      navigate('/invoices');
+      onTabChange('invoices');
+    } else {
+      // Determine dashboard root based on role
+      let dashboardPath = '/';
+      if (user?.role === 'buyer') dashboardPath = '/buyer';
+      if (user?.role === 'admin') dashboardPath = '/admin';
+      if (user?.role === 'investor') dashboardPath = '/investor';
+      if (user?.role === 'shipment' || user?.role === 'warehouse') dashboardPath = '/shipment';
+
+      if (isInvoicesPage) {
+          navigate(dashboardPath);
+      }
+      onTabChange(tabId);
+    }
+  };
+
   return (
     <div className="bg-white shadow-md rounded-lg p-4 h-full md:h-fit flex flex-col overflow-y-auto">
       <div className="flex justify-between items-center mb-4">
@@ -62,9 +89,9 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
         {visibleTabs.map(tab => (
           <li key={tab.id}>
             <button
-              onClick={() => onTabChange(tab.id)}
+              onClick={() => handleTabClick(tab.id)}
               className={`w-full text-left px-4 py-2 rounded-md transition-colors flex items-center space-x-2 ${
-                activeTab === tab.id
+                currentTab === tab.id
                   ? 'bg-finovate-blue-100 text-finovate-blue-800 font-medium'
                   : 'hover:bg-gray-100'
               }`}
