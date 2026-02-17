@@ -682,7 +682,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Buyer Dashboard</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Buyer Dashboard</h1>
             <p className="mt-1 text-sm text-gray-500">
               Wallet: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
             </p>

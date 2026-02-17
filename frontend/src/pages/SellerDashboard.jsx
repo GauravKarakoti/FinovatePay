@@ -774,7 +774,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <header className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Seller Dashboard</h1>
           <p className="mt-1 text-sm text-gray-500">
             Manage produce, invoices, and financing
           </p>

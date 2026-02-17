@@ -1,8 +1,28 @@
 import React from 'react';
 import { useStats } from '../../context/StatsContext';
+import { updateCurrentUserRole } from '../../utils/api';
+import { disconnectWallet } from '../../utils/web3';
 
-const Sidebar = ({ activeTab, onTabChange, user }) => {
+const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onClose }) => {
   const { stats } = useStats();
+
+  const handleRoleSwitch = async (newRole) => {
+    try {
+      const response = await updateCurrentUserRole(newRole);
+      if (response && response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Failed to switch role:', error);
+    }
+  };
+
+  const handleWalletDisconnect = async () => {
+    await disconnectWallet();
+    window.location.reload();
+  };
+
   const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'quotations', label: 'Quotations', icon: '💬' },
@@ -24,9 +44,21 @@ const Sidebar = ({ activeTab, onTabChange, user }) => {
 
   const visibleTabs = user?.role === 'investor' ? tabs.filter(tab => !['quotations', 'invoices', 'payments', 'produce', 'escrow'].includes(tab.id)) : tabs;
   return (
-    <div className="bg-white shadow-md rounded-lg p-4 h-fit">
-      <h2 className="text-lg font-semibold mb-4">Navigation</h2>
-      <ul className="space-y-2">
+    <div className="bg-white shadow-md rounded-lg p-4 h-full md:h-fit flex flex-col overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Navigation</h2>
+        <button
+          onClick={onClose}
+          className="md:hidden text-gray-500 hover:text-gray-700 focus:outline-none p-2"
+          aria-label="Close Sidebar"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <ul className="space-y-2 flex-grow">
         {visibleTabs.map(tab => (
           <li key={tab.id}>
             <button
@@ -61,6 +93,54 @@ const Sidebar = ({ activeTab, onTabChange, user }) => {
                   <span className="font-medium">{displayStats.completed}</span>
               </div>
           </div>
+      </div>
+
+      {/* Mobile Account Actions */}
+      <div className="mt-8 md:hidden border-t pt-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Account</h3>
+
+        {user?.role !== 'admin' && (
+           <div className="flex flex-col space-y-2 mb-4">
+             {user.role === 'buyer' ? <>
+                 <button onClick={() => handleRoleSwitch('seller')} className="w-full text-left px-4 py-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100 font-medium">Switch to Seller</button>
+                 <button onClick={() => handleRoleSwitch('shipment')} className="w-full text-left px-4 py-2 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Switch to Shipment</button>
+                 <button onClick={() => handleRoleSwitch('investor')} className="w-full text-left px-4 py-2 rounded-md bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium">Switch to Investor</button>
+             </> : user.role === 'seller' ? <>
+                 <button onClick={() => handleRoleSwitch('buyer')} className="w-full text-left px-4 py-2 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">Switch to Buyer</button>
+                 <button onClick={() => handleRoleSwitch('shipment')} className="w-full text-left px-4 py-2 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Switch to Shipment</button>
+                 <button onClick={() => handleRoleSwitch('investor')} className="w-full text-left px-4 py-2 rounded-md bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium">Switch to Investor</button>
+             </> : user.role === 'shipment' ? <>
+                 <button onClick={() => handleRoleSwitch('buyer')} className="w-full text-left px-4 py-2 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">Switch to Buyer</button>
+                 <button onClick={() => handleRoleSwitch('seller')} className="w-full text-left px-4 py-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100 font-medium">Switch to Seller</button>
+                 <button onClick={() => handleRoleSwitch('investor')} className="w-full text-left px-4 py-2 rounded-md bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium">Switch to Investor</button>
+             </> : <>
+                 <button onClick={() => handleRoleSwitch('buyer')} className="w-full text-left px-4 py-2 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">Switch to Buyer</button>
+                 <button onClick={() => handleRoleSwitch('seller')} className="w-full text-left px-4 py-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100 font-medium">Switch to Seller</button>
+                 <button onClick={() => handleRoleSwitch('shipment')} className="w-full text-left px-4 py-2 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Switch to Shipment</button>
+             </>}
+           </div>
+        )}
+
+        {walletConnected && (
+          <button
+            onClick={handleWalletDisconnect}
+            className="w-full text-left px-4 py-2 text-finovate-blue-600 hover:bg-finovate-blue-50 rounded-md flex items-center gap-2 font-medium"
+          >
+            <span>Disconnect Wallet</span>
+          </button>
+        )}
+
+        <button
+          onClick={onLogout}
+          className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-md flex items-center gap-2 font-medium"
+        >
+          <span>Logout</span>
+        </button>
+
+        <div className="mt-4 flex items-center gap-3 px-2 py-2 bg-gray-50 rounded-lg">
+            <img src="/pfp.jpg" className="w-8 h-8 rounded-full object-cover" alt="User" />
+            <div className="text-sm font-medium truncate text-gray-700">{user?.email}</div>
+        </div>
       </div>
     </div>
   );
