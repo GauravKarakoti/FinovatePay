@@ -19,17 +19,27 @@ router.get('/lots/available', authenticateToken, async (req, res) => {
         `;
         const result = await pool.query(query);
 
-        // Enhance lots with live market data
-        const lotsWithMarketPrice = await Promise.all(result.rows.map(async (lot) => {
-            const marketPrice = await marketService.getPricePerKg(lot.produce_type);
-            return {
-                ...lot,
-                // Override the 'price' field with the live market price.
-                // If fetching fails, fallback to the original price stored in the DB, or 0.
-                price: marketPrice !== null ? marketPrice : (lot.price / 50.75 || 0),
-            };
+        // Enhance lots with live market data.
+        // Fetch market prices per unique crop only once and reuse (reduces N external calls).
+        const rows = result.rows || [];
+        const uniqueCrops = [...new Set(rows.map(r => String(r.produce_type || '').toLowerCase()))].filter(Boolean);
+
+        const pricePairs = await Promise.all(uniqueCrops.map(async (crop) => {
+          const p = await marketService.getPricePerKg(crop).catch(() => null);
+          return [crop, p];
         }));
-        
+
+        const priceMap = pricePairs.reduce((m, [c, p]) => { m[c] = p; return m; }, {});
+
+        const lotsWithMarketPrice = rows.map(lot => {
+          const cropKey = String(lot.produce_type || '').toLowerCase();
+          const marketPrice = priceMap[cropKey];
+          return {
+            ...lot,
+            price: marketPrice !== null && marketPrice !== undefined ? marketPrice : (lot.price / 50.75 || 0),
+          };
+        });
+
         res.json(lotsWithMarketPrice);
     } catch (error) {
         console.error('Error getting available lots:', error);

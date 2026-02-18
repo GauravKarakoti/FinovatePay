@@ -11,6 +11,10 @@ const mockMarketPrices = [
     { cropId: 'wheat', cropName: 'Wheat', price: 2200, unit: 'quintal', location: 'Punjab', date: new Date(), trend: 'stable' }
 ];
 
+// Simple in-memory cache for price lookups to avoid repeated external requests
+const PRICE_CACHE_TTL = parseInt(process.env.MARKET_PRICE_CACHE_TTL_MS, 10) || 5 * 60 * 1000; // 5 minutes
+const priceCache = new Map();
+
 /**
  * Fetches the latest market prices for a given crop.
  * @param {string} crop - The name of the crop (e.g., "Wheat").
@@ -66,6 +70,12 @@ async function fetchLivePrices(crop, state) {
  */
 async function getPricePerKg(crop) {
     if (!crop) return null;
+    const key = String(crop).toLowerCase();
+    const cached = priceCache.get(key);
+    if (cached && (Date.now() - cached.ts) < PRICE_CACHE_TTL) {
+        return cached.price;
+    }
+
     const prices = await fetchLivePrices(crop);
     if (prices.length === 0) return null;
 
@@ -75,8 +85,9 @@ async function getPricePerKg(crop) {
     
     // Convert from quintal (100kg) to kg and format to 2 decimal places
     const pricePerKg = averagePricePerQuintal / 100;
-    
-    return parseFloat(pricePerKg.toFixed(2));
+    const value = parseFloat(pricePerKg.toFixed(2));
+    priceCache.set(key, { price: value, ts: Date.now() });
+    return value;
 }
 
 module.exports = { fetchLivePrices, getPricePerKg };
