@@ -178,6 +178,17 @@ class Invoice {
     const { rows } = await pool.query(query, [invoiceId]);
     return rows[0];
   }
+
+  static async findByIds(ids = []) {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    const query = `
+      SELECT *
+      FROM invoices
+      WHERE id = ANY($1)
+    `;
+    const { rows } = await pool.query(query, [ids]);
+    return rows;
+  }
 }
 
 module.exports = Invoice;

@@ -65,14 +65,26 @@ const startSyncWorker = () => {
   console.log('👷 Starting Invoice Sync Worker...');
   setInterval(async () => {
     try {
-      // Fetch pending invoices
-      const result = await pool.query(
-        "SELECT invoice_id FROM invoices WHERE status NOT IN ('RELEASED', 'CANCELLED', 'FAILED', 'SETTLED')"
-      );
-      const invoices = result.rows;
+      // Fetch a bounded batch of pending invoices to avoid pulling a huge result set
+      const BATCH_SIZE = parseInt(process.env.ESCROW_SYNC_BATCH_SIZE, 10) || 100;
+      const CONCURRENCY = parseInt(process.env.ESCROW_SYNC_CONCURRENCY, 10) || 8;
 
-      for (const inv of invoices) {
-        await syncInvoiceStatus(inv.invoice_id);
+      const result = await pool.query(
+        "SELECT invoice_id FROM invoices WHERE status NOT IN ('RELEASED', 'CANCELLED', 'FAILED', 'SETTLED') LIMIT $1",
+        [BATCH_SIZE]
+      );
+      const invoices = result.rows || [];
+
+      // Process invoices in small concurrent batches to balance throughput and RPC load
+      const chunkArray = (arr, size) => {
+        const chunks = [];
+        for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+        return chunks;
+      };
+
+      const invChunks = chunkArray(invoices, CONCURRENCY);
+      for (const chunk of invChunks) {
+        await Promise.all(chunk.map(inv => syncInvoiceStatus(inv.invoice_id)));
       }
     } catch (err) {
       console.error('Worker Error:', err);

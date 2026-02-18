@@ -175,22 +175,32 @@ router.get("/portfolio", authenticateToken, isInvestor, async (req, res) => {
       "Token balances fetched:",
       balances.map((b) => b.toString()),
     );
-    for (let i = 0; i < tokenIds.length; i++) {
-      // Note: Balances from ethers.js are BigNumbers, web3.js returns strings.
-      // .toString() works for both.
+
+    // Collect non-zero balances and batch-fetch invoices in a single DB call
+    const nonZeroIndexes = balances
+      .map((b, idx) => (b.toString && b.toString() !== '0' ? idx : -1))
+      .filter(i => i !== -1);
+
+    const invoiceIdsToFetch = nonZeroIndexes
+      .map(i => invoiceIdMap[tokenIds[i]])
+      .filter(Boolean);
+
+    const invoices = await Invoice.findByIds(invoiceIdsToFetch);
+    const invoiceById = invoices.reduce((m, inv) => { m[inv.id] = inv; return m; }, {});
+
+    for (const i of nonZeroIndexes) {
       const balance = balances[i].toString();
-      if (balance !== "0") {
-        const invoice = await Invoice.findByPk(invoiceIdMap[tokenIds[i]]);
-        console.log("Found invoice for token ID", tokenIds[i], ":", invoice);
-        if (invoice) {
-          portfolio.push({
-            invoice: invoice, // Contains all invoice details (amount, maturity_date, etc.)
-            tokens_owned: balance,
-            token_id: tokenIds[i],
-          });
-        }
+      const invoiceDbId = invoiceIdMap[tokenIds[i]];
+      const invoice = invoiceById[invoiceDbId];
+      if (invoice) {
+        portfolio.push({
+          invoice,
+          tokens_owned: balance,
+          token_id: tokenIds[i],
+        });
       }
     }
+
     res.json(portfolio);
   } catch (err) {
     console.error(err.message);
