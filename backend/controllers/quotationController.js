@@ -7,25 +7,27 @@ const AppError = require('../utils/AppError');
 // ---------------- CREATE QUOTATION ----------------
 exports.createQuotation = asyncHandler(async (req, res) => {
   const {
-    lot_id,
-    seller_address,
-    buyer_address,
+    lotId,
+    sellerAddress,
+    buyerAddress,
     quantity,
-    price_per_unit,
+    pricePerUnit,
     description,
   } = req.body;
 
-  const creator_address = req.user.wallet_address;
+  const creatorAddress = req.user.wallet_address;
 
-  let final_seller_address = seller_address;
-  let final_buyer_address = buyer_address;
-  let final_price_per_unit = price_per_unit;
+  let finalSellerAddress = sellerAddress;
+  let finalBuyerAddress = buyerAddress;
+  let finalPricePerUnit = pricePerUnit;
   let status;
-  let final_description = description;
+  let finalDescription = description;
+
 
   // Flow 1: Buyer creates quotation for on-platform produce
-  if (lot_id) {
-    if (!seller_address) {
+  if (lotId) {
+    if (!sellerAddress) {
+
       throw new AppError(
         'Seller address is required for produce quotations.',
         400
@@ -34,7 +36,8 @@ exports.createQuotation = asyncHandler(async (req, res) => {
 
     const lotQuery =
       'SELECT produce_type, current_quantity FROM produce_lots WHERE lot_id = $1';
-    const lotResult = await pool.query(lotQuery, [lot_id]);
+    const lotResult = await pool.query(lotQuery, [lotId]);
+
 
     if (lotResult.rows.length === 0) {
       throw new AppError('Produce lot not found.', 404);
@@ -57,42 +60,45 @@ exports.createQuotation = asyncHandler(async (req, res) => {
       );
     }
 
-    final_price_per_unit = marketPrice;
-    final_description = `${quantity}kg of ${lot.produce_type} from lot #${lot_id}`;
-    final_buyer_address = creator_address;
+    finalPricePerUnit = marketPrice;
+    finalDescription = `${quantity}kg of ${lot.produce_type} from lot #${lotId}`;
+    finalBuyerAddress = creatorAddress;
+
     status = 'pending_seller_approval';
   }
   // Flow 2: Seller creates off-platform quotation
   else {
-    if (!buyer_address) {
+    if (!buyerAddress) {
       throw new AppError(
         'Buyer address is required for off-platform quotations.',
         400
       );
     }
 
-    if (!price_per_unit) {
+    if (!pricePerUnit) {
       throw new AppError(
         'Price must be specified for off-platform quotations.',
         400
       );
     }
 
-    final_seller_address = creator_address;
+    finalSellerAddress = creatorAddress;
+
     status = 'pending_buyer_approval';
   }
 
   if (
-    !final_seller_address ||
-    !final_buyer_address ||
+    !finalSellerAddress ||
+    !finalBuyerAddress ||
     !quantity ||
-    !final_price_per_unit
+    !finalPricePerUnit
   ) {
+
     throw new AppError('Missing required fields for quotation.', 400);
   }
 
-  const total_amount =
-    parseFloat(quantity) * parseFloat(final_price_per_unit);
+  const totalAmount =
+    parseFloat(quantity) * parseFloat(finalPricePerUnit);
 
   const query = `
     INSERT INTO quotations 
@@ -103,17 +109,18 @@ exports.createQuotation = asyncHandler(async (req, res) => {
   `;
 
   const values = [
-    lot_id || null,
-    creator_address,
-    final_seller_address,
-    final_buyer_address,
+    lotId || null,
+    creatorAddress,
+    finalSellerAddress,
+    finalBuyerAddress,
     quantity,
-    final_price_per_unit,
-    total_amount,
+    finalPricePerUnit,
+    totalAmount,
     'MATIC',
-    final_description,
+    finalDescription,
     status,
   ];
+
 
   const result = await pool.query(query, values);
 
@@ -126,7 +133,7 @@ exports.createQuotation = asyncHandler(async (req, res) => {
 // ---------------- SELLER APPROVES ----------------
 exports.sellerApproveQuotation = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const seller_address = req.user.wallet_address;
+  const sellerAddress = req.user.wallet_address;
 
   const query = `
     UPDATE quotations 
@@ -135,7 +142,8 @@ exports.sellerApproveQuotation = asyncHandler(async (req, res) => {
     RETURNING *
   `;
 
-  const result = await pool.query(query, [id, seller_address]);
+  const result = await pool.query(query, [id, sellerAddress]);
+
 
   if (result.rows.length === 0) {
     throw new AppError(
@@ -153,7 +161,7 @@ exports.sellerApproveQuotation = asyncHandler(async (req, res) => {
 // ---------------- BUYER APPROVES ----------------
 exports.buyerApproveQuotation = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const buyer_address = req.user.wallet_address;
+  const buyerAddress = req.user.wallet_address;
 
   const query = `
     UPDATE quotations 
@@ -162,7 +170,8 @@ exports.buyerApproveQuotation = asyncHandler(async (req, res) => {
     RETURNING *
   `;
 
-  const result = await pool.query(query, [id, buyer_address]);
+  const result = await pool.query(query, [id, buyerAddress]);
+
 
   if (result.rows.length === 0) {
     throw new AppError(
@@ -179,7 +188,7 @@ exports.buyerApproveQuotation = asyncHandler(async (req, res) => {
 
 // ---------------- GET USER QUOTATIONS ----------------
 exports.getQuotations = asyncHandler(async (req, res) => {
-  const user_address = req.user.wallet_address;
+  const userAddress = req.user.wallet_address;
 
   const query = `
     SELECT q.*, p.produce_type
@@ -189,7 +198,8 @@ exports.getQuotations = asyncHandler(async (req, res) => {
     ORDER BY q.created_at DESC
   `;
 
-  const result = await pool.query(query, [user_address]);
+  const result = await pool.query(query, [userAddress]);
+
 
   res.json({
     success: true,
@@ -200,7 +210,7 @@ exports.getQuotations = asyncHandler(async (req, res) => {
 // ---------------- REJECT QUOTATION ----------------
 exports.rejectQuotation = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const user_address = req.user.wallet_address;
+  const userAddress = req.user.wallet_address;
 
   const query = `
     UPDATE quotations 
@@ -211,7 +221,8 @@ exports.rejectQuotation = asyncHandler(async (req, res) => {
     RETURNING *
   `;
 
-  const result = await pool.query(query, [id, user_address]);
+  const result = await pool.query(query, [id, userAddress]);
+
 
   if (result.rows.length === 0) {
     throw new AppError(
@@ -228,7 +239,7 @@ exports.rejectQuotation = asyncHandler(async (req, res) => {
 
 // ---------------- PENDING BUYER APPROVALS ----------------
 exports.getPendingBuyerApprovals = asyncHandler(async (req, res) => {
-  const buyer_address = req.user.wallet_address;
+  const buyerAddress = req.user.wallet_address;
 
   const query = `
     SELECT 
@@ -243,7 +254,8 @@ exports.getPendingBuyerApprovals = asyncHandler(async (req, res) => {
     ORDER BY q.created_at DESC
   `;
 
-  const result = await pool.query(query, [buyer_address]);
+  const result = await pool.query(query, [buyerAddress]);
+
 
   res.json({
     success: true,
