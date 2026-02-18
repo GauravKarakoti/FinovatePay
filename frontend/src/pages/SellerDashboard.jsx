@@ -515,6 +515,10 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* HEADER */}
         <header className="mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Seller Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage produce, invoices, and financing
+          </p>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
