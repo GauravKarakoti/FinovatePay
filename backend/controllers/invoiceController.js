@@ -43,6 +43,22 @@ exports.createInvoice = async (req, res) => {
       });
     }
 
+        if (quotationResult.rows.length === 0) {
+            throw new Error('Quotation not found, not fully approved, or already invoiced.');
+        }
+        const quotation = quotationResult.rows[0];
+        
+        // FIX: Add Quantity Validation
+        if (!quotation.quantity || quotation.quantity <= 0) {
+             await client.query('ROLLBACK');
+             return res.status(400).json({ error: "Invalid quantity in quotation" });
+        }
+
+        // TWEAK: RBAC - Check Organization ID instead of Wallet Address
+        // This allows any authorized user in the company to process the invoice
+        if (quotation.seller_org_id !== req.user.organization_id) {
+            throw new Error('Not authorized: Quotation belongs to a different organization.');
+        }
     await client.query('BEGIN');
 
     // 1. Lock & validate quotation
@@ -173,7 +189,8 @@ exports.createInvoice = async (req, res) => {
             JSON.stringify([{
                 description: quotation.description,
                 quantity: quotation.quantity,
-                price_per_unit: quotation.price_per_unit / EXCHANGE_RATE
+                // Use env variable or fallback
+                price_per_unit: quotation.price_per_unit / (parseFloat(process.env.EXCHANGE_RATE) || 50.75)
             }]),
             quotation.currency, contract_address, token_address,
             quotation.lot_id, quotation_id, tx_hash || null,

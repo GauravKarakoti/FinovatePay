@@ -244,6 +244,17 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Allows the owner to withdraw any accumulated native currency.
+     * Protected against reentrancy.
+     */
+    function withdraw() external onlyOwner nonReentrant {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+
+        (bool success, ) = payable(msg.sender).call{value: balance}("");
+        require(success, "Transfer failed");
+    }
+}
      * @notice Request financing using FractionTokens as collateral via WaltBridge to Katana liquidity.
      */
     function requestFinancing(
