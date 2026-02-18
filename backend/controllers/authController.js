@@ -5,14 +5,16 @@ const jwt = require('jsonwebtoken');
 // --- REGISTER USER ---
 exports.register = async (req, res) => {
   // 1. Get data from the form
-  const { name, email, password, wallet_address, company_name, phone } = req.body;
+  const { name, email, password, walletAddress, companyName, phone } = req.body;
+
 
   try {
     // 2. Check if user already exists
     const userCheck = await pool.query(
       'SELECT * FROM users WHERE email = $1 OR wallet_address = $2', 
-      [email, wallet_address]
+      [email, walletAddress]
     );
+
     
     if (userCheck.rows.length > 0) {
       return res.status(400).json({ error: 'User already exists with this Email or Wallet' });
@@ -27,8 +29,9 @@ exports.register = async (req, res) => {
       `INSERT INTO users (name, email, password, wallet_address, company_name, phone, role, kyc_status)
        VALUES ($1, $2, $3, $4, $5, $6, 'seller', 'pending') 
        RETURNING *`,
-      [name, email, hashedPassword, wallet_address, company_name, phone]
+      [name, email, hashedPassword, walletAddress, companyName, phone]
     );
+
 
     // 5. Create Login Token
     const token = jwt.sign(

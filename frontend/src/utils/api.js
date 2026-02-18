@@ -263,9 +263,10 @@ export const getProduceTransactions = (lotId) => {
 };
 
 // --- Payment API ---
-export const depositToEscrow = (invoiceId, amount, seller_address) => {
-  return api.post('/payments/escrow/deposit', { invoiceId, amount, seller_address });
+export const depositToEscrow = (invoiceId, amount, sellerAddress) => {
+  return api.post('/payments/escrow/deposit', { invoiceId, amount, sellerAddress });
 };
+
 
 export const confirmRelease = (invoiceId) => {
   return api.post('/payments/escrow/release', { invoiceId });
@@ -309,9 +310,10 @@ export const updateUserRole = (userId, role) => {
   return api.put(`/admin/users/${userId}/role`, { role });
 };
 
-export const updateInvoiceStatus = (invoiceId, status, tx_hash, dispute_reason = '') => {
-    return api.post(`/invoices/${invoiceId}/status`, { status, tx_hash, dispute_reason });
+export const updateInvoiceStatus = (invoiceId, status, txHash, disputeReason = '') => {
+    return api.post(`/invoices/${invoiceId}/status`, { status, txHash, disputeReason });
 };
+
 
 export const resolveDispute = async (invoiceId, sellerWins) => {
   const response = await api.post('/admin/resolve-dispute', { invoiceId, sellerWins });
