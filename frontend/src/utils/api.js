@@ -17,23 +17,146 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-// Handle API errors
+// Handle API errors with comprehensive error handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Clear user data from localStorage
-      localStorage.removeItem('user');
-      // Use React Router navigation if available, fallback to hard redirect
-      if (navigateFunction) {
-        navigateFunction('/login', { replace: true });
-      } else {
-        window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Handle network errors (no response from server)
+    if (!error.response) {
+      console.error('Network error: No response from server', error);
+      
+      // Check if it's a timeout error
+      if (error.code === 'ECONNABORTED') {
+        console.error('Request timeout');
+        return Promise.reject({
+          ...error,
+          message: 'Request timed out. Please try again.',
+          isTimeout: true
+        });
       }
+      
+      // Check if user is offline
+      if (!navigator.onLine) {
+        console.error('User is offline');
+        return Promise.reject({
+          ...error,
+          message: 'You are offline. Please check your internet connection.',
+          isOffline: true
+        });
+      }
+      
+      return Promise.reject({
+        ...error,
+        message: 'Network error. Please check your connection and try again.',
+        isNetworkError: true
+      });
     }
-    return Promise.reject(error);
+    
+    const status = error.response.status;
+    const errorData = error.response.data;
+    
+    // Handle specific HTTP status codes
+    switch (status) {
+      case 400:
+        console.error('Bad request:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Invalid request. Please check your input.',
+          isValidationError: true
+        });
+        
+      case 401:
+        // Clear user data from localStorage
+        localStorage.removeItem('user');
+        // Use React Router navigation if available, fallback to hard redirect
+        if (navigateFunction) {
+          navigateFunction('/login', { replace: true });
+        } else {
+          window.location.href = '/login';
+        }
+        return Promise.reject({
+          ...error,
+          message: 'Session expired. Please log in again.',
+          isAuthError: true
+        });
+        
+      case 403:
+        console.error('Forbidden:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'You do not have permission to perform this action.',
+          isForbidden: true
+        });
+        
+      case 404:
+        console.error('Not found:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'The requested resource was not found.',
+          isNotFound: true
+        });
+        
+      case 409:
+        console.error('Conflict:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'A conflict occurred. The resource may already exist.',
+          isConflict: true
+        });
+        
+      case 422:
+        console.error('Validation error:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Validation failed. Please check your input.',
+          isValidationError: true,
+          validationErrors: errorData?.errors
+        });
+        
+      case 429:
+        console.error('Rate limited:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Too many requests. Please try again later.',
+          isRateLimited: true
+        });
+        
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        console.error('Server error:', status, errorData);
+        
+        // Retry logic for transient server errors (only for GET requests and not already retried)
+        if (originalRequest.method === 'get' && !originalRequest._retry) {
+          originalRequest._retry = true;
+          console.log(`Retrying request after ${status} error...`);
+          
+          // Wait 1 second before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          return api(originalRequest);
+        }
+        
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Server error. Please try again later.',
+          isServerError: true
+        });
+        
+      default:
+        console.error(`HTTP ${status} error:`, errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || `An error occurred (HTTP ${status}). Please try again.`,
+          status
+        });
+    }
   }
 );
+
 
 
 

@@ -27,58 +27,279 @@ const ASSETS = {
 };
 
 /**
+ * Custom error class for bridge service errors
+ */
+class BridgeServiceError extends Error {
+    constructor(message, code, originalError = null) {
+        super(message);
+        this.name = 'BridgeServiceError';
+        this.code = code;
+        this.originalError = originalError;
+    }
+}
+
+/**
+ * Helper function to handle blockchain errors
+ */
+function handleBlockchainError(error, operation) {
+    const errorMessage = error.message || String(error);
+    
+    if (errorMessage.includes('insufficient funds')) {
+        throw new BridgeServiceError(
+            'Insufficient funds for transaction. Please ensure you have enough balance.',
+            'INSUFFICIENT_FUNDS',
+            error
+        );
+    }
+    
+    if (errorMessage.includes('nonce')) {
+        throw new BridgeServiceError(
+            'Transaction nonce error. Please try again.',
+            'NONCE_ERROR',
+            error
+        );
+    }
+    
+    if (errorMessage.includes('gas')) {
+        throw new BridgeServiceError(
+            'Insufficient gas for transaction. Please try again with more gas.',
+            'GAS_ERROR',
+            error
+        );
+    }
+    
+    if (errorMessage.includes('user rejected')) {
+        throw new BridgeServiceError(
+            'Transaction was rejected by user.',
+            'USER_REJECTED',
+            error
+        );
+    }
+    
+    if (errorMessage.includes('transaction reverted')) {
+        throw new BridgeServiceError(
+            `Transaction reverted during ${operation}. Please check the contract state.`,
+            'TRANSACTION_REVERTED',
+            error
+        );
+    }
+    
+    // Generic error
+    throw new BridgeServiceError(
+        `Failed to ${operation}. Please try again later.`,
+        'UNKNOWN_ERROR',
+        error
+    );
+}
+
+/**
  * Bridge collateral to Katana (if needed)
  */
 async function bridgeToKatana(collateralTokenId, amount, userId) {
-    // Assuming collateral is FractionToken
-    const fractionTokenAddress = process.env.FRACTION_TOKEN_ADDRESS;
-    const katanaChain = ethers.keccak256(ethers.toUtf8Bytes("katana"));
-    const lockId = await bridgeAdapter.lockERC1155ForBridge(fractionTokenAddress, collateralTokenId, amount, katanaChain);
-    await bridgeAdapter.bridgeERC1155Asset(lockId, LIQUIDITY_ADAPTER_ADDRESS);
-    return { lockId };
+    try {
+        // Assuming collateral is FractionToken
+        const fractionTokenAddress = process.env.FRACTION_TOKEN_ADDRESS;
+        
+        if (!fractionTokenAddress) {
+            throw new BridgeServiceError(
+                'FractionToken address not configured',
+                'CONFIG_ERROR'
+            );
+        }
+        
+        const katanaChain = ethers.keccak256(ethers.toUtf8Bytes("katana"));
+        
+        console.log(`[BridgeService] Locking ERC1155 for bridge: tokenId=${collateralTokenId}, amount=${amount}`);
+        
+        const lockTx = await bridgeAdapter.lockERC1155ForBridge(
+            fractionTokenAddress, 
+            collateralTokenId, 
+            amount, 
+            katanaChain
+        );
+        
+        console.log(`[BridgeService] Lock transaction sent: ${lockTx.hash}`);
+        const lockReceipt = await lockTx.wait();
+        
+        console.log(`[BridgeService] Lock confirmed, bridging asset...`);
+        
+        const bridgeTx = await bridgeAdapter.bridgeERC1155Asset(
+            lockTx.hash, 
+            LIQUIDITY_ADAPTER_ADDRESS
+        );
+        
+        console.log(`[BridgeService] Bridge transaction sent: ${bridgeTx.hash}`);
+        const bridgeReceipt = await bridgeTx.wait();
+        
+        console.log(`[BridgeService] Bridge completed successfully`);
+        
+        return { 
+            lockId: lockTx.hash,
+            lockTxHash: lockTx.hash,
+            bridgeTxHash: bridgeTx.hash,
+            blockNumber: bridgeReceipt.blockNumber
+        };
+        
+    } catch (error) {
+        if (error instanceof BridgeServiceError) {
+            throw error;
+        }
+        console.error('[BridgeService] Error bridging to Katana:', error);
+        handleBlockchainError(error, 'bridge collateral to Katana');
+    }
 }
 
 /**
  * Borrow from Katana liquidity pool
  */
 async function borrowFromKatana(asset, amount, collateralTokenId) {
-    const assetAddress = ASSETS[asset];
-    if (!assetAddress) throw new Error('Unsupported asset');
-
-    // First, bridge collateral if not already done
-    await bridgeToKatana(collateralTokenId, amount, 'user'); // amount might need adjustment
-
-    // Borrow from pool
-    const loanId = await liquidityAdapter.borrowFromPool(assetAddress, amount, signer.address);
-    return { loanId };
+    try {
+        const assetAddress = ASSETS[asset];
+        
+        if (!assetAddress) {
+            throw new BridgeServiceError(
+                `Unsupported asset: ${asset}. Supported assets: ${Object.keys(ASSETS).join(', ')}`,
+                'UNSUPPORTED_ASSET'
+            );
+        }
+        
+        if (!amount || amount <= 0) {
+            throw new BridgeServiceError(
+                'Invalid amount. Amount must be greater than 0.',
+                'INVALID_AMOUNT'
+            );
+        }
+        
+        if (!collateralTokenId) {
+            throw new BridgeServiceError(
+                'Collateral token ID is required.',
+                'MISSING_COLLATERAL'
+            );
+        }
+        
+        console.log(`[BridgeService] Borrowing from Katana: asset=${asset}, amount=${amount}, collateral=${collateralTokenId}`);
+        
+        // First, bridge collateral if not already done
+        const bridgeResult = await bridgeToKatana(collateralTokenId, amount, 'user');
+        
+        console.log(`[BridgeService] Borrowing from pool: assetAddress=${assetAddress}, amount=${amount}`);
+        
+        // Borrow from pool
+        const borrowTx = await liquidityAdapter.borrowFromPool(
+            assetAddress, 
+            amount, 
+            signer.address
+        );
+        
+        console.log(`[BridgeService] Borrow transaction sent: ${borrowTx.hash}`);
+        const receipt = await borrowTx.wait();
+        
+        console.log(`[BridgeService] Borrow completed successfully`);
+        
+        return { 
+            loanId: borrowTx.hash,
+            txHash: borrowTx.hash,
+            blockNumber: receipt.blockNumber,
+            bridgeResult
+        };
+        
+    } catch (error) {
+        if (error instanceof BridgeServiceError) {
+            throw error;
+        }
+        console.error('[BridgeService] Error borrowing from Katana:', error);
+        handleBlockchainError(error, 'borrow from Katana');
+    }
 }
 
 /**
  * Get liquidity rates for an asset
  */
 async function getLiquidityRates(asset) {
-    const assetAddress = ASSETS[asset];
-    if (!assetAddress) throw new Error('Unsupported asset');
-
-    const borrowRate = await liquidityAdapter.getBorrowRate(assetAddress);
-    const availableLiquidity = await liquidityAdapter.getAvailableLiquidity(assetAddress);
-
-    return {
-        borrowRate: borrowRate.toString(),
-        availableLiquidity: availableLiquidity.toString(),
-    };
+    try {
+        const assetAddress = ASSETS[asset];
+        
+        if (!assetAddress) {
+            throw new BridgeServiceError(
+                `Unsupported asset: ${asset}. Supported assets: ${Object.keys(ASSETS).join(', ')}`,
+                'UNSUPPORTED_ASSET'
+            );
+        }
+        
+        console.log(`[BridgeService] Getting liquidity rates for: ${asset}`);
+        
+        const borrowRate = await liquidityAdapter.getBorrowRate(assetAddress);
+        const availableLiquidity = await liquidityAdapter.getAvailableLiquidity(assetAddress);
+        
+        return {
+            borrowRate: borrowRate.toString(),
+            availableLiquidity: availableLiquidity.toString(),
+            asset,
+            assetAddress
+        };
+        
+    } catch (error) {
+        if (error instanceof BridgeServiceError) {
+            throw error;
+        }
+        console.error('[BridgeService] Error getting liquidity rates:', error);
+        handleBlockchainError(error, 'get liquidity rates');
+    }
 }
 
 /**
  * Repay to Katana liquidity pool
  */
 async function repayToKatana(asset, amount, loanId) {
-    const assetAddress = ASSETS[asset];
-    if (!assetAddress) throw new Error('Unsupported asset');
-
-    // Repay the loan
-    await liquidityAdapter.repayToPool(loanId);
-    return { success: true };
+    try {
+        const assetAddress = ASSETS[asset];
+        
+        if (!assetAddress) {
+            throw new BridgeServiceError(
+                `Unsupported asset: ${asset}. Supported assets: ${Object.keys(ASSETS).join(', ')}`,
+                'UNSUPPORTED_ASSET'
+            );
+        }
+        
+        if (!amount || amount <= 0) {
+            throw new BridgeServiceError(
+                'Invalid amount. Amount must be greater than 0.',
+                'INVALID_AMOUNT'
+            );
+        }
+        
+        if (!loanId) {
+            throw new BridgeServiceError(
+                'Loan ID is required for repayment.',
+                'MISSING_LOAN_ID'
+            );
+        }
+        
+        console.log(`[BridgeService] Repaying to Katana: asset=${asset}, amount=${amount}, loanId=${loanId}`);
+        
+        // Repay the loan
+        const repayTx = await liquidityAdapter.repayToPool(loanId);
+        
+        console.log(`[BridgeService] Repay transaction sent: ${repayTx.hash}`);
+        const receipt = await repayTx.wait();
+        
+        console.log(`[BridgeService] Repay completed successfully`);
+        
+        return { 
+            success: true,
+            txHash: repayTx.hash,
+            blockNumber: receipt.blockNumber,
+            amount,
+            asset
+        };
+        
+    } catch (error) {
+        if (error instanceof BridgeServiceError) {
+            throw error;
+        }
+        console.error('[BridgeService] Error repaying to Katana:', error);
+        handleBlockchainError(error, 'repay to Katana');
+    }
 }
 
 module.exports = {
@@ -86,4 +307,5 @@ module.exports = {
     borrowFromKatana,
     getLiquidityRates,
     repayToKatana,
+    BridgeServiceError
 };

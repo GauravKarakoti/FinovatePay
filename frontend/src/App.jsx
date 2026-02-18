@@ -17,6 +17,125 @@ import { Toaster } from 'sonner';
 
 import './App.css';
 
+/* -------------------- Error Boundary Component -------------------- */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { 
+      hasError: false, 
+      error: null,
+      errorInfo: null 
+    };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    // Log error to console in development
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    this.setState({
+      error,
+      errorInfo
+    });
+  }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      // Render error UI
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          padding: '20px',
+          textAlign: 'center',
+          backgroundColor: '#f5f5f5'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            padding: '40px',
+            borderRadius: '12px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+            maxWidth: '500px',
+            width: '100%'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+            <h2 style={{ 
+              color: '#dc2626', 
+              marginBottom: '16px',
+              fontSize: '24px',
+              fontWeight: '600'
+            }}>
+              Something went wrong
+            </h2>
+            <p style={{ 
+              color: '#6b7280', 
+              marginBottom: '24px',
+              lineHeight: '1.5'
+            }}>
+              We're sorry, but something unexpected happened. Please try again.
+            </p>
+            
+            {process.env.NODE_ENV === 'development' && this.state.error && (
+              <details style={{
+                marginBottom: '24px',
+                padding: '12px',
+                backgroundColor: '#f3f4f6',
+                borderRadius: '6px',
+                textAlign: 'left',
+                fontSize: '12px',
+                fontFamily: 'monospace'
+              }}>
+                <summary style={{ cursor: 'pointer', fontWeight: '600' }}>
+                  Error Details (Development Only)
+                </summary>
+                <pre style={{ 
+                  marginTop: '8px', 
+                  overflow: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}>
+                  {this.state.error.toString()}
+                  {this.state.errorInfo?.componentStack}
+                </pre>
+              </details>
+            )}
+            
+            <button
+              onClick={this.handleRetry}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '16px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseOver={(e) => e.target.style.backgroundColor = '#1d4ed8'}
+              onMouseOut={(e) => e.target.style.backgroundColor = '#2563eb'}
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 /* -------------------- Navigation Setup -------------------- */
 function NavigationSetup() {
   const navigate = useNavigate();
@@ -139,7 +258,9 @@ function App() {
 
   /* -------------------- Routes -------------------- */
   return (
-    <Router>
+    <ErrorBoundary>
+      <Router>
+
       <NavigationSetup />
       <Toaster position="top" richColors />
       <div className="App">
@@ -366,7 +487,8 @@ function App() {
           </button>
         </>
       )}
-    </Router>
+      </Router>
+    </ErrorBoundary>
   );
 }
 
