@@ -1,6 +1,6 @@
 const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
-const { pool } = require('../config/database');
+const  pool  = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 
 // Helper function to convert UUID to bytes32 using ethers v6 syntax
@@ -14,6 +14,9 @@ const uuidToBytes32 = (uuid) => {
 exports.releaseEscrow = async (req, res) => {
   try {
     const { invoiceId } = req.body;
+
+    const io = req.app.get("io"); // ⭐ ADD THIS
+
     const signer = getSigner();
     const escrowContract = new ethers.Contract(
       contractAddresses.escrowContract,
@@ -21,7 +24,6 @@ exports.releaseEscrow = async (req, res) => {
       signer
     );
 
-    // FIX: Convert the UUID string to bytes32
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     const tx = await escrowContract.confirmRelease(bytes32InvoiceId);
@@ -32,7 +34,15 @@ exports.releaseEscrow = async (req, res) => {
       ['released', tx.hash, invoiceId]
     );
 
+    // ⭐ REAL-TIME EVENT
+    io.to(`invoice-${invoiceId}`).emit("escrow:released", {
+      invoiceId,
+      txHash: tx.hash,
+      status: "released"
+    });
+
     res.json({ success: true, txHash: tx.hash });
+
   } catch (error) {
     console.error("Error in releaseEscrow:", error);
     res.status(500).json({ error: error.message });
@@ -42,6 +52,9 @@ exports.releaseEscrow = async (req, res) => {
 exports.raiseDispute = async (req, res) => {
   try {
     const { invoiceId, reason } = req.body;
+
+    const io = req.app.get("io"); // ⭐ ADD THIS
+
     const signer = getSigner();
     const escrowContract = new ethers.Contract(
       contractAddresses.escrowContract,
@@ -49,7 +62,6 @@ exports.raiseDispute = async (req, res) => {
       signer
     );
 
-    // FIX: Convert the UUID string to bytes32
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     const tx = await escrowContract.raiseDispute(bytes32InvoiceId);
@@ -60,7 +72,16 @@ exports.raiseDispute = async (req, res) => {
       ['disputed', reason, tx.hash, invoiceId]
     );
 
+    // ⭐ REAL-TIME EVENT
+    io.to(`invoice-${invoiceId}`).emit("escrow:dispute", {
+      invoiceId,
+      reason,
+      txHash: tx.hash,
+      status: "disputed"
+    });
+
     res.json({ success: true, txHash: tx.hash });
+
   } catch (error) {
     console.error("Error in raiseDispute:", error);
     res.status(500).json({ error: error.message });
