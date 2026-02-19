@@ -9,7 +9,7 @@ const dbConfig = {
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    ...(isProduction ? { ssl: { rejectUnauthorized: false } } : {}),
+    ssl: { rejectUnauthorized: false }
 };
 
 const pool = new Pool(dbConfig);
@@ -23,4 +23,4 @@ pool.connect((err, client, release) => {
   }
 });
 
-module.exports = pool; // Export directly!
+module.exports = { pool };
