@@ -176,9 +176,7 @@ function App() {
     completed: 0,
     produceLots: 0,
   });
-  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { resetStats } = useStatsActions(); // Use actions hook to avoid undefined context during login
   const { resetStats } = useStatsActions();
   
   // Use Web3Modal v3 hooks for wallet connection state
@@ -221,272 +219,274 @@ function App() {
 
   const renderDashboard = (dashboardComponent) => {
     return (
-      <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9] relative">
-          {/* Mobile Backdrop */}
-          {isSidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
-              onClick={() => setIsSidebarOpen(false)}
-            />
-          )}
-
-          <div className={`
-            fixed top-0 bottom-0 left-0 md:relative md:top-auto md:bottom-auto md:left-auto
-            z-40 h-full md:h-auto
-            transition-transform duration-300 ease-in-out
-            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-            md:w-64 flex-shrink-0
-          `}>
-              <Sidebar 
-                  activeTab={activeTab} 
-                  onTabChange={handleTabChange} 
-                  user={user}
-                  walletConnected={walletConnected}
-                  onLogout={handleLogout}
-                  onClose={() => setIsSidebarOpen(false)}
+      <div>
+        <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9] relative">
+            {/* Mobile Backdrop */}
+            {isSidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+                onClick={() => setIsSidebarOpen(false)}
               />
-          </div>
-          <div className="flex-1 overflow-auto w-full">
-                {dashboardComponent}
-          </div>
+            )}
+
+            <div className={`
+              fixed top-0 bottom-0 left-0 md:relative md:top-auto md:bottom-auto md:left-auto
+              z-40 h-full md:h-auto
+              transition-transform duration-300 ease-in-out
+              ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+              md:w-64 flex-shrink-0
+            `}>
+                <Sidebar 
+                    activeTab={activeTab} 
+                    onTabChange={handleTabChange} 
+                    user={user}
+                    walletConnected={walletConnected}
+                    onLogout={handleLogout}
+                    onClose={() => setIsSidebarOpen(false)}
+                />
+            </div>
+            <div className="flex-1 overflow-auto w-full">
+                  {dashboardComponent}
+            </div>
+        </div>
+        <div className="flex-1 overflow-auto">
+          {React.cloneElement(component, { onStatsChange: setDashboardStats })}
+        </div>
       </div>
-      <div className="flex-1 overflow-auto">
-        {React.cloneElement(component, { onStatsChange: setDashboardStats })}
-      </div>
-    </div>
-  );
+    )
+  }
 
   /* -------------------- Routes -------------------- */
   return (
     <ErrorBoundary>
       <Router>
 
-      <NavigationSetup />
-      <Toaster position="top" richColors />
-      <div className="App">
-        <Header 
-            user={user} 
-            onLogout={handleLogout} 
-            walletConnected={isConnected}
-            onUserUpdate={setUser}
-            onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        />
-        {console.log('Current user role in App.jsx:', user)}
-        <main>
-          <Routes>
-            {/* Home route - keeps existing role-based logic */}
-            <Route 
-                path="/" 
+        <NavigationSetup />
+        <Toaster position="top" richColors />
+        <div className="App">
+          <Header 
+              user={user} 
+              onLogout={handleLogout} 
+              walletConnected={isConnected}
+              onUserUpdate={setUser}
+              onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          />
+          {console.log('Current user role in App.jsx:', user)}
+          <main>
+            <Routes>
+              {/* Home route - keeps existing role-based logic */}
+              <Route 
+                  path="/" 
+                  element={
+                      user ? (
+                          user.role === 'admin' ? (
+                              renderDashboard(<AdminDashboard activeTab={activeTab} />)
+                          ) : user.role === 'buyer' ? (
+                              <Navigate to="/buyer" />
+                          ) : user.role === 'shipment' || user.role === 'warehouse' ? (
+                              <Navigate to="/shipment" />
+                          ) : user.role === 'investor' ? (
+                              <Navigate to="/investor" />
+                          ) : (
+                              renderDashboard(<SellerDashboard activeTab={activeTab} />)
+                          )
+                      ) : (
+                          <Navigate to="/login" />
+                      )
+                  } 
+              />
+              
+              {/* ✅ PROTECTED: Buyer */}
+              <Route 
+                  path="/buyer" 
+                  element={
+                      <RequireAuth allowedRoles={['buyer']}>
+                          {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
+                      </RequireAuth>
+                  }
+              />
+              
+              {/* ✅ PROTECTED: Investor */}
+              <Route 
+                  path="/investor" 
+                  element={
+                      <RequireAuth allowedRoles={['investor']}>
+                          {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
+                      </RequireAuth>
+                  }
+              />
+              
+              {/* ✅ PROTECTED: Admin */}
+              <Route 
+                path="/admin"
                 element={
-                    user ? (
-                        user.role === 'admin' ? (
-                            renderDashboard(<AdminDashboard activeTab={activeTab} />)
-                        ) : user.role === 'buyer' ? (
-                            <Navigate to="/buyer" />
-                        ) : user.role === 'shipment' || user.role === 'warehouse' ? (
-                            <Navigate to="/shipment" />
-                        ) : user.role === 'investor' ? (
-                            <Navigate to="/investor" />
-                        ) : (
-                            renderDashboard(<SellerDashboard activeTab={activeTab} />)
-                        )
-                    ) : (
-                        <Navigate to="/login" />
-                    )
+                  <RequireAuth allowedRoles={['admin']}>
+                      {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
+                  </RequireAuth>
                 } 
-            />
-            
-            {/* ✅ PROTECTED: Buyer */}
-            <Route 
-                path="/buyer" 
+              />
+              
+              {/* ✅ PROTECTED: Shipment/Warehouse */}
+              <Route 
+                path="/shipment" 
                 element={
-                    <RequireAuth allowedRoles={['buyer']}>
-                        {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
-                    </RequireAuth>
-                }
-            />
-            
-            {/* ✅ PROTECTED: Investor */}
-            <Route 
-                path="/investor" 
+                  <RequireAuth allowedRoles={['shipment', 'warehouse']}>
+                      <ShipmentDashboard />
+                  </RequireAuth>
+                } 
+              />
+              
+              {/* Public: Produce History */}
+              <Route 
+                path="/produce/:lotId" 
+                element={<ProduceHistory />}
+              />
+              
+              {/* Auth Pages */}
+              <Route 
+                path="/login" 
                 element={
-                    <RequireAuth allowedRoles={['investor']}>
-                        {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
-                    </RequireAuth>
+                  user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
+                } 
+              />
+              <Route 
+                path="/register" 
+                element={
+                  user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
+                } 
+              />
+          
+              {/* Chatbot UI */}
+              {user && (
+                <>
+                  <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
+                    {isChatbotOpen && <FinovateChatbot />}
+                  </div>
+                  <button
+                    onClick={toggleChatbot}
+                    className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-opacity-50 transition-transform transform hover:scale-110 z-[1000]"
+                    aria-label="Toggle Chatbot"
+                  >
+                    {isChatbotOpen ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    ) : (
+                      <Navigate to="/login" />
+                    )}
+                  </button>
+                </>
+              )}
+
+              {/* Seller */}
+              <Route
+                path="/seller"
+                element={
+                  <RequireAuth allowedRoles={['seller']}>
+                    {renderDashboard(<SellerDashboard activeTab={activeTab} />)}
+                  </RequireAuth>
                 }
-            />
-            
-            {/* ✅ PROTECTED: Admin */}
-            <Route 
-              path="/admin"
-              element={
-                <RequireAuth allowedRoles={['admin']}>
+              />
+
+              {/* Buyer */}
+              <Route
+                path="/buyer"
+                element={
+                  <RequireAuth allowedRoles={['buyer']}>
+                    {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
+                  </RequireAuth>
+                }
+              />
+
+              {/* Investor */}
+              <Route
+                path="/investor"
+                element={
+                  <RequireAuth allowedRoles={['investor']}>
+                    {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
+                  </RequireAuth>
+                }
+              />
+
+              {/* Admin */}
+              <Route
+                path="/admin"
+                element={
+                  <RequireAuth allowedRoles={['admin']}>
                     {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
-                </RequireAuth>
-              } 
-            />
-            
-            {/* ✅ PROTECTED: Shipment/Warehouse */}
-            <Route 
-              path="/shipment" 
-              element={
-                <RequireAuth allowedRoles={['shipment', 'warehouse']}>
+                  </RequireAuth>
+                }
+              />
+
+              {/* Shipment / Warehouse */}
+              <Route
+                path="/shipment"
+                element={
+                  <RequireAuth allowedRoles={['shipment', 'warehouse']}>
                     <ShipmentDashboard />
-                </RequireAuth>
-              } 
-            />
-            
-            {/* Public: Produce History */}
-            <Route 
-              path="/produce/:lotId" 
-              element={<ProduceHistory />}
-            />
-            
-            {/* Auth Pages */}
-            <Route 
-              path="/login" 
-              element={
-                user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
-              } 
-            />
-            <Route 
-              path="/register" 
-              element={
-                user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
-              } 
-            />
-          </Routes>
-        </main>
-        
-        {/* Chatbot UI */}
-        {user && (
-          <>
-            <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
-              {isChatbotOpen && <FinovateChatbot />}
-            </div>
-            <button
-              onClick={toggleChatbot}
-              className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-opacity-50 transition-transform transform hover:scale-110 z-[1000]"
-              aria-label="Toggle Chatbot"
-            >
-              {isChatbotOpen ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
-          />
+                  </RequireAuth>
+                }
+              />
 
-          {/* Seller */}
-          <Route
-            path="/seller"
-            element={
-              <RequireAuth allowedRoles={['seller']}>
-                {renderDashboard(<SellerDashboard activeTab={activeTab} />)}
-              </RequireAuth>
-            }
-          />
+              {/* Invoices */}
+              <Route
+                path="/invoices"
+                element={
+                  <RequireAuth>
+                    {renderDashboard(<Invoices />)}
+                  </RequireAuth>
+                }
+              />
 
-          {/* Buyer */}
-          <Route
-            path="/buyer"
-            element={
-              <RequireAuth allowedRoles={['buyer']}>
-                {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
-              </RequireAuth>
-            }
-          />
+              <Route
+                path="/invoices/:id"
+                element={user ? <InvoiceDetails /> : <Navigate to="/login" />}
+              />
 
-          {/* Investor */}
-          <Route
-            path="/investor"
-            element={
-              <RequireAuth allowedRoles={['investor']}>
-                {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
-              </RequireAuth>
-            }
-          />
+              {/* Dispute */}
+              <Route
+                path="/dispute/:invoiceId"
+                element={
+                  <RequireAuth>
+                    {renderDashboard(<DisputeDashboard />)}
+                  </RequireAuth>
+                }
+              />
 
-          {/* Admin */}
-          <Route
-            path="/admin"
-            element={
-              <RequireAuth allowedRoles={['admin']}>
-                {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
-              </RequireAuth>
-            }
-          />
+              {/* Public */}
+              <Route path="/produce/:lotId" element={<ProduceHistory />} />
 
-          {/* Shipment / Warehouse */}
-          <Route
-            path="/shipment"
-            element={
-              <RequireAuth allowedRoles={['shipment', 'warehouse']}>
-                <ShipmentDashboard />
-              </RequireAuth>
-            }
-          />
+              {/* Auth */}
+              <Route
+                path="/login"
+                element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
+              />
+              <Route
+                path="/register"
+                element={user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />}
+              />
+            </Routes>
+          </main>
 
-          {/* Invoices */}
-          <Route
-            path="/invoices"
-            element={
-              <RequireAuth>
-                {renderDashboard(<Invoices />)}
-              </RequireAuth>
-            }
-          />
+          {/* Chatbot */}
+          {user && (
+            <>
+              {isChatbotOpen && (
+                <div className="fixed bottom-[90px] right-[30px] z-[999]">
+                  <FinovateChatbot />
+                </div>
+              )}
 
-          <Route
-            path="/invoices/:id"
-            element={user ? <InvoiceDetails /> : <Navigate to="/login" />}
-          />
-
-          {/* Dispute */}
-          <Route
-            path="/dispute/:invoiceId"
-            element={
-              <RequireAuth>
-                {renderDashboard(<DisputeDashboard />)}
-              </RequireAuth>
-            }
-          />
-
-          {/* Public */}
-          <Route path="/produce/:lotId" element={<ProduceHistory />} />
-
-          {/* Auth */}
-          <Route
-            path="/login"
-            element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
-          />
-          <Route
-            path="/register"
-            element={user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />}
-          />
-        </Routes>
-      </main>
-
-      {/* Chatbot */}
-      {user && (
-        <>
-          {isChatbotOpen && (
-            <div className="fixed bottom-[90px] right-[30px] z-[999]">
-              <FinovateChatbot />
-            </div>
+              <button
+                onClick={() => setIsChatbotOpen(!isChatbotOpen)}
+                className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 z-[1000]"
+                aria-label="Toggle Chatbot"
+              >
+                {isChatbotOpen ? '✖' : '💬'}
+              </button>
+            </>
           )}
-
-          <button
-            onClick={() => setIsChatbotOpen(!isChatbotOpen)}
-            className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 z-[1000]"
-            aria-label="Toggle Chatbot"
-          >
-            {isChatbotOpen ? '✖' : '💬'}
-          </button>
-        </>
-      )}
+        </div>
       </Router>
     </ErrorBoundary>
   );

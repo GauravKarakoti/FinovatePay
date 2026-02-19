@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { toast } from 'sonner';
 
 import {
   getSellerInvoices,
-  getSellerLots,
-  getQuotations,
   getKYCStatus
 } from '../utils/api';
 import { 
-  connectWallet, getInvoiceFactoryContract, getEscrowContract, getProduceTrackingContract, erc20ABI
+  connectWallet, getEscrowContract, getProduceTrackingContract, erc20ABI
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
@@ -17,14 +15,6 @@ import InvoiceList from '../components/Invoice/InvoiceList';
 import KYCStatus from '../components/KYC/KYCStatus';
 import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { generateTimelineEvents } from '../utils/timeline';
-
-// ------------------ UI HELPERS ------------------
-
-const LoadingSpinner = () => (
-  <div className="flex justify-center py-20">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-  </div>
-);
 
 ProduceLotsTable.propTypes = {
   lots: PropTypes.array.isRequired,
@@ -114,7 +104,7 @@ const InvoiceDetailsModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
                         onChange={e => setDeadline(e.target.value)}
                         className="w-full p-2 border border-gray-300 rounded-md mt-1"
                     />
-                    <p className="text-xs text-gray-500 mt-1">If discount > 0, deadline must be in the future.</p>
+                    <p className="text-xs text-gray-500 mt-1">If discount &gt; 0, deadline must be in the future.</p>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
                     <ActionButton onClick={onClose} variant="secondary" disabled={isSubmitting}>Cancel</ActionButton>
@@ -142,7 +132,6 @@ ShipmentConfirmationModal.propTypes = {
 const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [invoices, setInvoices] = useState([]);
   const [walletAddress, setWalletAddress] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
   const [showFiatModal, setShowFiatModal] = useState(false);
 
   const [kycData, setKycData] = useState({
@@ -208,62 +197,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   useEffect(() => {
     if (walletAddress) loadQuotations(walletAddress);
   }, [walletAddress, loadQuotations]);
-
-  // Event Handlers
-  const handleSelectInvoice = useCallback((invoice) => {
-    setSelectedInvoice(invoice);
-    setTimelineEvents(generateTimelineEvents(invoice));
-  }, []);
-
-  const handleShowQRCode = useCallback((invoice) => {
-    setSelectedLotQR({
-      lotId: invoice.lot_id,
-      produceType: invoice.produce_type,
-      origin: invoice.origin,
-    });
-    setShowQRCode(true);
-  }, []);
-
-  const handleKYCComplete = useCallback(() => {
-    setShowKYCVerification(false);
-    loadKYCStatus();
-    toast.success('KYC status updated');
-  }, [loadKYCStatus]);
-
-  // Blockchain Interactions
-  const handleTokenizeInvoice = useCallback(async (invoiceId, { faceValue, maturityDate }) => {
-    if (!invoiceToTokenize) return;
-    setIsSubmitting(true);
-    const toastId = toast.loading('Preparing tokenization...');
-
-    try {
-      const { provider } = await connectWallet();
-      const tokenAddress = invoiceToTokenize.token_address;
-      
-      let decimals = 18;
-      if (tokenAddress !== NATIVE_CURRENCY_ADDRESS) {
-        const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, provider);
-        decimals = await tokenContract.decimals();
-      }
-      
-      const faceValueAsUint = ethers.utils.parseUnits(faceValue.toString(), decimals);
-      
-      const response = await api.post('/financing/tokenize', {
-        invoiceId,
-        faceValue: faceValueAsUint.toString(),
-        maturityDate
-      });
-
-      toast.success('Invoice tokenized successfully!', { id: toastId });
-      await loadData();
-      setInvoiceToTokenize(null);
-    } catch (error) {
-      console.error('Tokenization failed:', error);
-      toast.error(error.response?.data?.msg || error.message, { id: toastId });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [invoiceToTokenize, loadData]);
 
   const handleFinalizeInvoice = useCallback(async ({ discountRate, deadline }) => {
     if (!invoiceQuotation) return;
@@ -338,44 +271,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     }
   }, [invoiceQuotation, loadData, loadQuotations]);
 
-  const handleCreateProduceLot = useCallback(async (formData) => {
-    setIsSubmitting(true);
-    const toastId = toast.loading('Registering on blockchain...');
-
-    try {
-      const contract = await getProduceTrackingContract();
-      const tx = await contract.createProduceLot(
-        formData.produceType,
-        formData.harvestDate,
-        formData.qualityMetrics,
-        formData.origin,
-        ethers.utils.parseUnits(formData.quantity.toString(), 18),
-        ""
-      );
-
-      toast.loading('Confirming transaction...', { id: toastId });
-      const receipt = await tx.wait();
-      const event = receipt.events?.find(e => e.event === 'ProduceLotCreated');
-      
-      if (!event) throw new Error("ProduceLotCreated event not found");
-
-      await syncProduceLot({
-        ...formData,
-        lotId: event.args.lotId.toNumber(),
-        txHash: tx.hash,
-      });
-
-      toast.success('Produce lot registered!', { id: toastId });
-      setShowCreateProduceForm(false);
-      await loadProduceLots();
-    } catch (error) {
-      console.error('Failed to create lot:', error);
-      toast.error(error.reason || error.message, { id: toastId });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [loadProduceLots]);
-
   const submitShipmentProof = useCallback(async () => {
     if (!proofFile || !confirmingShipment) return;
     
@@ -422,19 +317,18 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     }
   }, [loadQuotations]);
 
-    const handleDispute = () => {
+    const handleDispute = (() => {
       toast.error('Dispute raised');
       loadInvoices();
-    };
 
-    socket.on('escrow:released', handleEscrowRelease);
-    socket.on('escrow:dispute', handleDispute);
+      socket.on('escrow:released', handleEscrowRelease);
+      socket.on('escrow:dispute', handleDispute);
 
-    return () => {
-      socket.off('escrow:released', handleEscrowRelease);
-      socket.off('escrow:dispute', handleDispute);
-    };
-  }, [walletAddress, loadInvoices]);
+      return () => {
+        socket.off('escrow:released', handleEscrowRelease);
+        socket.off('escrow:dispute', handleDispute);
+      };
+    }, [walletAddress, loadInvoices]);
 
   // ------------------ EFFECTS ------------------
 
@@ -474,38 +368,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       }
     ],
     [invoices]
-  );
-
-  const QuotationsTab = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Quotations</h2>
-        <ActionButton onClick={() => setShowCreateQuotation(true)} variant="primary">
-          + Create Quotation
-        </ActionButton>
-      </div>
-
-      {showCreateQuotation ? (
-        <Card className="p-6">
-          <CreateQuotation
-            onSubmit={handleCreateQuotation}
-            onCancel={() => setShowCreateQuotation(false)}
-          />
-        </Card>
-      ) : (
-        quotations.length > 0 ? (
-          <QuotationList
-            quotations={quotations}
-            userRole="seller"
-            onApprove={handleApproveQuotation}
-            onReject={handleRejectQuotation}
-              onCreateInvoice={setInvoiceQuotation} // Open modal
-          />
-        ) : (
-          <EmptyState message="No active quotations" icon="📋" />
-        )
-      )}
-    </div>
   );
 
   // ------------------ RENDER ------------------
@@ -576,8 +438,8 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
                 <ExportTransactions invoices={invoices} />
               )}
             </div>
-          )}
-        </Modal>
+          </div>
+        )}
 
         <ShipmentConfirmationModal
           isOpen={!!confirmingShipment}

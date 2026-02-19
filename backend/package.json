@@ -29,6 +29,7 @@
     "express": "^5.1.0",
     "groq-sdk": "^0.33.0",
     "jsonwebtoken": "^9.0.2",
+    "mailersend": "^2.6.0",
     "pg": "^8.18.0",
     "socket.io": "^4.8.1",
     "sonner": "^2.0.7",
