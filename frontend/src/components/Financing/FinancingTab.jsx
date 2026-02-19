@@ -116,6 +116,7 @@ const FinancingTab = ({ invoices, onTokenizeClick }) => {
                                     <p className="font-semibold">Invoice {invoice.invoice_id.substring(0, 8)}...</p>
                                     <p className="text-sm text-gray-600">Face Value: {invoice.face_value} {invoice.currency}</p>
                                     <p className="text-sm text-gray-600">Token ID: {invoice.token_id}</p>
+                                    <p className="text-sm text-gray-600">Investor Yield: {invoice.yield_bps ? (invoice.yield_bps / 100).toFixed(2) : '0.00'}%</p>
                                 </div>
                                 <span className="text-sm font-medium text-blue-600 px-3 py-1 bg-blue-100 rounded-full">
                                     Listed

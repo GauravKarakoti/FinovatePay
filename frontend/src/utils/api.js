@@ -3,31 +3,162 @@ import axios from 'axios';
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 console.log("API Base URL:", API_BASE_URL);
 
+// Navigation utility for programmatic navigation outside React components
+let navigateFunction = null;
+
+export const setNavigateFunction = (navigate) => {
+  navigateFunction = navigate;
+};
+
 // Create axios instance with default config
+// withCredentials: true ensures cookies are sent with requests
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
 });
 
-// Add token to requests automatically via interceptor
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-// Handle API errors
+// Handle API errors with comprehensive error handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Handle network errors (no response from server)
+    if (!error.response) {
+      console.error('Network error: No response from server', error);
+      
+      // Check if it's a timeout error
+      if (error.code === 'ECONNABORTED') {
+        console.error('Request timeout');
+        return Promise.reject({
+          ...error,
+          message: 'Request timed out. Please try again.',
+          isTimeout: true
+        });
+      }
+      
+      // Check if user is offline
+      if (!navigator.onLine) {
+        console.error('User is offline');
+        return Promise.reject({
+          ...error,
+          message: 'You are offline. Please check your internet connection.',
+          isOffline: true
+        });
+      }
+      
+      return Promise.reject({
+        ...error,
+        message: 'Network error. Please check your connection and try again.',
+        isNetworkError: true
+      });
     }
-    return Promise.reject(error);
+    
+    const status = error.response.status;
+    const errorData = error.response.data;
+    
+    // Handle specific HTTP status codes
+    switch (status) {
+      case 400:
+        console.error('Bad request:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Invalid request. Please check your input.',
+          isValidationError: true
+        });
+        
+      case 401:
+        // Clear user data from localStorage
+        localStorage.removeItem('user');
+        // Use React Router navigation if available, fallback to hard redirect
+        if (navigateFunction) {
+          navigateFunction('/login', { replace: true });
+        } else {
+          window.location.href = '/login';
+        }
+        return Promise.reject({
+          ...error,
+          message: 'Session expired. Please log in again.',
+          isAuthError: true
+        });
+        
+      case 403:
+        console.error('Forbidden:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'You do not have permission to perform this action.',
+          isForbidden: true
+        });
+        
+      case 404:
+        console.error('Not found:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'The requested resource was not found.',
+          isNotFound: true
+        });
+        
+      case 409:
+        console.error('Conflict:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'A conflict occurred. The resource may already exist.',
+          isConflict: true
+        });
+        
+      case 422:
+        console.error('Validation error:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Validation failed. Please check your input.',
+          isValidationError: true,
+          validationErrors: errorData?.errors
+        });
+        
+      case 429:
+        console.error('Rate limited:', errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Too many requests. Please try again later.',
+          isRateLimited: true
+        });
+        
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        console.error('Server error:', status, errorData);
+        
+        // Retry logic for transient server errors (only for GET requests and not already retried)
+        if (originalRequest.method === 'get' && !originalRequest._retry) {
+          originalRequest._retry = true;
+          console.log(`Retrying request after ${status} error...`);
+          
+          // Wait 1 second before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          return api(originalRequest);
+        }
+        
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || 'Server error. Please try again later.',
+          isServerError: true
+        });
+        
+      default:
+        console.error(`HTTP ${status} error:`, errorData);
+        return Promise.reject({
+          ...error,
+          message: errorData?.message || errorData?.error || `An error occurred (HTTP ${status}). Please try again.`,
+          status
+        });
+    }
   }
 );
+
+
+
 
 // --- Fixed Functions (Now using 'api' instance) ---
 
@@ -42,15 +173,15 @@ export const getMarketplaceListings = () => {
 
 // --- Auth API ---
 export const login = (email, password) => {
-  return api.post('auth/login', { email, password });
+  return api.post('/auth/login', { email, password });
 };
 
 export const register = (userData) => {
-  return api.post('auth/register', userData);
+  return api.post('/auth/register', userData);
 };
 
 export const updateCurrentUserRole = (role) => {
-  return api.put('auth/role', { role });
+  return api.put('/auth/role', { role });
 };
 
 // --- Invoice API ---
@@ -132,9 +263,10 @@ export const getProduceTransactions = (lotId) => {
 };
 
 // --- Payment API ---
-export const depositToEscrow = (invoiceId, amount, seller_address) => {
-  return api.post('/payments/escrow/deposit', { invoiceId, amount, seller_address });
+export const depositToEscrow = (invoiceId, amount, sellerAddress) => {
+  return api.post('/payments/escrow/deposit', { invoiceId, amount, sellerAddress });
 };
+
 
 export const confirmRelease = (invoiceId) => {
   return api.post('/payments/escrow/release', { invoiceId });
@@ -178,9 +310,10 @@ export const updateUserRole = (userId, role) => {
   return api.put(`/admin/users/${userId}/role`, { role });
 };
 
-export const updateInvoiceStatus = (invoiceId, status, tx_hash, dispute_reason = '') => {
-    return api.post(`/invoices/${invoiceId}/status`, { status, tx_hash, dispute_reason });
+export const updateInvoiceStatus = (invoiceId, status, txHash, disputeReason = '') => {
+    return api.post(`/invoices/${invoiceId}/status`, { status, txHash, disputeReason });
 };
+
 
 export const resolveDispute = async (invoiceId, sellerWins) => {
   const response = await api.post('/admin/resolve-dispute', { invoiceId, sellerWins });
