@@ -1,5 +1,4 @@
 const { pool } = require('../config/database');
-const { EXCHANGE_RATE } = require('../config/constants');
 
 /*//////////////////////////////////////////////////////////////
                     CREATE INVOICE (FROM QUOTATION)
@@ -46,7 +45,6 @@ exports.createInvoice = async (req, res) => {
         if (quotationResult.rows.length === 0) {
             throw new Error('Quotation not found, not fully approved, or already invoiced.');
         }
-        const quotation = quotationResult.rows[0];
         
         // FIX: Add Quantity Validation
         if (!quotation.quantity || quotation.quantity <= 0) {
@@ -110,60 +108,6 @@ exports.createInvoice = async (req, res) => {
       );
     }
 
-    // 3. Insert invoice
-    const insertInvoiceQuery = `
-      INSERT INTO invoices (
-        invoice_id,
-        invoice_hash,
-        seller_address,
-        buyer_address,
-        amount,
-        due_date,
-        description,
-        items,
-        currency,
-        contract_address,
-        token_address,
-        lot_id,
-        quotation_id,
-        escrow_status,
-        financing_status,
-        annual_apr,
-        tx_hash
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,
-        'created','none',$14,$15
-      )
-      RETURNING *
-    `;
-
-    const values = [
-      invoice_id,
-      invoice_hash,
-      quotation.seller_address,
-      quotation.buyer_address,
-      quotation.total_amount,
-      due_date,
-      quotation.description,
-      JSON.stringify([
-        {
-          description: quotation.description,
-          quantity: quotation.quantity,
-          price_per_unit: quotation.price_per_unit
-        }
-      ]),
-      quotation.currency,
-      contract_address,
-      token_address,
-      quotation.lot_id,
-      quotation_id,
-      annual_apr,
-      tx_hash || null
-    ];
-
-    const result = await client.query(insertInvoiceQuery, values);
-
     // 4. Mark quotation as invoiced
     await client.query(
       `UPDATE quotations SET status = 'invoiced' WHERE id = $1`,
@@ -216,36 +160,6 @@ exports.createInvoice = async (req, res) => {
     } finally {
         client.release();
     }
-
-    const invoice = result.rows[0];
-    const amount = Number(invoice.amount);
-    const apr = Number(invoice.annual_apr) / 100;
-
-    const today = new Date();
-    const dueDate = new Date(invoice.due_date);
-    const daysRemaining = Math.ceil(
-      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (daysRemaining <= 0) {
-      return res.json({
-        eligible: false,
-        message: 'Invoice is due or overdue'
-      });
-    }
-
-    const discountAmount = (amount * apr * daysRemaining) / 365;
-    const offerAmount = amount - discountAmount;
-
-    res.json({
-      eligible: true,
-      originalAmount: amount,
-      discountAmount: discountAmount.toFixed(2),
-      offerAmount: offerAmount.toFixed(2),
-      daysRemaining,
-      apr: (apr * 100).toFixed(2)
-    });
-
   } catch (error) {
     console.error('Early payment offer error:', error);
     res.status(500).json({ error: error.message });
@@ -283,6 +197,56 @@ exports.settleInvoiceEarly = async (req, res) => {
 
   } catch (error) {
     console.error('Settle invoice error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.getEarlyPaymentOffer = async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+
+    // You need to fetch the invoice from the DB first
+    const result = await pool.query(
+      'SELECT amount, annual_apr, due_date FROM invoices WHERE invoice_id = $1',
+      [invoiceId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const invoice = result.rows[0];
+    const amount = Number(invoice.amount);
+    // Provide a fallback APR if it's null in the DB
+    const apr = Number(invoice.annual_apr || 18.0) / 100; 
+
+    const today = new Date();
+    const dueDate = new Date(invoice.due_date);
+    const daysRemaining = Math.ceil(
+      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysRemaining <= 0) {
+      return res.json({
+        eligible: false,
+        message: 'Invoice is due or overdue'
+      });
+    }
+
+    const discountAmount = (amount * apr * daysRemaining) / 365;
+    const offerAmount = amount - discountAmount;
+
+    res.json({
+      eligible: true,
+      originalAmount: amount,
+      discountAmount: discountAmount.toFixed(2),
+      offerAmount: offerAmount.toFixed(2),
+      daysRemaining,
+      apr: (apr * 100).toFixed(2)
+    });
+
+  } catch (error) {
+    console.error('Early payment offer error:', error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { register, login } = require('../controllers/authController');
+const { authenticateToken } = require('../middleware/auth');
 
 router.put('/role', authenticateToken, async (req, res) => {
   const { role } = req.body;
