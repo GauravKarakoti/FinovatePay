@@ -15,10 +15,10 @@ const io = socketIo(server, {
   }
 });
 
-const allowedOrigins = [
-    'https://finovate-pay.vercel.app', 
-    'http://localhost:5173'
-];
+// Parse CORS origins from environment variable (comma-separated)
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173'];
 
 const corsOptions = {
   origin: (origin, callback) => {
