@@ -25,34 +25,10 @@ const io = socketIo(server, {
   },
 });
 
-// Default origins as fallback when ALLOWED_ORIGINS env var is not set or invalid
-const defaultAllowedOrigins = [
-  'https://finovate-pay.vercel.app',
-  'http://localhost:5173',
-];
-
-// Parse ALLOWED_ORIGINS from environment variable (comma-separated)
-// Example .env value: ALLOWED_ORIGINS=https://example.com,http://localhost:3000,https://my-app.vercel.app
-let allowedOrigins = defaultAllowedOrigins;
-
-if (process.env.ALLOWED_ORIGINS) {
-  try {
-    const customOrigins = process.env.ALLOWED_ORIGINS.split(',')
-      .map(origin => origin.trim())
-      .filter(origin => origin.length > 0);
-
-    if (customOrigins.length > 0) {
-      allowedOrigins = customOrigins;
-      console.log('[CORS] Using custom allowed origins from ALLOWED_ORIGINS:', allowedOrigins);
-    } else {
-      console.log('[CORS] ALLOWED_ORIGINS is empty, using defaults');
-    }
-  } catch (error) {
-    console.error('[CORS] Error parsing ALLOWED_ORIGINS:', error.message);
-  }
-} else {
-  console.log('[CORS] ALLOWED_ORIGINS not set, using defaults');
-}
+// Parse CORS origins from environment variable (comma-separated)
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  : ['http://localhost:5173'];
 
 const corsOptions = {
   origin: (origin, callback) => {
