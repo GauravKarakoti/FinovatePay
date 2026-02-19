@@ -3,7 +3,7 @@ const router = express.Router();
 const bridgeService = require('../services/bridgeService');
 const { authenticateToken } = require('../middleware/auth');
 const kycValidation = require('../middleware/kycValidation');
-const { getFractionTokenContract } = require('../utils/web3');
+const { getFractionTokenContract } = require('../config/blockchain');
 const pool = require('../config/database');
 const { ethers } = require('ethers');
 
