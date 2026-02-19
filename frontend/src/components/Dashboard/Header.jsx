@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 // FIX: Receive the onToggleRole prop
 const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar }) => {
   const navigate = useNavigate();
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
   const handleWalletConnect = async () => {
     try {
       await connectWallet();
@@ -123,10 +122,10 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
                 />
                 <span className="hidden md:inline text-sm font-medium">{user.email}</span>
               </div>
-            )}
             </div>
-          </div>
+          )}  
         </div>
+      </div>
     </header>
   );
 };
