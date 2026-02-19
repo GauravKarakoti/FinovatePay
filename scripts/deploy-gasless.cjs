@@ -107,6 +107,13 @@ async function main() {
   await bridgeAdapter.waitForDeployment();
   console.log("BridgeAdapter deployed to:", bridgeAdapter.target);
 
+  // 13. Deploy LiquidityAdapter
+  console.log("\n13. Deploying LiquidityAdapter...");
+  const LiquidityAdapter = await ethers.getContractFactory("LiquidityAdapter");
+  const liquidityAdapter = await LiquidityAdapter.deploy(waltBridgePlaceholder, complianceManager.target);
+  await liquidityAdapter.waitForDeployment();
+  console.log("LiquidityAdapter deployed to:", liquidityAdapter.target);
+
   // Save deployed addresses
   const contractsDir = __dirname + "/../deployed";
 
@@ -125,7 +132,8 @@ async function main() {
       FractionToken: fractionToken.target,
       ProduceTracking: produceTracking.target,
       FinancingManager: financingManager.target,
-      BridgeAdapter: bridgeAdapter.target
+      BridgeAdapter: bridgeAdapter.target,
+      LiquidityAdapter: liquidityAdapter.target
     }, undefined, 2)
   );
 
@@ -140,6 +148,7 @@ async function main() {
   const produceTrackingArtifact = await artifacts.readArtifact("ProduceTracking");
   const financingManagerArtifact = await artifacts.readArtifact("FinancingManager");
   const bridgeAdapterArtifact = await artifacts.readArtifact("BridgeAdapter");
+  const liquidityAdapterArtifact = await artifacts.readArtifact("LiquidityAdapter");
 
   fs.writeFileSync(contractsDir + "/MinimalForwarder.json", JSON.stringify(minimalForwarderArtifact, null, 2));
   fs.writeFileSync(contractsDir + "/ComplianceManager.json", JSON.stringify(complianceManagerArtifact, null, 2));
@@ -151,6 +160,7 @@ async function main() {
   fs.writeFileSync(contractsDir + "/ProduceTracking.json", JSON.stringify(produceTrackingArtifact, null, 2));
   fs.writeFileSync(contractsDir + "/FinancingManager.json", JSON.stringify(financingManagerArtifact, null, 2));
   fs.writeFileSync(contractsDir + "/BridgeAdapter.json", JSON.stringify(bridgeAdapterArtifact, null, 2));
+  fs.writeFileSync(contractsDir + "/LiquidityAdapter.json", JSON.stringify(liquidityAdapterArtifact, null, 2));
 
   console.log("\n✅ Deployment completed with gasless transaction support!");
   console.log("\n📋 Summary:");
@@ -163,6 +173,7 @@ async function main() {
   console.log("- FinancingManager:", financingManager.target);
   console.log("- ProduceTracking:", produceTracking.target);
   console.log("- BridgeAdapter:", bridgeAdapter.target);
+  console.log("- LiquidityAdapter:", liquidityAdapter.target);
   console.log("\nAll artifacts saved to deployed/ directory");
 }
 
