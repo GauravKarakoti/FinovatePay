@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@transak/transak-sdk": "^4.0.2",
     "@web3modal/ethers": "^5.1.11",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.13.2",

@@ -24,6 +24,7 @@ contract EscrowContract is
 {
 
     using ECDSA for bytes32;
+    using SafeERC20 for IERC20; // Moved this up here
 
     /*//////////////////////////////////////////////////////////////
                                 TYPES
@@ -36,14 +37,11 @@ contract EscrowContract is
         Expired
     }
 
-contract EscrowContract is ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
     struct Escrow {
         address seller;
         address buyer;
         uint256 amount;
-        address token; // address(0) = native
+        address token;
         EscrowStatus status;
         bool sellerConfirmed;
         bool buyerConfirmed;

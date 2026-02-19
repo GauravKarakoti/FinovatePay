@@ -1,5 +1,4 @@
-const MailerSend = require('mailersend');
-const { EmailParams } = MailerSend;
+const { MailerSend, EmailParams } = require('mailersend');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../config/database');
 const handlebars = require('handlebars');
