@@ -5,6 +5,7 @@ const socketIo = require('socket.io');
 require('dotenv').config();
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
+const { socketAuthMiddleware, verifyInvoiceAccess, verifyMarketplaceAccess } = require('./middleware/socketAuth');
 
 const app = express();
 const server = http.createServer(app);
@@ -123,22 +124,83 @@ app.use('/api/shipment', shipmentRoutes);
 app.use('/api/financing', require('./routes/financing'));
 app.use('/api/investor', require('./routes/investor'));
 
+// --- SOCKET.IO AUTHENTICATION & AUTHORIZATION ---
 
-// Socket.io, error handlers, and server.listen call
+// Apply authentication middleware to all socket connections
+io.use(socketAuthMiddleware);
+
+// Socket.io connection handler with authorization
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+  console.log(`User connected: ${socket.id} (User ID: ${socket.user.id}, Role: ${socket.user.role})`);
   
-  socket.on('join-invoice', (invoiceId) => {
-    socket.join(`invoice-${invoiceId}`);
+  // Handle join-invoice event with authorization
+  socket.on('join-invoice', async (invoiceId) => {
+    try {
+      // Verify user has permission to access this invoice
+      const isAuthorized = await verifyInvoiceAccess(
+        socket.user.id,
+        socket.user.role,
+        socket.user.wallet_address,
+        invoiceId
+      );
+
+      if (!isAuthorized) {
+        console.warn(`Unauthorized invoice access attempt: User ${socket.user.id} tried to join invoice ${invoiceId}`);
+        socket.emit('error', { 
+          message: 'Not authorized to access this invoice',
+          code: 'UNAUTHORIZED_INVOICE_ACCESS'
+        });
+        return;
+      }
+
+      socket.join(`invoice-${invoiceId}`);
+      console.log(`User ${socket.user.id} joined invoice room: ${invoiceId}`);
+      socket.emit('joined-invoice', { invoiceId, success: true });
+
+    } catch (error) {
+      console.error('Error in join-invoice:', error);
+      socket.emit('error', { 
+        message: 'Failed to join invoice room',
+        code: 'JOIN_INVOICE_ERROR'
+      });
+    }
   });
 
-  // Room for investors to receive marketplace updates
+  // Handle join-marketplace event with authorization
   socket.on('join-marketplace', () => {
-    socket.join('marketplace');
+    try {
+      // Verify user has permission to access marketplace
+      const isAuthorized = verifyMarketplaceAccess(socket.user);
+
+      if (!isAuthorized) {
+        console.warn(`Unauthorized marketplace access attempt: User ${socket.user.id} (Role: ${socket.user.role})`);
+        socket.emit('error', { 
+          message: 'Not authorized to access marketplace. Investor role required.',
+          code: 'UNAUTHORIZED_MARKETPLACE_ACCESS'
+        });
+        return;
+      }
+
+      socket.join('marketplace');
+      console.log(`User ${socket.user.id} joined marketplace room`);
+      socket.emit('joined-marketplace', { success: true });
+
+    } catch (error) {
+      console.error('Error in join-marketplace:', error);
+      socket.emit('error', { 
+        message: 'Failed to join marketplace room',
+        code: 'JOIN_MARKETPLACE_ERROR'
+      });
+    }
   });
   
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log(`User disconnected: ${socket.id} (User ID: ${socket.user.id})`);
+  });
+
+  // Handle authentication errors
+  socket.on('error', (error) => {
+    console.error(`Socket error for user ${socket.user?.id}:`, error);
   });
 });
 
