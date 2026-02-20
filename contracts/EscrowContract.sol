@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "./ComplianceManager.sol";
-import "./dao/ArbitratorsRegistry.sol";
+import "./dao/Arbitrators_Registry.sol";
 
 
 contract EscrowContract is
