@@ -349,7 +349,7 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     setIsRedeeming(true);
     const toastId = toast.loading('Processing redemption...');
     
-    let totalRedeemedValue = ethers.BigNumber.from(0);
+    let totalRedeemedValue = 0n;
     let successfulRedemptions = 0;
     let failedRedemptions = 0;
     const txHashes = [];
@@ -361,8 +361,8 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
         if (!holding.amount || parseFloat(holding.amount) <= 0) continue;
         
         try {
-          const tokenAmountToRedeem = ethers.utils.parseEther(holding.amount.toString());
-          if (tokenAmountToRedeem.isZero()) continue;
+          const tokenAmountToRedeem = ethers.parseEther(holding.amount.toString());
+          if (tokenAmountToRedeem === 0n) continue;
 
           const tx = await fractionToken.redeem(holding.token_id, tokenAmountToRedeem);
           const receipt = await tx.wait();
@@ -370,7 +370,10 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
 
           const redeemEvent = receipt.events?.find(e => e.event === 'Redeemed');
           if (redeemEvent) {
-            totalRedeemedValue = totalRedeemedValue.add(redeemEvent.args?.amount || redeemEvent.args[2]);
+            const redeemedAmount = redeemEvent.args?.amount ?? redeemEvent.args?.[2];
+            if (redeemedAmount !== undefined) {
+              totalRedeemedValue += redeemedAmount;
+            }
           }
           successfulRedemptions++;
         } catch (error) {
@@ -379,7 +382,7 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
         }
       }
 
-      const totalRedeemedReadable = ethers.utils.formatEther(totalRedeemedValue);
+      const totalRedeemedReadable = ethers.formatEther(totalRedeemedValue);
 
       if (successfulRedemptions > 0) {
         toast.success(`Redeemed ${parseFloat(totalRedeemedReadable).toFixed(4)} ${invoice.currency}`, { id: toastId });
