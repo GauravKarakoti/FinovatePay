@@ -43,7 +43,9 @@ interface IEscrowContract {
         address token,
         uint256 duration,
         address rwaNft,
-        uint256 rwaTokenId
+        uint256 rwaTokenId,
+        uint256 _discountRate,
+        uint256 _discountDeadline
     ) external;
     function confirmRelease(bytes32 invoiceId) external;
 }
@@ -241,6 +243,14 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         emit FractionsPurchased(_tokenId, msg.sender, seller, _tokenAmount, platformFee);
     }
 
+    function withdraw() external onlyOwner nonReentrant {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+
+        (bool success, ) = payable(msg.sender).call{value: balance}("");
+        require(success, "Transfer failed");
+    }
+
     /**
      * @notice Request financing using FractionTokens as collateral via WaltBridge to Katana liquidity.
      */
@@ -293,7 +303,9 @@ contract FinancingManager is Ownable, ReentrancyGuard {
             request.loanAsset,
             30 days, // 30 day duration
             address(fractionToken),
-            request.tokenId
+            request.tokenId,
+            0,
+            0
         );
 
         bytes32 loanId;

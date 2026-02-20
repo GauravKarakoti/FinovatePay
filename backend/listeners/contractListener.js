@@ -55,8 +55,7 @@ async function processTokenizedEvent(
             return false;
         }
 
-        // --- UPDATE LAST PROCESSED BLOCK ---
-        await EventSync.updateLastProcessedBlock('Tokenized', blockNumber);
+        await EventSync.updateLastProcessedBlock('InvoiceFractionalized', blockNumber);
 
         await client.query('COMMIT');
 
@@ -82,13 +81,11 @@ async function processTokenizedEvent(
     }
 }
 
-/**
- * Replay missed Tokenized events
- */
 async function replayMissedEvents(contract, fromBlock, toBlock) {
-    console.log(`🔄 Replaying Tokenized events from ${fromBlock} → ${toBlock}`);
+    console.log(`🔄 Replaying InvoiceFractionalized events from ${fromBlock} → ${toBlock}`);
 
-    const filter = contract.filters.Tokenized();
+    // Update the filter name here
+    const filter = contract.filters.InvoiceFractionalized(); 
     const events = await contract.queryFilter(filter, fromBlock, toBlock);
 
     console.log(`📦 Found ${events.length} events`);
@@ -96,14 +93,17 @@ async function replayMissedEvents(contract, fromBlock, toBlock) {
     let successCount = 0;
 
     for (const event of events) {
-        const { invoiceId, tokenId, totalSupply, faceValue } = event.args;
+        // Destructure matching the Solidity event arguments
+        const { invoiceId, tokenId, seller, totalFractions, pricePerFraction } = event.args;
 
         try {
+            // Note: If processTokenizedEvent requires faceValue, you might need to calculate it 
+            // or fetch it from the contract since it's not in the event payload
             const success = await processTokenizedEvent(
                 invoiceId,
                 tokenId,
-                totalSupply,
-                faceValue,
+                totalFractions, // passing fractions instead of supply
+                pricePerFraction, // passing price instead of faceValue
                 event.blockNumber
             );
 
@@ -128,7 +128,7 @@ async function listenForTokenization() {
         const provider = getProvider();
 
         const currentBlock = await provider.getBlockNumber();
-        const lastProcessedBlock = await EventSync.getLastProcessedBlock('Tokenized');
+        const lastProcessedBlock = await EventSync.getLastProcessedBlock('InvoiceFractionalized');
 
         console.log(`📍 Current block: ${currentBlock}`);
         console.log(`📍 Last processed block: ${lastProcessedBlock}`);
@@ -147,17 +147,18 @@ async function listenForTokenization() {
             }
         }
 
-        console.log("🎧 Listening for new Tokenized events...");
+        console.log("🎧 Listening for new InvoiceFractionalized events...");
 
+        // Update event name and parameter list
         contract.on(
-            "Tokenized",
-            async (invoiceHash, tokenId, totalSupply, faceValue, event) => {
+            "InvoiceFractionalized",
+            async (invoiceId, tokenId, seller, totalFractions, pricePerFraction, event) => {
                 try {
                     await processTokenizedEvent(
-                        invoiceHash,
+                        invoiceId,
                         tokenId,
-                        totalSupply,
-                        faceValue,
+                        totalFractions,
+                        pricePerFraction, 
                         event.log.blockNumber
                     );
                 } catch (err) {

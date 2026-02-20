@@ -1,46 +1,25 @@
 {
   "name": "finovatepay",
   "version": "1.0.0",
-  "description": "This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "test"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "Hardhat-based smart contract project for FinovatePay",
   "type": "module",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy": "hardhat ignition deploy ./ignition/modules/Deploy.ts"
+  },
   "devDependencies": {
-    "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
-    "@nomicfoundation/hardhat-ethers": "^3.1.3",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@nomicfoundation/hardhat-ignition": "^0.15.16",
     "@nomicfoundation/hardhat-ignition-ethers": "^0.15.17",
-    "@nomicfoundation/hardhat-network-helpers": "^1.1.2",
-    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
-    "@nomicfoundation/hardhat-verify": "^2.1.3",
     "@nomicfoundation/ignition-core": "^0.15.15",
-    "@nomiclabs/hardhat-ethers": "^2.2.3",
-    "@nomiclabs/hardhat-waffle": "^2.0.6",
-    "ethers": "^5.8.0",
     "hardhat": "^2.26.3",
-    "jest": "^30.2.0",
-    "waffle": "^0.0.4"
+    "ethers": "^6.14.0",
+    "jest": "^30.2.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
     "dotenv": "^17.2.2",
     "sonner": "^2.0.7"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/GauravKarakoti/FinovatePay.git"
-  },
-  "bugs": {
-    "url": "https://github.com/GauravKarakoti/FinovatePay/issues"
-  },
-  "homepage": "https://github.com/GauravKarakoti/FinovatePay#readme"
+  }
 }
