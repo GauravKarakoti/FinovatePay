@@ -17,7 +17,6 @@ import InvoiceList from '../components/Invoice/InvoiceList';
 import EscrowStatus from '../components/Escrow/EscrowStatus';
 import EscrowTimeline from '../components/Escrow/EscrowTimeline';
 import KYCStatus from '../components/KYC/KYCStatus';
-// import InvoiceContractABI from '../../../deployed/Invoice.json';
 import { generateTimelineEvents } from '../utils/timeline';
 import { toast } from 'sonner';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
@@ -25,7 +24,6 @@ import BuyerQuotationApproval from '../components/Quotation/BuyerQuotationApprov
 import AmountDisplay from '../components/common/AmountDisplay';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
-import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { useStatsActions } from '../context/StatsContext';
 import FiatOnRamp from '../components/FiatOnRamp';
 
@@ -252,6 +250,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   const [showKYCVerification, setShowKYCVerification] = useState(false);
   const [paymentInvoice, setPaymentInvoice] = useState(null); // For modal
   const { setStats: setGlobalStats } = useStatsActions();
+  const [showFiatModal, setShowFiatModal] = useState(false);
 
   // Load Initial Data
   const loadInitialData = useCallback(async () => {

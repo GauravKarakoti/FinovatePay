@@ -155,13 +155,21 @@ function App() {
     localStorage.setItem('user', JSON.stringify(user));
   }, [user]);
 
-  /* -------------------- Handlers -------------------- */
-  const handleLogin = (userData) => {
+  const handleLogin = (userData, token) => {
+    // 1. Save synchronously FIRST to prevent RequireAuth from failing
+    localStorage.setItem('user', JSON.stringify(userData));
+    if (token) {
+      localStorage.setItem('token', token); // Save the JWT token
+    }
+    // 2. Then update React state
     setUser(userData);
   };
 
+  // Update handleLogout to clear the token as well
   const handleLogout = () => {
     setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token'); // Clear the token
     resetStats();
   };
 

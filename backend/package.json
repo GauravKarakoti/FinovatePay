@@ -12,7 +12,8 @@
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "migrate:db": "node scripts/migrate-db.js",
-    "seed:db": "node scripts/seed-db.js"
+    "seed:db": "node scripts/seed-db.js",
+    "build": "docker build -t backend-prod -f Dockerfile .."
   },
   "keywords": [],
   "author": "",
@@ -28,9 +29,11 @@
     "ethers": "^6.15.0",
     "express": "^5.1.0",
     "groq-sdk": "^0.33.0",
+    "handlebars": "^4.7.8",
     "jsonwebtoken": "^9.0.2",
     "mailersend": "^2.6.0",
     "multer": "^2.0.2",
+    "nodemon": "^3.1.10",
     "pg": "^8.18.0",
     "socket.io": "^4.8.1",
     "sonner": "^2.0.7",
@@ -41,7 +44,6 @@
     "chai": "^4.3.10",
     "jest": "^30.2.0",
     "mocha": "^10.2.0",
-    "nodemon": "^3.1.10",
     "supertest": "^7.2.2"
   }
 }
