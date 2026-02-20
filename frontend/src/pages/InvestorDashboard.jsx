@@ -8,6 +8,7 @@ import { ethers } from 'ethers';
 import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
+import { useStatsActions } from '../context/StatsContext';
 
 // --- Reusable UI Components ---
 
@@ -238,6 +239,7 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [showFiatModal, setShowFiatModal] = useState(false);
   const [socket, setSocket] = useState(null);
+  const { setStats: setGlobalStats } = useStatsActions();
 
   // Initialize Socket.IO
   useEffect(() => {
@@ -279,13 +281,23 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     }
   }, []);
 
-  // Load data when tab changes
+  // Load data on mount
   useEffect(() => {
-    if (activeTab === 'financing') {
-      fetchMarketplace();
-      fetchPortfolio();
-    }
-  }, [activeTab]);
+    fetchMarketplace();
+    fetchPortfolio();
+  }, [fetchMarketplace, fetchPortfolio]);
+
+  // Sync global stats
+  useEffect(() => {
+    const active = portfolio.filter(p => p.invoice && p.invoice.status !== 'redeemed' && p.invoice.status !== 'cancelled').length;
+    const completed = portfolio.filter(p => p.invoice && p.invoice.status === 'redeemed').length;
+    
+    setGlobalStats({
+      totalInvoices: marketplaceListings.length,
+      activeEscrows: active,
+      completed: completed
+    });
+  }, [marketplaceListings, portfolio, setGlobalStats]);
 
   const fetchMarketplace = useCallback(async () => {
     setIsLoading(true);
