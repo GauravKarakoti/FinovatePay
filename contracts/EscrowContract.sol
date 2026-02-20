@@ -169,8 +169,10 @@ contract EscrowContract is
         admin = _msgSender();
         treasury = admin;
         keeper = admin;
+        feeBasisPoints = 10; // Default 0.1% fee (10 basis points)
 
         complianceManager = ComplianceManager(_complianceManager);
+
 
         for (uint256 i; i < _managers.length; i++) {
             isManager[_managers[i]] = true;

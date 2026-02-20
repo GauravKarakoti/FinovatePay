@@ -20,14 +20,18 @@ describe("EscrowContract", function () {
     compliance = await ComplianceManager.deploy();
     await compliance.deployed();
 
-    // Deploy EscrowContract
+    // Deploy EscrowContract with new constructor parameters
     EscrowContract = await ethers.getContractFactory("EscrowContract");
-    escrow = await EscrowContract.deploy(compliance.address);
+    const managers = [owner.address, other.address, manager1.address];
+    const threshold = 1; // Single approval needed for execution
+    escrow = await EscrowContract.deploy(
+      compliance.address,
+      owner.address, // trustedForwarder (using owner for testing)
+      managers,
+      threshold
+    );
     await escrow.deployed();
 
-    // Add other and manager1 as managers
-    await escrow.connect(owner).addManager(other.address);
-    await escrow.connect(owner).addManager(manager1.address);
 
     // Verify KYC for seller and buyer
     await compliance.verifyKYC(seller.address);
