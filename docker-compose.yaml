@@ -1,16 +1,17 @@
-
+version: '3.8'
 
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    container_name: finovate-backend
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${DB_USER:-user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-finovatepay}
+
     ports:
       - "3000:3000"
     env_file:
       - ./backend/.env
-    
     restart: unless-stopped
 
   frontend:
@@ -27,3 +28,20 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: finovate_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-finovate_db}
+
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
