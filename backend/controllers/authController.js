@@ -2,6 +2,13 @@ const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+// Utility function to sanitize user object (remove sensitive fields)
+const sanitizeUser = (user) => {
+  const { password, password_hash, ...sanitizedUser } = user;
+  return sanitizedUser;
+};
+
+
 // --- REGISTER USER ---
 exports.register = async (req, res) => {
   // 1. Get data from the form
@@ -48,7 +55,9 @@ exports.register = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
-    res.json({ user: newUser.rows[0] });
+    // Sanitize user object before sending response (remove password)
+    res.json({ user: sanitizeUser(newUser.rows[0]) });
+
 
 
   } catch (err) {
@@ -89,7 +98,9 @@ exports.login = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
-    res.json({ user: user.rows[0] });
+    // Sanitize user object before sending response (remove password)
+    res.json({ user: sanitizeUser(user.rows[0]) });
+
 
 
   } catch (err) {
