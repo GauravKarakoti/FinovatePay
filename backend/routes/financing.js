@@ -2,13 +2,13 @@ const express = require('express');
 const router = express.Router();
 const bridgeService = require('../services/bridgeService');
 const { authenticateToken } = require('../middleware/auth');
-const kycValidation = require('../middleware/kycValidation');
-const { getFractionTokenContract } = require('../utils/web3');
+const { requireKYC } = require('../middleware/kycValidation');
+const { getFractionTokenContract } = require('../config/blockchain');
 const pool = require('../config/database');
 const { ethers } = require('ethers');
 
 // Request financing using Katana liquidity
-router.post('/request', authenticateToken, kycValidation, async (req, res) => {
+router.post('/request', authenticateToken, requireKYC, async (req, res) => {
     try {
         const { invoiceId, amount, asset, collateralTokenId } = req.body;
         const userId = req.user.id;
@@ -49,7 +49,7 @@ router.get('/rates/:asset', authenticateToken, async (req, res) => {
 });
 
 // Repay financing
-router.post('/repay', authenticateToken, kycValidation, async (req, res) => {
+router.post('/repay', authenticateToken, requireKYC, async (req, res) => {
     try {
         const { financingId, amount, asset } = req.body;
 
@@ -74,7 +74,7 @@ router.post('/repay', authenticateToken, kycValidation, async (req, res) => {
 });
 
 // Tokenize invoice
-router.post('/tokenize', authenticateToken, kycValidation, async (req, res) => {
+router.post('/tokenize', authenticateToken, requireKYC, async (req, res) => {
     try {
         const { invoiceId, faceValue, maturityDate, yieldBps } = req.body;
         const userId = req.user.id;

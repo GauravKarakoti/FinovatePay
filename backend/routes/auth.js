@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { register, login } = require('../controllers/authController');
-const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -17,12 +16,18 @@ router.put('/role', authenticateToken, async (req, res) => {
   }
 
   try {
-    const updatedUser = await User.updateRole(userId, role);
-    if (!updatedUser) {
+    // FIX: Use pool.query instead of User.updateRole
+    const updateResult = await pool.query(
+      `UPDATE users SET role = $1 WHERE id = $2 
+       RETURNING id, email, wallet_address, company_name, first_name, last_name, role, created_at`,
+      [role, userId]
+    );
+
+    if (updateResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    // User.updateRole already returns sanitized data (no password_hash)
-    res.json({ message: 'Role updated successfully', user: updatedUser });
+    
+    res.json({ message: 'Role updated successfully', user: updateResult.rows[0] });
   } catch (error) {
     console.error('Role update error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -70,11 +75,10 @@ router.post('/register', async (req, res) => {
       [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, userRole]
     );
 
-    // Generate JWT token
     const token = jwt.sign(
-      { userId: newUser.rows[0].id },
+      { id: newUser.rows[0].id }, // Changed from userId to id
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '1Y' }
     );
 
     res.status(201).json({
@@ -126,11 +130,10 @@ router.post('/login', async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id },
+      { id: user.id }, // Changed from userId to id
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '1Y' }
     );
 
     res.json({
