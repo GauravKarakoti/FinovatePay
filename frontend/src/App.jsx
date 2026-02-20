@@ -155,8 +155,10 @@ function App() {
     localStorage.setItem('user', JSON.stringify(user));
   }, [user]);
 
-  /* -------------------- Handlers -------------------- */
   const handleLogin = (userData) => {
+    // 1. Save synchronously FIRST to prevent RequireAuth from failing
+    localStorage.setItem('user', JSON.stringify(userData)); 
+    // 2. Then update React state
     setUser(userData);
   };
 
