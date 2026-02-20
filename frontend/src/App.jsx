@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useWeb3ModalAccount } from '@web3modal/ethers/react';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
 import Register from './components/Register';
-
+import Invoices from './pages/Invoices';
+import InvoiceDetails from './pages/InvoiceDetails';
+import DisputeDashboard from './pages/DisputeDashboard';
+import FinovateChatbot from './components/Chatbot/Chatbot';
 import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
@@ -14,8 +17,8 @@ import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
 import './App.css';
 import { Toaster } from 'sonner';
-
-import './App.css';
+import { useStatsActions } from './context/StatsContext';
+import { setNavigateFunction } from './utils/api';
 
 /* -------------------- Error Boundary Component -------------------- */
 class ErrorBoundary extends React.Component {
@@ -191,7 +194,6 @@ function App() {
     }
   }, []);
 
-
   useEffect(() => {
     if (!user) {
       localStorage.removeItem('user');
@@ -205,7 +207,6 @@ function App() {
   const handleLogin = (userData) => {
     setUser(userData);
   };
-
 
   const handleLogout = () => {
     setUser(null);
@@ -240,7 +241,7 @@ function App() {
                     activeTab={activeTab} 
                     onTabChange={handleTabChange} 
                     user={user}
-                    walletConnected={walletConnected}
+                    walletConnected={isConnected}
                     onLogout={handleLogout}
                     onClose={() => setIsSidebarOpen(false)}
                 />
@@ -250,7 +251,7 @@ function App() {
             </div>
         </div>
         <div className="flex-1 overflow-auto">
-          {React.cloneElement(component, { onStatsChange: setDashboardStats })}
+          {React.cloneElement(dashboardComponent, { onStatsChange: setDashboardStats })}
         </div>
       </div>
     )
@@ -260,7 +261,6 @@ function App() {
   return (
     <ErrorBoundary>
       <Router>
-
         <NavigationSetup />
         <Toaster position="top" richColors />
         <div className="App">
@@ -271,7 +271,6 @@ function App() {
               onUserUpdate={setUser}
               onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           />
-          {console.log('Current user role in App.jsx:', user)}
           <main>
             <Routes>
               {/* Home route - keeps existing role-based logic */}
@@ -336,94 +335,12 @@ function App() {
                 } 
               />
               
-              {/* Public: Produce History */}
-              <Route 
-                path="/produce/:lotId" 
-                element={<ProduceHistory />}
-              />
-              
-              {/* Auth Pages */}
-              <Route 
-                path="/login" 
-                element={
-                  user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
-                } 
-              />
-              <Route 
-                path="/register" 
-                element={
-                  user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
-                } 
-              />
-          
-              {/* Chatbot UI */}
-              {user && (
-                <>
-                  <div style={{ position: 'fixed', bottom: '90px', right: '30px', zIndex: 999 }}>
-                    {isChatbotOpen && <FinovateChatbot />}
-                  </div>
-                  <button
-                    onClick={toggleChatbot}
-                    className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-opacity-50 transition-transform transform hover:scale-110 z-[1000]"
-                    aria-label="Toggle Chatbot"
-                  >
-                    {isChatbotOpen ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    ) : (
-                      <Navigate to="/login" />
-                    )}
-                  </button>
-                </>
-              )}
-
-              {/* Seller */}
+              {/* ✅ PROTECTED: Seller */}
               <Route
                 path="/seller"
                 element={
                   <RequireAuth allowedRoles={['seller']}>
                     {renderDashboard(<SellerDashboard activeTab={activeTab} />)}
-                  </RequireAuth>
-                }
-              />
-
-              {/* Buyer */}
-              <Route
-                path="/buyer"
-                element={
-                  <RequireAuth allowedRoles={['buyer']}>
-                    {renderDashboard(<BuyerDashboard activeTab={activeTab} />)}
-                  </RequireAuth>
-                }
-              />
-
-              {/* Investor */}
-              <Route
-                path="/investor"
-                element={
-                  <RequireAuth allowedRoles={['investor']}>
-                    {renderDashboard(<InvestorDashboard activeTab={activeTab} />)}
-                  </RequireAuth>
-                }
-              />
-
-              {/* Admin */}
-              <Route
-                path="/admin"
-                element={
-                  <RequireAuth allowedRoles={['admin']}>
-                    {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
-                  </RequireAuth>
-                }
-              />
-
-              {/* Shipment / Warehouse */}
-              <Route
-                path="/shipment"
-                element={
-                  <RequireAuth allowedRoles={['shipment', 'warehouse']}>
-                    <ShipmentDashboard />
                   </RequireAuth>
                 }
               />
@@ -453,17 +370,24 @@ function App() {
                 }
               />
 
-              {/* Public */}
-              <Route path="/produce/:lotId" element={<ProduceHistory />} />
-
-              {/* Auth */}
-              <Route
-                path="/login"
-                element={user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />}
+              {/* Public: Produce History */}
+              <Route 
+                path="/produce/:lotId" 
+                element={<ProduceHistory />}
               />
-              <Route
-                path="/register"
-                element={user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />}
+              
+              {/* Auth Pages */}
+              <Route 
+                path="/login" 
+                element={
+                  user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
+                } 
+              />
+              <Route 
+                path="/register" 
+                element={
+                  user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
+                } 
               />
             </Routes>
           </main>
@@ -479,10 +403,14 @@ function App() {
 
               <button
                 onClick={() => setIsChatbotOpen(!isChatbotOpen)}
-                className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 z-[1000]"
+                className="fixed bottom-5 right-5 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-opacity-50 transition-transform transform hover:scale-110 z-[1000]"
                 aria-label="Toggle Chatbot"
               >
-                {isChatbotOpen ? '✖' : '💬'}
+                {isChatbotOpen ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : '💬'}
               </button>
             </>
           )}

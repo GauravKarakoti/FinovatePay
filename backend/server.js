@@ -25,28 +25,29 @@ const io = socketIo(server, {
   },
 });
 
-// Parse CORS origins from environment variable (comma-separated)
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim().replace(/\/$/, ''))
   : ['http://localhost:5173'];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow null origin ONLY in development
-    if (!origin || allowedOrigins.includes(origin)) {
+    // 1. Allow requests with no origin (like Postman/curl) ONLY in development
+    if (!origin) {
       if (process.env.NODE_ENV !== "production") {
         return callback(null, true);
       }
       return callback(new Error("Not allowed by CORS"));
     }
 
+    // 2. Allow requests if the origin is in our allowed list
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
+    // 3. Reject anything else
     return callback(new Error("Not allowed by CORS"));
   },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
   credentials: true,
   optionsSuccessStatus: 204,
 };

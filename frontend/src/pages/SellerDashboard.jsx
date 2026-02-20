@@ -7,20 +7,13 @@ import {
   getKYCStatus
 } from '../utils/api';
 import { 
-  connectWallet, getEscrowContract, getProduceTrackingContract, erc20ABI
+  connectWallet, getEscrowContract
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import KYCStatus from '../components/KYC/KYCStatus';
 import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
-import { generateTimelineEvents } from '../utils/timeline';
-
-ProduceLotsTable.propTypes = {
-  lots: PropTypes.array.isRequired,
-  onSelect: PropTypes.func.isRequired,
-  onViewHistory: PropTypes.func
-};
 
 const ShipmentConfirmationModal = ({ 
   isOpen, 
