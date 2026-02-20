@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { login } from '../utils/api';
 
@@ -13,7 +13,6 @@ const Login = ({ onLogin }) => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -36,9 +35,6 @@ const Login = ({ onLogin }) => {
     }
   };
 
-  const inputBase =
-    'block w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 shadow-sm placeholder:text-gray-400 transition-all duration-200 focus:border-finovate-blue-500 focus:ring-2 focus:ring-finovate-blue-500/20 focus:outline-none sm:text-sm';
-
   return (
     <div className="min-h-screen flex">
       {/* Left: Brand panel (hidden on small screens) */}
@@ -47,10 +43,7 @@ const Login = ({ onLogin }) => {
           <div className="absolute top-20 left-20 w-72 h-72 rounded-full bg-white blur-3xl" />
           <div className="absolute bottom-32 right-16 w-96 h-96 rounded-full bg-finovate-green-400 blur-3xl" />
         </div>
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">FinovatePay</h1>
-          </div>
+        <div className="relative z-10 flex flex-col justify-center gap-10 p-12 text-white">
           <div className="space-y-6">
             <h2 className="text-3xl xl:text-4xl font-bold leading-tight">
               Secure payments for the modern supply chain.
