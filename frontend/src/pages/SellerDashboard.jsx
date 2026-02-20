@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
-
+import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import {
   getSellerInvoices,
   getKYCStatus,
@@ -32,6 +32,7 @@ import QuotationList from '../components/Dashboard/QuotationList';
 import CreateProduceLot from '../components/Produce/CreateProduceLot';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
+import FiatOnRamp from '../components/FiatOnRamp';
 
 // ------------------ HELPER COMPONENTS ------------------
 
@@ -225,7 +226,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [quotations, setQuotations] = useState([]);
   const [walletAddress, setWalletAddress] = useState('');
   const [showFiatModal, setShowFiatModal] = useState(false);
-
+  const [selectedQRCode, setSelectedQRCode] = useState(null);
   const [kycData, setKycData] = useState({
     status: 'not_started',
     riskLevel: 'unknown',
@@ -490,6 +491,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
                   userRole="seller"
                   onRaiseDispute={handleRaiseDispute}
                   onConfirmShipment={(invoice) => setConfirmingShipment(invoice)}
+                  onShowQRCode={(invoice) => setSelectedQRCode(invoice)} // <-- ADD THIS
                 />
               ) : (
                 <EmptyState message="No invoices yet" />
@@ -499,6 +501,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         </div>
 
         <div className="space-y-6">
+          <FiatOnRamp walletAddress={walletAddress} />
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <KYCStatus
               status={kycData.status}
@@ -525,6 +528,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
             userRole="seller"
             onRaiseDispute={handleRaiseDispute}
             onConfirmShipment={(invoice) => setConfirmingShipment(invoice)}
+            onShowQRCode={(invoice) => setSelectedQRCode(invoice)} // <-- ADD THIS
           />
         ) : (
           <EmptyState message="No invoices found" />
@@ -580,6 +584,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
             userRole="seller"
             onRaiseDispute={handleRaiseDispute}
             onConfirmShipment={(invoice) => setConfirmingShipment(invoice)}
+            onShowQRCode={(invoice) => setSelectedQRCode(invoice)} // <-- ADD THIS
           />
         ) : (
           <EmptyState message="No active escrows" icon="🔓" />
@@ -677,6 +682,20 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         onSubmit={handleFinalizeInvoice}
         isSubmitting={isSubmitting}
       />
+
+      <Modal
+        isOpen={!!selectedQRCode}
+        onClose={() => setSelectedQRCode(null)}
+        title="Produce Passport & Tracking"
+      >
+        {selectedQRCode && (
+          <ProduceQRCode 
+            lotId={selectedQRCode.invoice_id} 
+            produceType={selectedQRCode.description || "Produce"} 
+            origin={walletAddress} 
+          />
+        )}
+      </Modal>
 
       {showFiatModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
