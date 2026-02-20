@@ -12,7 +12,7 @@ const FINANCING_MANAGER_ADDRESS = process.env.FINANCING_MANAGER_ADDRESS;
 
 // Provider and signer setup (use environment variables for RPC URL, private key)
 const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+const signer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
 
 // Contract instances
 const bridgeAdapter = new ethers.Contract(BRIDGE_ADAPTER_ADDRESS, BridgeAdapterABI, signer);
