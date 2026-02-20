@@ -47,7 +47,6 @@ router.post('/:id/sync', async (req, res) => {
 // Get buyer's invoices
 router.get('/buyer', async (req, res) => {
   try {
-    console.log("Buyer:", req.user.wallet_address);
     const invoices = await Invoice.findByBuyer(req.user.wallet_address);
     res.json(invoices);
   } catch (error) {
