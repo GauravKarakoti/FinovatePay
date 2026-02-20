@@ -49,7 +49,11 @@ const sanitizeUser = (user) => {
 // Register new user
 router.post('/register', async (req, res) => {
   console.log('Registration request body:', req.body);
-  const { email, password, walletAddress, company_name, tax_id, first_name, last_name } = req.body;
+  const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;
+
+  // Validate role - only allow 'buyer' or 'seller' (arbitrators should be admin-only)
+  const allowedRoles = ['buyer', 'seller'];
+  const userRole = allowedRoles.includes(role) ? role : 'seller'; // Default to 'seller'
 
   try {
     // Check if user already exists
@@ -74,7 +78,7 @@ router.post('/register', async (req, res) => {
        (email, password_hash, wallet_address, company_name, tax_id, first_name, last_name, role) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING id, email, wallet_address, company_name, first_name, last_name, role, created_at`,
-      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, 'buyer']
+      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, userRole]
     );
 
     const token = jwt.sign(
