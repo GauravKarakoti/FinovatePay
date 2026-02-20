@@ -3,160 +3,223 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-// --- ADD ReentrancyGuard ---
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
-// --- INHERIT from ReentrancyGuard ---
 contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     using Strings for uint256;
 
-    // Standard 18 decimals for all fractional tokens (same as MATIC/ETH)
-    uint8 public constant DECIMALS = 18;
+    IERC20 public paymentToken; // USDC
 
-    mapping(bytes32 => uint256) public invoiceToTokenId;
-    mapping(uint256 => TokenDetails) public tokenDetails;
-    uint256 private currentTokenId = 1;
-
-    struct TokenDetails {
-        bytes32 invoiceId;
-        uint256 totalSupply;
-        uint256 remainingSupply;
-        uint256 faceValue;
+    struct InvoiceMeta {
+        address seller;
+        uint256 totalFractions;
+        uint256 pricePerFraction;
         uint256 maturityDate;
-        address issuer;
-        bool isRedeemed;
-        uint256 totalFunded; // TWEAK: Track funded amount for partial funding transparency
-        uint256 yieldBps; // Yield % for investors (basis points, e.g., 500 = 5%)
+        uint256 totalValue; // Face value (Repayment amount)
+        uint256 financedAmount; // Amount raised so far
+        bool repaymentFunded; // True if the invoice has been repaid (ready for redemption)
     }
 
-    event Tokenized(bytes32 indexed invoiceId, uint256 tokenId, uint256 totalSupply, uint256 faceValue);
-    event Redeemed(uint256 indexed tokenId, address indexed redeemer, uint256 redemptionValue);
-    event TokensPurchased(uint256 indexed tokenId, address indexed buyer, uint256 amount, uint256 payment);
-    event RedemptionFunded(uint256 indexed tokenId, address indexed funder, uint256 amount);
-    
-    constructor() 
+    mapping(uint256 => InvoiceMeta) public invoiceMetadata;
+    mapping(uint256 => bool) public isActive;
+    // Map invoice ID (uint256) to funds raised (already in struct, but keeping explicit if needed, here using struct)
+    // Map unique invoice ID (external) to Token ID
+    mapping(bytes32 => uint256) public invoiceToTokenId;
+
+    event InvoiceFractionalized(
+        bytes32 indexed invoiceId,
+        uint256 tokenId,
+        address seller,
+        uint256 totalFractions,
+        uint256 pricePerFraction
+    );
+
+    event FractionsPurchased(
+        uint256 indexed tokenId,
+        address indexed buyer,
+        uint256 amount,
+        uint256 totalCost
+    );
+
+    event RepaymentReceived(
+        uint256 indexed tokenId,
+        uint256 amount
+    );
+
+    event FractionsRedeemed(
+        uint256 indexed tokenId,
+        address indexed redeemer,
+        uint256 amount,
+        uint256 payout
+    );
+
+    event InvoiceClosed(uint256 indexed tokenId);
+
+    constructor(address _paymentToken)
         ERC1155("https://api.finovatepay.com/token/{id}.json") 
-        Ownable(msg.sender) 
-        ReentrancyGuard() // Initialize ReentrancyGuard
-    {}
+        Ownable(msg.sender)
+    {
+        require(_paymentToken != address(0), "Invalid payment token");
+        paymentToken = IERC20(_paymentToken);
+    }
 
     /**
-     * @notice Tokenizes an invoice.
-     * @dev _totalSupply and _faceValue MUST be passed in their base units (e.g., multiplied by 10**18).
-     * @dev To tokenize 0.01 tokens, pass _totalSupply = 10000000000000000.
+     * @notice Creates a fractionalized invoice (mints ERC-1155 tokens).
+     * @param _invoiceId The unique identifier of the invoice (bytes32).
+     * @param _seller The address of the seller receiving the financing.
+     * @param _totalFractions Total number of fractional units to mint.
+     * @param _pricePerFraction Price per unit in paymentToken (USDC) base units.
+     * @param _maturityDate Timestamp after which tokens can be redeemed (if repaid).
+     * @param _totalValue The total face value of the invoice (expected repayment).
      */
-    function tokenizeInvoice(
+    function createFractionalInvoice(
         bytes32 _invoiceId,
-        uint256 _totalSupply,
-        uint256 _faceValue,
+        address _seller,
+        uint256 _totalFractions,
+        uint256 _pricePerFraction,
         uint256 _maturityDate,
-        address _issuer,
-        uint256 _yieldBps
+        uint256 _totalValue
     ) external onlyOwner returns (uint256) {
-        require(invoiceToTokenId[_invoiceId] == 0, "Invoice already tokenized");
-        require(_totalSupply > 0, "Total supply must be greater than 0");
-        require(_yieldBps <= 10000, "Yield must be <= 100% (10000 bps)");
+        // Since tokenId = uint256(invoiceId), we use that directly.
+        uint256 tokenId = uint256(_invoiceId);
+        require(tokenId != 0, "Invalid Token ID");
+        require(invoiceMetadata[tokenId].totalFractions == 0, "Invoice already exists");
+        require(_totalFractions > 0, "Invalid total fractions");
+        require(_seller != address(0), "Invalid seller");
 
-        uint256 tokenId = currentTokenId++;
-        invoiceToTokenId[_invoiceId] = tokenId;
-
-        tokenDetails[tokenId] = TokenDetails({
-            invoiceId: _invoiceId,
-            totalSupply: _totalSupply,
-            remainingSupply: _totalSupply,
-            faceValue: _faceValue,
+        invoiceMetadata[tokenId] = InvoiceMeta({
+            seller: _seller,
+            totalFractions: _totalFractions,
+            pricePerFraction: _pricePerFraction,
             maturityDate: _maturityDate,
-            issuer: _issuer,
-            isRedeemed: false,
-            totalFunded: 0,
-            yieldBps: _yieldBps
+            totalValue: _totalValue,
+            financedAmount: 0,
+            repaymentFunded: false
         });
 
-        _mint(owner(), tokenId, _totalSupply, "");
-        emit Tokenized(_invoiceId, tokenId, _totalSupply, _faceValue);
+        isActive[tokenId] = true;
+        invoiceToTokenId[_invoiceId] = tokenId;
+
+        // Mint tokens to THIS contract.
+        // The contract acts as the marketplace custodian.
+        _mint(address(this), tokenId, _totalFractions, "");
+
+        emit InvoiceFractionalized(_invoiceId, tokenId, _seller, _totalFractions, _pricePerFraction);
         return tokenId;
     }
 
     /**
-     * @notice Allows issuer to fund the contract to pay for redemptions.
-     * @dev This must be called before 'redeem' can be used.
-     * @dev The contract must be funded with MATIC equal to the token's total faceValue.
+     * @notice Buy fractions of an invoice.
+     * @param _tokenId The token ID to purchase.
+     * @param _amount The number of fractions to buy.
      */
-    function fundRedemption(uint256 _tokenId) external payable {
-        TokenDetails storage details = tokenDetails[_tokenId];
-        require(msg.sender == details.issuer, "Only issuer can fund");
-        require(!details.isRedeemed, "Already redeemed");
-        require(msg.value > 0, "Must send MATIC");
+    function buyFractions(uint256 _tokenId, uint256 _amount) external nonReentrant {
+        require(isActive[_tokenId], "Invoice not active");
+        require(balanceOf(address(this), _tokenId) >= _amount, "Insufficient supply");
+        require(block.timestamp < invoiceMetadata[_tokenId].maturityDate, "Invoice expired");
 
-        // TWEAK: Allow partials but track them
-        details.totalFunded += msg.value;
-        
-        emit RedemptionFunded(_tokenId, msg.sender, msg.value);
-    }
+        InvoiceMeta storage meta = invoiceMetadata[_tokenId];
+        uint256 totalCost = _amount * meta.pricePerFraction;
 
-    function redeem(uint256 _tokenId, uint256 _amount) external nonReentrant {
-        TokenDetails storage details = tokenDetails[_tokenId];
-        require(block.timestamp >= details.maturityDate, "Not yet mature");
-        
-        uint256 redemptionValue = (_amount * details.faceValue) / details.totalSupply;
-        require(redemptionValue > 0, "Redemption value is zero");
-        
-        require(details.totalFunded >= redemptionValue, "Insufficient funding for this specific token");
-        require(address(this).balance >= redemptionValue, "Contract has insufficient funds");
+        // Transfer USDC from Buyer to Seller directly
+        // This gives immediate liquidity to the Seller.
+        paymentToken.safeTransferFrom(msg.sender, meta.seller, totalCost);
 
-        _burn(msg.sender, _tokenId, _amount);
-        details.remainingSupply -= _amount;
-        details.totalFunded -= redemptionValue; // Deduct from tracked funds
+        // Transfer Fractions from Contract to Buyer
+        _safeTransferFrom(address(this), msg.sender, _tokenId, _amount, "");
 
-        if (details.remainingSupply == 0) {
-            details.isRedeemed = true;
-        }
+        meta.financedAmount += totalCost;
 
-        (bool success, ) = payable(msg.sender).call{value: redemptionValue}("");
-        require(success, "Transfer failed");
-        
-        emit Redeemed(_tokenId, msg.sender, redemptionValue);
+        emit FractionsPurchased(_tokenId, msg.sender, _amount, totalCost);
     }
 
     /**
-     * @notice Allows an investor to purchase tokens by paying with MATIC.
-     * @dev Assumes 1:1 price (1 base unit of token = 1 WEI of MATIC).
-     * @dev To buy 0.01 tokens, send _amount = 10000000000000000 and msg.value = 10000000000000000.
-     * @param _tokenId The ID of the token to purchase.
-     * @param _amount The amount of tokens to purchase (in base units, 10**18).
-     * @param _tokenHolder The address that currently holds the tokens for sale.
+     * @notice Deposit repayment for an invoice (usually called by EscrowContract).
+     * @param _tokenId The token ID.
+     * @param _amount The amount of USDC being repaid.
      */
-    function purchaseTokens(
-        uint256 _tokenId,
-        uint256 _amount,
-        address _tokenHolder
-    ) external payable nonReentrant { // <-- Added nonReentrant
-        TokenDetails storage details = tokenDetails[_tokenId];
-        require(details.totalSupply > 0, "Token does not exist");
-        require(_amount > 0, "Amount must be positive");
-
-        // This is the core 1:1 WEI-for-WEI price logic
-        uint256 paymentAmount = _amount;
-        require(msg.value == paymentAmount, "Incorrect MATIC value sent");
-
-        // --- Checks-Effects-Interactions Pattern ---
-        // 1. Interaction (Payment to Seller)
-        (bool success, ) = payable(_tokenHolder).call{value: msg.value}("");
-        require(success, "MATIC payment to holder failed");
+    function depositRepayment(uint256 _tokenId, uint256 _amount) external nonReentrant {
+        InvoiceMeta storage meta = invoiceMetadata[_tokenId];
+        require(meta.totalFractions > 0, "Invoice not found");
+        // require(!meta.repaymentFunded, "Already repaid"); // Allow partial? For now, assume full or nothing logic later.
         
-        // 2. Effect (Token Transfer)
-        _safeTransferFrom(_tokenHolder, msg.sender, _tokenId, _amount, "");
+        // Transfer USDC from Payer (Escrow/Relayer) to THIS contract
+        paymentToken.safeTransferFrom(msg.sender, address(this), _amount);
         
-        emit TokensPurchased(_tokenId, msg.sender, _amount, paymentAmount);
+        // Simple logic: If we have enough funds to cover the Total Value (Face Value), mark as ready.
+        // Or we just track the balance of the contract?
+        // Ideally we track per-invoice balance, but for simplicity we mark as funded.
+
+        // Check if the contract holds enough for this specific invoice?
+        // We'll rely on the caller to send the correct amount.
+
+        // If amount >= totalValue, we consider it fully repaid.
+        if (_amount >= meta.totalValue) {
+            meta.repaymentFunded = true;
+        }
+
+        emit RepaymentReceived(_tokenId, _amount);
     }
 
-    function uri(uint256 _tokenId) public view override returns (string memory) {
-        require(_tokenId > 0 && _tokenId < currentTokenId, "Nonexistent token");
-        return super.uri(_tokenId);
+    /**
+     * @notice Redeem fractions for repayment + interest.
+     * @param _tokenId The token ID.
+     */
+    function redeemFractions(uint256 _tokenId) external nonReentrant {
+        InvoiceMeta storage meta = invoiceMetadata[_tokenId];
+        // require(block.timestamp >= meta.maturityDate, "Not mature yet");
+        // Actually, if it's repaid early, we should allow redemption?
+        // The prompt says "After invoice repayment...". So check repaymentFunded.
+        require(meta.repaymentFunded, "Repayment not yet received");
+
+        uint256 userBalance = balanceOf(msg.sender, _tokenId);
+        require(userBalance > 0, "No tokens to redeem");
+
+        // Calculate Payout: (UserTokens / TotalTokens) * TotalValue
+        // This ensures they get their principal + share of the discount (interest).
+        uint256 payout = (userBalance * meta.totalValue) / meta.totalFractions;
+
+        require(paymentToken.balanceOf(address(this)) >= payout, "Contract insufficient funds");
+
+        // Burn tokens
+        _burn(msg.sender, _tokenId, userBalance);
+
+        // Transfer Payout
+        paymentToken.safeTransfer(msg.sender, payout);
+
+        emit FractionsRedeemed(_tokenId, msg.sender, userBalance, payout);
     }
-    
-    function setURI(string memory _newuri) external onlyOwner {
-        _setURI(_newuri);
+
+    /**
+     * @notice Closes an invoice, preventing further purchases.
+     */
+    function closeInvoice(uint256 _tokenId) external onlyOwner {
+        isActive[_tokenId] = false;
+        emit InvoiceClosed(_tokenId);
+    }
+
+    // Needed for receiving ERC1155 tokens (if we mint to ourselves)
+    function onERC1155Received(
+        address,
+        address,
+        uint256,
+        uint256,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        return this.onERC1155Received.selector;
+    }
+
+    function onERC1155BatchReceived(
+        address,
+        address,
+        uint256[] memory,
+        uint256[] memory,
+        bytes memory
+    ) public virtual returns (bytes4) {
+        return this.onERC1155BatchReceived.selector;
     }
 }

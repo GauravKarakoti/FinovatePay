@@ -52,13 +52,13 @@ const EscrowStatus = ({ invoice, onConfirm, onDispute }) => {
 
             <p className="text-gray-600 mb-4 min-h-[40px]">{config.action}</p>
 
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
                 {/* CHANGE: The 'Confirm & Release' button now only appears when status is 'shipped' 
                 */}
                 {status === 'shipped' && onConfirm && (
                     <button
                         onClick={() => onConfirm(invoice)}
-                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md"
+                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md w-full sm:w-auto"
                     >
                         Confirm & Release Funds
                     </button>
@@ -72,7 +72,7 @@ const EscrowStatus = ({ invoice, onConfirm, onDispute }) => {
                             const reason = prompt('Please enter the reason for the dispute:');
                             if (reason) onDispute(invoice, reason);
                         }}
-                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md w-full sm:w-auto"
                     >
                         Raise Dispute
                     </button>

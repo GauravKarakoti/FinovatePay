@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { Transak } from '@transak/transak-sdk';
 import { stablecoinAddresses, erc20ABI, connectWallet } from '../utils/web3';
@@ -7,7 +7,6 @@ import { toast } from 'sonner';
 const FiatOnRamp = ({ walletAddress }) => {
   const [amount, setAmount] = useState('100'); // Default 100
   const [balance, setBalance] = useState('0.00');
-  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Fetch USDC Balance
@@ -22,7 +21,7 @@ const FiatOnRamp = ({ walletAddress }) => {
       const contract = new ethers.Contract(usdcAddress, erc20ABI, provider);
 
       const rawBalance = await contract.balanceOf(walletAddress);
-      const formattedBalance = ethers.utils.formatUnits(rawBalance, 6); // USDC has 6 decimals
+      const formattedBalance = ethers.formatUnits(rawBalance, 6); // USDC has 6 decimals
 
       setBalance(formattedBalance);
     } catch (error) {
@@ -47,27 +46,34 @@ const FiatOnRamp = ({ walletAddress }) => {
       return;
     }
 
-    const transakConfig = {
-      apiKey: import.meta.env.VITE_TRANSAK_API_KEY || '4fcd6904-706b-4009-8bb2-91f8071f727c', // Fallback to a public staging key for demo if env missing
-      environment: 'STAGING', // STAGING/PRODUCTION
+    const apiKey = import.meta.env.VITE_TRANSAK_API_KEY || '4fcd6904-706b-4009-8bb2-91f8071f727c';
+    
+    // 1. Manually construct the widget URL with query parameters
+    const baseUrl = 'https://global-stg.transak.com/'; 
+    
+    const queryParams = new URLSearchParams({
+      apiKey: apiKey,
       defaultCryptoCurrency: 'USDC',
       walletAddress: walletAddress,
-      themeColor: '2563EB', // Blue-600
-      fiatAmount: amount,
+      themeColor: '2563EB',
+      fiatAmount: amount.toString(),
       defaultFiatCurrency: 'USD',
-      email: '', // Can pre-fill if available
-      redirectURL: '',
-      hostURL: window.location.origin,
+      network: 'polygon'
+    });
+
+    // 2. Pass exactly what the TransakConfig type requires
+    const transakConfig = {
+      widgetUrl: `${baseUrl}?${queryParams.toString()}`,
+      referrer: window.location.origin, 
       widgetHeight: '625px',
       widgetWidth: '500px',
-      network: 'polygon' // Amoy is Polygon testnet, Transak Staging usually maps 'polygon' to Amoy/Mumbai
     };
 
     const transak = new Transak(transakConfig);
 
     transak.init();
 
-    // This will trigger when the user marks payment is made
+    // 3. Listen for successful transactions
     Transak.on(Transak.EVENTS.TRANSAK_ORDER_SUCCESSFUL, (orderData) => {
       console.log(orderData);
       toast.success("Transaction successful! Updating balance...");
@@ -80,6 +86,12 @@ const FiatOnRamp = ({ walletAddress }) => {
         await fetchBalance();
         if (attempts >= 5) clearInterval(pollInterval);
       }, 3000);
+    });
+
+    // 4. ADD THIS: Listen for the user closing the widget
+    Transak.on(Transak.EVENTS.TRANSAK_WIDGET_CLOSE, () => {
+      console.log('Transak widget closed by user');
+      transak.close(); // This physically removes the iframe from the DOM
     });
   };
 

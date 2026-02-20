@@ -1,5 +1,6 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import { expect } from "chai";
+import hre from "hardhat";
+const { ethers } = hre;
 
 describe("EscrowContract", function () {
   let EscrowContract, ComplianceManager;
@@ -100,7 +101,9 @@ describe("EscrowContract", function () {
         buyer.address,
         amount,
         token.address,
-        duration
+        duration,
+        ethers.constants.AddressZero, // rwaNftContract
+        0 // rwaTokenId
       )).to.emit(escrow, "EscrowCreated");
     });
     
@@ -115,7 +118,9 @@ describe("EscrowContract", function () {
         buyer.address,
         amount,
         token.address,
-        duration
+        duration,
+        ethers.constants.AddressZero,
+        0
       )).to.be.revertedWith("Not admin");
     });
   });
@@ -132,7 +137,9 @@ describe("EscrowContract", function () {
         buyer.address,
         amount,
         token.address,
-        duration
+        duration,
+        ethers.constants.AddressZero,
+        0
       );
     });
     
@@ -163,7 +170,7 @@ describe("EscrowContract", function () {
       const invoiceId = ethers.utils.formatBytes32String("INV-001");
       const amount = ethers.utils.parseEther("1");
       const duration = 7 * 24 * 60 * 60;
-      
+
       await escrow.connect(owner).createEscrow(
         invoiceId,
         seller.address,

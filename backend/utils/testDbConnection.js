@@ -1,4 +1,4 @@
-const { pool, getConnection } = require('../config/database');
+const { pool } = require('../config/database'); // ✅ Corrected import
 
 /**
  * ENHANCED DATABASE CONNECTION TEST WITH EXPONENTIAL BACKOFF
@@ -15,7 +15,8 @@ const testDbConnection = async () => {
     try {
       console.log(`Attempting database connection (${retries + 1}/${maxRetries})...`);
 
-      const client = await getConnection();
+      // ✅ Use pool.connect() instead of getConnection()
+      const client = await pool.connect(); 
       await client.query('SELECT 1 as test');
       client.release();
 
