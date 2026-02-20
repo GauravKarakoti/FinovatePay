@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const {
   releaseEscrow,
@@ -12,17 +12,18 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 router.use(authenticateToken);
 router.use(requireKYC);
 
-// Release escrow funds
-router.post('/escrow/release', async (req, res) => {
+// Release escrow funds (buyer confirms product/service received)
+router.post('/escrow/release', requireRole(['buyer', 'admin']), async (req, res) => {
   await releaseEscrow(req, res);
 });
 
-// Raise a dispute
-router.post('/escrow/dispute', async (req, res) => {
+// Raise a dispute (buyer or seller)
+router.post('/escrow/dispute', requireRole(['buyer', 'seller', 'admin']), async (req, res) => {
   await raiseDispute(req, res);
 });
 
-router.post('/onramp', async (req, res) => {
+// Calculate fiat to crypto conversion
+router.post('/onramp', requireRole(['buyer', 'seller', 'investor', 'admin']), async (req, res) => {
     try {
         const { amount, currency } = req.body;
         const userId = req.user.id; // From authenticateToken middleware

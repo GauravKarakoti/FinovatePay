@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const Invoice = require('../models/Invoice');
 const { pool } = require("../config/database");
@@ -17,14 +17,14 @@ const {
 // All invoice routes require authentication
 router.use(authenticateToken);
 
-// Create a new invoice
-router.post('/', requireKYC, async (req, res) => {
+// Create a new invoice - Only sellers can create invoices
+router.post('/', requireKYC, requireRole(['seller', 'admin']), async (req, res) => {
   console.log("Creating invoice with data:", req.body);
   await createInvoice(req, res);
 });
 
-// Get seller's invoices
-router.get('/seller', async (req, res) => {
+// Get seller's invoices - Only accessible by sellers and admins
+router.get('/seller', requireRole(['seller', 'admin']), async (req, res) => {
   try {
     const invoices = await Invoice.findBySeller(req.user.wallet_address);
     res.json(invoices);
@@ -44,8 +44,8 @@ router.post('/:id/sync', async (req, res) => {
   }
 });
 
-// Get buyer's invoices
-router.get('/buyer', async (req, res) => {
+// Get buyer's invoices - Only accessible by buyers and admins
+router.get('/buyer', requireRole(['buyer', 'admin']), async (req, res) => {
   try {
     const invoices = await Invoice.findByBuyer(req.user.wallet_address);
     res.json(invoices);
@@ -58,11 +58,12 @@ router.get('/buyer', async (req, res) => {
 
 // 1. Get Early Payment Offer (Check discount details)
 // Note: using :invoiceId to match controller param
-router.get('/:invoiceId/offer', getEarlyPaymentOffer);
+router.get('/:invoiceId/offer', requireRole(['buyer', 'seller', 'admin']), getEarlyPaymentOffer);
 
 // 2. Accept Early Settlement (Process payment)
 // We add requireKYC here because it involves a financial transaction
-router.post('/:invoiceId/settle-early', requireKYC, settleInvoiceEarly);
+// Only buyers settle invoices
+router.post('/:invoiceId/settle-early', requireKYC, requireRole(['buyer', 'admin']), settleInvoiceEarly);
 
 // --------------------------------------
 

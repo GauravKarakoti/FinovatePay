@@ -1,4 +1,4 @@
-const  pool  = require('../config/database');
+const { pool } = require('../config/database');
 const sandboxService = require('../services/sandboxService');
 const { ethers } = require('ethers');
 const { getSigner, contractAddresses } = require('../config/blockchain');
