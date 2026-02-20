@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const User = require('../models/User');
+const { sanitizeUser } = require('../utils/sanitize');
 const router = express.Router();
 
 router.put('/role', authenticateToken, async (req, res) => {
@@ -21,7 +22,7 @@ router.put('/role', authenticateToken, async (req, res) => {
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.json({ message: 'Role updated successfully', user: updatedUser });
+    res.json({ message: 'Role updated successfully', user: sanitizeUser(updatedUser) });
   } catch (error) {
     console.error('Role update error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -68,7 +69,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       message: 'User created successfully',
-      user: newUser.rows[0],
+      user: sanitizeUser(newUser.rows[0]),
       token
     });
   } catch (error) {
@@ -113,11 +114,9 @@ router.post('/login', async (req, res) => {
     );
 
     // Return user data (excluding password)
-    const { password_hash, ...userWithoutPassword } = user;
-
     res.json({
       message: 'Login successful',
-      user: userWithoutPassword,
+      user: sanitizeUser(user),
       token
     });
   } catch (error) {
@@ -140,7 +139,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(userResult.rows[0]);
+    res.json(sanitizeUser(userResult.rows[0]));
   } catch (error) {
     console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -155,7 +154,7 @@ router.post('/logout', (req, res) => {
 
 // Verify token validity
 router.get('/verify', authenticateToken, (req, res) => {
-  res.json({ valid: true, user: req.user });
+  res.json({ valid: true, user: sanitizeUser(req.user) });
 });
 
 module.exports = router;
