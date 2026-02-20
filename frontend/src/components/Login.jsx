@@ -28,6 +28,7 @@ const Login = ({ onLogin }) => {
       const response = await login(formData.email, formData.password);
       onLogin(response.data.user, response.data.token);
       navigate(from, { replace: true });
+      console.log('Login successful:', response.data, from);
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {
