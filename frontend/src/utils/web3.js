@@ -23,7 +23,7 @@ const amoyTestnet = {
   name: 'Polygon Amoy Testnet',
   currency: 'MATIC',
   explorerUrl: 'https://www.oklink.com/amoy',
-  rpcUrl: 'https://rpc-amoy.polygon.technology/',
+  rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.ankr.com/polygon_amoy',
 };
 
 // App Metadata
@@ -217,7 +217,9 @@ export async function getErc20Contract(tokenAddress) {
 // Token approval functions
 export async function approveFinancingManager() {
   const contract = await getFractionTokenContract();
+  console.log("Got contract")
   const tx = await contract.setApprovalForAll(contractAddresses.FinancingManager, true);
+  console.log("Tx recieved")
   return tx.wait();
 }
 

@@ -37,7 +37,9 @@ const FinancingTab = ({ invoices, onTokenizeClick }) => {
         setIsApprovalLoading(true);
         toast.loading("Waiting for approval transaction...");
         try {
+            console.log("Sending approval transaction...");
             await approveFinancingManager();
+            console.log("Approval transaction sent.");
             toast.dismiss();
             toast.success("Automated financing enabled!");
             setIsFinancingApproved(true);
