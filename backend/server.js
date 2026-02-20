@@ -5,6 +5,7 @@ const socketIo = require('socket.io');
 require('dotenv').config();
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
+const { globalLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
 const server = http.createServer(app);
@@ -38,6 +39,9 @@ const corsOptions = {
 // This single middleware at the top will handle all CORS and preflight requests
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Apply global rate limiter to all API routes
+app.use('/api/', globalLimiter);
 
 // --- DATABASE CONNECTION ---
 const { pool, getConnection, getDatabaseHealth } = require('./config/database');

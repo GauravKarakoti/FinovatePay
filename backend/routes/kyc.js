@@ -1,14 +1,15 @@
 const express = require('express');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { kycLimiter } = require('../middleware/rateLimiter');
 const router = express.Router();
 const kycController = require('../controllers/kycController');
 
 // Route to initiate Aadhaar verification
-router.post('/initiate', authenticateToken, kycController.initiateKYC);
+router.post('/initiate', authenticateToken, kycLimiter, kycController.initiateKYC);
 
 // Route to verify OTP and complete process
-router.post('/verify-otp', authenticateToken, kycController.verifyKYCOtp);
+router.post('/verify-otp', authenticateToken, kycLimiter, kycController.verifyKYCOtp);
 
 // Check KYC status
 router.get('/status', authenticateToken, async (req, res) => {
