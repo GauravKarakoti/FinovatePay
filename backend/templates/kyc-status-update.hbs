@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+    .email-wrapper { background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; }
+    .status-badge { display: inline-block; padding: 10px 20px; border-radius: 20px; font-weight: bold; font-size: 16px; margin-top: 15px; }
+    .status-approved { background-color: #4caf50; }
+    .status-pending { background-color: #ff9800; }
+    .status-rejected { background-color: #f44336; }
+    .details { background-color: #f9f9f9; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; }
+    .message-box { background-color: #f9f9f9; padding: 15px; border-left: 4px solid #667eea; margin: 20px 0; }
+    .button { display: inline-block; background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 20px; font-weight: bold; }
+    .button:hover { background-color: #764ba2; }
+    .footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #ddd; }
+    .footer a { color: #667eea; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="email-wrapper">
+      <div class="header">
+        <h1>🆔 KYC Status Update</h1>
+        <div class="status-badge {{statusClass}}" style="color: white;">{{status}}</div>
+      </div>
+      
+      <div class="content" style="padding: 30px;">
+        <p>Hi {{userName}},</p>
+        
+        <p>We're reaching out to inform you about an important update regarding your KYC (Know Your Customer) verification status.</p>
+        
+        <div class="details">
+          <p><strong>Current Status:</strong> {{status}}</p>
+          <p><strong>Last Updated:</strong> {{lastUpdated}}</p>
+        </div>
+        
+        {{#if message}}
+        <div class="message-box">
+          <p><strong>Additional Information:</strong></p>
+          <p>{{message}}</p>
+        </div>
+        {{/if}}
+        
+        {{#if requiresAction}}
+        <p><strong>Action Required:</strong> Please complete the verification process to unlock all features.</p>
+        {{/if}}
+        
+        {{#if actionUrl}}
+        <a href="{{actionUrl}}" class="button">View KYC Status</a>
+        {{/if}}
+        
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+          If you have any questions about your KYC status or need assistance, please don't hesitate to contact our support team.
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>&copy; 2026 {{companyName}}. All rights reserved.</p>
+        <p><a href="{{unsubscribeUrl}}">Unsubscribe from emails</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

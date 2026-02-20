@@ -12,6 +12,7 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
     // ---
     const [faceValue, setFaceValue] = useState(invoice.amount ? String(invoice.amount) : '');
     const [maturityDate, setMaturityDate] = useState(defaultMaturityString);
+    const [yieldBps, setYieldBps] = useState('500'); // Default 5% yield
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -28,7 +29,8 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
         // Pass the data up to the parent component's submit handler
         onSubmit(invoice.invoice_id, {
             faceValue,
-            maturityDate
+            maturityDate,
+            yieldBps
         });
     };
 
@@ -61,7 +63,7 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
                          <p className="text-xs text-gray-500 mt-1">This is the total value investors will fund.</p>
                     </div>
 
-                    <div className="mb-6">
+                    <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="maturityDate">
                             Maturity Date
                         </label>
@@ -72,6 +74,24 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
                             onChange={(e) => setMaturityDate(e.target.value)}
                             className="block w-full text-sm p-2 border rounded-md"
                         />
+                    </div>
+
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="yieldBps">
+                            Investor Yield (%)
+                        </label>
+                        <input
+                            id="yieldBps"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={yieldBps}
+                            onChange={(e) => setYieldBps(e.target.value)}
+                            className="block w-full text-sm p-2 border rounded-md"
+                            placeholder="e.g., 5.00"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Percentage discount investors get on purchase price (e.g., 5% means they pay 95% of face value).</p>
                     </div>
 
                     <div className="flex justify-end space-x-3">
