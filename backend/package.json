@@ -8,7 +8,6 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "test:manual": "node test/manual-event-sync-test.js",
-    "test:backend": "jest",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "migrate:db": "node scripts/migrate-db.js",
@@ -45,5 +44,8 @@
     "jest": "^30.2.0",
     "mocha": "^10.2.0",
     "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
