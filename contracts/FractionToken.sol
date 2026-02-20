@@ -8,6 +8,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
+/**
+ * @title FractionToken
+ * @author FinovatePay Team
+ * @notice Mints and manages fractionalized invoice tokens (ERC1155) representing future revenue claims.
+ */
 contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Strings for uint256;
@@ -20,14 +25,25 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 pricePerFraction;
         uint256 maturityDate;
         uint256 totalValue; // Face value (Repayment amount)
-        uint256 financedAmount; // Amount raised so far
-        bool repaymentFunded; // True if the invoice has been repaid (ready for redemption)
+        uint256 financedAmount;
+        bool repaymentFunded; // True if the invoice has been repaid
+        uint256 yieldBps; // Yield/interest rate in basis points
+    }
+
+    // Required for compatibility with FinancingManager IFractionToken interface
+    struct TokenDetails {
+        bytes32 invoiceId;
+        uint256 totalSupply;
+        uint256 remainingSupply;
+        uint256 faceValue;
+        uint256 maturityDate;
+        address issuer;
+        bool isRedeemed;
+        uint256 yieldBps;
     }
 
     mapping(uint256 => InvoiceMeta) public invoiceMetadata;
     mapping(uint256 => bool) public isActive;
-    // Map invoice ID (uint256) to funds raised (already in struct, but keeping explicit if needed, here using struct)
-    // Map unique invoice ID (external) to Token ID
     mapping(bytes32 => uint256) public invoiceToTokenId;
 
     event InvoiceFractionalized(
@@ -37,26 +53,22 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 totalFractions,
         uint256 pricePerFraction
     );
-
     event FractionsPurchased(
         uint256 indexed tokenId,
         address indexed buyer,
         uint256 amount,
         uint256 totalCost
     );
-
     event RepaymentReceived(
         uint256 indexed tokenId,
         uint256 amount
     );
-
     event FractionsRedeemed(
         uint256 indexed tokenId,
         address indexed redeemer,
         uint256 amount,
         uint256 payout
     );
-
     event InvoiceClosed(uint256 indexed tokenId);
 
     constructor(address _paymentToken)
@@ -75,16 +87,17 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
      * @param _pricePerFraction Price per unit in paymentToken (USDC) base units.
      * @param _maturityDate Timestamp after which tokens can be redeemed (if repaid).
      * @param _totalValue The total face value of the invoice (expected repayment).
+     * @param _yieldBps The yield percentage for investors (basis points).
      */
-    function createFractionalInvoice(
+    function tokenizeInvoice(
         bytes32 _invoiceId,
         address _seller,
         uint256 _totalFractions,
         uint256 _pricePerFraction,
         uint256 _maturityDate,
-        uint256 _totalValue
+        uint256 _totalValue,
+        uint256 _yieldBps
     ) external onlyOwner returns (uint256) {
-        // Since tokenId = uint256(invoiceId), we use that directly.
         uint256 tokenId = uint256(_invoiceId);
         require(tokenId != 0, "Invalid Token ID");
         require(invoiceMetadata[tokenId].totalFractions == 0, "Invoice already exists");
@@ -98,7 +111,8 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
             maturityDate: _maturityDate,
             totalValue: _totalValue,
             financedAmount: 0,
-            repaymentFunded: false
+            repaymentFunded: false,
+            yieldBps: _yieldBps
         });
 
         isActive[tokenId] = true;
@@ -113,7 +127,24 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Buy fractions of an invoice.
+     * @notice Returns metadata for FinancingManager interface compatibility.
+     */
+    function tokenDetails(uint256 tokenId) external view returns (TokenDetails memory) {
+        InvoiceMeta memory meta = invoiceMetadata[tokenId];
+        return TokenDetails({
+            invoiceId: bytes32(tokenId),
+            totalSupply: meta.totalFractions,
+            remainingSupply: balanceOf(address(this), tokenId),
+            faceValue: meta.totalValue,
+            maturityDate: meta.maturityDate,
+            issuer: meta.seller,
+            isRedeemed: meta.repaymentFunded,
+            yieldBps: meta.yieldBps
+        });
+    }
+
+    /**
+     * @notice Buy fractions of an invoice directly (Primary Market).
      * @param _tokenId The token ID to purchase.
      * @param _amount The number of fractions to buy.
      */
@@ -125,39 +156,29 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         InvoiceMeta storage meta = invoiceMetadata[_tokenId];
         uint256 totalCost = _amount * meta.pricePerFraction;
 
-        // Transfer USDC from Buyer to Seller directly
-        // This gives immediate liquidity to the Seller.
+        // Transfer USDC from Buyer to Seller directly to provide immediate liquidity.
         paymentToken.safeTransferFrom(msg.sender, meta.seller, totalCost);
 
-        // Transfer Fractions from Contract to Buyer
+        // Transfer Fractions from Contract custodian to Buyer.
         _safeTransferFrom(address(this), msg.sender, _tokenId, _amount, "");
-
         meta.financedAmount += totalCost;
 
         emit FractionsPurchased(_tokenId, msg.sender, _amount, totalCost);
     }
 
     /**
-     * @notice Deposit repayment for an invoice (usually called by EscrowContract).
+     * @notice Deposit repayment for an invoice (called by EscrowContract).
      * @param _tokenId The token ID.
      * @param _amount The amount of USDC being repaid.
      */
     function depositRepayment(uint256 _tokenId, uint256 _amount) external nonReentrant {
         InvoiceMeta storage meta = invoiceMetadata[_tokenId];
         require(meta.totalFractions > 0, "Invoice not found");
-        // require(!meta.repaymentFunded, "Already repaid"); // Allow partial? For now, assume full or nothing logic later.
         
-        // Transfer USDC from Payer (Escrow/Relayer) to THIS contract
+        // Transfer USDC from Payer (Escrow/Relayer) to THIS contract to pool for redemption.
         paymentToken.safeTransferFrom(msg.sender, address(this), _amount);
-        
-        // Simple logic: If we have enough funds to cover the Total Value (Face Value), mark as ready.
-        // Or we just track the balance of the contract?
-        // Ideally we track per-invoice balance, but for simplicity we mark as funded.
 
-        // Check if the contract holds enough for this specific invoice?
-        // We'll rely on the caller to send the correct amount.
-
-        // If amount >= totalValue, we consider it fully repaid.
+        // If the contract holds enough for the face value, mark it as ready for redemption.
         if (_amount >= meta.totalValue) {
             meta.repaymentFunded = true;
         }
@@ -166,30 +187,23 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Redeem fractions for repayment + interest.
+     * @notice Redeem fractions for repayment + interest (share of total value).
      * @param _tokenId The token ID.
      */
     function redeemFractions(uint256 _tokenId) external nonReentrant {
         InvoiceMeta storage meta = invoiceMetadata[_tokenId];
-        // require(block.timestamp >= meta.maturityDate, "Not mature yet");
-        // Actually, if it's repaid early, we should allow redemption?
-        // The prompt says "After invoice repayment...". So check repaymentFunded.
         require(meta.repaymentFunded, "Repayment not yet received");
 
         uint256 userBalance = balanceOf(msg.sender, _tokenId);
         require(userBalance > 0, "No tokens to redeem");
 
-        // Calculate Payout: (UserTokens / TotalTokens) * TotalValue
-        // This ensures they get their principal + share of the discount (interest).
+        // Payout Calculation: (UserTokens / TotalTokens) * TotalValue.
         uint256 payout = (userBalance * meta.totalValue) / meta.totalFractions;
 
         require(paymentToken.balanceOf(address(this)) >= payout, "Contract insufficient funds");
-
-        // Burn tokens
-        _burn(msg.sender, _tokenId, userBalance);
-
-        // Transfer Payout
-        paymentToken.safeTransfer(msg.sender, payout);
+        
+        _burn(msg.sender, _tokenId, userBalance); // Burn tokens upon claim.
+        paymentToken.safeTransfer(msg.sender, payout); // Distribute share of profit/principal.
 
         emit FractionsRedeemed(_tokenId, msg.sender, userBalance, payout);
     }
@@ -202,24 +216,12 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         emit InvoiceClosed(_tokenId);
     }
 
-    // Needed for receiving ERC1155 tokens (if we mint to ourselves)
-    function onERC1155Received(
-        address,
-        address,
-        uint256,
-        uint256,
-        bytes memory
-    ) public virtual returns (bytes4) {
+    // Boilerplate for receiving ERC1155 tokens
+    function onERC1155Received(address, address, uint256, uint256, bytes memory) public virtual returns (bytes4) {
         return this.onERC1155Received.selector;
     }
 
-    function onERC1155BatchReceived(
-        address,
-        address,
-        uint256[] memory,
-        uint256[] memory,
-        bytes memory
-    ) public virtual returns (bytes4) {
+    function onERC1155BatchReceived(address, address, uint256[] memory, uint256[] memory, bytes memory) public virtual returns (bytes4) {
         return this.onERC1155BatchReceived.selector;
     }
 }
