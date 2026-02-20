@@ -49,16 +49,27 @@ contract Invoice is ReentrancyGuard {
     function depositNative() external payable onlyBuyer inStatus(Status.Unpaid) nonReentrant {
         require(tokenAddress == address(0), "Invoice is for ERC20 token");
         require(msg.value == amount, "Incorrect amount");
+
+        // Update mapping
+        escrowBalance[0] += msg.value;
+
         currentStatus = Status.Deposited;
         emit InvoiceDeposited(msg.value);
         emit StatusChanged(Status.Deposited);
     }
 
+    mapping(uint => uint) public escrowBalance;
+
     // Buyer deposits ERC20 tokens into this contract
     function depositToken() external onlyBuyer inStatus(Status.Unpaid) nonReentrant {
         require(tokenAddress != address(0), "Invoice is for native currency");
         IERC20 token = IERC20(tokenAddress);
-        token.safeTransferFrom(msg.sender, address(seller), amount);
+        // FIX: Hold funds in contract instead of transferring directly to seller
+        token.safeTransferFrom(msg.sender, address(this), amount);
+
+        // Update mapping as per requirement (using 0 as ID since this is a single invoice contract)
+        escrowBalance[0] += amount;
+
         currentStatus = Status.Deposited;
         emit InvoiceDeposited(amount);
         emit StatusChanged(Status.Deposited);
@@ -66,8 +77,11 @@ contract Invoice is ReentrancyGuard {
 
     // Buyer releases the funds from this contract to the seller
     function releaseFunds() external onlyBuyer inStatus(Status.Deposited) nonReentrant {
+        // Clear balance mapping before transfer (reentrancy protection pattern)
+        escrowBalance[0] = 0;
+
         if (tokenAddress == address(0)) {
-            (bool success, ) = seller.call{value: amount}("");
+            (bool success, ) = payable(seller).call{value: amount}("");
             require(success, "Native transfer failed");
         } else {
             IERC20(tokenAddress).safeTransfer(seller, amount);

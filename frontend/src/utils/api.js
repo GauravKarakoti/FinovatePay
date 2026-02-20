@@ -17,6 +17,16 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 // Handle API errors with comprehensive error handling
 api.interceptors.response.use(
   (response) => response,
@@ -68,8 +78,10 @@ api.interceptors.response.use(
         });
         
       case 401:
-        // Clear user data from localStorage
+        // Clear user data and token from localStorage
         localStorage.removeItem('user');
+        localStorage.removeItem('token'); // Add this line
+        
         // Use React Router navigation if available, fallback to hard redirect
         if (navigateFunction) {
           navigateFunction('/login', { replace: true });
@@ -173,15 +185,15 @@ export const getMarketplaceListings = () => {
 
 // --- Auth API ---
 export const login = (email, password) => {
-  return api.post('auth/login', { email, password });
+  return api.post('/auth/login', { email, password });
 };
 
 export const register = (userData) => {
-  return api.post('auth/register', userData);
+  return api.post('/auth/register', userData);
 };
 
 export const updateCurrentUserRole = (role) => {
-  return api.put('auth/role', { role });
+  return api.put('/auth/role', { role });
 };
 
 // --- Invoice API ---

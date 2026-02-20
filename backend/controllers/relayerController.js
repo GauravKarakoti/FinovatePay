@@ -33,7 +33,7 @@ const relayTransaction = async (req, res) => {
         }
 
         const provider = new ethers.JsonRpcProvider(providerUrl);
-        const privateKey = process.env.RELAYER_PRIVATE_KEY || process.env.PRIVATE_KEY;
+        const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
 
         if (!privateKey) {
              return res.status(500).json({ error: "Relayer wallet not configured" });

@@ -2,37 +2,84 @@ const express = require('express');
 const router = express.Router();
 const bridgeService = require('../services/bridgeService');
 const { authenticateToken } = require('../middleware/auth');
-const kycValidation = require('../middleware/kycValidation');
-const { getFractionTokenContract } = require('../utils/web3');
-const pool = require('../config/database');
+const { requireKYC } = require('../middleware/kycValidation');
+const { getFractionTokenContract } = require('../config/blockchain');
+const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 
+// Get marketplace listings
+router.get('/marketplace', authenticateToken, async (req, res) => {
+    try {
+        // Fetch all invoices that have been tokenized and are listed on the marketplace
+        const query = `
+            SELECT 
+                i.*, 
+                i.amount as remaining_supply -- Aliased for the frontend to use as the max available supply
+            FROM invoices i
+            WHERE i.is_tokenized = true 
+            AND i.financing_status = 'listed'
+            ORDER BY i.created_at DESC
+        `;
+        
+        const result = await pool.query(query);
+        
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Failed to load marketplace listings:', error);
+        res.status(500).json({ error: 'Failed to load marketplace listings' });
+    }
+});
+
 // Request financing using Katana liquidity
-router.post('/request', authenticateToken, kycValidation, async (req, res) => {
+router.post('/request', authenticateToken, requireKYC, async (req, res) => {
     try {
         const { invoiceId, amount, asset, collateralTokenId } = req.body;
         const userId = req.user.id;
 
-        // Validate invoice and user
-        // ... (existing validation logic)
+        if (!invoiceId || !amount || !asset || !collateralTokenId) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
 
-        // Bridge collateral to Katana if needed
+        // 1. Validate invoice exists, belongs to user, and is eligible
+        const invoiceQuery = await pool.query(
+            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_id = $2',
+            [invoiceId, userId]
+        );
+
+        if (invoiceQuery.rows.length === 0) {
+            return res.status(404).json({ error: 'Invoice not found or unauthorized' });
+        }
+
+        const invoice = invoiceQuery.rows[0];
+
+        if (invoice.financing_status === 'financed' || invoice.financing_status === 'listed') {
+            return res.status(400).json({ error: 'Invoice is already financed or listed' });
+        }
+
+        // 2. Bridge collateral to Katana if needed
         const bridgeResult = await bridgeService.bridgeToKatana(collateralTokenId, amount, userId);
 
-        // Borrow from Katana liquidity
+        // 3. Borrow from Katana liquidity
         const borrowResult = await bridgeService.borrowFromKatana(asset, amount, collateralTokenId);
 
-        // Record financing in DB
-        // ... (existing DB logic)
+        // 4. Record financing in DB
+        await pool.query(
+            `UPDATE invoices 
+             SET financing_status = 'financed', 
+                 updated_at = NOW() 
+             WHERE invoice_id = $1`,
+            [invoiceId]
+        );
 
         res.json({
             success: true,
-            message: 'Financing request submitted',
+            message: 'Financing request submitted successfully',
+            bridgeResult,
             borrowResult
         });
     } catch (error) {
         console.error('Financing request failed:', error);
-        res.status(500).json({ error: 'Financing request failed' });
+        res.status(500).json({ error: 'Financing request failed. Please try again.' });
     }
 });
 
@@ -49,18 +96,44 @@ router.get('/rates/:asset', authenticateToken, async (req, res) => {
 });
 
 // Repay financing
-router.post('/repay', authenticateToken, kycValidation, async (req, res) => {
+router.post('/repay', authenticateToken, requireKYC, async (req, res) => {
     try {
-        const { financingId, amount, asset } = req.body;
+        const { financingId, invoiceId, amount, asset } = req.body;
+        const userId = req.user.id;
 
-        // Validate repayment
-        // ... (existing validation)
+        if (!amount || !asset || (!financingId && !invoiceId)) {
+            return res.status(400).json({ error: 'Missing required repayment fields' });
+        }
 
-        // Repay to Katana
+        const targetInvoiceId = invoiceId || financingId;
+
+        // 1. Validate repayment target belongs to user and is currently financed
+        const invoiceQuery = await pool.query(
+            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_id = $2',
+            [targetInvoiceId, userId]
+        );
+
+        if (invoiceQuery.rows.length === 0) {
+            return res.status(404).json({ error: 'Invoice/Financing record not found or unauthorized' });
+        }
+
+        const invoice = invoiceQuery.rows[0];
+
+        if (invoice.financing_status !== 'financed') {
+            return res.status(400).json({ error: 'This invoice is not currently actively financed' });
+        }
+
+        // 2. Repay to Katana
         const repayResult = await bridgeService.repayToKatana(asset, amount);
 
-        // Update DB
-        // ... (existing DB logic)
+        // 3. Update DB to reflect repayment
+        await pool.query(
+            `UPDATE invoices 
+             SET financing_status = 'repaid', 
+                 updated_at = NOW() 
+             WHERE invoice_id = $1`,
+            [targetInvoiceId]
+        );
 
         res.json({
             success: true,
@@ -69,15 +142,19 @@ router.post('/repay', authenticateToken, kycValidation, async (req, res) => {
         });
     } catch (error) {
         console.error('Repayment failed:', error);
-        res.status(500).json({ error: 'Repayment failed' });
+        res.status(500).json({ error: 'Repayment failed. Please ensure sufficient funds.' });
     }
 });
 
 // Tokenize invoice
-router.post('/tokenize', authenticateToken, kycValidation, async (req, res) => {
+router.post('/tokenize', authenticateToken, requireKYC, async (req, res) => {
     try {
         const { invoiceId, faceValue, maturityDate, yieldBps } = req.body;
         const userId = req.user.id;
+
+        if (!invoiceId || !faceValue || !maturityDate || yieldBps === undefined) {
+             return res.status(400).json({ error: 'Missing required tokenization parameters' });
+        }
 
         // Validate invoice exists and belongs to user
         const invoiceQuery = await pool.query(
@@ -118,15 +195,28 @@ router.post('/tokenize', authenticateToken, kycValidation, async (req, res) => {
         );
 
         const receipt = await tx.wait();
-        const event = receipt.events?.find(e => e.event === 'Tokenized');
+        const event = receipt.logs?.find(
+            e => e.fragment && e.fragment.name === 'Tokenized'
+        ) || receipt.events?.find(e => e.event === 'Tokenized');
 
-        if (!event) throw new Error("Tokenized event not found");
+        if (!event) throw new Error("Tokenized event not emitted by the contract");
 
-        const tokenId = event.args.tokenId;
+        // Accommodate both ethers v5 (event.args.tokenId) and v6 (event.args[0] or similar)
+        const tokenId = event.args ? (event.args.tokenId || event.args[0]) : null;
+
+        if (!tokenId) {
+            throw new Error("Could not parse Token ID from event logs");
+        }
 
         // Update database
         await pool.query(
-            'UPDATE invoices SET token_id = $1, financing_status = $2, is_tokenized = true, yield_bps = $3 WHERE invoice_id = $4',
+            `UPDATE invoices 
+             SET token_id = $1, 
+                 financing_status = $2, 
+                 is_tokenized = true, 
+                 yield_bps = $3,
+                 updated_at = NOW() 
+             WHERE invoice_id = $4`,
             [tokenId.toString(), 'listed', yieldBps, invoiceId]
         );
 
@@ -138,7 +228,12 @@ router.post('/tokenize', authenticateToken, kycValidation, async (req, res) => {
         });
     } catch (error) {
         console.error('Tokenization failed:', error);
-        res.status(500).json({ error: 'Tokenization failed' });
+        
+        // Return clear contract revert reasons if available
+        if (error.reason) {
+            return res.status(400).json({ error: `Contract rejected: ${error.reason}` });
+        }
+        res.status(500).json({ error: 'Tokenization failed due to an internal error' });
     }
 });
 

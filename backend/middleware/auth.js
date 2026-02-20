@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const  pool  = require('../config/database'); // ✅ Correct Import
+const  { pool }  = require('../config/database');
 
 const authenticateToken = async (req, res, next) => {
   // 1. Get the token from cookies first, then fall back to Authorization header
@@ -18,9 +18,11 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id || decoded.userId;
+
     const userResult = await pool.query(
       'SELECT id, email, wallet_address, role, organization_id FROM users WHERE id = $1',
-      [decoded.id]
+      [userId]
     );
     
     if (userResult.rows.length === 0) {
