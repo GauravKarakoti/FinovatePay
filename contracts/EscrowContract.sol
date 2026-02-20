@@ -43,6 +43,7 @@ contract EscrowContract is
         uint256 amount;
         address token;
         EscrowStatus status;
+        address payee;
         bool sellerConfirmed;
         bool buyerConfirmed;
         bool disputeRaised;
@@ -191,6 +192,7 @@ contract EscrowContract is
             amount: _amount,
             token: _token,
             status: EscrowStatus.Created,
+            payee: _seller,
             sellerConfirmed: false,
             buyerConfirmed: false,
             disputeRaised: false,
@@ -320,7 +322,7 @@ contract EscrowContract is
         );
 
         if (sellerWins) {
-            _payout(escrow.seller, escrow.token, escrow.amount);
+            _payout(escrow.payee, escrow.token, escrow.amount);
             _transferNFT(address(this), escrow.buyer, escrow);
         } else {
             _payout(escrow.buyer, escrow.token, escrow.amount);
@@ -342,9 +344,17 @@ contract EscrowContract is
         delete escrows[_invoiceId];
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            INTERNAL HELPERS
-    //////////////////////////////////////////////////////////////*/
+    function setPayee(bytes32 _invoiceId, address _newPayee) external {
+        Escrow storage escrow = escrows[_invoiceId];
+
+        _payout(escrow.payee, escrow.token, escrow.amount); 
+        _transferNFT(address(this), escrow.buyer, escrow);
+
+        require(_msgSender() == escrow.seller, "Only seller can set payee");
+        require(escrow.status == EscrowStatus.Created || escrow.status == EscrowStatus.Funded, "Invalid escrow status");
+        escrow.payee = _newPayee;
+    }
+
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
 
