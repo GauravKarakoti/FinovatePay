@@ -10,6 +10,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { authLimiter } = require('../middleware/rateLimiter');
+const User = require('../models/User');
 
 router.put('/role', authenticateToken, async (req, res) => {
   const { role } = req.body;
@@ -47,7 +49,7 @@ const sanitizeUser = (user) => {
 };
 
 // Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   console.log('Registration request body:', req.body);
   const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;
 
@@ -99,7 +101,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   try {

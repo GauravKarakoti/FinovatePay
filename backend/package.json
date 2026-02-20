@@ -27,6 +27,7 @@
     "dotenv": "^17.2.4",
     "ethers": "^6.15.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
     "groq-sdk": "^0.33.0",
     "handlebars": "^4.7.8",
     "jsonwebtoken": "^9.0.2",

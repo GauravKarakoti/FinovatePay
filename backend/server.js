@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
+const { globalLimiter } = require('./middleware/rateLimiter');
 const listenForTokenization = require('./listeners/contractListener');
 const errorHandler = require('./middleware/errorHandler');
 // Added this line for [Feature]: email notifications 
@@ -56,6 +57,12 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
 
+// Apply global rate limiter to all API routes
+app.use('/api/', globalLimiter);
+
+// --- DATABASE CONNECTION ---
+const { pool, getConnection, getDatabaseHealth } = require('./config/database');
+const listenForTokenization = require('./listeners/contractListener');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // Serve uploads
 
 const testDbConnection = require('./utils/testDbConnection');
