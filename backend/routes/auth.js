@@ -5,11 +5,8 @@ const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const User = require('../models/User');
 const { sanitizeUser } = require('../utils/sanitize');
+
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
-const { pool } = require('../config/database');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
 router.put('/role', authenticateToken, async (req, res) => {
   const { role } = req.body;
@@ -39,12 +36,6 @@ router.put('/role', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Utility function to sanitize user object (remove sensitive fields)
-const sanitizeUser = (user) => {
-  const { password_hash, ...sanitizedUser } = user;
-  return sanitizedUser;
-};
 
 // Register new user
 router.post('/register', async (req, res) => {
