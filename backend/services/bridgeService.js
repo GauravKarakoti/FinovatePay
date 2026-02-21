@@ -15,9 +15,31 @@ const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
 const signer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
 
 // Contract instances
-const bridgeAdapter = new ethers.Contract(BRIDGE_ADAPTER_ADDRESS, BridgeAdapterABI, signer);
-const liquidityAdapter = new ethers.Contract(LIQUIDITY_ADAPTER_ADDRESS, LiquidityAdapterABI, signer);
-const financingManager = new ethers.Contract(FINANCING_MANAGER_ADDRESS, FinancingManagerABI, signer);
+let bridgeAdapter, liquidityAdapter, financingManager;
+
+const getBridgeAdapter = () => {
+    if (!bridgeAdapter) {
+        if (!BRIDGE_ADAPTER_ADDRESS) throw new BridgeServiceError('BRIDGE_ADAPTER_ADDRESS not set');
+        bridgeAdapter = new ethers.Contract(BRIDGE_ADAPTER_ADDRESS, BridgeAdapterABI, signer);
+    }
+    return bridgeAdapter;
+};
+
+const getLiquidityAdapter = () => {
+    if (!liquidityAdapter) {
+        if (!LIQUIDITY_ADAPTER_ADDRESS) throw new BridgeServiceError('LIQUIDITY_ADAPTER_ADDRESS not set');
+        liquidityAdapter = new ethers.Contract(LIQUIDITY_ADAPTER_ADDRESS, LiquidityAdapterABI, signer);
+    }
+    return liquidityAdapter;
+};
+
+const getFinancingManager = () => {
+    if (!financingManager) {
+        if (!FINANCING_MANAGER_ADDRESS) throw new BridgeServiceError('FINANCING_MANAGER_ADDRESS not set');
+        financingManager = new ethers.Contract(FINANCING_MANAGER_ADDRESS, FinancingManagerABI, signer);
+    }
+    return financingManager;
+};
 
 // Supported assets (stablecoins)
 const ASSETS = {
@@ -111,7 +133,7 @@ async function bridgeToKatana(collateralTokenId, amount, userId) {
         
         console.log(`[BridgeService] Locking ERC1155 for bridge: tokenId=${collateralTokenId}, amount=${amount}`);
         
-        const lockTx = await bridgeAdapter.lockERC1155ForBridge(
+        const lockTx = await getBridgeAdapter().lockERC1155ForBridge(
             fractionTokenAddress, 
             collateralTokenId, 
             amount, 
@@ -123,7 +145,7 @@ async function bridgeToKatana(collateralTokenId, amount, userId) {
         
         console.log(`[BridgeService] Lock confirmed, bridging asset...`);
         
-        const bridgeTx = await bridgeAdapter.bridgeERC1155Asset(
+        const bridgeTx = await getBridgeAdapter().bridgeERC1155Asset(
             lockTx.hash, 
             LIQUIDITY_ADAPTER_ADDRESS
         );
@@ -185,7 +207,7 @@ async function borrowFromKatana(asset, amount, collateralTokenId) {
         console.log(`[BridgeService] Borrowing from pool: assetAddress=${assetAddress}, amount=${amount}`);
         
         // Borrow from pool
-        const borrowTx = await liquidityAdapter.borrowFromPool(
+        const borrowTx = await getLiquidityAdapter().borrowFromPool(
             assetAddress, 
             amount, 
             signer.address
@@ -228,8 +250,8 @@ async function getLiquidityRates(asset) {
         
         console.log(`[BridgeService] Getting liquidity rates for: ${asset}`);
         
-        const borrowRate = await liquidityAdapter.getBorrowRate(assetAddress);
-        const availableLiquidity = await liquidityAdapter.getAvailableLiquidity(assetAddress);
+        const borrowRate = await getLiquidityAdapter().getBorrowRate(assetAddress);
+        const availableLiquidity = await getLiquidityAdapter().getAvailableLiquidity(assetAddress);
         
         return {
             borrowRate: borrowRate.toString(),
@@ -278,7 +300,7 @@ async function repayToKatana(asset, amount, loanId) {
         console.log(`[BridgeService] Repaying to Katana: asset=${asset}, amount=${amount}, loanId=${loanId}`);
         
         // Repay the loan
-        const repayTx = await liquidityAdapter.repayToPool(loanId);
+        const repayTx = await getLiquidityAdapter().repayToPool(loanId);
         
         console.log(`[BridgeService] Repay transaction sent: ${repayTx.hash}`);
         const receipt = await repayTx.wait();

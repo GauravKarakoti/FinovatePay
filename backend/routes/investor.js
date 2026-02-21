@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { authenticateToken } = require("../middleware/auth");
+const { authenticateToken, requireRole } = require("../middleware/auth");
 const Invoice = require("../models/Invoice");
 const { pool } = require("../config/database");
 const { getSigner, getFractionTokenContract } = require("../config/blockchain");
@@ -8,19 +8,10 @@ const { getSigner, getFractionTokenContract } = require("../config/blockchain");
 const signer = getSigner();
 const fractionToken = getFractionTokenContract(signer);
 
-const isInvestor = (req, res, next) => {
-  if (req.user.role !== "investor" && req.user.role !== "admin") {
-    return res
-      .status(403)
-      .json({ msg: "Access denied. Investor role required." });
-  }
-  next();
-};
-
 router.post(
   "/record-investment",
   authenticateToken,
-  isInvestor,
+  requireRole(["investor", "admin"]),
   async (req, res) => {
     // Added 'paymentMethod' to destructuring
     const { invoiceId, amountInvested, tokenId, txHash, paymentMethod } =
@@ -85,7 +76,7 @@ router.post(
 router.post(
   "/record-redemption",
   authenticateToken,
-  isInvestor,
+  requireRole(['investor', 'admin']),
   async (req, res) => {
     const { invoiceId, redeemedAmount, txHashes } = req.body;
     const investorAddress = req.user.wallet_address;
@@ -141,7 +132,7 @@ router.post(
 // @route   GET /api/investor/portfolio
 // @desc    Get the investing portfolio for the logged-in investor
 // @access  Private (Investor)
-router.get("/portfolio", authenticateToken, isInvestor, async (req, res) => {
+router.get("/portfolio", authenticateToken, requireRole(['investor', 'admin']), async (req, res) => {
   console.log(`Fetching portfolio for investor: ${req.user.wallet_address}`);
   try {
     // --- WEB3 INTERACTION ---
@@ -214,7 +205,7 @@ router.get("/portfolio", authenticateToken, isInvestor, async (req, res) => {
 router.post(
   "/redeem-tokens",
   authenticateToken,
-  isInvestor,
+  requireRole(['investor', 'admin']),
   async (req, res) => {
     const { tokenId, amount } = req.body;
     const investorWallet = req.user.wallet_address; // Corrected from walletAddress

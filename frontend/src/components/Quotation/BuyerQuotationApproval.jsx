@@ -62,14 +62,21 @@ const BuyerQuotationApproval = ({ quotations, onApprove, onReject }) => {
                     </p>
                     {/* --- End of update --- */}
 
-                    <p><strong>Seller:</strong> {quotation.seller_address}</p>
-                    <button
-                        onClick={() => onApprove(quotation.id)}
-                        className="bg-blue-500 hover:bg-blue-900 text-white px-4 py-2 rounded mt-2 font-semibold"
-                    >
-                        Approve Quotation
-                    </button>
-                    <button onClick={() => onReject(quotation.id)} className="bg-red-600 hover:bg-red-900 text-white font-semibold ml-2 px-4 py-2 rounded mt-2">Reject Quotation</button>
+                    <p className="break-all"><strong>Seller:</strong> {quotation.seller_address}</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        <button
+                            onClick={() => onApprove(quotation.id)}
+                            className="bg-blue-500 hover:bg-blue-900 text-white px-4 py-2 rounded font-semibold text-sm flex-1 sm:flex-none justify-center"
+                        >
+                            Approve Quotation
+                        </button>
+                        <button 
+                            onClick={() => onReject(quotation.id)} 
+                            className="bg-red-600 hover:bg-red-900 text-white font-semibold px-4 py-2 rounded text-sm flex-1 sm:flex-none justify-center"
+                        >
+                            Reject Quotation
+                        </button>
+                    </div>
                 </div>
             ))}
             {quotations.length === 0 && <p>No pending quotations to approve.</p>}

@@ -8,6 +8,7 @@ import { ethers } from 'ethers';
 import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
+import { useStatsActions } from '../context/StatsContext';
 
 // --- Reusable UI Components ---
 
@@ -238,13 +239,49 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [showFiatModal, setShowFiatModal] = useState(false);
   const [socket, setSocket] = useState(null);
+  const { setStats: setGlobalStats } = useStatsActions();
 
-  // Initialize Socket.IO
+  // Initialize Socket.IO with authentication
   useEffect(() => {
-    const newSocket = io(import.meta.env.VITE_API_URL);
+    const token = localStorage.getItem('token');
+    
+    if (!token) {
+      console.error('No authentication token found');
+      return;
+    }
+
+    const newSocket = io(import.meta.env.VITE_API_URL, {
+      auth: {
+        token: token
+      }
+    });
+
     setSocket(newSocket);
 
-    newSocket.emit('join-marketplace');
+    // Handle connection success
+    newSocket.on('connect', () => {
+      console.log('Socket connected successfully');
+      newSocket.emit('join-marketplace');
+    });
+
+    // Handle authentication errors
+    newSocket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error.message);
+      if (error.message.includes('Authentication') || error.message.includes('token')) {
+        toast.error('Authentication failed. Please login again.');
+      }
+    });
+
+    // Handle authorization errors
+    newSocket.on('error', (error) => {
+      console.error('Socket error:', error);
+      toast.error(error.message || 'Socket connection error');
+    });
+
+    // Handle successful room join
+    newSocket.on('joined-marketplace', () => {
+      console.log('Successfully joined marketplace room');
+    });
 
     newSocket.on('new-listing', (newInvoice) => {
       toast.info(`New invoice listed: ${newInvoice.invoice_id.substring(0, 8)}...`);
@@ -279,13 +316,23 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     }
   }, []);
 
-  // Load data when tab changes
+  // Load data on mount
   useEffect(() => {
-    if (activeTab === 'financing') {
-      fetchMarketplace();
-      fetchPortfolio();
-    }
-  }, [activeTab]);
+    fetchMarketplace();
+    fetchPortfolio();
+  }, [fetchMarketplace, fetchPortfolio]);
+
+  // Sync global stats
+  useEffect(() => {
+    const active = portfolio.filter(p => p.invoice && p.invoice.status !== 'redeemed' && p.invoice.status !== 'cancelled').length;
+    const completed = portfolio.filter(p => p.invoice && p.invoice.status === 'redeemed').length;
+    
+    setGlobalStats({
+      totalInvoices: marketplaceListings.length,
+      activeEscrows: active,
+      completed: completed
+    });
+  }, [marketplaceListings, portfolio, setGlobalStats]);
 
   const fetchMarketplace = useCallback(async () => {
     setIsLoading(true);

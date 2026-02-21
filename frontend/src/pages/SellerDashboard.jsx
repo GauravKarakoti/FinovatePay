@@ -296,7 +296,14 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   }, [loadInitialData]);
 
   useEffect(() => {
-    setGlobalStats({ totalInvoices: invoices.length });
+    const activeEscrows = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status)).length;
+    const completed = invoices.filter(inv => inv.escrow_status === 'released').length;
+    
+    setGlobalStats({ 
+      totalInvoices: invoices.length,
+      activeEscrows,
+      completed
+    });
   }, [invoices, setGlobalStats]);
 
 
