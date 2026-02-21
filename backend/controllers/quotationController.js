@@ -1,4 +1,4 @@
-const  pool  = require('../config/database');
+const { pool } = require('../config/database');
 const marketService = require('../services/marketService');
 
 const asyncHandler = require('../utils/asyncHandler');
