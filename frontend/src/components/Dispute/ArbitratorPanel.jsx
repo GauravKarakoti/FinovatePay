@@ -46,18 +46,18 @@ const ArbitratorPanel = ({ invoiceId, onResolve }) => {
 
       {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
 
-      <div className="flex space-x-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <button
           onClick={() => handleResolve('resolved')}
           disabled={loading}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50 font-medium"
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:opacity-50 font-medium flex-1 justify-center"
         >
           Resolve (Favor Buyer)
         </button>
         <button
           onClick={() => handleResolve('rejected')}
           disabled={loading}
-          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50 font-medium"
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50 font-medium flex-1 justify-center"
         >
           Reject (Favor Seller)
         </button>

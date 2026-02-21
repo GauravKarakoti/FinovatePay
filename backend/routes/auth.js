@@ -1,9 +1,17 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { pool } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
+const User = require('../models/User');
+const { sanitizeUser } = require('../utils/sanitize');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { authLimiter } = require('../middleware/rateLimiter');
+const User = require('../models/User');
 
 router.put('/role', authenticateToken, async (req, res) => {
   const { role } = req.body;
@@ -41,9 +49,13 @@ const sanitizeUser = (user) => {
 };
 
 // Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   console.log('Registration request body:', req.body);
-  const { email, password, walletAddress, company_name, tax_id, first_name, last_name } = req.body;
+  const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;
+
+  // Validate role - only allow 'buyer' or 'seller' (arbitrators should be admin-only)
+  const allowedRoles = ['buyer', 'seller'];
+  const userRole = allowedRoles.includes(role) ? role : 'seller'; // Default to 'seller'
 
   try {
     // Check if user already exists
@@ -68,7 +80,7 @@ router.post('/register', async (req, res) => {
        (email, password_hash, wallet_address, company_name, tax_id, first_name, last_name, role) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
        RETURNING id, email, wallet_address, company_name, first_name, last_name, role, created_at`,
-      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, 'buyer']
+      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, userRole]
     );
 
     const token = jwt.sign(
@@ -79,7 +91,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       message: 'User created successfully',
-      user: newUser.rows[0],
+      user: sanitizeUser(newUser.rows[0]),
       token
     });
   } catch (error) {
@@ -89,7 +101,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -132,9 +144,10 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1Y' }
     );
 
+    // Return user data (excluding password)
     res.json({
       message: 'Login successful',
-      user: user,
+      user: sanitizeUser(user),
       token
     });
   } catch (error) {
@@ -157,7 +170,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(userResult.rows[0]);
+    res.json(sanitizeUser(userResult.rows[0]));
   } catch (error) {
     console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -172,7 +185,7 @@ router.post('/logout', (req, res) => {
 
 // Verify token validity
 router.get('/verify', authenticateToken, (req, res) => {
-  res.json({ valid: true, user: req.user });
+  res.json({ valid: true, user: sanitizeUser(req.user) });
 });
 
 module.exports = router;

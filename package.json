@@ -21,5 +21,8 @@
     "@openzeppelin/contracts": "^5.4.0",
     "dotenv": "^17.2.2",
     "sonner": "^2.0.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

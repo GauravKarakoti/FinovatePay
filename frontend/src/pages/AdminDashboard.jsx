@@ -240,7 +240,9 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-800">User Management</h3>
       </div>
-      <div className="overflow-x-auto">
+      
+      {/* Desktop Table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -290,8 +292,55 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
             ))}
           </tbody>
         </table>
-        {users.length === 0 && <EmptyState message="No users found" />}
       </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden p-4 space-y-4">
+        {users.map(user => (
+          <div key={user.id} className="bg-white border rounded-lg p-4 shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+              <span className="font-medium text-gray-900 truncate max-w-[200px]">{user.email}</span>
+              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                  user.kyc_status === 'verified' ? 'bg-green-100 text-green-800' : 
+                  user.kyc_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {user.kyc_status}
+              </span>
+            </div>
+            
+            <div className="text-xs text-gray-500 font-mono mb-4 break-all">
+              {user.wallet_address}
+            </div>
+
+            <div className="flex flex-col gap-2">
+               <div className="flex justify-between items-center gap-2">
+                  <ActionButton
+                    onClick={() => handleFreezeToggle(user.id, user.is_frozen)}
+                    variant={user.is_frozen ? 'success' : 'danger'}
+                    className="flex-1 text-center justify-center"
+                  >
+                    {user.is_frozen ? 'Unfreeze' : 'Freeze'}
+                  </ActionButton>
+                  
+                  <select 
+                    onChange={(e) => handleUpdateUserRole(user.id, e.target.value)} 
+                    defaultValue={user.role}
+                    className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    aria-label="Change user role"
+                  >
+                    <option value="seller">Seller</option>
+                    <option value="buyer">Buyer</option>
+                    <option value="admin">Admin</option>
+                    <option value="shipment">Shipment</option>
+                  </select>
+               </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {users.length === 0 && <EmptyState message="No users found" />}
     </div>
   );
 
