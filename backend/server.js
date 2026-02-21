@@ -92,6 +92,9 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/financing', require('./routes/financing'));
 app.use('/api/investor', require('./routes/investor'));
 
+// --- STREAMING PAYMENTS ROUTES ---
+app.use('/api/streaming', require('./routes/streaming'));
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
