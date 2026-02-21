@@ -5,6 +5,7 @@ const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const User = require('../models/User');
 const { sanitizeUser } = require('../utils/sanitize');
+
 const router = express.Router();
 const { authLimiter } = require('../middleware/rateLimiter');
 
