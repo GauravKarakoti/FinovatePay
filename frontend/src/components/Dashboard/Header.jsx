@@ -33,7 +33,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
 
         // 5. Navigate to the root. App.jsx's routing logic
         //    will see the new role and navigate to the correct dashboard.
-        navigate(`/`); 
+        navigate(`/`);
       } else {
         console.error('API response did not contain user object.', response);
       }
@@ -41,7 +41,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
       console.error('Failed to switch role:', error);
     }
   };
-   
+
   return (
     <header className="bg-finovate-blue-800 text-white shadow-lg sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -123,7 +123,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
                 <span className="hidden md:inline text-sm font-medium">{user.email}</span>
               </div>
             </div>
-          )}
+          )}  
         </div>
       </div>
     </header>
