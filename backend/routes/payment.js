@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
+const { paymentLimiter } = require('../middleware/rateLimiter');
 const {
   releaseEscrow,
   raiseDispute
@@ -12,7 +13,10 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 router.use(authenticateToken);
 router.use(requireKYC);
 
-// Release escrow funds (buyer confirms product/service received)
+// Apply payment rate limiter to all payment routes
+router.use(paymentLimiter);
+
+// Release escrow funds
 router.post('/escrow/release', requireRole(['buyer', 'admin']), async (req, res) => {
   await releaseEscrow(req, res);
 });
