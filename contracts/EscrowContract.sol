@@ -53,6 +53,7 @@ contract EscrowContract is
         // --- NEW: RWA Collateral Link ---
         address rwaNftContract; // Address of the ProduceTracking contract
         uint256 rwaTokenId;     // The tokenId of the produce lot
+        uint256 feeAmount;      // Platform fee amount
     }
     
     mapping(bytes32 => Escrow) public escrows;
@@ -62,12 +63,17 @@ contract EscrowContract is
     ArbitratorsRegistry public arbitratorsRegistry;
 
     address public admin;
+    address public treasury;        // Platform treasury address for fee collection
+    uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
 
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
@@ -100,6 +106,30 @@ contract EscrowContract is
     {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        treasury = msg.sender; // Default treasury to admin
+        feePercentage = 50;    // Default 0.5% fee (50 basis points)
+    }
+    
+    /**
+     * @notice Set the treasury address for fee collection
+     * @param _treasury New treasury address
+     */
+    function setTreasury(address _treasury) external onlyAdmin {
+        require(_treasury != address(0), "Treasury cannot be zero address");
+        address oldTreasury = treasury;
+        treasury = _treasury;
+        emit TreasuryUpdated(oldTreasury, _treasury);
+    }
+    
+    /**
+     * @notice Set the fee percentage in basis points
+     * @param _feePercentage Fee in basis points (e.g., 50 = 0.5%, 100 = 1%)
+     */
+    function setFeePercentage(uint256 _feePercentage) external onlyAdmin {
+        require(_feePercentage <= 1000, "Fee cannot exceed 10%"); // Max 10% fee
+        uint256 oldFee = feePercentage;
+        feePercentage = _feePercentage;
+        emit FeePercentageUpdated(oldFee, _feePercentage);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -117,6 +147,9 @@ contract EscrowContract is
         uint256 _rwaTokenId
     ) external onlyAdmin returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
+
+        // Calculate fee amount
+        uint256 calculatedFee = (_amount * feePercentage) / 10000; // Basis points calculation
 
         // --- NEW: Lock the Produce NFT as Collateral ---
         // The seller must have approved the EscrowContract to spend this NFT beforehand.
@@ -142,7 +175,8 @@ contract EscrowContract is
             createdAt: block.timestamp,
             expiresAt: block.timestamp + _duration,
             rwaNftContract: _rwaNftContract,
-            rwaTokenId: _rwaTokenId
+            rwaTokenId: _rwaTokenId,
+            feeAmount: calculatedFee
         });
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
