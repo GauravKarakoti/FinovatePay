@@ -40,11 +40,14 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-const requireRole = (role) => {
+const requireRole = (roles) => {
   return (req, res, next) => {
+    // Determine the allowed roles
+    const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
     // Ensure req.user exists before checking role
-    if (!req.user || req.user.role !== role) {
-      return res.status(403).json({ error: `Requires ${role} role` });
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: `Access denied. Requires one of: ${allowedRoles.join(', ')}` });
     }
     next();
   };

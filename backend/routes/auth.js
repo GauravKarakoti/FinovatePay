@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/sanitize');
 
 const router = express.Router();
+const { authLimiter } = require('../middleware/rateLimiter');
 
 router.put('/role', authenticateToken, async (req, res) => {
   const { role } = req.body;
@@ -37,7 +38,7 @@ router.put('/role', authenticateToken, async (req, res) => {
 });
 
 // Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   console.log('Registration request body:', req.body);
   const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;
 
@@ -89,7 +90,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   try {
