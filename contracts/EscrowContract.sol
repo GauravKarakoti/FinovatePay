@@ -76,9 +76,6 @@ contract EscrowContract is
 
     address public admin;
 
-    // Arbitrator Registry for dispute voting
-    ArbitratorsRegistry public arbitratorsRegistry;
-
     // Dispute voting state
     struct DisputeVoting {
         uint256 snapshotArbitratorCount;
@@ -87,7 +84,6 @@ contract EscrowContract is
         bool resolved;
     }
     mapping(bytes32 => DisputeVoting) public disputeVotings;
-    mapping(bytes32 => mapping(address => bool)) public hasVoted;
 
     // Minimum quorum required (percentage of snapshot count, e.g., 60 = 60%)
     uint256 public quorumPercentage = 60;
@@ -112,11 +108,6 @@ contract EscrowContract is
     //////////////////////////////////////////////////////////////*/
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
-        _;
-    }
-
-    modifier onlyArbitrator() {
-        require(arbitratorsRegistry.isArbitrator(_msgSender()), "Not arbitrator");
         _;
     }
 
@@ -259,52 +250,31 @@ contract EscrowContract is
         }
     }
 
-    function raiseDispute(bytes32 _invoiceId) external {
-        Escrow storage escrow = escrows[_invoiceId];
+    function raiseDispute(bytes32 invoiceId) external {
+        Escrow storage e = escrows[invoiceId];
+
         require(
-            _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
+            _msgSender() == e.seller || _msgSender() == e.buyer,
             "Not party"
         );
-        require(!escrow.disputeRaised, "Already disputed");
+        require(e.status == EscrowStatus.Funded, "Not funded");
+        require(!e.disputeRaised, "Already disputed");
 
-        escrow.snapshotArbitratorCount = arbitratorsRegistry.arbitratorCount();
-        require(escrow.snapshotArbitratorCount > 0, "No arbitrators");
+        uint256 arbitratorCount = arbitratorsRegistry.arbitratorCount();
+        require(arbitratorCount > 0, "No arbitrators");
 
-        escrow.disputeRaised = true;
-        escrow.status = EscrowStatus.Disputed;
+        e.disputeRaised = true;
+        e.status = EscrowStatus.Disputed;
 
-        emit DisputeRaised(
-            _invoiceId,
-            _msgSender(),
-            escrow.snapshotArbitratorCount
-        );
-    }
+        // Initialize quorum-based voting
+        disputeVotings[invoiceId] = DisputeVoting({
+            snapshotArbitratorCount: arbitratorCount,
+            votesForBuyer: 0,
+            votesForSeller: 0,
+            resolved: false
+        });
 
-    function voteOnDispute(bytes32 _invoiceId, bool _forSeller)
-        external
-        onlyArbitrator
-    {
-        Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.disputeRaised, "No dispute");
-        require(!hasVoted[_invoiceId][_msgSender()], "Voted");
-
-        hasVoted[_invoiceId][_msgSender()] = true;
-
-        if (_forSeller) {
-            escrow.votesForSeller++;
-        } else {
-            escrow.votesForBuyer++;
-        }
-
-        emit ArbitratorVoted(_invoiceId, _msgSender(), _forSeller);
-
-        uint256 quorum = (escrow.snapshotArbitratorCount / 2) + 1;
-
-        if (escrow.votesForSeller >= quorum) {
-            _resolveDispute(_invoiceId, true);
-        } else if (escrow.votesForBuyer >= quorum) {
-            _resolveDispute(_invoiceId, false);
-        }
+        emit DisputeRaised(invoiceId, _msgSender(), arbitratorCount);
     }
 
     function _resolveDispute(bytes32 _invoiceId, bool sellerWins)
@@ -485,9 +455,6 @@ contract EscrowContract is
         });
     }
 
-    /// @notice Vote on a dispute (only active arbitrators can vote)
-    /// @param invoiceId The escrow invoice ID
-    /// @param voteForBuyer True if voting for buyer, false for seller
     function voteOnDispute(bytes32 invoiceId, bool voteForBuyer)
         external
         whenNotPaused
@@ -501,41 +468,50 @@ contract EscrowContract is
         require(!voting.resolved, "Already resolved");
         require(!hasVoted[invoiceId][_msgSender()], "Already voted");
 
-        // Check if registry has shrunk - update snapshot if needed (Option B from acceptance criteria)
-        uint256 currentLiveCount = arbitratorsRegistry.arbitratorCount();
-        if (currentLiveCount < voting.snapshotArbitratorCount) {
-            voting.snapshotArbitratorCount = currentLiveCount;
+        // Handle arbitrator set shrink (acceptance criteria)
+        uint256 liveCount = arbitratorsRegistry.arbitratorCount();
+        if (liveCount < voting.snapshotArbitratorCount) {
+            voting.snapshotArbitratorCount = liveCount;
         }
 
-        // Record the vote
         hasVoted[invoiceId][_msgSender()] = true;
+
         if (voteForBuyer) {
             voting.votesForBuyer += 1;
         } else {
             voting.votesForSeller += 1;
         }
 
-        emit ArbitratorVoted(invoiceId, _msgSender(), voteForBuyer);
+        emit ArbitratorVoted(invoiceId, _msgSender(), !voteForBuyer);
 
-        // Check if quorum is reached and resolve automatically
         _checkAndResolveVoting(invoiceId);
     }
 
-    /// @notice Check if quorum is reached and resolve the dispute
-    /// @param invoiceId The escrow invoice ID
     function _checkAndResolveVoting(bytes32 invoiceId) internal {
         DisputeVoting storage voting = disputeVotings[invoiceId];
         if (voting.resolved) return;
 
-        uint256 quorumRequired = (voting.snapshotArbitratorCount * quorumPercentage) / 100;
-        uint256 totalVotes = voting.votesForBuyer + voting.votesForSeller;
+        uint256 quorumRequired =
+            (voting.snapshotArbitratorCount * quorumPercentage) / 100;
 
-        // Check if quorum is met
+        if (quorumRequired == 0) quorumRequired = 1;
+
+        uint256 totalVotes =
+            voting.votesForBuyer + voting.votesForSeller;
+
         if (totalVotes >= quorumRequired) {
-            bool sellerWins = voting.votesForSeller > voting.votesForBuyer;
+            bool sellerWins =
+                voting.votesForSeller > voting.votesForBuyer;
+
             voting.resolved = true;
             _resolveEscrow(invoiceId, sellerWins);
-            emit DisputeVotingResolved(invoiceId, sellerWins, voting.votesForBuyer, voting.votesForSeller);
+
+            emit DisputeResolved(
+                invoiceId,
+                sellerWins,
+                voting.votesForSeller,
+                voting.votesForBuyer
+            );
         }
     }
 
