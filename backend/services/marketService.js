@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { EXCHANGE_RATE } = require('../config/constants');
 
 // NOTE: Add these to your .env file
 const MARKET_API_KEY = process.env.MARKET_API_KEY;
@@ -9,6 +10,10 @@ const mockMarketPrices = [
     { cropId: 'rice', cropName: 'Rice', price: 2500, unit: 'quintal', location: 'Delhi', date: new Date(), trend: 'up' },
     { cropId: 'wheat', cropName: 'Wheat', price: 2200, unit: 'quintal', location: 'Punjab', date: new Date(), trend: 'stable' }
 ];
+
+// Simple in-memory cache for price lookups to avoid repeated external requests
+const PRICE_CACHE_TTL = parseInt(process.env.MARKET_PRICE_CACHE_TTL_MS, 10) || 5 * 60 * 1000; // 5 minutes
+const priceCache = new Map();
 
 /**
  * Fetches the latest market prices for a given crop.
@@ -46,7 +51,7 @@ async function fetchLivePrices(crop, state) {
                 unit: 'quintal',
                 location: [r?.market, r?.district, r?.state].filter(Boolean).join(', ') || 'N/A',
             };
-        }).filter(p => p.price / 50.75 > 0); // Filter out records with no valid price
+        }).filter(p => p.price / EXCHANGE_RATE > 0); // Filter out records with no valid price
 
         if (mapped.length === 0) throw new Error(`Could not determine a valid price for ${crop}`);
         
@@ -65,17 +70,24 @@ async function fetchLivePrices(crop, state) {
  */
 async function getPricePerKg(crop) {
     if (!crop) return null;
+    const key = String(crop).toLowerCase();
+    const cached = priceCache.get(key);
+    if (cached && (Date.now() - cached.ts) < PRICE_CACHE_TTL) {
+        return cached.price;
+    }
+
     const prices = await fetchLivePrices(crop);
     if (prices.length === 0) return null;
 
     // Calculate the average price from all available records
-    const total = prices.reduce((acc, p) => acc + (p.price / 50.75), 0);
+    const total = prices.reduce((acc, p) => acc + (p.price / EXCHANGE_RATE), 0);
     const averagePricePerQuintal = total / prices.length;
     
     // Convert from quintal (100kg) to kg and format to 2 decimal places
     const pricePerKg = averagePricePerQuintal / 100;
-    
-    return parseFloat(pricePerKg.toFixed(2));
+    const value = parseFloat(pricePerKg.toFixed(2));
+    priceCache.set(key, { price: value, ts: Date.now() });
+    return value;
 }
 
 module.exports = { fetchLivePrices, getPricePerKg };

@@ -4,7 +4,9 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const User = require('../models/User');
+const { sanitizeUser } = require('../utils/sanitize');
 const router = express.Router();
+const { authLimiter } = require('../middleware/rateLimiter');
 
 router.put('/role', authenticateToken, async (req, res) => {
   const { role } = req.body;
@@ -17,11 +19,18 @@ router.put('/role', authenticateToken, async (req, res) => {
   }
 
   try {
-    const updatedUser = await User.updateRole(userId, role);
-    if (!updatedUser) {
+    // FIX: Use pool.query instead of User.updateRole
+    const updateResult = await pool.query(
+      `UPDATE users SET role = $1 WHERE id = $2 
+       RETURNING id, email, wallet_address, company_name, first_name, last_name, role, created_at`,
+      [role, userId]
+    );
+
+    if (updateResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    res.json({ message: 'Role updated successfully', user: updatedUser });
+    
+    res.json({ message: 'Role updated successfully', user: updateResult.rows[0] });
   } catch (error) {
     console.error('Role update error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -29,9 +38,13 @@ router.put('/role', authenticateToken, async (req, res) => {
 });
 
 // Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   console.log('Registration request body:', req.body);
-  const { email, password, walletAddress, company_name, tax_id, first_name, last_name } = req.body;
+  const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;
+
+  // Validate role - only allow 'buyer' or 'seller' (arbitrators should be admin-only)
+  const allowedRoles = ['buyer', 'seller'];
+  const userRole = allowedRoles.includes(role) ? role : 'seller'; // Default to 'seller'
 
   try {
     // Check if user already exists
@@ -50,25 +63,24 @@ router.post('/register', async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Create user
+    // Create user - explicitly exclude password_hash from RETURNING clause
     const newUser = await pool.query(
       `INSERT INTO users 
        (email, password_hash, wallet_address, company_name, tax_id, first_name, last_name, role) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-       RETURNING id, email, wallet_address, company_name, created_at`,
-      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, 'buyer']
+       RETURNING id, email, wallet_address, company_name, first_name, last_name, role, created_at`,
+      [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, userRole]
     );
 
-    // Generate JWT token
     const token = jwt.sign(
-      { userId: newUser.rows[0].id },
+      { id: newUser.rows[0].id }, // Changed from userId to id
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '1Y' }
     );
 
     res.status(201).json({
       message: 'User created successfully',
-      user: newUser.rows[0],
+      user: sanitizeUser(newUser.rows[0]),
       token
     });
   } catch (error) {
@@ -78,46 +90,53 @@ router.post('/register', async (req, res) => {
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // Find user by email
-    const userResult = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
+    // Find user by email - fetch password_hash separately for verification only
+    const passwordResult = await pool.query(
+      'SELECT id, password_hash, is_frozen FROM users WHERE email = $1',
       [email]
     );
 
-    if (userResult.rows.length === 0) {
+    if (passwordResult.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const user = userResult.rows[0];
+    const { id, password_hash, is_frozen } = passwordResult.rows[0];
 
     // Check password
-    const validPassword = await bcrypt.compare(password, user.password_hash);
+    const validPassword = await bcrypt.compare(password, password_hash);
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     // Check if user is frozen
-    if (user.is_frozen) {
+    if (is_frozen) {
       return res.status(403).json({ error: 'Account is frozen. Please contact support.' });
     }
 
-    // Generate JWT token
+    // Fetch user data WITHOUT password_hash
+    const userResult = await pool.query(
+      `SELECT id, email, wallet_address, company_name, 
+              first_name, last_name, role, created_at 
+       FROM users WHERE id = $1`,
+      [id]
+    );
+
+    const user = userResult.rows[0];
+
     const token = jwt.sign(
-      { userId: user.id },
+      { id: user.id }, // Changed from userId to id
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: '1Y' }
     );
 
     // Return user data (excluding password)
-    const { password_hash, ...userWithoutPassword } = user;
-
     res.json({
       message: 'Login successful',
-      user: userWithoutPassword,
+      user: sanitizeUser(user),
       token
     });
   } catch (error) {
@@ -130,8 +149,8 @@ router.post('/login', async (req, res) => {
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const userResult = await pool.query(
-      `SELECT id, email, wallet_address, company_name, tax_id, 
-              first_name, last_name, kyc_status, role, created_at 
+      `SELECT id, email, wallet_address, company_name, 
+              first_name, last_name, role, created_at 
        FROM users WHERE id = $1`,
       [req.user.id]
     );
@@ -140,7 +159,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(userResult.rows[0]);
+    res.json(sanitizeUser(userResult.rows[0]));
   } catch (error) {
     console.error('Profile fetch error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -155,7 +174,7 @@ router.post('/logout', (req, res) => {
 
 // Verify token validity
 router.get('/verify', authenticateToken, (req, res) => {
-  res.json({ valid: true, user: req.user });
+  res.json({ valid: true, user: sanitizeUser(req.user) });
 });
 
 module.exports = router;

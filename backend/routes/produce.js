@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const { pool } = require('../config/database');
 const produceController = require('../controllers/produceController');
 const marketService = require('../services/marketService');
@@ -19,17 +19,27 @@ router.get('/lots/available', authenticateToken, async (req, res) => {
         `;
         const result = await pool.query(query);
 
-        // Enhance lots with live market data
-        const lotsWithMarketPrice = await Promise.all(result.rows.map(async (lot) => {
-            const marketPrice = await marketService.getPricePerKg(lot.produce_type);
-            return {
-                ...lot,
-                // Override the 'price' field with the live market price.
-                // If fetching fails, fallback to the original price stored in the DB, or 0.
-                price: marketPrice !== null ? marketPrice : (lot.price / 50.75 || 0),
-            };
+        // Enhance lots with live market data.
+        // Fetch market prices per unique crop only once and reuse (reduces N external calls).
+        const rows = result.rows || [];
+        const uniqueCrops = [...new Set(rows.map(r => String(r.produce_type || '').toLowerCase()))].filter(Boolean);
+
+        const pricePairs = await Promise.all(uniqueCrops.map(async (crop) => {
+          const p = await marketService.getPricePerKg(crop).catch(() => null);
+          return [crop, p];
         }));
-        
+
+        const priceMap = pricePairs.reduce((m, [c, p]) => { m[c] = p; return m; }, {});
+
+        const lotsWithMarketPrice = rows.map(lot => {
+          const cropKey = String(lot.produce_type || '').toLowerCase();
+          const marketPrice = priceMap[cropKey];
+          return {
+            ...lot,
+            price: marketPrice !== null && marketPrice !== undefined ? marketPrice : (lot.price / 50.75 || 0),
+          };
+        });
+
         res.json(lotsWithMarketPrice);
     } catch (error) {
         console.error('Error getting available lots:', error);
@@ -38,7 +48,7 @@ router.get('/lots/available', authenticateToken, async (req, res) => {
 });
 
 // Get producer's own lots
-router.get('/lots/producer', authenticateToken, async (req, res) => {
+router.get('/lots/producer', authenticateToken, requireRole(['seller', 'admin']), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM produce_lots WHERE farmer_address = $1 ORDER BY created_at DESC',
@@ -51,9 +61,9 @@ router.get('/lots/producer', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/lots/seller', authenticateToken, produceController.getSellerLots);
+router.get('/lots/seller', authenticateToken, requireRole(['seller', 'admin']), produceController.getSellerLots);
 
-router.get('/lots/:lotId', async (req, res) => {
+router.get('/lots/:lotId', authenticateToken, async (req, res) => {
   try {
     const { lotId } = req.params;
     
@@ -92,6 +102,6 @@ router.get('/lots/:lotId', async (req, res) => {
 });
 
 // Create a new produce lot (syncs from blockchain)
-router.post('/lots', authenticateToken, produceController.createProduceLot);
+router.post('/lots', authenticateToken, requireRole(['seller', 'admin']), produceController.createProduceLot);
 
 module.exports = router;

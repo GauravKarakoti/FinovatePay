@@ -3,6 +3,7 @@ const router = express.Router();
 const Groq = require('groq-sdk');
 const Invoice = require('../models/Invoice'); // <-- ADDED
 const { pool } = require('../config/database');   // <-- ADDED
+const { authenticateToken } = require('../middleware/auth'); // <-- ADDED
 
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
@@ -90,7 +91,7 @@ const availableTools = {
     },
 };
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
     const { message, history = [] } = req.body;
     console.log("Received message:", message);
 
@@ -150,20 +151,61 @@ router.post('/', async (req, res) => {
             console.log("Groq API final response:", finalResponse);
 
             const reply = finalResponse.choices[0]?.message?.content;
+            
+            if (!reply) {
+                console.error('Groq API returned empty response');
+                return res.status(500).json({ 
+                    error: 'AI assistant returned an empty response. Please try again.' 
+                });
+            }
+            
             console.log("Groq API final reply:", reply);
             res.json({ reply });
+
 
         } else {
             // No tool call needed, just a regular chat response
             const reply = responseMessage.content;
+            
+            if (!reply) {
+                console.error('Groq API returned empty content in simple response');
+                return res.status(500).json({ 
+                    error: 'AI assistant returned an empty response. Please try again.' 
+                });
+            }
+            
             console.log("Groq API simple reply:", reply);
             res.json({ reply });
         }
 
+
     } catch (error) {
         console.error('Error communicating with Groq API:', error);
-        res.status(500).json({ error: 'An error occurred with the AI assistant.' });
+        
+        // Handle specific error types
+        if (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+            return res.status(503).json({ 
+                error: 'AI service is temporarily unavailable. Please try again in a moment.' 
+            });
+        }
+        
+        if (error.response?.status === 429) {
+            return res.status(429).json({ 
+                error: 'Too many requests to AI service. Please wait a moment and try again.' 
+            });
+        }
+        
+        if (error.response?.status >= 500) {
+            return res.status(502).json({ 
+                error: 'AI service is experiencing issues. Please try again later.' 
+            });
+        }
+        
+        res.status(500).json({ 
+            error: 'An error occurred with the AI assistant. Please try again.' 
+        });
     }
+
 });
 
 module.exports = router;
