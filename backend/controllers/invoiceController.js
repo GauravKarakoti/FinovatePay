@@ -6,7 +6,7 @@ exports.createInvoice = async (req, res) => {
     try {
         const {
             quotation_id,
-            // On-chain data is still passed from the frontend after contract creation
+            // On-chain data passed from frontend
             invoice_id,
             invoice_hash,
             contract_address,
@@ -14,39 +14,50 @@ exports.createInvoice = async (req, res) => {
             due_date
         } = req.body;
 
+        // Basic Input Validation
         if (!quotation_id || !invoice_id || !contract_address) {
             return res.status(400).json({ error: 'Missing quotation_id or required on-chain data.' });
         }
 
         await client.query('BEGIN');
 
-        // 1. Fetch and lock the quotation, ensuring it's fully approved.
-        const quotationQuery = `SELECT * FROM quotations WHERE id = $1 AND status = 'approved' FOR UPDATE`;
+        // 1. Fetch and lock the quotation
+        const quotationQuery = `SELECT * FROM quotations WHERE id = $1 FOR UPDATE`;
         const quotationResult = await client.query(quotationQuery, [quotation_id]);
 
         if (quotationResult.rows.length === 0) {
-            throw new Error('Quotation not found, not fully approved, or already invoiced.');
+            throw new Error('Quotation not found');
         }
-        const quotation = quotationResult.rows[0];
         
-        // FIX: Add Quantity Validation
-        if (!quotation.quantity || quotation.quantity <= 0) {
-             await client.query('ROLLBACK');
-             return res.status(400).json({ error: "Invalid quantity in quotation" });
+        const quotation = quotationResult.rows[0];
+
+        // 2. Status Validation
+        if (quotation.status === 'invoiced') {
+            throw new Error('Quotation already invoiced');
+        }
+        if (quotation.status !== 'approved') {
+            throw new Error('Quotation not fully approved');
         }
 
-        // TWEAK: RBAC - Check Organization ID instead of Wallet Address
-        // This allows any authorized user in the company to process the invoice
+        // 3. RBAC / Authorization Check
+        // Ensure the caller belongs to the seller's organization
         if (quotation.seller_org_id !== req.user.organization_id) {
             throw new Error('Not authorized: Quotation belongs to a different organization.');
         }
 
-        // 2. If it's a produce lot, fetch, lock, and update the inventory
+        // 4. Quantity Validation
+        if (!quotation.quantity || quotation.quantity <= 0) {
+             throw new Error("Invalid quantity in quotation");
+        }
+
+        // 5. Inventory Management (Produce Lots)
         if (quotation.lot_id) {
             const lotQuery = 'SELECT current_quantity FROM produce_lots WHERE lot_id = $1 FOR UPDATE';
             const lotResult = await client.query(lotQuery, [quotation.lot_id]);
 
-            if (lotResult.rows.length === 0) throw new Error('Produce lot not found.');
+            if (lotResult.rows.length === 0) {
+                throw new Error('Produce lot not found.');
+            }
             
             const lot = lotResult.rows[0];
             if (parseFloat(lot.current_quantity) < parseFloat(quotation.quantity)) {
@@ -57,6 +68,8 @@ exports.createInvoice = async (req, res) => {
             await client.query(updateLotQuery, [quotation.quantity, quotation.lot_id]);
         }
 
+        // 6. Insert Invoice
+        // Trusting quotation data for financial fields
         const insertInvoiceQuery = `
             INSERT INTO invoices (
                 invoice_id, invoice_hash, seller_address, buyer_address,
@@ -67,32 +80,57 @@ exports.createInvoice = async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none')
             RETURNING *
         `;
+
+        // Use env variable for exchange rate or fallback, preserving existing logic
+        const pricePerUnit = quotation.price_per_unit / (parseFloat(process.env.EXCHANGE_RATE) || 50.75);
+
         const values = [
-            invoice_id, invoice_hash, quotation.seller_address, quotation.buyer_address,
-            quotation.total_amount, due_date, quotation.description,
+            invoice_id,
+            invoice_hash,
+            quotation.seller_address,
+            quotation.buyer_address,
+            quotation.total_amount,
+            due_date,
+            quotation.description,
             JSON.stringify([{
                 description: quotation.description,
                 quantity: quotation.quantity,
-                // Use env variable or fallback
-                price_per_unit: quotation.price_per_unit / (parseFloat(process.env.EXCHANGE_RATE) || 50.75)
+                price_per_unit: pricePerUnit
             }]),
-            quotation.currency, contract_address, token_address,
-            quotation.lot_id, quotation_id
+            quotation.currency,
+            contract_address,
+            token_address,
+            quotation.lot_id,
+            quotation_id
         ];
 
         const result = await client.query(insertInvoiceQuery, values);
 
-        // 4. Update the quotation status to 'invoiced' to prevent reuse
+        // 7. Update Quotation Status
         const updateQuotationQuery = `UPDATE quotations SET status = 'invoiced' WHERE id = $1`;
         await client.query(updateQuotationQuery, [quotation_id]);
 
         await client.query('COMMIT');
-        res.status(201).json({ success: true, invoice: result.rows[0] });
+
+        return res.status(201).json({
+            success: true,
+            message: "Invoice created successfully",
+            invoice: result.rows[0]
+        });
 
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error creating invoice from quotation:', error);
-        res.status(500).json({ error: error.message || 'Internal server error.' });
+
+        // Determine status code based on error message or default to 500
+        let statusCode = 500;
+        if (error.message === 'Quotation not found') statusCode = 404;
+        if (error.message === 'Quotation already invoiced') statusCode = 400;
+        if (error.message === 'Quotation not fully approved') statusCode = 400;
+        if (error.message.includes('Not authorized')) statusCode = 403;
+        if (error.message.includes('Insufficient quantity')) statusCode = 400;
+
+        return res.status(statusCode).json({ error: error.message || 'Internal server error.' });
     } finally {
         client.release();
     }
