@@ -1,14 +1,21 @@
 const express = require('express');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { kycLimiter } = require('../middleware/rateLimiter');
+const { 
+  validateKYCInitiate, 
+  validateKYCVerifyOTP, 
+  validateKYCOverride,
+  validateWalletAddress 
+} = require('../middleware/validators');
 const router = express.Router();
 const kycController = require('../controllers/kycController');
 
 // Route to initiate Aadhaar verification
-router.post('/initiate', authenticateToken, kycController.initiateKYC);
+router.post('/initiate', authenticateToken, kycLimiter, validateKYCInitiate, kycController.initiateKYC);
 
 // Route to verify OTP and complete process
-router.post('/verify-otp', authenticateToken, kycController.verifyKYCOtp);
+router.post('/verify-otp', authenticateToken, kycLimiter, validateKYCVerifyOTP, kycController.verifyKYCOtp);
 
 // Check KYC status
 router.get('/status', authenticateToken, async (req, res) => {
@@ -64,7 +71,7 @@ router.get('/admin/verifications', authenticateToken, async (req, res) => {
 });
 
 // Manual KYC override (admin only)
-router.post('/admin/override', authenticateToken, async (req, res) => {
+router.post('/admin/override', authenticateToken, validateKYCOverride, async (req, res) => {
   const { user_id, status, risk_level, reason } = req.body;
 
   try {
@@ -107,5 +114,25 @@ router.post('/admin/override', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+
+
+// Verify or upsert wallet-level KYC mapping
+// POST /api/kyc/verify-wallet { walletAddress, status, riskLevel, provider, onChain }
+router.post('/verify-wallet', authenticateToken, kycController.verifyWallet);
+
+// Get wallet status
+// GET /api/kyc/wallet-status/:wallet
+router.get('/wallet-status/:wallet', validateWalletAddress, async (req, res) => {
+  try {
+    const wallet = req.params.wallet;
+    // Call controller handler directly with wallet parameter
+    await kycController.getWalletStatus(req, res, wallet);
+  } catch (error) {
+    console.error('[kyc routes] wallet status error:', error.message || error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
 
 module.exports = router;

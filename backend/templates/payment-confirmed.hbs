@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+    .email-wrapper { background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; }
+    .badge { display: inline-block; background-color: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; font-size: 14px; margin-top: 10px; }
+    .content { padding: 30px; }
+    .success-box { background-color: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; }
+    .success-box p { margin: 0; color: #2e7d32; }
+    .details { background-color: #f9f9f9; padding: 15px; border-left: 4px solid #11998e; margin: 20px 0; }
+    .details-row { display: flex; justify-content: space-between; margin: 8px 0; }
+    .details-label { font-weight: bold; color: #666; }
+    .details-value { color: #333; }
+    .button { display: inline-block; background-color: #11998e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 20px; font-weight: bold; }
+    .button:hover { background-color: #38ef7d; color: #333; }
+    .footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #ddd; }
+    .footer a { color: #11998e; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="email-wrapper">
+      <div class="header">
+        <h1>✅ Payment Confirmed</h1>
+        <div class="badge">Transaction Successful</div>
+      </div>
+      
+      <div class="content">
+        <p>Hi {{userName}},</p>
+        
+        <div class="success-box">
+          <p>✓ Your payment has been processed successfully and is now confirmed!</p>
+        </div>
+        
+        <p>Here's your payment receipt:</p>
+        
+        <div class="details">
+          <div class="details-row">
+            <span class="details-label">Transaction ID:</span>
+            <span class="details-value">{{transactionId}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Amount Paid:</span>
+            <span class="details-value">{{amount}} {{currency}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Paid On:</span>
+            <span class="details-value">{{paidDate}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Invoice ID:</span>
+            <span class="details-value">{{invoiceId}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Status:</span>
+            <span class="details-value" style="color: #4caf50; font-weight: bold;">Completed</span>
+          </div>
+        </div>
+        
+        <p>Download your receipt for your records:</p>
+        
+        <a href="{{downloadReceiptUrl}}" class="button">Download Receipt</a>
+        
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+          Thank you for your business! If you have any questions, please contact support.
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>&copy; 2026 {{companyName}}. All rights reserved.</p>
+        <p><a href="{{unsubscribeUrl}}">Unsubscribe from emails</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
