@@ -332,4 +332,56 @@ export const resolveDispute = async (invoiceId, sellerWins) => {
   return response.data;
 };
 
+// --- Streaming Payments API ---
+
+// Create a new subscription stream (seller)
+export const createStream = (streamData) => {
+  return api.post('/streaming', streamData);
+};
+
+// Get all streams for current user
+export const getMyStreams = () => {
+  return api.get('/streaming');
+};
+
+// Get streams where user is seller
+export const getSellerStreams = () => {
+  return api.get('/streaming/seller');
+};
+
+// Get streams where user is buyer
+export const getBuyerStreams = () => {
+  return api.get('/streaming/buyer');
+};
+
+// Get stream details
+export const getStream = (streamId) => {
+  return api.get(`/streaming/${streamId}`);
+};
+
+// Approve and fund a stream (buyer)
+export const approveStream = (streamId, amount) => {
+  return api.post(`/streaming/${streamId}/approve`, { amount });
+};
+
+// Release payment for completed interval
+export const releasePayment = (streamId) => {
+  return api.post(`/streaming/${streamId}/release`);
+};
+
+// Pause a stream (buyer)
+export const pauseStream = (streamId) => {
+  return api.post(`/streaming/${streamId}/pause`);
+};
+
+// Resume a paused stream (buyer)
+export const resumeStream = (streamId) => {
+  return api.post(`/streaming/${streamId}/resume`);
+};
+
+// Cancel a stream (seller or buyer)
+export const cancelStream = (streamId) => {
+  return api.post(`/streaming/${streamId}/cancel`);
+};
+
 export default api;
