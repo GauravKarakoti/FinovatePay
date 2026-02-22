@@ -332,4 +332,17 @@ export const resolveDispute = async (invoiceId, sellerWins) => {
   return response.data;
 };
 
+// --- Fiat On-Ramp API (MoonPay) ---
+export const createFiatRampLink = (data) => {
+  return api.post('/fiat-ramp/create-link', data);
+};
+
+export const getFiatRampQuote = (params) => {
+  return api.get('/fiat-ramp/quote', { params });
+};
+
+export const getFiatRampStatus = (transactionId) => {
+  return api.get(`/fiat-ramp/status/${transactionId}`);
+};
+
 export default api;
