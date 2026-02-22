@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { api } from '../utils/api';
 import { toast } from 'sonner';
@@ -316,24 +316,6 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     }
   }, []);
 
-  // Load data on mount
-  useEffect(() => {
-    fetchMarketplace();
-    fetchPortfolio();
-  }, [fetchMarketplace, fetchPortfolio]);
-
-  // Sync global stats
-  useEffect(() => {
-    const active = portfolio.filter(p => p.invoice && p.invoice.status !== 'redeemed' && p.invoice.status !== 'cancelled').length;
-    const completed = portfolio.filter(p => p.invoice && p.invoice.status === 'redeemed').length;
-    
-    setGlobalStats({
-      totalInvoices: marketplaceListings.length,
-      activeEscrows: active,
-      completed: completed
-    });
-  }, [marketplaceListings, portfolio, setGlobalStats]);
-
   const fetchMarketplace = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -381,6 +363,23 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
       toast.error('Failed to load portfolio');
     }
   }, []);
+  
+  useEffect(() => {
+    fetchMarketplace();
+    fetchPortfolio();
+  }, [fetchMarketplace, fetchPortfolio]);
+
+  // Sync global stats
+  useEffect(() => {
+    const active = portfolio.filter(p => p.invoice && p.invoice.status !== 'redeemed' && p.invoice.status !== 'cancelled').length;
+    const completed = portfolio.filter(p => p.invoice && p.invoice.status === 'redeemed').length;
+    
+    setGlobalStats({
+      totalInvoices: marketplaceListings.length,
+      activeEscrows: active,
+      completed: completed
+    });
+  }, [marketplaceListings, portfolio, setGlobalStats]);
 
   const handlePurchaseSuccess = useCallback(() => {
     fetchMarketplace();

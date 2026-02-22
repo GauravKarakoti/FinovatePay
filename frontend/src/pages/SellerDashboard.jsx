@@ -32,6 +32,7 @@ import QuotationList from '../components/Dashboard/QuotationList';
 import CreateProduceLot from '../components/Produce/CreateProduceLot';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
+import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
 import AnalyticsPage from '../pages/AnalyticsPage';
 
@@ -601,9 +602,15 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     </div>
   );
 
-  const FinancingTabComponent = () => (
+const FinancingTabComponent = () => (
     <div className="space-y-6">
       <FinancingTab invoices={invoices} userRole="seller" />
+    </div>
+  );
+
+  const StreamingTabComponent = () => (
+    <div className="space-y-6">
+      <StreamingTab userRole="seller" />
     </div>
   );
 
@@ -616,8 +623,8 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       case 'produce': return <ProduceTab />;
       case 'payments': return <PaymentsTab />;
       case 'escrow': return <EscrowTab />;
-case 'financing': return <FinancingTabComponent />;
-      case 'analytics': return <AnalyticsPage />;
+      case 'financing': return <FinancingTabComponent />;
+      case 'streaming': return <StreamingTabComponent />;
       default: return <OverviewTab />;
     }
   };

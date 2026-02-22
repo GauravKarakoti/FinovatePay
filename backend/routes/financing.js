@@ -6,6 +6,11 @@ const { requireKYC } = require('../middleware/kycValidation');
 const { getFractionTokenContract } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const { ethers } = require('ethers');
+const { 
+  validateFinancingRequest, 
+  validateFinancingRepay, 
+  validateFinancingTokenize 
+} = require('../middleware/validators');
 
 // Get marketplace listings
 router.get('/marketplace', authenticateToken, async (req, res) => {
@@ -31,7 +36,7 @@ router.get('/marketplace', authenticateToken, async (req, res) => {
 });
 
 // Request financing using Katana liquidity
-router.post('/request', authenticateToken, requireRole(['seller', 'admin']), requireKYC, async (req, res) => {
+router.post('/request', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateFinancingRequest, async (req, res) => {
     try {
         const { invoiceId, amount, asset, collateralTokenId } = req.body;
         const userId = req.user.id;
@@ -96,7 +101,7 @@ router.get('/rates/:asset', authenticateToken, async (req, res) => {
 });
 
 // Repay financing
-router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requireKYC, async (req, res) => {
+router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateFinancingRepay, async (req, res) => {
     try {
         const { financingId, invoiceId, amount, asset } = req.body;
         const userId = req.user.id;
@@ -147,7 +152,7 @@ router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requi
 });
 
 // Tokenize invoice
-router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), requireKYC, async (req, res) => {
+router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateFinancingTokenize, async (req, res) => {
     try {
         const { invoiceId, faceValue, maturityDate, yieldBps } = req.body;
         const userId = req.user.id;

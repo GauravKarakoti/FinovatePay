@@ -4,11 +4,16 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/sanitize');
+const { 
+  validateRegister, 
+  validateLogin, 
+  validateRoleUpdate 
+} = require('../middleware/validators');
 
 const router = express.Router();
 const { authLimiter } = require('../middleware/rateLimiter');
 
-router.put('/role', authenticateToken, async (req, res) => {
+router.put('/role', authenticateToken, validateRoleUpdate, async (req, res) => {
   const { role } = req.body;
   const userId = req.user.id;
 
@@ -38,12 +43,12 @@ router.put('/role', authenticateToken, async (req, res) => {
 });
 
 // Register new user
-router.post('/register', authLimiter, async (req, res) => {
+router.post('/register', authLimiter, validateRegister, async (req, res) => {
   console.log('Registration request body:', req.body);
   const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;
 
-  // Validate role - only allow 'buyer' or 'seller' (arbitrators should be admin-only)
-  const allowedRoles = ['buyer', 'seller'];
+  // Validate role - allow buyer, seller, investor, and shipment (arbitrators should be admin-only)
+  const allowedRoles = ['buyer', 'seller', 'investor', 'shipment'];
   const userRole = allowedRoles.includes(role) ? role : 'seller'; // Default to 'seller'
 
   try {
@@ -90,7 +95,7 @@ router.post('/register', authLimiter, async (req, res) => {
 });
 
 // Login user
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', authLimiter, validateLogin, async (req, res) => {
   const { email, password } = req.body;
 
   try {

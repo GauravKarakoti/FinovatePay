@@ -4,6 +4,10 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { pool } = require('../config/database');
 const produceController = require('../controllers/produceController');
 const marketService = require('../services/marketService');
+const { 
+  validateProduceLotId, 
+  validateCreateProduceLot 
+} = require('../middleware/validators');
 
 router.get('/lots/available', authenticateToken, async (req, res) => {
     try {
@@ -63,7 +67,7 @@ router.get('/lots/producer', authenticateToken, requireRole(['seller', 'admin'])
 
 router.get('/lots/seller', authenticateToken, requireRole(['seller', 'admin']), produceController.getSellerLots);
 
-router.get('/lots/:lotId', authenticateToken, async (req, res) => {
+router.get('/lots/:lotId', authenticateToken, validateProduceLotId, async (req, res) => {
   try {
     const { lotId } = req.params;
     
@@ -102,6 +106,6 @@ router.get('/lots/:lotId', authenticateToken, async (req, res) => {
 });
 
 // Create a new produce lot (syncs from blockchain)
-router.post('/lots', authenticateToken, requireRole(['seller', 'admin']), produceController.createProduceLot);
+router.post('/lots', authenticateToken, requireRole(['seller', 'admin']), validateCreateProduceLot, produceController.createProduceLot);
 
 module.exports = router;

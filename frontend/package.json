@@ -14,7 +14,6 @@
     "@web3modal/ethers": "^5.1.11",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.13.2",
-    "dunder-proto": "^1.0.1",
     "ethers": "^6.13.4",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.1.0",
