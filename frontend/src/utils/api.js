@@ -332,34 +332,56 @@ export const resolveDispute = async (invoiceId, sellerWins) => {
   return response.data;
 };
 
-// --- Fiat On-Ramp API (MoonPay) ---
-export const createFiatRampLink = (data) => {
-  return api.post('/fiat-ramp/create-link', data);
+// --- Streaming Payments API ---
+
+// Create a new subscription stream (seller)
+export const createStream = (streamData) => {
+  return api.post('/streaming', streamData);
 };
 
-export const getFiatRampQuote = (params) => {
-  return api.get('/fiat-ramp/quote', { params });
+// Get all streams for current user
+export const getMyStreams = () => {
+  return api.get('/streaming');
 };
 
-export const getFiatRampStatus = (transactionId) => {
-  return api.get(`/fiat-ramp/status/${transactionId}`);
+// Get streams where user is seller
+export const getSellerStreams = () => {
+  return api.get('/streaming/seller');
 };
 
-// --- Analytics API ---
-export const getAnalyticsOverview = () => {
-  return api.get('/analytics/overview');
+// Get streams where user is buyer
+export const getBuyerStreams = () => {
+  return api.get('/streaming/buyer');
 };
 
-export const getPaymentAnalytics = (page = 1, limit = 20) => {
-  return api.get('/analytics/payments', { params: { page, limit } });
+// Get stream details
+export const getStream = (streamId) => {
+  return api.get(`/streaming/${streamId}`);
 };
 
-export const getFinancingAnalytics = () => {
-  return api.get('/analytics/financing');
+// Approve and fund a stream (buyer)
+export const approveStream = (streamId, amount) => {
+  return api.post(`/streaming/${streamId}/approve`, { amount });
 };
 
-export const getRiskScore = (invoiceId) => {
-  return api.get(`/analytics/risk/${invoiceId}`);
+// Release payment for completed interval
+export const releasePayment = (streamId) => {
+  return api.post(`/streaming/${streamId}/release`);
+};
+
+// Pause a stream (buyer)
+export const pauseStream = (streamId) => {
+  return api.post(`/streaming/${streamId}/pause`);
+};
+
+// Resume a paused stream (buyer)
+export const resumeStream = (streamId) => {
+  return api.post(`/streaming/${streamId}/resume`);
+};
+
+// Cancel a stream (seller or buyer)
+export const cancelStream = (streamId) => {
+  return api.post(`/streaming/${streamId}/cancel`);
 };
 
 export default api;

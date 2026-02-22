@@ -35,6 +35,11 @@ const tabs = [
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
   ];
+
+  // Add Streaming Payments tab for seller role
+  if (user?.role === 'seller') {
+    tabs.push({ id: 'streaming', label: 'Streaming', icon: '📺' });
+  }
   const displayStats = stats || { totalInvoices: 0, activeEscrows: 0, completed: 0 };
 
   // Add Financing tab for relevant roles
