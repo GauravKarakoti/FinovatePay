@@ -1,5 +1,8 @@
 const { pool } = require('../config/database');
 
+/*//////////////////////////////////////////////////////////////
+                    CREATE INVOICE (FROM QUOTATION)
+//////////////////////////////////////////////////////////////*/
 exports.createInvoice = async (req, res) => {
     const client = await pool.connect();
 
@@ -11,7 +14,10 @@ exports.createInvoice = async (req, res) => {
             invoice_hash,
             contract_address,
             token_address,
-            due_date
+            due_date,
+            tx_hash, // <-- Added tx_hash
+            discount_rate,
+            discount_deadline
         } = req.body;
 
         // Basic Input Validation
@@ -19,11 +25,26 @@ exports.createInvoice = async (req, res) => {
             return res.status(400).json({ error: 'Missing quotation_id or required on-chain data.' });
         }
 
-        await client.query('BEGIN');
+  try {
+    const {
+      quotation_id,
+      invoice_id,
+      invoice_hash,
+      contract_address,
+      token_address,
+      due_date,
+      tx_hash,
+      annual_apr = 18.0
+    } = req.body;
 
         // 1. Fetch and lock the quotation
         const quotationQuery = `SELECT * FROM quotations WHERE id = $1 FOR UPDATE`;
         const quotationResult = await client.query(quotationQuery, [quotation_id]);
+    if (!quotation_id || !invoice_id || !contract_address) {
+      return res.status(400).json({
+        error: 'Missing quotation_id, invoice_id, or contract_address'
+      });
+    }
 
         if (quotationResult.rows.length === 0) {
             throw new Error('Quotation not found');
@@ -44,6 +65,15 @@ exports.createInvoice = async (req, res) => {
         if (quotation.seller_org_id !== req.user.organization_id) {
             throw new Error('Not authorized: Quotation belongs to a different organization.');
         }
+    await client.query('BEGIN');
+
+    // 1. Lock & validate quotation
+    const quotationQuery = `
+      SELECT * FROM quotations 
+      WHERE id = $1 AND status = 'approved'
+      FOR UPDATE
+    `;
+    const quotationResult = await client.query(quotationQuery, [quotation_id]);
 
         // 4. Quantity Validation
         if (!quotation.quantity || quotation.quantity <= 0) {
@@ -63,10 +93,54 @@ exports.createInvoice = async (req, res) => {
             if (parseFloat(lot.current_quantity) < parseFloat(quotation.quantity)) {
                 throw new Error(`Insufficient quantity. Only ${lot.current_quantity}kg available.`);
             }
+    if (quotationResult.rows.length === 0) {
+      throw new Error('Quotation not found, not approved, or already invoiced');
+    }
 
-            const updateLotQuery = 'UPDATE produce_lots SET current_quantity = current_quantity - $1 WHERE lot_id = $2';
-            await client.query(updateLotQuery, [quotation.quantity, quotation.lot_id]);
-        }
+    const quotation = quotationResult.rows[0];
+
+    // RBAC: org-level authorization
+    if (quotation.seller_org_id !== req.user.organization_id) {
+      throw new Error('Not authorized for this quotation');
+    }
+
+    // 2. Handle produce inventory if applicable
+    if (quotation.lot_id) {
+      const lotQuery = `
+        SELECT current_quantity 
+        FROM produce_lots 
+        WHERE lot_id = $1
+        FOR UPDATE
+      `;
+      const lotResult = await client.query(lotQuery, [quotation.lot_id]);
+
+      if (lotResult.rows.length === 0) {
+        throw new Error('Produce lot not found');
+      }
+
+      const lot = lotResult.rows[0];
+
+      if (Number(lot.current_quantity) < Number(quotation.quantity)) {
+        throw new Error(
+          `Insufficient quantity. Only ${lot.current_quantity} available`
+        );
+      }
+
+      await client.query(
+        `UPDATE produce_lots 
+         SET current_quantity = current_quantity - $1 
+         WHERE lot_id = $2`,
+        [quotation.quantity, quotation.lot_id]
+      );
+    }
+
+    // 4. Mark quotation as invoiced
+    await client.query(
+      `UPDATE quotations SET status = 'invoiced' WHERE id = $1`,
+      [quotation_id]
+    );
+
+    await client.query('COMMIT');
 
         // 6. Insert Invoice
         // Trusting quotation data for financial fields
@@ -75,9 +149,10 @@ exports.createInvoice = async (req, res) => {
                 invoice_id, invoice_hash, seller_address, buyer_address,
                 amount, due_date, description, items, currency,
                 contract_address, token_address, lot_id, quotation_id, escrow_status,
-                financing_status
+                financing_status, tx_hash,
+                discount_rate, discount_deadline
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none')
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none', $14, $15, $16)
             RETURNING *
         `;
 
