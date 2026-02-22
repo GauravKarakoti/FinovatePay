@@ -214,8 +214,40 @@ describe('Auth Registration Tests', () => {
       expect(response.body.user.role).toBe('seller'); // Should default to seller, not arbitrator
     });
 
-    it('should not allow invalid roles like admin, shipment, investor', async () => {
-      const invalidRoles = ['admin', 'shipment', 'investor', 'moderator', 'ABC'];
+    it('should allow investor role when provided', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'investor' }] });
+
+      bcrypt.hash.mockResolvedValue('hashedPassword');
+      jwt.sign.mockReturnValue('mock-token');
+
+      const response = await request(app)
+        .post('/auth/register')
+        .send({ ...validUserData, role: 'investor' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.user.role).toBe('investor');
+    });
+
+    it('should allow shipment role when provided', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'shipment' }] });
+
+      bcrypt.hash.mockResolvedValue('hashedPassword');
+      jwt.sign.mockReturnValue('mock-token');
+
+      const response = await request(app)
+        .post('/auth/register')
+        .send({ ...validUserData, role: 'shipment' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.user.role).toBe('shipment');
+    });
+
+    it('should not allow invalid roles like admin, arbitrator, moderator', async () => {
+      const invalidRoles = ['admin', 'arbitrator', 'moderator', 'ABC'];
 
       for (const invalidRole of invalidRoles) {
         mockQuery
