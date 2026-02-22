@@ -46,30 +46,54 @@ const contractAddresses = {
 
 // 3. Contract Instance Getters
 const getFractionTokenContract = (signerOrProvider) => {
-  const provider = getProvider();
-  return new ethers.Contract(
-    contractAddresses.fractionToken,
-    FractionTokenABI,
-    signerOrProvider || provider
-  );
+  if (!contractAddresses.fractionToken) {
+    throw new Error("FractionToken contract address is not configured.");
+  }
+
+  try {
+    const provider = getProvider();
+    return new ethers.Contract(
+      contractAddresses.fractionToken,
+      FractionTokenABI,
+      signerOrProvider || provider
+    );
+  } catch (error) {
+    throw new Error(`Failed to initialize FractionToken contract: ${error.message}`);
+  }
 };
 
 const getComplianceManagerContract = (signerOrProvider) => {
-  const provider = getProvider();
-  return new ethers.Contract(
-    contractAddresses.complianceManager,
-    ComplianceManagerABI,
-    signerOrProvider || provider
-  );
+  if (!contractAddresses.complianceManager) {
+    throw new Error("ComplianceManager contract address is not configured.");
+  }
+
+  try {
+    const provider = getProvider();
+    return new ethers.Contract(
+      contractAddresses.complianceManager,
+      ComplianceManagerABI,
+      signerOrProvider || provider
+    );
+  } catch (error) {
+    throw new Error(`Failed to initialize ComplianceManager contract: ${error.message}`);
+  }
 };
 
 const getFinancingManagerContract = (signerOrProvider) => {
-  const provider = getProvider();
-  return new ethers.Contract(
-    contractAddresses.financingManager,
-    FinancingManagerABI,
-    signerOrProvider || provider
-  );
+  if (!contractAddresses.financingManager) {
+    throw new Error("FinancingManager contract address is not configured.");
+  }
+
+  try {
+    const provider = getProvider();
+    return new ethers.Contract(
+      contractAddresses.financingManager,
+      FinancingManagerABI,
+      signerOrProvider || provider
+    );
+  } catch (error) {
+    throw new Error(`Failed to initialize FinancingManager contract: ${error.message}`);
+  }
 };
 
 module.exports = {

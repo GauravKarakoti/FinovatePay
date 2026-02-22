@@ -1,5 +1,7 @@
 const { Pool } = require('pg');
 
+const isProduction = process.env.NODE_ENV === "production";
+
 // Enhanced Database Configuration with Resilience
 const dbConfig = {
     // Your Database Credentials from .env
@@ -8,9 +10,9 @@ const dbConfig = {
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     port: process.env.DB_PORT,
-    ssl: {
-      rejectUnauthorized: false
-    },
+    ssl: isProduction
+      ? { rejectUnauthorized: false }
+      : false,
     
     // Enhanced Pool Settings for Maximum Resilience
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 30000,
