@@ -186,8 +186,6 @@ app.use((req, res, next) => {
 
 app.use(errorHandler);
 
-app.use(errorHandler);
-
 /* ---------------- SERVER START ---------------- */
 
 const PORT = process.env.PORT || 3000;
