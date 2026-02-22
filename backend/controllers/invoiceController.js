@@ -1,7 +1,7 @@
 const { pool } = require('../config/database');
 
 /*//////////////////////////////////////////////////////////////
-                    CREATE INVOICE (FROM QUOTATION)
+                CREATE INVOICE (FROM QUOTATION)
 //////////////////////////////////////////////////////////////*/
 exports.createInvoice = async (req, res) => {
   const client = await pool.connect();
@@ -15,11 +15,12 @@ exports.createInvoice = async (req, res) => {
       token_address,
       due_date,
       tx_hash,
-      discount_rate,
-      discount_deadline,
+      discount_rate = 0,
+      discount_deadline = null,
       annual_apr = 18.0
     } = req.body;
 
+    // Basic validation
     if (!quotation_id || !invoice_id || !contract_address) {
       return res.status(400).json({
         error: 'Missing quotation_id, invoice_id, or contract_address'
@@ -28,7 +29,9 @@ exports.createInvoice = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Lock approved quotation
+    /*----------------------------------------------------------
+      1. Fetch & lock approved quotation
+    ----------------------------------------------------------*/
     const quotationResult = await client.query(
       `SELECT * FROM quotations
        WHERE id = $1 AND status = 'approved'
@@ -42,17 +45,23 @@ exports.createInvoice = async (req, res) => {
 
     const quotation = quotationResult.rows[0];
 
-    // RBAC
+    /*----------------------------------------------------------
+      2. RBAC check
+    ----------------------------------------------------------*/
     if (quotation.seller_org_id !== req.user.organization_id) {
       throw new Error('Not authorized for this quotation');
     }
 
-    // Quantity validation
+    /*----------------------------------------------------------
+      3. Quantity validation
+    ----------------------------------------------------------*/
     if (!quotation.quantity || quotation.quantity <= 0) {
       throw new Error('Invalid quantity in quotation');
     }
 
-    // Inventory handling
+    /*----------------------------------------------------------
+      4. Inventory handling (produce lots)
+    ----------------------------------------------------------*/
     if (quotation.lot_id) {
       const lotResult = await client.query(
         `SELECT current_quantity
@@ -82,18 +91,30 @@ exports.createInvoice = async (req, res) => {
       );
     }
 
-    // Insert invoice
+    /*----------------------------------------------------------
+      5. Insert invoice
+    ----------------------------------------------------------*/
     const insertResult = await client.query(
       `INSERT INTO invoices (
-        invoice_id, invoice_hash,
-        seller_address, buyer_address,
-        amount, due_date,
-        description, items, currency,
-        contract_address, token_address,
-        lot_id, quotation_id,
-        escrow_status, financing_status,
-        tx_hash, discount_rate,
-        discount_deadline, annual_apr
+        invoice_id,
+        invoice_hash,
+        seller_address,
+        buyer_address,
+        amount,
+        due_date,
+        description,
+        items,
+        currency,
+        contract_address,
+        token_address,
+        lot_id,
+        quotation_id,
+        escrow_status,
+        financing_status,
+        tx_hash,
+        discount_rate,
+        discount_deadline,
+        annual_apr
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,
@@ -110,24 +131,28 @@ exports.createInvoice = async (req, res) => {
         quotation.total_amount,
         due_date,
         quotation.description,
-        JSON.stringify([{
-          description: quotation.description,
-          quantity: quotation.quantity,
-          price_per_unit: quotation.price_per_unit
-        }]),
+        JSON.stringify([
+          {
+            description: quotation.description,
+            quantity: quotation.quantity,
+            price_per_unit: quotation.price_per_unit
+          }
+        ]),
         quotation.currency,
         contract_address,
         token_address,
         quotation.lot_id,
         quotation_id,
-        tx_hash || null,
-        discount_rate || 0,
-        discount_deadline || null,
+        tx_hash,
+        discount_rate,
+        discount_deadline,
         annual_apr
       ]
     );
 
-    // Mark quotation invoiced
+    /*----------------------------------------------------------
+      6. Mark quotation invoiced
+    ----------------------------------------------------------*/
     await client.query(
       `UPDATE quotations SET status = 'invoiced' WHERE id = $1`,
       [quotation_id]
@@ -135,7 +160,7 @@ exports.createInvoice = async (req, res) => {
 
     await client.query('COMMIT');
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Invoice created successfully',
       invoice: insertResult.rows[0]
@@ -145,50 +170,20 @@ exports.createInvoice = async (req, res) => {
     await client.query('ROLLBACK');
     console.error('Create invoice error:', error);
 
-    const errorMessage =
-      process.env.NODE_ENV === 'development'
-        ? error.message
-        : 'Internal server error';
+    let statusCode = 500;
+    if (error.message.includes('not found')) statusCode = 404;
+    if (error.message.includes('Not authorized')) statusCode = 403;
+    if (error.message.includes('Insufficient quantity')) statusCode = 400;
 
-    res.status(500).json({ error: errorMessage });
+    return res.status(statusCode).json({
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error'
+    });
 
   } finally {
     client.release();
-  }
-};
-
-/*//////////////////////////////////////////////////////////////
-                ACCEPT EARLY PAYMENT OFFER
-//////////////////////////////////////////////////////////////*/
-exports.settleInvoiceEarly = async (req, res) => {
-  try {
-    const { invoiceId } = req.params;
-
-    const result = await pool.query(
-      `
-      UPDATE invoices
-      SET status = 'paid',
-          financing_status = 'early_paid',
-          settled_at = NOW()
-      WHERE invoice_id = $1
-      RETURNING *
-      `,
-      [invoiceId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    res.json({
-      success: true,
-      message: 'Invoice settled early',
-      invoice: result.rows[0]
-    });
-
-  } catch (error) {
-    console.error('Settle invoice error:', error);
-    res.status(500).json({ error: error.message });
   }
 };
 
@@ -228,7 +223,7 @@ exports.getEarlyPaymentOffer = async (req, res) => {
     const discountAmount = (amount * apr * daysRemaining) / 365;
     const offerAmount = amount - discountAmount;
 
-    res.json({
+    return res.json({
       eligible: true,
       originalAmount: amount,
       discountAmount: discountAmount.toFixed(2),
@@ -239,6 +234,6 @@ exports.getEarlyPaymentOffer = async (req, res) => {
 
   } catch (error) {
     console.error('Early payment offer error:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
