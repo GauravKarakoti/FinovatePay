@@ -1,13 +1,12 @@
 const { pool } = require('../config/database');
 
 /*//////////////////////////////////////////////////////////////
-                    CREATE INVOICE (FROM QUOTATION)
+                CREATE INVOICE (FROM QUOTATION)
 //////////////////////////////////////////////////////////////*/
 exports.createInvoice = async (req, res) => {
   const client = await pool.connect();
 
   try {
-    // 1. Validate input
     const {
       quotation_id,
       invoice_id,
@@ -16,20 +15,25 @@ exports.createInvoice = async (req, res) => {
       token_address,
       due_date,
       tx_hash,
-      discount_rate,
-      discount_deadline
+      discount_rate = 0,
+      discount_deadline = null,
+      annual_apr = 18.0
     } = req.body;
 
+    /*----------------------------------------------------------
+      Basic validation
+    ----------------------------------------------------------*/
     if (!quotation_id || !invoice_id || !contract_address) {
       return res.status(400).json({
         error: 'Missing quotation_id, invoice_id, or contract_address'
       });
     }
 
-    // 2. Begin transaction
     await client.query('BEGIN');
 
-    // 3. Lock & fetch quotation (FOR UPDATE prevents race conditions)
+    /*----------------------------------------------------------
+      1. Fetch & lock approved quotation
+    ----------------------------------------------------------*/
     const quotationResult = await client.query(
       `SELECT * FROM quotations
        WHERE id = $1 AND status = 'approved'
@@ -43,17 +47,23 @@ exports.createInvoice = async (req, res) => {
 
     const quotation = quotationResult.rows[0];
 
-    // 4. Validate quotation state
-    if (!quotation.quantity || quotation.quantity <= 0) {
-      throw new Error('Invalid quantity in quotation');
-    }
-
-    // RBAC: org-level authorization
+    /*----------------------------------------------------------
+      2. RBAC check
+    ----------------------------------------------------------*/
     if (quotation.seller_org_id !== req.user.organization_id) {
       throw new Error('Not authorized for this quotation');
     }
 
-    // 5. Handle produce inventory if applicable
+    /*----------------------------------------------------------
+      3. Quantity validation
+    ----------------------------------------------------------*/
+    if (!quotation.quantity || quotation.quantity <= 0) {
+      throw new Error('Invalid quantity in quotation');
+    }
+
+    /*----------------------------------------------------------
+      4. Inventory handling (produce lots)
+    ----------------------------------------------------------*/
     if (quotation.lot_id) {
       const lotResult = await client.query(
         `SELECT current_quantity
@@ -83,110 +93,109 @@ exports.createInvoice = async (req, res) => {
       );
     }
 
-    // 6. Insert invoice
-    const insertInvoiceQuery = `
-      INSERT INTO invoices (
-        invoice_id, invoice_hash, seller_address, buyer_address,
-        amount, due_date, description, items, currency,
-        contract_address, token_address, lot_id, quotation_id,
-        escrow_status, financing_status, tx_hash,
-        discount_rate, discount_deadline
+    /*----------------------------------------------------------
+      5. Insert invoice
+    ----------------------------------------------------------*/
+    const insertResult = await client.query(
+      `INSERT INTO invoices (
+        invoice_id,
+        invoice_hash,
+        seller_address,
+        buyer_address,
+        amount,
+        due_date,
+        description,
+        items,
+        currency,
+        contract_address,
+        token_address,
+        lot_id,
+        quotation_id,
+        escrow_status,
+        financing_status,
+        tx_hash,
+        discount_rate,
+        discount_deadline,
+        annual_apr
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-              'created', 'none', $14, $15, $16)
-      RETURNING *
-    `;
+      VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,
+        $10,$11,$12,$13,
+        'created','none',
+        $14,$15,$16,$17
+      )
+      RETURNING *`,
+      [
+        invoice_id,
+        invoice_hash,
+        quotation.seller_address,
+        quotation.buyer_address,
+        quotation.total_amount,
+        due_date,
+        quotation.description,
+        JSON.stringify([
+          {
+            description: quotation.description,
+            quantity: quotation.quantity,
+            price_per_unit: quotation.price_per_unit
+          }
+        ]),
+        quotation.currency,
+        contract_address,
+        token_address,
+        quotation.lot_id,
+        quotation_id,
+        tx_hash || null,
+        discount_rate,
+        discount_deadline,
+        annual_apr
+      ]
+    );
 
-    const values = [
-      invoice_id,
-      invoice_hash,
-      quotation.seller_address,
-      quotation.buyer_address,
-      quotation.total_amount,
-      due_date,
-      quotation.description,
-      JSON.stringify([{
-        description: quotation.description,
-        quantity: quotation.quantity,
-        price_per_unit: quotation.price_per_unit / (parseFloat(process.env.EXCHANGE_RATE) || 50.75)
-      }]),
-      quotation.currency,
-      contract_address,
-      token_address,
-      quotation.lot_id,
-      quotation_id,
-      tx_hash || null,
-      discount_rate || 0,
-      discount_deadline || 0
-    ];
-
-    const result = await client.query(insertInvoiceQuery, values);
-
-    // 7. Mark quotation as invoiced (single update, no duplicates)
+    /*----------------------------------------------------------
+      6. Mark quotation invoiced
+    ----------------------------------------------------------*/
     await client.query(
       `UPDATE quotations SET status = 'invoiced' WHERE id = $1`,
       [quotation_id]
     );
 
-    // 8. Commit (single commit)
     await client.query('COMMIT');
 
-    // 9. Return success
-    res.status(201).json({ success: true, invoice: result.rows[0] });
+    return res.status(201).json({
+      success: true,
+      message: 'Invoice created successfully',
+      invoice: insertResult.rows[0]
+    });
 
   } catch (error) {
-    // Rollback on any error
     await client.query('ROLLBACK');
-    console.error('Error creating invoice from quotation:', error);
-    const errorMessage = process.env.NODE_ENV === 'development'
-      ? error.message
-      : 'Internal server error.';
-    res.status(500).json({ error: errorMessage });
+    console.error('Create invoice error:', error);
+
+    let statusCode = 500;
+    if (error.message.includes('not found')) statusCode = 404;
+    if (error.message.includes('Not authorized')) statusCode = 403;
+    if (error.message.includes('Insufficient quantity')) statusCode = 400;
+
+    return res.status(statusCode).json({
+      error:
+        process.env.NODE_ENV === 'development'
+          ? error.message
+          : 'Internal server error'
+    });
+
   } finally {
     client.release();
   }
 };
 
 /*//////////////////////////////////////////////////////////////
-                ACCEPT EARLY PAYMENT OFFER
+                GET EARLY PAYMENT OFFER
 //////////////////////////////////////////////////////////////*/
-exports.settleInvoiceEarly = async (req, res) => {
-  try {
-    const { invoiceId } = req.params;
-
-    const result = await pool.query(
-      `
-      UPDATE invoices
-      SET status = 'paid',
-          financing_status = 'early_paid',
-          settled_at = NOW()
-      WHERE invoice_id = $1
-      RETURNING *
-      `,
-      [invoiceId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    res.json({
-      success: true,
-      message: 'Invoice settled early',
-      invoice: result.rows[0]
-    });
-
-  } catch (error) {
-    console.error('Settle invoice error:', error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
 exports.getEarlyPaymentOffer = async (req, res) => {
   try {
     const { invoiceId } = req.params;
 
-    // You need to fetch the invoice from the DB first
     const result = await pool.query(
       'SELECT amount, annual_apr, due_date FROM invoices WHERE invoice_id = $1',
       [invoiceId]
@@ -198,8 +207,7 @@ exports.getEarlyPaymentOffer = async (req, res) => {
 
     const invoice = result.rows[0];
     const amount = Number(invoice.amount);
-    // Provide a fallback APR if it's null in the DB
-    const apr = Number(invoice.annual_apr || 18.0) / 100; 
+    const apr = Number(invoice.annual_apr || 18.0) / 100;
 
     const today = new Date();
     const dueDate = new Date(invoice.due_date);
@@ -217,7 +225,7 @@ exports.getEarlyPaymentOffer = async (req, res) => {
     const discountAmount = (amount * apr * daysRemaining) / 365;
     const offerAmount = amount - discountAmount;
 
-    res.json({
+    return res.json({
       eligible: true,
       originalAmount: amount,
       discountAmount: discountAmount.toFixed(2),
@@ -228,6 +236,100 @@ exports.getEarlyPaymentOffer = async (req, res) => {
 
   } catch (error) {
     console.error('Early payment offer error:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+/*//////////////////////////////////////////////////////////////
+                SETTLE INVOICE EARLY
+//////////////////////////////////////////////////////////////*/
+exports.settleInvoiceEarly = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { invoiceId } = req.params;
+    const { tx_hash } = req.body;
+
+    await client.query('BEGIN');
+
+    /*----------------------------------------------------------
+      1. Fetch & lock the invoice
+    ----------------------------------------------------------*/
+    const result = await client.query(
+      `SELECT * FROM invoices 
+       WHERE invoice_id = $1 
+       FOR UPDATE`,
+      [invoiceId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Invoice not found');
+    }
+
+    const invoice = result.rows[0];
+
+    /*----------------------------------------------------------
+      2. Authorization & Status Check
+    ----------------------------------------------------------*/
+    if (req.user.role === 'buyer' && invoice.buyer_address !== req.user.wallet_address) {
+      throw new Error('Not authorized to settle this invoice');
+    }
+
+    if (['settled', 'paid', 'completed'].includes(invoice.escrow_status)) {
+      throw new Error('Invoice is already settled or paid');
+    }
+
+    /*----------------------------------------------------------
+      3. Eligibility Check & Calculations
+    ----------------------------------------------------------*/
+    const today = new Date();
+    const dueDate = new Date(invoice.due_date);
+    const daysRemaining = Math.ceil(
+      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysRemaining <= 0) {
+      throw new Error('Invoice is due or overdue, cannot settle early');
+    }
+
+    const amount = Number(invoice.amount);
+    const apr = Number(invoice.annual_apr || 18.0) / 100;
+    const discountAmount = (amount * apr * daysRemaining) / 365;
+    const offerAmount = amount - discountAmount;
+
+    /*----------------------------------------------------------
+      4. Update Invoice Status
+    ----------------------------------------------------------*/
+    const updateResult = await client.query(
+      `UPDATE invoices 
+       SET escrow_status = 'settled', 
+           tx_hash = COALESCE($1, tx_hash) 
+       WHERE invoice_id = $2 
+       RETURNING *`,
+      [tx_hash || null, invoiceId]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Invoice settled early successfully',
+      settledAmount: offerAmount.toFixed(2),
+      discountApplied: discountAmount.toFixed(2),
+      invoice: updateResult.rows[0]
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Early settlement error:', error);
+    
+    let statusCode = 500;
+    if (error.message.includes('not found')) statusCode = 404;
+    if (error.message.includes('Not authorized')) statusCode = 403;
+    if (error.message.includes('overdue') || error.message.includes('already settled')) statusCode = 400;
+
+    return res.status(statusCode).json({ error: error.message });
+  } finally {
+    client.release();
   }
 };

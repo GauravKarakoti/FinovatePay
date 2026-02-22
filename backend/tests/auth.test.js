@@ -1,26 +1,33 @@
 const request = require('supertest');
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
-// Mock the database pool
-const mockPool = {
-  query: jest.fn()
-};
+// Mock the database pool before importing anything
+const mockQuery = jest.fn();
 
-// Mock the authenticateToken middleware
-const mockAuthenticateToken = jest.fn((req, res, next) => {
-  req.user = { id: 'mock-user-id' };
-  next();
-});
-
-// Mock dependencies before requiring the route
-jest.mock('../config/database', () => mockPool);
-jest.mock('../middleware/auth', () => ({
-  authenticateToken: mockAuthenticateToken
+// Mock the database module
+jest.mock('../config/database', () => ({
+  pool: {
+    query: jest.fn((...args) => mockQuery(...args))
+  }
 }));
-jest.mock('bcryptjs');
-jest.mock('jsonwebtoken');
+
+// Mock the auth middleware
+jest.mock('../middleware/auth', () => ({
+  authenticateToken: jest.fn((req, res, next) => {
+    req.user = { id: 'mock-user-id' };
+    next();
+  })
+}));
+
+// Mock bcrypt and jwt
+jest.mock('bcryptjs', () => ({
+  hash: jest.fn(),
+  compare: jest.fn()
+}));
+
+jest.mock('jsonwebtoken', () => ({
+  sign: jest.fn()
+}));
 
 describe('Auth Registration Tests', () => {
   let app;
@@ -43,7 +50,16 @@ describe('Auth Registration Tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockQuery.mockReset();
     
+    // Import mocks after jest.clearAllMocks to ensure fresh mocks
+    const bcrypt = require('bcryptjs');
+    const jwt = require('jsonwebtoken');
+    
+    bcrypt.hash.mockResolvedValue('hashedPassword');
+    bcrypt.compare.mockResolvedValue(true);
+    jwt.sign.mockReturnValue('mock-token');
+
     // Create a fresh Express app for each test
     app = express();
     app.use(express.json());
@@ -65,13 +81,13 @@ describe('Auth Registration Tests', () => {
     };
 
     it('should register user with role "buyer" when role is provided as buyer', async () => {
+      const bcrypt = require('bcryptjs');
+      const jwt = require('jsonwebtoken');
+      
       // Mock: user does not exist
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] }) // userExists check
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'buyer' }] }); // insert
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -79,17 +95,14 @@ describe('Auth Registration Tests', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.user.role).toBe('buyer');
-      expect(mockPool.query).toHaveBeenCalledTimes(2);
+      expect(mockQuery).toHaveBeenCalledTimes(2);
     });
 
     it('should register user with role "seller" when role is provided as seller', async () => {
       // Mock: user does not exist
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] }) // userExists check
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] }); // insert
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -101,12 +114,9 @@ describe('Auth Registration Tests', () => {
 
     it('should default to "seller" role when no role is provided', async () => {
       // Mock: user does not exist
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] }) // userExists check
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] }); // insert
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -115,19 +125,16 @@ describe('Auth Registration Tests', () => {
       expect(response.status).toBe(201);
       expect(response.body.user.role).toBe('seller');
       
-      // Verify the SQL was called with 'seller' as the role
-      const insertCall = mockPool.query.mock.calls[1][0];
-      expect(insertCall).toContain("'seller'");
+      // Verify the SQL was called with 'seller' as the role (in the parameters array)
+      const insertParams = mockQuery.mock.calls[1][1];
+      expect(insertParams[6]).toBe('seller');
     });
 
     it('should default to "seller" role when invalid role is provided', async () => {
       // Mock: user does not exist
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] }) // userExists check
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] }); // insert
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -139,7 +146,7 @@ describe('Auth Registration Tests', () => {
 
     it('should reject user registration if email already exists', async () => {
       // Mock: user already exists
-      mockPool.query.mockResolvedValueOnce({ 
+      mockQuery.mockResolvedValueOnce({ 
         rows: [{ id: 'existing-user-id' }] 
       });
 
@@ -153,7 +160,7 @@ describe('Auth Registration Tests', () => {
 
     it('should reject user registration if wallet address already exists', async () => {
       // Mock: user already exists (same wallet)
-      mockPool.query.mockResolvedValueOnce({ 
+      mockQuery.mockResolvedValueOnce({ 
         rows: [{ id: 'existing-user-id' }] 
       });
 
@@ -165,12 +172,11 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should hash password before storing', async () => {
-      mockPool.query
+      const bcrypt = require('bcryptjs');
+      
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'buyer' }] });
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       await request(app)
         .post('/auth/register')
@@ -180,11 +186,12 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should return token on successful registration', async () => {
-      mockPool.query
+      const jwt = require('jsonwebtoken');
+      
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser }] });
 
-      bcrypt.hash.mockResolvedValue('hashedPassword');
       jwt.sign.mockReturnValue('mock-jwt-token');
 
       const response = await request(app)
@@ -195,12 +202,9 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should not allow arbitrator role (admin-only)', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] }); // Should default to seller
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -210,16 +214,45 @@ describe('Auth Registration Tests', () => {
       expect(response.body.user.role).toBe('seller'); // Should default to seller, not arbitrator
     });
 
-    it('should not allow invalid roles like admin, shipment, investor', async () => {
-      const invalidRoles = ['admin', 'shipment', 'investor', 'moderator', 'ABC'];
+    it('should allow investor role when provided', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'investor' }] });
+
+      bcrypt.hash.mockResolvedValue('hashedPassword');
+      jwt.sign.mockReturnValue('mock-token');
+
+      const response = await request(app)
+        .post('/auth/register')
+        .send({ ...validUserData, role: 'investor' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.user.role).toBe('investor');
+    });
+
+    it('should allow shipment role when provided', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'shipment' }] });
+
+      bcrypt.hash.mockResolvedValue('hashedPassword');
+      jwt.sign.mockReturnValue('mock-token');
+
+      const response = await request(app)
+        .post('/auth/register')
+        .send({ ...validUserData, role: 'shipment' });
+
+      expect(response.status).toBe(201);
+      expect(response.body.user.role).toBe('shipment');
+    });
+
+    it('should not allow invalid roles like admin, arbitrator, moderator', async () => {
+      const invalidRoles = ['admin', 'arbitrator', 'moderator', 'ABC'];
 
       for (const invalidRole of invalidRoles) {
-        mockPool.query
+        mockQuery
           .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] });
-
-        bcrypt.hash.mockResolvedValue('hashedPassword');
-        jwt.sign.mockReturnValue('mock-token');
 
         const response = await request(app)
           .post('/auth/register')
@@ -232,12 +265,9 @@ describe('Auth Registration Tests', () => {
 
   describe('Role Validation Edge Cases', () => {
     it('should handle null role as seller', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] });
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -247,12 +277,9 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should handle undefined role as seller', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] });
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -262,12 +289,9 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should handle empty string role as seller', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] });
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -277,12 +301,9 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should be case-sensitive - lowercase buyer should work', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'buyer' }] });
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -292,12 +313,9 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should treat uppercase Buyer as invalid (defaults to seller)', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'seller' }] });
-
-      bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')

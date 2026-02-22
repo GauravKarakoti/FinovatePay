@@ -26,7 +26,7 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
   const navigate = useNavigate();
   const location = useLocation();
 
-  const tabs = [
+const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'quotations', label: 'Quotations', icon: '💬' },
     { id: 'invoices', label: 'Invoices', icon: '📝' },
@@ -34,6 +34,11 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
     { id: 'payments', label: 'Payments', icon: '💳' },
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
   ];
+
+  // Add Streaming Payments tab for seller role
+  if (user?.role === 'seller') {
+    tabs.push({ id: 'streaming', label: 'Streaming', icon: '📺' });
+  }
   const displayStats = stats || { totalInvoices: 0, activeEscrows: 0, completed: 0 };
 
   // Add Financing tab for relevant roles
