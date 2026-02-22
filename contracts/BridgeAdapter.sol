@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -28,6 +29,8 @@ interface IAggLayer {
 }
 
 contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
+    using SafeERC20 for IERC20;
+    
     IWaltBridge public waltBridge;
     IAggLayer public aggLayer;
     ComplianceManager public complianceManager;
@@ -80,7 +83,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
         require(destinationChain == KATANA_CHAIN, "Invalid destination chain");
         require(amount > 0, "Amount must be positive");
 
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         bytes32 lockId = keccak256(abi.encodePacked(token, amount, msg.sender, block.timestamp));
         lockedAssets[lockId] = LockedAsset(token, amount, msg.sender, block.timestamp);
@@ -107,9 +110,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
         bytes32 lockId = keccak256(abi.encodePacked(token, amount, recipient, block.timestamp));
         lockedAssets[lockId] = LockedAsset(token, amount, recipient, block.timestamp);
 
-        // For ERC20, mint or transfer from bridge
-        // Assuming WaltBridge handles the actual transfer
-        IERC20(token).transfer(recipient, amount);
+        IERC20(token).safeTransfer(recipient, amount);
 
         emit AssetReceived(lockId, token, amount, recipient, sourceChain);
     }
@@ -154,7 +155,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // Emergency withdraw ERC20 (admin only)
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
-        IERC20(token).transfer(owner(), amount);
+        IERC20(token).safeTransfer(owner(), amount);
     }
 
     // Emergency withdraw ERC1155 (admin only)
@@ -177,7 +178,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
         require(destinationChain != FINOVATE_CHAIN, "Cannot transfer to same chain");
         require(amount > 0, "Amount must be positive");
 
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
 
         bytes memory data = abi.encode(token, amount, recipient);
         aggLayer.sendMessage(destinationChain, destinationContract, data);
@@ -205,8 +206,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
         (address token, uint256 amount, address recipient) = abi.decode(data, (address, uint256, address));
         require(complianceManager.isKYCVerified(recipient), "Recipient not KYC verified");
 
-        // Mint or transfer equivalent on this chain (assuming AggLayer handles minting)
-        IERC20(token).transfer(recipient, amount);
+        IERC20(token).safeTransfer(recipient, amount);
 
         emit AssetReceived(keccak256(abi.encodePacked(token, amount, recipient, block.timestamp)), token, amount, recipient, sourceChain);
     }

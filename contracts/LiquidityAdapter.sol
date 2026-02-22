@@ -99,7 +99,7 @@ contract LiquidityAdapter is Ownable, ReentrancyGuard {
         IERC20(loan.asset).safeTransferFrom(msg.sender, address(this), totalRepayment);
 
         // Approve and repay to pool
-        IERC20(loan.asset).approve(pool, totalRepayment);
+        IERC20(loan.asset).safeApprove(pool, totalRepayment);
         require(katanaPool.repay(loan.asset, totalRepayment, msg.sender), "Repay failed");
 
         loan.active = false;
