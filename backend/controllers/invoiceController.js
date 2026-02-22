@@ -20,7 +20,9 @@ exports.createInvoice = async (req, res) => {
       annual_apr = 18.0
     } = req.body;
 
-    // Basic validation
+    /*----------------------------------------------------------
+      Basic validation
+    ----------------------------------------------------------*/
     if (!quotation_id || !invoice_id || !contract_address) {
       return res.status(400).json({
         error: 'Missing quotation_id, invoice_id, or contract_address'

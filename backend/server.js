@@ -178,14 +178,13 @@ io.on('connection', (socket) => {
 
 app.set('io', io);
 
-/* ---------------- FALLBACKS ---------------- */
-
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-  });
+app.use((req, res, next) => {
+  const error = new Error('Route not found');
+  error.statusCode = 404;
+  next(error);
 });
+
+app.use(errorHandler);
 
 app.use(errorHandler);
 
