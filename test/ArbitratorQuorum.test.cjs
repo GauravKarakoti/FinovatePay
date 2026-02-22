@@ -330,7 +330,7 @@ describe("Issue #127 - Dynamic Arbitrator Quorum Fix", function () {
       expect(escrowData.disputeRaised).to.be.false;
     });
 
-    it("Should handle even number of arbitrators", async function () {
+    it("Should revert if arbitrator count is even", async function () {
       // Add one more arbitrator to make it 4 total
       await arbitratorsRegistry.addArbitrator(arbitrator3.address);
       
@@ -350,13 +350,9 @@ describe("Issue #127 - Dynamic Arbitrator Quorum Fix", function () {
       await token.connect(buyer).approve(escrow.address, ethers.utils.parseEther("5"));
       await escrow.connect(buyer).deposit(newInvoiceId, ethers.utils.parseEther("5"));
       
-      // Raise dispute
-      await escrow.connect(seller).raiseDispute(newInvoiceId);
-      
-      // Check quorum: 4 arbitrators, need 3 votes (4/2 + 1 = 3)
-      const status = await escrow.getDisputeVotingStatus(newInvoiceId);
-      expect(status.snapshotCount).to.equal(4);
-      expect(status.requiredVotes).to.equal(3);
+      // Raise dispute should revert
+      await expect(escrow.connect(seller).raiseDispute(newInvoiceId))
+        .to.be.revertedWith("Arbitrator count must be odd");
     });
   });
 });

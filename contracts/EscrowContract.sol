@@ -247,6 +247,7 @@ contract EscrowContract is
 
         escrow.snapshotArbitratorCount = arbitratorsRegistry.arbitratorCount();
         require(escrow.snapshotArbitratorCount > 0, "No arbitrators");
+        require(escrow.snapshotArbitratorCount % 2 != 0, "Arbitrator count must be odd");
 
         escrow.disputeRaised = true;
         escrow.status = EscrowStatus.Disputed;
