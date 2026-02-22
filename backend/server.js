@@ -5,6 +5,7 @@ const socketIo = require('socket.io');
 require('dotenv').config();
 const chatbotRoutes = require('./routes/chatbot');
 const shipmentRoutes = require('./routes/shipment');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 const server = http.createServer(app);
@@ -144,17 +145,13 @@ io.on('connection', (socket) => {
 
 app.set('io', io);
 
-app.use((err, req, res, next) => {
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ error: 'Access denied by CORS policy.' });
-  }
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+app.use((req, res, next) => {
+  const error = new Error('Route not found');
+  error.statusCode = 404;
+  next(error);
 });
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
