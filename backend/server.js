@@ -41,7 +41,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // --- DATABASE CONNECTION ---
-const { pool, getConnection, getDatabaseHealth } = require('./config/database');
+const { pool, getConnection } = require('./config/database');
 const listenForTokenization = require('./listeners/contractListener');
 
 /**
