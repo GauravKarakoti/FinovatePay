@@ -42,8 +42,8 @@ router.post('/register', authLimiter, async (req, res) => {
   console.log('Registration request body:', req.body);
   const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;
 
-  // Validate role - only allow 'buyer' or 'seller' (arbitrators should be admin-only)
-  const allowedRoles = ['buyer', 'seller'];
+  // Validate role - allow buyer, seller, investor, and shipment (arbitrators should be admin-only)
+  const allowedRoles = ['buyer', 'seller', 'investor', 'shipment'];
   const userRole = allowedRoles.includes(role) ? role : 'seller'; // Default to 'seller'
 
   try {
