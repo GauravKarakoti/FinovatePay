@@ -2,14 +2,20 @@ const express = require('express');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { kycLimiter } = require('../middleware/rateLimiter');
+const { 
+  validateKYCInitiate, 
+  validateKYCVerifyOTP, 
+  validateKYCOverride,
+  validateWalletAddress 
+} = require('../middleware/validators');
 const router = express.Router();
 const kycController = require('../controllers/kycController');
 
 // Route to initiate Aadhaar verification
-router.post('/initiate', authenticateToken, kycLimiter, kycController.initiateKYC);
+router.post('/initiate', authenticateToken, kycLimiter, validateKYCInitiate, kycController.initiateKYC);
 
 // Route to verify OTP and complete process
-router.post('/verify-otp', authenticateToken, kycLimiter, kycController.verifyKYCOtp);
+router.post('/verify-otp', authenticateToken, kycLimiter, validateKYCVerifyOTP, kycController.verifyKYCOtp);
 
 // Check KYC status
 router.get('/status', authenticateToken, async (req, res) => {
@@ -65,7 +71,7 @@ router.get('/admin/verifications', authenticateToken, async (req, res) => {
 });
 
 // Manual KYC override (admin only)
-router.post('/admin/override', authenticateToken, async (req, res) => {
+router.post('/admin/override', authenticateToken, validateKYCOverride, async (req, res) => {
   const { user_id, status, risk_level, reason } = req.body;
 
   try {
@@ -117,7 +123,7 @@ router.post('/verify-wallet', authenticateToken, kycController.verifyWallet);
 
 // Get wallet status
 // GET /api/kyc/wallet-status/:wallet
-router.get('/wallet-status/:wallet', async (req, res) => {
+router.get('/wallet-status/:wallet', validateWalletAddress, async (req, res) => {
   try {
     const wallet = req.params.wallet;
     // Call controller handler directly with wallet parameter
