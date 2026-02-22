@@ -13,7 +13,8 @@ const Register = ({ onLogin }) => {
     password: '',
     confirmPassword: '',
     companyName: '',
-    walletAddress: ''
+    walletAddress: '',
+    role: 'seller'
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -108,7 +109,7 @@ const Register = ({ onLogin }) => {
             </div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1.5">
                     First name
@@ -158,6 +159,25 @@ const Register = ({ onLogin }) => {
                   value={formData.companyName}
                   onChange={handleChange}
                 />
+              </div>
+
+              <div>
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Account type
+                </label>
+                <select
+                  id="role"
+                  name="role"
+                  required
+                  className={inputClass}
+                  value={formData.role}
+                  onChange={handleChange}
+                >
+                  <option value="seller">Seller - Create invoices and receive payments</option>
+                  <option value="buyer">Buyer - Pay invoices and confirm delivery</option>
+                  <option value="investor">Investor - Purchase fractional invoice tokens</option>
+                  <option value="shipment">Shipper - Track and update shipment status</option>
+                </select>
               </div>
 
               <div>

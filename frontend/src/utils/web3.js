@@ -237,8 +237,7 @@ export async function approveStablecoin(stablecoinAddress, amount) {
 }
 
 export async function checkStablecoinAllowance(stablecoinAddress) {
-  const { address } = await connectWallet();
-  const { signer } = await connectWallet();
+  const { address, signer } = await connectWallet();
   const contract = new Contract(stablecoinAddress, ERC20Artifact.abi, signer);
   return await contract.allowance(address, contractAddresses.FinancingManager);
 }

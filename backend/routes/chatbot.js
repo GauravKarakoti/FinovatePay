@@ -3,6 +3,7 @@ const router = express.Router();
 const Groq = require('groq-sdk');
 const Invoice = require('../models/Invoice'); // <-- ADDED
 const { pool } = require('../config/database');   // <-- ADDED
+const { authenticateToken } = require('../middleware/auth'); // <-- ADDED
 
 const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY
@@ -90,7 +91,7 @@ const availableTools = {
     },
 };
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
     const { message, history = [] } = req.body;
     console.log("Received message:", message);
 

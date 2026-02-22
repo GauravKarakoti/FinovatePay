@@ -1,4 +1,4 @@
-const  pool  = require('../config/database');
+const { pool } = require('../config/database'); // Ensure correct destructuring
 
 const requireKYC = async (req, res, next) => {
   try {

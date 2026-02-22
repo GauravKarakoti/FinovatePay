@@ -9,17 +9,21 @@
     "deploy": "hardhat ignition deploy ./ignition/modules/Deploy.ts"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@nomicfoundation/hardhat-ignition": "^0.15.16",
     "@nomicfoundation/hardhat-ignition-ethers": "^0.15.17",
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@nomicfoundation/ignition-core": "^0.15.15",
-    "hardhat": "^2.26.3",
     "ethers": "^6.14.0",
+    "hardhat": "^2.26.3",
     "jest": "^30.2.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
     "dotenv": "^17.2.2",
+    "helmet": "^8.1.0",
     "sonner": "^2.0.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

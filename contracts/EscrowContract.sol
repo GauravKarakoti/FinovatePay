@@ -50,24 +50,12 @@ contract EscrowContract is
         address disputeResolver;
         uint256 createdAt;
         uint256 expiresAt;
-
-        // RWA Collateral
-        address rwaNftContract;
-        uint256 rwaTokenId;
-
-        // Dispute voting
-        uint256 snapshotArbitratorCount;
-        uint256 votesForSeller;
-        uint256 votesForBuyer;
-
-        // Early payment discount
-        uint256 discountRate;      // basis points
-        uint256 discountDeadline;
+        // --- NEW: RWA Collateral Link ---
+        address rwaNftContract; // Address of the ProduceTracking contract
+        uint256 rwaTokenId;     // The tokenId of the produce lot
+        uint256 feeAmount;      // Platform fee amount
     }
-
-    /*//////////////////////////////////////////////////////////////
-                                STORAGE
-    //////////////////////////////////////////////////////////////*/
+    
     mapping(bytes32 => Escrow) public escrows;
     mapping(bytes32 => mapping(address => bool)) public hasVoted;
 
@@ -75,32 +63,20 @@ contract EscrowContract is
     ArbitratorsRegistry public arbitratorsRegistry;
 
     address public admin;
-
-    /*//////////////////////////////////////////////////////////////
-                                EVENTS
-    //////////////////////////////////////////////////////////////*/
+    address public treasury;        // Platform treasury address for fee collection
+    uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
+    
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
-    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 snapshotArbitratorCount);
-    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool votedForSeller);
-    event DisputeResolved(
-        bytes32 indexed invoiceId,
-        bool sellerWins,
-        uint256 votesForSeller,
-        uint256 votesForBuyer
-    );
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
+    event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
+    event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
+    event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
 
-    /*//////////////////////////////////////////////////////////////
-                                MODIFIERS
-    //////////////////////////////////////////////////////////////*/
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
-        _;
-    }
-
-    modifier onlyArbitrator() {
-        require(arbitratorsRegistry.isArbitrator(_msgSender()), "Not arbitrator");
         _;
     }
 
@@ -108,6 +84,12 @@ contract EscrowContract is
         require(!complianceManager.isFrozen(account), "Account frozen");
         require(complianceManager.isKYCVerified(account), "KYC not verified");
         require(complianceManager.hasIdentity(account), "No identity SBT");
+        _;
+    }
+
+    modifier onlyArbitrator() {
+        require(address(arbitratorsRegistry) != address(0), "Registry not set");
+        require(arbitratorsRegistry.isArbitrator(_msgSender()), "Not arbitrator");
         _;
     }
 
@@ -124,7 +106,30 @@ contract EscrowContract is
     {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
-        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
+        treasury = msg.sender; // Default treasury to admin
+        feePercentage = 50;    // Default 0.5% fee (50 basis points)
+    }
+    
+    /**
+     * @notice Set the treasury address for fee collection
+     * @param _treasury New treasury address
+     */
+    function setTreasury(address _treasury) external onlyAdmin {
+        require(_treasury != address(0), "Treasury cannot be zero address");
+        address oldTreasury = treasury;
+        treasury = _treasury;
+        emit TreasuryUpdated(oldTreasury, _treasury);
+    }
+    
+    /**
+     * @notice Set the fee percentage in basis points
+     * @param _feePercentage Fee in basis points (e.g., 50 = 0.5%, 100 = 1%)
+     */
+    function setFeePercentage(uint256 _feePercentage) external onlyAdmin {
+        require(_feePercentage <= 1000, "Fee cannot exceed 10%"); // Max 10% fee
+        uint256 oldFee = feePercentage;
+        feePercentage = _feePercentage;
+        emit FeePercentageUpdated(oldFee, _feePercentage);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -139,23 +144,15 @@ contract EscrowContract is
         address _token,
         uint256 _duration,
         address _rwaNftContract,
-        uint256 _rwaTokenId,
-        uint256 _discountRate,
-        uint256 _discountDeadline
-    ) external onlyCompliant(_msgSender()) returns (bool) {
-        require(escrows[_invoiceId].seller == address(0), "Escrow exists");
-        require(_amount > 0, "Invalid amount");
-        require(_discountRate <= 10_000, "Invalid discount");
+        uint256 _rwaTokenId
+    ) external onlyAdmin returns (bool) {
+        require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
 
-        require(
-            _msgSender() == _seller || _msgSender() == admin,
-            "Only seller or admin"
-        );
+        // Calculate fee amount
+        uint256 calculatedFee = (_amount * feePercentage) / 10000; // Basis points calculation
 
-        if (_discountRate > 0) {
-            require(_discountDeadline > block.timestamp, "Bad deadline");
-        }
-
+        // --- NEW: Lock the Produce NFT as Collateral ---
+        // The seller must have approved the EscrowContract to spend this NFT beforehand.
         if (_rwaNftContract != address(0)) {
             IERC721(_rwaNftContract).transferFrom(
                 _seller,
@@ -179,11 +176,7 @@ contract EscrowContract is
             expiresAt: block.timestamp + _duration,
             rwaNftContract: _rwaNftContract,
             rwaTokenId: _rwaTokenId,
-            snapshotArbitratorCount: 0,
-            votesForSeller: 0,
-            votesForBuyer: 0,
-            discountRate: _discountRate,
-            discountDeadline: _discountDeadline
+            feeAmount: calculatedFee
         });
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
@@ -237,110 +230,74 @@ contract EscrowContract is
         }
     }
 
-    function raiseDispute(bytes32 _invoiceId) external {
-        Escrow storage escrow = escrows[_invoiceId];
+    function raiseDispute(bytes32 invoiceId) external {
+        Escrow storage e = escrows[invoiceId];
+
         require(
-            _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
+            _msgSender() == e.seller || _msgSender() == e.buyer,
             "Not party"
         );
-        require(!escrow.disputeRaised, "Already disputed");
+        require(e.status == EscrowStatus.Funded, "Not funded");
+        require(!e.disputeRaised, "Already disputed");
 
-        escrow.snapshotArbitratorCount = arbitratorsRegistry.arbitratorCount();
-        require(escrow.snapshotArbitratorCount > 0, "No arbitrators");
-        require(escrow.snapshotArbitratorCount % 2 != 0, "Arbitrator count must be odd");
+        uint256 arbitratorCount = arbitratorsRegistry.arbitratorCount();
+        require(arbitratorCount > 0, "No arbitrators");
+        require(arbitratorCount % 2 != 0, "Arbitrator count must be odd");
 
-        escrow.disputeRaised = true;
-        escrow.status = EscrowStatus.Disputed;
+        e.disputeRaised = true;
+        e.status = EscrowStatus.Disputed;
 
-        emit DisputeRaised(
-            _invoiceId,
-            _msgSender(),
-            escrow.snapshotArbitratorCount
-        );
+        // Initialize quorum-based voting
+        disputeVotings[invoiceId] = DisputeVoting({
+            snapshotArbitratorCount: arbitratorCount,
+            votesForBuyer: 0,
+            votesForSeller: 0,
+            resolved: false
+        });
+
+        emit DisputeRaised(invoiceId, _msgSender(), arbitratorCount);
     }
-
-    function voteOnDispute(bytes32 _invoiceId, bool _forSeller)
-        external
-        onlyArbitrator
-    {
+    
+    function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
         Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.disputeRaised, "No dispute");
-        require(!hasVoted[_invoiceId][_msgSender()], "Voted");
+        require(escrow.disputeRaised, "No dispute raised");
+        
+        escrow.disputeResolver = msg.sender;
+        IERC20 token = IERC20(escrow.token);
 
-        hasVoted[_invoiceId][_msgSender()] = true;
-
-        if (_forSeller) {
-            escrow.votesForSeller++;
+        if (_sellerWins) {
+            // Seller wins: Get paid. Buyer gets the goods (NFT).
+            require(token.transfer(escrow.seller, escrow.amount), "Transfer to seller failed");
+            
+            // Release NFT to Buyer (Ownership Transfer)
+            if (escrow.rwaNftContract != address(0)) {
+                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
+            }
         } else {
-            escrow.votesForBuyer++;
+            // Buyer wins: Get refund. Seller gets the goods (NFT) back.
+            require(token.transfer(escrow.buyer, escrow.amount), "Transfer to buyer failed");
+
+            // Return NFT to Seller
+            if (escrow.rwaNftContract != address(0)) {
+                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.seller, escrow.rwaTokenId); //
+            }
         }
-
-        emit ArbitratorVoted(_invoiceId, _msgSender(), _forSeller);
-
-        uint256 quorum = (escrow.snapshotArbitratorCount / 2) + 1;
-
-        if (escrow.votesForSeller >= quorum) {
-            _resolveDispute(_invoiceId, true);
-        } else if (escrow.votesForBuyer >= quorum) {
-            _resolveDispute(_invoiceId, false);
-        }
-    }
-
-    function _resolveDispute(bytes32 _invoiceId, bool sellerWins)
-        internal
-        nonReentrant
-    {
-        Escrow storage escrow = escrows[_invoiceId];
-        escrow.disputeRaised = false;
-
-        emit DisputeResolved(
-            _invoiceId,
-            sellerWins,
-            escrow.votesForSeller,
-            escrow.votesForBuyer
-        );
-
-        if (sellerWins) {
-            _payout(escrow.payee, escrow.token, escrow.amount);
-            _transferNFT(address(this), escrow.buyer, escrow);
-        } else {
-            _payout(escrow.buyer, escrow.token, escrow.amount);
-            _transferNFT(address(this), escrow.seller, escrow);
-        }
-
-        escrow.status = EscrowStatus.Released;
-    }
-
-    function expireEscrow(bytes32 _invoiceId) external nonReentrant {
-        Escrow storage escrow = escrows[_invoiceId];
-        require(block.timestamp >= escrow.expiresAt, "Not expired");
-
-        if (escrow.buyerConfirmed) {
-            _payout(escrow.buyer, escrow.token, escrow.amount);
-        }
-
-        _transferNFT(address(this), escrow.seller, escrow);
-        delete escrows[_invoiceId];
-    }
-
-    function setPayee(bytes32 _invoiceId, address _newPayee) external {
-        Escrow storage escrow = escrows[_invoiceId];
-
-        _payout(escrow.payee, escrow.token, escrow.amount); 
-        _transferNFT(address(this), escrow.buyer, escrow);
-
-        require(_msgSender() == escrow.seller, "Only seller can set payee");
-        require(escrow.status == EscrowStatus.Created || escrow.status == EscrowStatus.Funded, "Invalid escrow status");
-        escrow.payee = _newPayee;
+        
+        emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
     }
 
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
-
-        _payout(escrow.seller, escrow.token, escrow.amount);
-        _transferNFT(address(this), escrow.buyer, escrow);
-
-        escrow.status = EscrowStatus.Released;
+        IERC20 token = IERC20(escrow.token);
+        
+        // Transfer funds to Seller
+        require(token.transfer(escrow.seller, escrow.amount), "Transfer failed");
+        
+        // --- NEW: Release RWA NFT to Buyer ---
+        if (escrow.rwaNftContract != address(0)) {
+            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
+        }
+        
         emit EscrowReleased(_invoiceId, escrow.amount);
     }
 
@@ -424,5 +381,197 @@ contract EscrowContract is
         bytes calldata
     ) external pure override returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    ARBITRATOR VOTING FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Set the arbitrators registry address
+    /// @param _registry The address of the ArbitratorsRegistry contract
+    function setArbitratorsRegistry(address _registry) external onlyAdmin {
+        require(_registry != address(0), "Invalid registry");
+        arbitratorsRegistry = ArbitratorsRegistry(_registry);
+    }
+
+    /// @notice Update the quorum percentage
+    /// @param _percentage The new quorum percentage (e.g., 60 for 60%)
+    function updateQuorumPercentage(uint256 _percentage) external onlyAdmin {
+        require(_percentage > 0 && _percentage <= 100, "Invalid percentage");
+        quorumPercentage = _percentage;
+    }
+
+    /// @notice Initialize arbitration voting for a dispute (snapshots arbitrator count)
+    /// @dev Called when a dispute is raised to snapshot the current arbitrator count
+    /// @param invoiceId The escrow invoice ID
+    function startArbitratorVoting(bytes32 invoiceId) internal {
+        Escrow storage e = escrows[invoiceId];
+        require(e.status == EscrowStatus.Disputed, "Not disputed");
+        require(address(arbitratorsRegistry) != address(0), "Registry not set");
+
+        // Snapshot the current arbitrator count
+        uint256 currentCount = arbitratorsRegistry.arbitratorCount();
+        require(currentCount > 0, "No arbitrators");
+
+        disputeVotings[invoiceId] = DisputeVoting({
+            snapshotArbitratorCount: currentCount,
+            votesForBuyer: 0,
+            votesForSeller: 0,
+            resolved: false
+        });
+    }
+
+    function voteOnDispute(bytes32 invoiceId, bool voteForBuyer)
+        external
+        whenNotPaused
+        onlyArbitrator
+        nonReentrant
+    {
+        Escrow storage e = escrows[invoiceId];
+        require(e.status == EscrowStatus.Disputed, "Not disputed");
+
+        DisputeVoting storage voting = disputeVotings[invoiceId];
+        require(!voting.resolved, "Already resolved");
+        require(!hasVoted[invoiceId][_msgSender()], "Already voted");
+
+        // Handle arbitrator set shrink (acceptance criteria)
+        uint256 liveCount = arbitratorsRegistry.arbitratorCount();
+        if (liveCount < voting.snapshotArbitratorCount) {
+            voting.snapshotArbitratorCount = liveCount;
+        }
+
+        hasVoted[invoiceId][_msgSender()] = true;
+
+        if (voteForBuyer) {
+            voting.votesForBuyer += 1;
+        } else {
+            voting.votesForSeller += 1;
+        }
+
+        emit ArbitratorVoted(invoiceId, _msgSender(), !voteForBuyer);
+
+        _checkAndResolveVoting(invoiceId);
+    }
+
+    function _checkAndResolveVoting(bytes32 invoiceId) internal {
+        DisputeVoting storage voting = disputeVotings[invoiceId];
+        if (voting.resolved) return;
+
+        uint256 quorumRequired =
+            (voting.snapshotArbitratorCount * quorumPercentage) / 100;
+
+        if (quorumRequired == 0) quorumRequired = 1;
+
+        uint256 totalVotes =
+            voting.votesForBuyer + voting.votesForSeller;
+
+        if (totalVotes >= quorumRequired) {
+            bool sellerWins =
+                voting.votesForSeller > voting.votesForBuyer;
+
+            voting.resolved = true;
+            _resolveEscrow(invoiceId, sellerWins);
+
+            emit DisputeResolved(
+                invoiceId,
+                sellerWins,
+                voting.votesForSeller,
+                voting.votesForBuyer
+            );
+        }
+    }
+
+    /// @notice Get current voting status for a dispute
+    /// @param invoiceId The escrow invoice ID
+    /// @return snapshotCount The snapshot arbitrator count
+    /// @return buyerVotes Number of votes for buyer
+    /// @return sellerVotes Number of votes for seller
+    /// @return resolved Whether the dispute is resolved
+    function getVotingStatus(bytes32 invoiceId)
+        external
+        view
+        returns (
+            uint256 snapshotCount,
+            uint256 buyerVotes,
+            uint256 sellerVotes,
+            bool resolved
+        )
+    {
+        DisputeVoting storage voting = disputeVotings[invoiceId];
+        return (
+            voting.snapshotArbitratorCount,
+            voting.votesForBuyer,
+            voting.votesForSeller,
+            voting.resolved
+        );
+    }
+
+    /// @notice Safe Escape - Admin function to resolve stuck disputes
+    /// @dev Used when quorum is mathematically impossible (e.g., arbitrators fired)
+    /// @param invoiceId The escrow invoice ID
+    /// @param sellerWins Whether the seller wins
+    function safeEscape(bytes32 invoiceId, bool sellerWins)
+        external
+        onlyAdmin
+        nonReentrant
+    {
+        Escrow storage e = escrows[invoiceId];
+        require(e.status == EscrowStatus.Disputed, "Not disputed");
+
+        DisputeVoting storage voting = disputeVotings[invoiceId];
+        require(!voting.resolved, "Already resolved");
+
+        // Verify that it's actually stuck (no quorum possible with live arbitrators)
+        uint256 liveCount = arbitratorsRegistry.arbitratorCount();
+        uint256 quorumRequired = (voting.snapshotArbitratorCount * quorumPercentage) / 100;
+
+        // Only allow if live count is less than needed for quorum
+        require(liveCount < quorumRequired, "Quorum still possible");
+
+        voting.resolved = true;
+        _resolveEscrow(invoiceId, sellerWins);
+        emit SafeEscape(invoiceId, _msgSender());
+    }
+
+    /// @notice Internal function to resolve escrow after voting
+    /// @param invoiceId The escrow invoice ID
+    /// @param sellerWins Whether the seller wins
+    function _resolveEscrow(bytes32 invoiceId, bool sellerWins) internal {
+        Escrow storage e = escrows[invoiceId];
+        require(e.status == EscrowStatus.Disputed, "Not disputed");
+
+        // EFFECTS
+        e.disputeResolver = _msgSender();
+        e.status = EscrowStatus.Released;
+
+        address seller = e.seller;
+        address buyer = e.buyer;
+        uint256 amount = e.amount;
+        uint256 fee = e.feeAmount;
+        address token = e.token;
+        address nft = e.rwaNftContract;
+        uint256 nftId = e.rwaTokenId;
+
+        emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
+
+        // INTERACTIONS
+        // Transfer fee to treasury first
+        if (fee > 0) {
+            IERC20(token).transfer(treasury, fee);
+            emit FeeCollected(invoiceId, fee);
+        }
+
+        // Transfer remaining amount to winner
+        IERC20(token).transfer(sellerWins ? seller : buyer, amount);
+
+        if (nft != address(0)) {
+            IERC721(nft).transferFrom(
+                address(this),
+                sellerWins ? buyer : seller,
+                nftId
+            );
+        }
+
+        delete escrows[invoiceId];
     }
 }
