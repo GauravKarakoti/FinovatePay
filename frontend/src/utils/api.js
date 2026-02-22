@@ -345,4 +345,21 @@ export const getFiatRampStatus = (transactionId) => {
   return api.get(`/fiat-ramp/status/${transactionId}`);
 };
 
+// --- Analytics API ---
+export const getAnalyticsOverview = () => {
+  return api.get('/analytics/overview');
+};
+
+export const getPaymentAnalytics = (page = 1, limit = 20) => {
+  return api.get('/analytics/payments', { params: { page, limit } });
+};
+
+export const getFinancingAnalytics = () => {
+  return api.get('/analytics/financing');
+};
+
+export const getRiskScore = (invoiceId) => {
+  return api.get(`/analytics/risk/${invoiceId}`);
+};
+
 export default api;

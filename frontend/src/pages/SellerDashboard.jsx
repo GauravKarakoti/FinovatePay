@@ -33,6 +33,7 @@ import CreateProduceLot from '../components/Produce/CreateProduceLot';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
+import AnalyticsPage from '../pages/AnalyticsPage';
 
 // ------------------ HELPER COMPONENTS ------------------
 
@@ -615,7 +616,8 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       case 'produce': return <ProduceTab />;
       case 'payments': return <PaymentsTab />;
       case 'escrow': return <EscrowTab />;
-      case 'financing': return <FinancingTabComponent />;
+case 'financing': return <FinancingTabComponent />;
+      case 'analytics': return <AnalyticsPage />;
       default: return <OverviewTab />;
     }
   };

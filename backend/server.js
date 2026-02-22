@@ -101,6 +101,10 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/financing', require('./routes/financing'));
 app.use('/api/investor', require('./routes/investor'));
 
+/* ---------------- ANALYTICS ---------------- */
+
+app.use('/api/analytics', require('./routes/analytics'));
+
 /* ---------------- FIAT ON-RAMP ---------------- */
 
 app.use('/api/fiat-ramp', require('./routes/fiatRamp'));
