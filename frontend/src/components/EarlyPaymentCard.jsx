@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { api } from '../utils/api';
+import { toast } from 'sonner';
 
 const EarlyPaymentCard = ({ invoiceId }) => {
   const [offer, setOffer] = useState(null);
@@ -9,7 +10,7 @@ const EarlyPaymentCard = ({ invoiceId }) => {
     const fetchOffer = async () => {
       try {
         // Adjust URL to match your backend port
-        const res = await axios.get(`http://localhost:5000/api/invoices/${invoiceId}/offer`);
+        const res = await api.get(`/invoices/${invoiceId}/offer`);
         setOffer(res.data);
       } catch (err) {
         console.error("Error fetching offer", err);
@@ -22,11 +23,11 @@ const EarlyPaymentCard = ({ invoiceId }) => {
 
   const handleAccept = async () => {
     try {
-      await axios.post(`http://localhost:5000/api/invoices/${invoiceId}/settle-early`);
-      alert("✅ Offer Accepted! Payment is being processed.");
+      await api.post(`/invoices/${invoiceId}/settle-early`);
+      toast.success("Offer Accepted! Payment is being processed.");
       window.location.reload(); 
     } catch (err) {
-      alert("❌ Failed to process request.");
+      // Error is already handled by api interceptor
     }
   };
 
