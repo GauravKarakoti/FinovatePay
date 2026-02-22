@@ -4,6 +4,8 @@ exports.createInvoice = async (req, res) => {
     const client = await pool.connect();
 
     try {
+        await client.query('BEGIN');
+
         const {
             quotation_id,
             // On-chain data passed from frontend
@@ -16,16 +18,14 @@ exports.createInvoice = async (req, res) => {
 
         // Basic Input Validation
         if (!quotation_id || !invoice_id || !contract_address) {
-            return res.status(400).json({ error: 'Missing quotation_id or required on-chain data.' });
+            throw new Error('Missing quotation_id or required on-chain data.');
         }
-
-        await client.query('BEGIN');
 
         // 1. Fetch and lock the quotation
         const quotationQuery = `SELECT * FROM quotations WHERE id = $1 FOR UPDATE`;
         const quotationResult = await client.query(quotationQuery, [quotation_id]);
 
-        if (quotationResult.rows.length === 0) {
+        if (quotationResult.rowCount === 0) {
             throw new Error('Quotation not found');
         }
         
@@ -55,7 +55,7 @@ exports.createInvoice = async (req, res) => {
             const lotQuery = 'SELECT current_quantity FROM produce_lots WHERE lot_id = $1 FOR UPDATE';
             const lotResult = await client.query(lotQuery, [quotation.lot_id]);
 
-            if (lotResult.rows.length === 0) {
+            if (lotResult.rowCount === 0) {
                 throw new Error('Produce lot not found.');
             }
             
@@ -129,6 +129,7 @@ exports.createInvoice = async (req, res) => {
         if (error.message === 'Quotation not fully approved') statusCode = 400;
         if (error.message.includes('Not authorized')) statusCode = 403;
         if (error.message.includes('Insufficient quantity')) statusCode = 400;
+        if (error.message === 'Missing quotation_id or required on-chain data.') statusCode = 400;
 
         return res.status(statusCode).json({ error: error.message || 'Internal server error.' });
     } finally {
