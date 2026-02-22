@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useWeb3ModalAccount } from '@web3modal/ethers/react';
+import { useAppKitAccount } from '@reown/appkit/react';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -137,7 +137,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { resetStats } = useStatsActions();
   
-  const { isConnected } = useWeb3ModalAccount();
+  const { address, isConnected } = useAppKitAccount();
 
   /* -------------------- Effects -------------------- */
   useEffect(() => {
