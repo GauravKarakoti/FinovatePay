@@ -55,8 +55,16 @@ contract EscrowContract is
         uint256 rwaTokenId;     // The tokenId of the produce lot
         uint256 feeAmount;      // Platform fee amount
     }
+
+    struct DisputeVoting {
+        uint256 snapshotArbitratorCount;
+        uint256 votesForBuyer;
+        uint256 votesForSeller;
+        bool resolved;
+    }
     
     mapping(bytes32 => Escrow) public escrows;
+    mapping(bytes32 => DisputeVoting) public disputeVotings;
     mapping(bytes32 => mapping(address => bool)) public hasVoted;
 
     ComplianceManager public complianceManager;
@@ -65,12 +73,16 @@ contract EscrowContract is
     address public admin;
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
+    uint256 public quorumPercentage;
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
-    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 snapshotArbitratorCount);
+    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool votedForSeller);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event DisputeOutcome(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer);
+    event SafeEscape(bytes32 indexed invoiceId, address resolver);
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
@@ -106,6 +118,7 @@ contract EscrowContract is
     {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
         treasury = msg.sender; // Default treasury to admin
         feePercentage = 50;    // Default 0.5% fee (50 basis points)
     }
@@ -306,6 +319,8 @@ contract EscrowContract is
         view
         returns (uint256)
     {
+        /*
+        // Discount logic commented out because discountRate is not in struct yet
         if (
             escrow.discountRate > 0 &&
             block.timestamp <= escrow.discountDeadline
@@ -314,6 +329,7 @@ contract EscrowContract is
                 (escrow.amount * escrow.discountRate) / 10_000;
             return escrow.amount - discount;
         }
+        */
         return escrow.amount;
     }
 
@@ -435,10 +451,10 @@ contract EscrowContract is
         require(!hasVoted[invoiceId][_msgSender()], "Already voted");
 
         // Handle arbitrator set shrink (acceptance criteria)
-        uint256 liveCount = arbitratorsRegistry.arbitratorCount();
-        if (liveCount < voting.snapshotArbitratorCount) {
-            voting.snapshotArbitratorCount = liveCount;
-        }
+        // uint256 liveCount = arbitratorsRegistry.arbitratorCount();
+        // if (liveCount < voting.snapshotArbitratorCount) {
+        //    voting.snapshotArbitratorCount = liveCount;
+        // }
 
         hasVoted[invoiceId][_msgSender()] = true;
 
@@ -457,22 +473,21 @@ contract EscrowContract is
         DisputeVoting storage voting = disputeVotings[invoiceId];
         if (voting.resolved) return;
 
-        uint256 quorumRequired =
-            (voting.snapshotArbitratorCount * quorumPercentage) / 100;
-
-        if (quorumRequired == 0) quorumRequired = 1;
+        // Use simple majority: (N / 2) + 1
+        // This ensures no ties for odd N
+        uint256 quorumRequired = (voting.snapshotArbitratorCount / 2) + 1;
 
         uint256 totalVotes =
             voting.votesForBuyer + voting.votesForSeller;
 
-        if (totalVotes >= quorumRequired) {
-            bool sellerWins =
-                voting.votesForSeller > voting.votesForBuyer;
+        // Check if either side has reached the required votes
+        if (voting.votesForSeller >= quorumRequired || voting.votesForBuyer >= quorumRequired) {
+             bool sellerWins = voting.votesForSeller >= quorumRequired;
 
             voting.resolved = true;
             _resolveEscrow(invoiceId, sellerWins);
 
-            emit DisputeResolved(
+            emit DisputeOutcome(
                 invoiceId,
                 sellerWins,
                 voting.votesForSeller,
@@ -484,9 +499,33 @@ contract EscrowContract is
     /// @notice Get current voting status for a dispute
     /// @param invoiceId The escrow invoice ID
     /// @return snapshotCount The snapshot arbitrator count
-    /// @return buyerVotes Number of votes for buyer
-    /// @return sellerVotes Number of votes for seller
+    /// @return requiredVotes The number of votes required for quorum
+    /// @return votesForBuyer Number of votes for buyer
+    /// @return votesForSeller Number of votes for seller
     /// @return resolved Whether the dispute is resolved
+    function getDisputeVotingStatus(bytes32 invoiceId)
+        external
+        view
+        returns (
+            uint256 snapshotCount,
+            uint256 requiredVotes,
+            uint256 votesForBuyer,
+            uint256 votesForSeller,
+            bool resolved
+        )
+    {
+        DisputeVoting storage voting = disputeVotings[invoiceId];
+        uint256 rv = (voting.snapshotArbitratorCount / 2) + 1;
+        return (
+            voting.snapshotArbitratorCount,
+            rv,
+            voting.votesForBuyer,
+            voting.votesForSeller,
+            voting.resolved
+        );
+    }
+
+    /// @notice Get current voting status for a dispute (legacy)
     function getVotingStatus(bytes32 invoiceId)
         external
         view
@@ -556,13 +595,15 @@ contract EscrowContract is
 
         // INTERACTIONS
         // Transfer fee to treasury first
+        uint256 payoutAmount = amount;
         if (fee > 0) {
             IERC20(token).transfer(treasury, fee);
             emit FeeCollected(invoiceId, fee);
+            payoutAmount -= fee;
         }
 
         // Transfer remaining amount to winner
-        IERC20(token).transfer(sellerWins ? seller : buyer, amount);
+        IERC20(token).transfer(sellerWins ? seller : buyer, payoutAmount);
 
         if (nft != address(0)) {
             IERC721(nft).transferFrom(
