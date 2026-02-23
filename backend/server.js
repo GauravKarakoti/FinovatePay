@@ -23,6 +23,9 @@ const startComplianceListeners = require('./listeners/complianceListener');
 const app = express();
 const server = http.createServer(app);
 
+// Import graceful shutdown utility
+const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
+
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
 const io = socketIo(server, {
@@ -201,6 +204,9 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+// Set up graceful shutdown handlers
+setupGracefulShutdown(server, io);
 
 listenForTokenization();
 startSyncWorker();
