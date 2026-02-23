@@ -1,163 +1,218 @@
-const express = require('express');
-const cors = require('cors');
-const http = require('http');
-const socketIo = require('socket.io');
-require('dotenv').config();
-const chatbotRoutes = require('./routes/chatbot');
-const shipmentRoutes = require('./routes/shipment');
-const errorHandler = require('./middleware/errorHandler');
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
+const http = require("http");
+const path = require("path");
+const socketIo = require("socket.io");
+require("dotenv").config();
+
+const chatbotRoutes = require("./routes/chatbot");
+const shipmentRoutes = require("./routes/shipment");
+const {
+  socketAuthMiddleware,
+  verifyInvoiceAccess,
+  verifyMarketplaceAccess,
+} = require("./middleware/socketAuth");
+const { globalLimiter } = require("./middleware/rateLimiter");
+const errorHandler = require("./middleware/errorHandler");
+const notificationRoutes = require("./routes/notifications");
+
+const listenForTokenization = require("./listeners/contractListener");
+const startComplianceListeners = require("./listeners/complianceListener");
+const testDbConnection = require("./utils/testDbConnection");
+const { startSyncWorker } = require("./services/escrowSyncService");
 
 const app = express();
 const server = http.createServer(app);
+
+/* ---------------- SOCKET.IO SETUP ---------------- */
+
 const io = socketIo(server, {
   cors: {
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
-const allowedOrigins = [
-    'https://finovate-pay.vercel.app', 
-    'http://localhost:5173'
-];
+/* ---------------- CORS CONFIG ---------------- */
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) =>
+      o.trim().replace(/\/$/, "")
+    )
+  : ["http://localhost:5173"];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    if (!origin && process.env.NODE_ENV !== "production") {
+      return callback(null, true);
     }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
   },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   credentials: true,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 204,
 };
 
-// --- MIDDLEWARE SETUP ---
-
-// This single middleware at the top will handle all CORS and preflight requests
 app.use(cors(corsOptions));
+app.use(helmet());
+app.use(cookieParser());
 app.use(express.json());
 
-// --- DATABASE CONNECTION ---
-const { pool, getConnection } = require('./config/database');
-const listenForTokenization = require('./listeners/contractListener');
+/* ---------------- RATE LIMITING ---------------- */
 
-/**
- * ENHANCED DATABASE CONNECTION TEST WITH EXPONENTIAL BACKOFF
- * Implements robust retry logic with exponential backoff and jitter
- */
-const testDbConnection = async () => {
-  const maxRetries = parseInt(process.env.DB_MAX_RETRIES) || 5;
-  const baseDelay = parseInt(process.env.DB_RETRY_BASE_DELAY) || 1000;
-  const maxDelay = parseInt(process.env.DB_RETRY_MAX_DELAY) || 30000;
-  
-  let retries = 0;
-  
-  while (retries < maxRetries) {
-    try {
-      console.log(`Attempting database connection (${retries + 1}/${maxRetries})...`);
-      
-      const client = await getConnection();
-      await client.query('SELECT 1 as test');
-      client.release();
-      
-      console.log('Database connection established successfully');
-      console.log('Initial database pool status:', {
-        totalCount: pool.totalCount,
-        idleCount: pool.idleCount,
-        waitingCount: pool.waitingCount
-      });
-      
-      return true;
-      
-    } catch (err) {
-      retries++;
-      
-      console.error(`❌ Database connection attempt ${retries} failed:`, {
-        error: err.message,
-        code: err.code,
-        attempt: `${retries}/${maxRetries}`,
-        timestamp: new Date().toISOString()
-      });
-      
-      if (retries >= maxRetries) {
-        console.error('Failed to connect to database after maximum retries.');
-        console.error('Server will continue but database features may not work.');
-        console.error('Please check your database configuration and network connectivity.');
-        return false;
-      }
-      
-      // Calculate exponential backoff delay with jitter
-      const exponentialDelay = Math.min(baseDelay * Math.pow(2, retries - 1), maxDelay);
-      const jitter = Math.random() * 0.1 * exponentialDelay;
-      const delay = exponentialDelay + jitter;
-      
-      console.log(`Retrying database connection in ${Math.round(delay)}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  
-  return false;
-};
+app.use("/api/", globalLimiter);
 
-// Initialize database connection
+/* ---------------- DATABASE ---------------- */
+
 testDbConnection();
 
+/* ---------------- STATIC FILES ---------------- */
 
-// --- ROUTES ---
-app.use('/api/health', require('./routes/health'));
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/invoices', require('./routes/invoice'));
-app.use('/api/payments', require('./routes/payment'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/kyc', require('./routes/kyc'));
-app.use('/api/produce', require('./routes/produce'));
-app.use('/api/quotations', require('./routes/quotation'));
-app.use('/api/market', require('./routes/market'));
-app.use('/api/chatbot', chatbotRoutes);
-app.use('/api/shipment', shipmentRoutes);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// --- V2 FINANCING ROUTES ---
-// NOTE: You will need to create 'routes/financing.js' and 'routes/investor.js'
-app.use('/api/financing', require('./routes/financing'));
-app.use('/api/investor', require('./routes/investor'));
+/* ---------------- API ROUTES ---------------- */
 
+app.use("/api/health", require("./routes/health"));
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/invoices", require("./routes/invoice"));
+app.use("/api/payments", require("./routes/payment"));
+app.use("/api/admin", require("./routes/admin"));
+app.use("/api/kyc", require("./routes/kyc"));
+app.use("/api/produce", require("./routes/produce"));
+app.use("/api/quotations", require("./routes/quotation"));
+app.use("/api/market", require("./routes/market"));
+app.use("/api/dispute", require("./routes/dispute"));
+app.use("/api/relayer", require("./routes/relayer"));
+app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/shipment", shipmentRoutes);
+app.use("/api/meta-tx", require("./routes/metaTransaction"));
+app.use("/api/notifications", notificationRoutes);
 
-// Socket.io, error handlers, and server.listen call
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
-  socket.on('join-invoice', (invoiceId) => {
-    socket.join(`invoice-${invoiceId}`);
+/* ---------------- V2 FINANCING ---------------- */
+
+app.use("/api/financing", require("./routes/financing"));
+app.use("/api/investor", require("./routes/investor"));
+
+/* ---------------- FIAT ON-RAMP ---------------- */
+
+app.use("/api/fiat-ramp", require("./routes/fiatRamp"));
+
+/* ---------------- SOCKET AUTH ---------------- */
+
+io.use(socketAuthMiddleware);
+
+io.on("connection", (socket) => {
+  console.log(
+    `User connected: ${socket.id} | User: ${socket.user?.id} | Role: ${socket.user?.role}`
+  );
+
+  socket.on("join-invoice", async (invoiceId) => {
+    try {
+      const isAuthorized = await verifyInvoiceAccess(
+        socket.user.id,
+        socket.user.role,
+        socket.user.wallet_address,
+        invoiceId
+      );
+
+      if (!isAuthorized) {
+        socket.emit("error", {
+          message: "Not authorized to access this invoice",
+          code: "UNAUTHORIZED_INVOICE_ACCESS",
+        });
+        return;
+      }
+
+      socket.join(`invoice-${invoiceId}`);
+      socket.emit("joined-invoice", { invoiceId, success: true });
+
+      console.log(
+        `User ${socket.user.id} joined invoice room ${invoiceId}`
+      );
+    } catch (err) {
+      console.error("join-invoice error:", err);
+      socket.emit("error", {
+        message: "Failed to join invoice room",
+        code: "JOIN_INVOICE_ERROR",
+      });
+    }
   });
 
-  // Room for investors to receive marketplace updates
-  socket.on('join-marketplace', () => {
-    socket.join('marketplace');
+  socket.on("join-marketplace", () => {
+    try {
+      const isAuthorized = verifyMarketplaceAccess(socket.user);
+
+      if (!isAuthorized) {
+        socket.emit("error", {
+          message: "Investor role required",
+          code: "UNAUTHORIZED_MARKETPLACE_ACCESS",
+        });
+        return;
+      }
+
+      socket.join("marketplace");
+      socket.emit("joined-marketplace", { success: true });
+
+      console.log(`User ${socket.user.id} joined marketplace`);
+    } catch (err) {
+      console.error("join-marketplace error:", err);
+      socket.emit("error", {
+        message: "Failed to join marketplace",
+        code: "JOIN_MARKETPLACE_ERROR",
+      });
+    }
   });
-  
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+
+  socket.on("disconnect", () => {
+    console.log(`User disconnected: ${socket.id}`);
+  });
+
+  socket.on("error", (err) => {
+    console.error(`Socket error (${socket.user?.id}):`, err);
   });
 });
 
-app.set('io', io);
+app.set("io", io);
+
+/* ---------------- 404 HANDLER ---------------- */
 
 app.use((req, res, next) => {
-  const error = new Error('Route not found');
+  const error = new Error("Route not found");
   error.statusCode = 404;
   next(error);
 });
 
+/* ---------------- ERROR HANDLER ---------------- */
+
 app.use(errorHandler);
 
+/* ---------------- SERVER START ---------------- */
+
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
 
-listenForTokenization()
+/* ---------------- BACKGROUND WORKERS ---------------- */
+
+listenForTokenization();
+startSyncWorker();
+
+try {
+  startComplianceListeners();
+} catch (err) {
+  console.error(
+    "[server] Compliance listeners failed:",
+    err?.message || err
+  );
+}
 
 module.exports = app;

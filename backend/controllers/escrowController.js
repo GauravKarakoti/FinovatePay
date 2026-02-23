@@ -14,6 +14,9 @@ const uuidToBytes32 = (uuid) => {
 exports.releaseEscrow = async (req, res, next) => {
   try {
     const { invoiceId } = req.body;
+
+    const io = req.app.get("io"); // ⭐ ADD THIS
+
     const signer = getSigner();
     const escrowContract = new ethers.Contract(
       contractAddresses.escrowContract,
@@ -21,7 +24,6 @@ exports.releaseEscrow = async (req, res, next) => {
       signer
     );
 
-    // FIX: Convert the UUID string to bytes32
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     const tx = await escrowContract.confirmRelease(bytes32InvoiceId);
@@ -32,7 +34,15 @@ exports.releaseEscrow = async (req, res, next) => {
       ['released', tx.hash, invoiceId]
     );
 
+    // ⭐ REAL-TIME EVENT
+    io.to(`invoice-${invoiceId}`).emit("escrow:released", {
+      invoiceId,
+      txHash: tx.hash,
+      status: "released"
+    });
+
     res.json({ success: true, txHash: tx.hash });
+
   } catch (error) {
     next(error);
   }
@@ -41,6 +51,9 @@ exports.releaseEscrow = async (req, res, next) => {
 exports.raiseDispute = async (req, res, next) => {
   try {
     const { invoiceId, reason } = req.body;
+
+    const io = req.app.get("io"); // ⭐ ADD THIS
+
     const signer = getSigner();
     const escrowContract = new ethers.Contract(
       contractAddresses.escrowContract,
@@ -48,7 +61,6 @@ exports.raiseDispute = async (req, res, next) => {
       signer
     );
 
-    // FIX: Convert the UUID string to bytes32
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     const tx = await escrowContract.raiseDispute(bytes32InvoiceId);
@@ -59,7 +71,16 @@ exports.raiseDispute = async (req, res, next) => {
       ['disputed', reason, tx.hash, invoiceId]
     );
 
+    // ⭐ REAL-TIME EVENT
+    io.to(`invoice-${invoiceId}`).emit("escrow:dispute", {
+      invoiceId,
+      reason,
+      txHash: tx.hash,
+      status: "disputed"
+    });
+
     res.json({ success: true, txHash: tx.hash });
+
   } catch (error) {
     next(error);
   }

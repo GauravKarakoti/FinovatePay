@@ -4,35 +4,52 @@
   "description": "",
   "main": "server.js",
   "scripts": {
+    "test": "jest",
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test:backend": "jest",
+    "test:manual": "node test/manual-event-sync-test.js",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
     "migrate:db": "node scripts/migrate-db.js",
-    "seed:db": "node scripts/seed-db.js"
+    "seed:db": "node scripts/seed-db.js",
+    "build": "docker build -t backend-prod -f Dockerfile .."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@moonpay/moonpay-js": "^0.7.6",
     "@truffle/hdwallet-provider": "^2.1.15",
     "axios": "^1.11.0",
-    "bcryptjs": "^3.0.2",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.2",
+    "dotenv": "^17.2.4",
     "ethers": "^6.15.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.1",
     "groq-sdk": "^0.33.0",
+    "handlebars": "^4.7.8",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3",
+    "mailersend": "^2.6.0",
+    "multer": "^2.0.2",
+    "nodemon": "^3.1.10",
+    "pg": "^8.18.0",
     "socket.io": "^4.8.1",
     "sonner": "^2.0.7",
     "stripe": "^20.0.0",
-    "uuid": "^12.0.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "chai": "^4.3.10",
+    "jest": "^30.2.0",
+    "mocha": "^10.2.0",
+    "supertest": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

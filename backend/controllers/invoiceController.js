@@ -136,3 +136,148 @@ exports.createInvoice = async (req, res, next) => {
         client.release();
     }
 };
+
+/*//////////////////////////////////////////////////////////////
+                GET EARLY PAYMENT OFFER
+//////////////////////////////////////////////////////////////*/
+exports.getEarlyPaymentOffer = async (req, res) => {
+  try {
+    const { invoiceId } = req.params;
+
+    const result = await pool.query(
+      'SELECT amount, annual_apr, due_date FROM invoices WHERE invoice_id = $1',
+      [invoiceId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const invoice = result.rows[0];
+    const amount = Number(invoice.amount);
+    const apr = Number(invoice.annual_apr || 18.0) / 100;
+
+    const today = new Date();
+    const dueDate = new Date(invoice.due_date);
+    const daysRemaining = Math.ceil(
+      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysRemaining <= 0) {
+      return res.json({
+        eligible: false,
+        message: 'Invoice is due or overdue'
+      });
+    }
+
+    const discountAmount = (amount * apr * daysRemaining) / 365;
+    const offerAmount = amount - discountAmount;
+
+    return res.json({
+      eligible: true,
+      originalAmount: amount,
+      discountAmount: discountAmount.toFixed(2),
+      offerAmount: offerAmount.toFixed(2),
+      daysRemaining,
+      apr: (apr * 100).toFixed(2)
+    });
+
+  } catch (error) {
+    console.error('Early payment offer error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+exports.settleInvoiceEarly = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { invoiceId } = req.params;
+    const { tx_hash } = req.body; // Usually passed from the frontend after the blockchain tx succeeds
+
+    await client.query('BEGIN');
+
+    /*----------------------------------------------------------
+      1. Fetch & lock the invoice
+    ----------------------------------------------------------*/
+    const result = await client.query(
+      `SELECT * FROM invoices 
+       WHERE invoice_id = $1 
+       FOR UPDATE`,
+      [invoiceId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('Invoice not found');
+    }
+
+    const invoice = result.rows[0];
+
+    /*----------------------------------------------------------
+      2. Authorization & Status Check
+    ----------------------------------------------------------*/
+    // Ensure the user owns this invoice (if they are a buyer)
+    if (req.user.role === 'buyer' && invoice.buyer_address !== req.user.wallet_address) {
+      throw new Error('Not authorized to settle this invoice');
+    }
+
+    // Ensure it's not already paid/settled
+    if (['settled', 'paid', 'completed'].includes(invoice.escrow_status)) {
+      throw new Error('Invoice is already settled or paid');
+    }
+
+    /*----------------------------------------------------------
+      3. Eligibility Check & Calculations
+    ----------------------------------------------------------*/
+    const today = new Date();
+    const dueDate = new Date(invoice.due_date);
+    const daysRemaining = Math.ceil(
+      (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (daysRemaining <= 0) {
+      throw new Error('Invoice is due or overdue, cannot settle early');
+    }
+
+    // Calculate the final amounts for the response
+    const amount = Number(invoice.amount);
+    const apr = Number(invoice.annual_apr || 18.0) / 100;
+    const discountAmount = (amount * apr * daysRemaining) / 365;
+    const offerAmount = amount - discountAmount;
+
+    /*----------------------------------------------------------
+      4. Update Invoice Status
+    ----------------------------------------------------------*/
+    const updateResult = await client.query(
+      `UPDATE invoices 
+       SET escrow_status = 'settled', 
+           tx_hash = COALESCE($1, tx_hash) 
+       WHERE invoice_id = $2 
+       RETURNING *`,
+      [tx_hash || null, invoiceId]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Invoice settled early successfully',
+      settledAmount: offerAmount.toFixed(2),
+      discountApplied: discountAmount.toFixed(2),
+      invoice: updateResult.rows[0]
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Early settlement error:', error);
+    
+    let statusCode = 500;
+    if (error.message.includes('not found')) statusCode = 404;
+    if (error.message.includes('Not authorized')) statusCode = 403;
+    if (error.message.includes('overdue') || error.message.includes('already settled')) statusCode = 400;
+
+    return res.status(statusCode).json({ error: error.message });
+  } finally {
+    client.release();
+  }
+};

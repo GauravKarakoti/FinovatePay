@@ -2,6 +2,7 @@ import React from 'react';
 import { useStats } from '../../context/StatsContext';
 import { updateCurrentUserRole } from '../../utils/api';
 import { disconnectWallet } from '../../utils/web3';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onClose }) => {
   const { stats } = useStats();
@@ -11,7 +12,22 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
       const response = await updateCurrentUserRole(newRole);
       if (response && response.data.user) {
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        window.location.reload();
+        
+        // Navigate to the appropriate dashboard based on new role
+        const dashboardRoutes = {
+          buyer: '/buyer',
+          seller: '/',
+          admin: '/admin',
+          investor: '/investor',
+          shipment: '/shipment',
+          warehouse: '/shipment'
+        };
+        
+        const targetRoute = dashboardRoutes[newRole] || '/';
+        navigate(targetRoute);
+        
+        // Force a re-render by updating the page
+        window.location.href = targetRoute;
       }
     } catch (error) {
       console.error('Failed to switch role:', error);
@@ -22,8 +38,10 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
     await disconnectWallet();
     window.location.reload();
   };
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const tabs = [
+const tabs = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'quotations', label: 'Quotations', icon: '💬' },
     { id: 'invoices', label: 'Invoices', icon: '📝' },
@@ -31,6 +49,11 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
     { id: 'payments', label: 'Payments', icon: '💳' },
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
   ];
+
+  // Add Streaming Payments tab for seller role
+  if (user?.role === 'seller') {
+    tabs.push({ id: 'streaming', label: 'Streaming', icon: '📺' });
+  }
   const displayStats = stats || { totalInvoices: 0, activeEscrows: 0, completed: 0 };
 
   // Add Financing tab for relevant roles
@@ -43,6 +66,30 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
   }
 
   const visibleTabs = user?.role === 'investor' ? tabs.filter(tab => !['quotations', 'invoices', 'payments', 'produce', 'escrow'].includes(tab.id)) : tabs;
+
+  const isInvoicesPage = location.pathname === '/invoices';
+  // If on invoices page, force activeTab to 'invoices' regardless of prop
+  const currentTab = isInvoicesPage ? 'invoices' : activeTab;
+
+  const handleTabClick = (tabId) => {
+    if (tabId === 'invoices') {
+      navigate('/invoices');
+      onTabChange('invoices');
+    } else {
+      // Determine dashboard root based on role
+      let dashboardPath = '/';
+      if (user?.role === 'buyer') dashboardPath = '/buyer';
+      if (user?.role === 'admin') dashboardPath = '/admin';
+      if (user?.role === 'investor') dashboardPath = '/investor';
+      if (user?.role === 'shipment' || user?.role === 'warehouse') dashboardPath = '/shipment';
+
+      if (isInvoicesPage) {
+          navigate(dashboardPath);
+      }
+      onTabChange(tabId);
+    }
+  };
+
   return (
     <div className="bg-white shadow-md rounded-lg p-4 h-full md:h-fit flex flex-col overflow-y-auto">
       <div className="flex justify-between items-center mb-4">
@@ -62,9 +109,9 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
         {visibleTabs.map(tab => (
           <li key={tab.id}>
             <button
-              onClick={() => onTabChange(tab.id)}
+              onClick={() => handleTabClick(tab.id)}
               className={`w-full text-left px-4 py-2 rounded-md transition-colors flex items-center space-x-2 ${
-                activeTab === tab.id
+                currentTab === tab.id
                   ? 'bg-finovate-blue-100 text-finovate-blue-800 font-medium'
                   : 'hover:bg-gray-100'
               }`}

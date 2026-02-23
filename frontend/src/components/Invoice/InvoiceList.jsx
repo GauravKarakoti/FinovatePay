@@ -1,4 +1,5 @@
 import AmountDisplay from '../common/AmountDisplay';
+import { toast } from 'sonner';
 
 const InvoiceList = ({
     invoices,
@@ -27,11 +28,11 @@ const InvoiceList = ({
         e.stopPropagation(); // Prevent the row's onClick from firing
         navigator.clipboard.writeText(textToCopy)
             .then(() => {
-                alert(`Copied to clipboard: ${textToCopy}`);
+                toast.success(`Copied to clipboard: ${textToCopy}`);
             })
             .catch(err => {
                 console.error('Failed to copy text: ', err);
-                alert('Failed to copy.');
+                toast.error('Failed to copy.');
             });
     };
 
@@ -47,9 +48,43 @@ const InvoiceList = ({
         }
     };
 
+    const renderActions = (invoice) => (
+        <div className="flex flex-wrap gap-2 items-center">
+            {userRole === 'buyer' && invoice.escrow_status === 'created' && (
+                <button onClick={(e) => { e.stopPropagation(); onPayInvoice(invoice); }} className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md text-xs">Pay Invoice</button>
+            )}
+            {userRole === 'seller' && invoice.escrow_status === 'deposited' && onConfirmShipment && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onConfirmShipment(invoice); }}
+                    className="text-purple-600 hover:text-purple-900 text-xs font-semibold"
+                >
+                    Confirm Shipment
+                </button>
+            )}
+            {userRole === 'buyer' && invoice.escrow_status === 'shipped' && (
+                <button onClick={(e) => { e.stopPropagation(); onConfirmRelease(invoice); }} className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-xs">Release Funds</button>
+            )}
+            {['deposited', 'shipped'].includes(invoice.escrow_status) && (
+                <button onClick={(e) => { e.stopPropagation(); onRaiseDispute(invoice); }} className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-xs">Raise Dispute</button>
+            )}
+            <button 
+                onClick={(e) => { e.stopPropagation(); onShowQRCode(invoice); }} 
+                className="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded-md text-xs flex items-center gap-1"
+                title="View Produce Passport & Tracking"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
+                </svg>
+                View Passport
+            </button>
+        </div>
+    );
+
     return (
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -75,41 +110,45 @@ const InvoiceList = ({
                                     <AmountDisplay maticAmount={invoice.amount} />
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm">{getStatusChip(invoice.escrow_status)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2 flex items-center">
-                                    {userRole === 'buyer' && invoice.escrow_status === 'created' && (
-                                        <button onClick={(e) => { e.stopPropagation(); onPayInvoice(invoice); }} className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md text-xs">Pay Invoice</button>
-                                    )}
-                                    {userRole === 'seller' && invoice.escrow_status === 'deposited' && onConfirmShipment && (
-                                        <button
-                                            onClick={() => onConfirmShipment(invoice)}
-                                            className="text-purple-600 hover:text-purple-900"
-                                        >
-                                            Confirm Shipment
-                                        </button>
-                                    )}
-                                    {userRole === 'buyer' && invoice.escrow_status === 'shipped' && (
-                                        <button onClick={(e) => { e.stopPropagation(); onConfirmRelease(invoice); }} className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-xs">Release Funds</button>
-                                    )}
-                                    {['deposited', 'shipped'].includes(invoice.escrow_status) && (
-                                        <button onClick={(e) => { e.stopPropagation(); onRaiseDispute(invoice); }} className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-xs">Raise Dispute</button>
-                                    )}
-                                    {/* UPDATED: "View Passport" Button */}
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); onShowQRCode(invoice); }} 
-                                        className="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded-md text-xs flex items-center gap-1"
-                                        title="View Produce Passport & Tracking"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
-                                        </svg>
-                                        View Passport
-                                    </button>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    {renderActions(invoice)}
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4 p-4">
+                {invoices.map((invoice) => (
+                    <div 
+                        key={invoice.invoice_id} 
+                        className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm active:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => onSelectInvoice(invoice)}
+                    >
+                        <div className="flex justify-between items-start mb-2">
+                            <div 
+                                className="text-sm font-medium text-gray-900 truncate hover:text-blue-600 hover:underline"
+                                onClick={(e) => copyToClipboard(invoice.invoice_id, e)}
+                            >
+                                #{formatAddress(invoice.invoice_id)}
+                            </div>
+                            <div>{getStatusChip(invoice.escrow_status)}</div>
+                        </div>
+                        
+                        <div className="flex justify-between items-center mb-2">
+                            <div className="text-sm text-gray-500">{invoice.description}</div>
+                            <div className="text-sm font-semibold">
+                                <AmountDisplay maticAmount={invoice.amount} />
+                            </div>
+                        </div>
+
+                        <div className="mt-3 border-t pt-3">
+                            {renderActions(invoice)}
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
