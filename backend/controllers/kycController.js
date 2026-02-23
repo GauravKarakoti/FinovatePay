@@ -135,14 +135,15 @@ exports.initiateKYC = async (req, res) => {
       referenceId: kycReferenceId // Update this variable
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.response?.data?.message || 'Failed to initiate KYC' 
-    });
+    if (error.response && error.response.status >= 400 && error.response.status < 500) {
+       error.statusCode = error.response.status;
+       error.message = error.response.data?.message || error.message;
+    }
+    next(error);
   }
 };
 
-exports.verifyKYCOtp = async (req, res) => {
+exports.verifyKYCOtp = async (req, res, next) => {
   const { otp, referenceId } = req.body;
   const userId = req.user.id;
 
@@ -201,15 +202,13 @@ exports.verifyKYCOtp = async (req, res) => {
       throw new Error('OTP Verification failed');
     }
   } catch (error) {
-    console.error('KYC Verification Error:', error);
-    res.status(400).json({ 
-      success: false, 
-      error: error.response?.data?.message || error.message || 'Verification failed' 
-    });
+    error.statusCode = 400;
+    error.message = error.response?.data?.message || error.message || 'Verification failed';
+    next(error);
   }
 };
 
-exports.checkCompliance = async (req, res) => {
+exports.checkCompliance = async (req, res, next) => {
   try {
     const { walletAddress } = req.body;
     
@@ -231,6 +230,6 @@ exports.checkCompliance = async (req, res) => {
       reason: compliant ? '' : `KYC status: ${user.kyc_status}, Risk level: ${user.kyc_risk_level}`
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };

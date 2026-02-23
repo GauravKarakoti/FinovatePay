@@ -24,8 +24,7 @@ const requireKYC = async (req, res, next) => {
     
     next();
   } catch (error) {
-    console.error("KYC Middleware Error:", error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    next(error);
   }
 };
 

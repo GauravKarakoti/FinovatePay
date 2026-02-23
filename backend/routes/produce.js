@@ -48,8 +48,7 @@ router.get('/lots/available', authenticateToken, async (req, res) => {
 
         res.json(lotsWithMarketPrice);
     } catch (error) {
-        console.error('Error getting available lots:', error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
@@ -62,8 +61,7 @@ router.get('/lots/producer', authenticateToken, requireRole(['seller', 'admin'])
     );
     res.json(result.rows);
   } catch (error) {
-    console.error('Error getting producer lots:', error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
@@ -103,8 +101,7 @@ router.get('/lots/:lotId', authenticateToken, validateLotId, async (req, res) =>
       locations: locationHistoryResult.rows // <-- Send locations to frontend
     });
   } catch (error) {
-    console.error('Error getting produce lot:', error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 

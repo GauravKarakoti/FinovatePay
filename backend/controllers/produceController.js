@@ -3,7 +3,7 @@ const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const ProduceTrackingArtifact = require('../../deployed/ProduceTracking.json');
 
-exports.createProduceLot = async (req, res) => {
+exports.createProduceLot = async (req, res, next) => {
   try {
     // The frontend now provides all the necessary data after the blockchain transaction
     const { lotId, produceType, harvestDate, qualityMetrics, origin, quantity, txHash } = req.body;
@@ -35,16 +35,15 @@ exports.createProduceLot = async (req, res) => {
     res.status(201).json({ success: true, lotId, txHash });
 
   } catch (error) {
-    console.error("Error syncing produce lot:", error);
     // Handle potential duplicate key errors if the same lot is synced twice
     if (error.code === '23505') { 
         return res.status(409).json({ error: 'This produce lot has already been synced.' });
     }
-    res.status(500).json({ error: 'Failed to sync produce lot to the database.' });
+    next(error);
   }
 };
 
-exports.transferProduce = async (req, res) => {
+exports.transferProduce = async (req, res, next) => {
   try {
     const { lotId, toAddress, quantity, price, transactionHash } = req.body;
     const signer = getSigner();
@@ -86,12 +85,11 @@ exports.transferProduce = async (req, res) => {
 
     res.json({ success: true, txHash: tx.hash });
   } catch (error) {
-    console.error("Error transferring produce:", error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-exports.getProduceLot = async (req, res) => {
+exports.getProduceLot = async (req, res, next) => {
   try {
     const { lotId } = req.params;
     const signer = getSigner();
@@ -116,12 +114,11 @@ exports.getProduceLot = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error("Error getting produce lot:", error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-exports.getSellerLots = async (req, res) => {
+exports.getSellerLots = async (req, res, next) => {
   try {
     const seller_address = req.user.wallet_address;
     const query = `
@@ -132,7 +129,6 @@ exports.getSellerLots = async (req, res) => {
     const result = await pool.query(query, [seller_address]);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching seller lots:', error);
-    res.status(500).json({ error: 'Failed to fetch seller lots.' });
+    next(error);
   }
 };

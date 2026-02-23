@@ -11,7 +11,7 @@ const uuidToBytes32 = (uuid) => {
   return ethers.zeroPadValue(hex, 32);
 };
 
-exports.releaseEscrow = async (req, res) => {
+exports.releaseEscrow = async (req, res, next) => {
   try {
     const { invoiceId } = req.body;
 
@@ -44,12 +44,11 @@ exports.releaseEscrow = async (req, res) => {
     res.json({ success: true, txHash: tx.hash });
 
   } catch (error) {
-    console.error("Error in releaseEscrow:", error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };
 
-exports.raiseDispute = async (req, res) => {
+exports.raiseDispute = async (req, res, next) => {
   try {
     const { invoiceId, reason } = req.body;
 
@@ -83,7 +82,6 @@ exports.raiseDispute = async (req, res) => {
     res.json({ success: true, txHash: tx.hash });
 
   } catch (error) {
-    console.error("Error in raiseDispute:", error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 };

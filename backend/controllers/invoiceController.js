@@ -1,9 +1,6 @@
 const { pool } = require('../config/database');
 
-/*//////////////////////////////////////////////////////////////
-                CREATE INVOICE (FROM QUOTATION)
-//////////////////////////////////////////////////////////////*/
-exports.createInvoice = async (req, res) => {
+exports.createInvoice = async (req, res, next) => {
     const client = await pool.connect();
 
     try {
@@ -123,7 +120,6 @@ exports.createInvoice = async (req, res) => {
 
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error('Error creating invoice from quotation:', error);
 
         // Determine status code based on error message or default to 500
         let statusCode = 500;
@@ -134,7 +130,8 @@ exports.createInvoice = async (req, res) => {
         if (error.message.includes('Insufficient quantity')) statusCode = 400;
         if (error.message === 'Missing quotation_id or required on-chain data.') statusCode = 400;
 
-        return res.status(statusCode).json({ error: error.message || 'Internal server error.' });
+        error.statusCode = statusCode;
+        next(error);
     } finally {
         client.release();
     }

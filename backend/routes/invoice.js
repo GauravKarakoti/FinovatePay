@@ -25,7 +25,7 @@ router.use(authenticateToken);
 // Create a new invoice - Only sellers can create invoices
 router.post('/', requireKYC, requireRole(['seller', 'admin']), validateCreateInvoice, async (req, res) => {
   console.log("Creating invoice with data:", req.body);
-  await createInvoice(req, res);
+  await createInvoice(req, res, next);
 });
 
 // Get seller's invoices - Only accessible by sellers and admins
@@ -34,7 +34,7 @@ router.get('/seller', requireRole(['seller', 'admin']), async (req, res) => {
     const invoices = await Invoice.findBySeller(req.user.wallet_address);
     res.json(invoices);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
@@ -55,7 +55,7 @@ router.get('/buyer', requireRole(['buyer', 'admin']), async (req, res) => {
     const invoices = await Invoice.findByBuyer(req.user.wallet_address);
     res.json(invoices);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
@@ -89,7 +89,7 @@ router.get('/:id', validateInvoiceId, async (req, res) => {
     
     res.json(invoice);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
@@ -138,8 +138,8 @@ router.post('/:invoiceId/status', validateInvoiceId, validateInvoiceStatus, requ
 
         res.json({ success: true, invoice: updatedInvoice });
     } catch (error) {
-        console.error(`Error updating status for invoice ${req.params.invoiceId}:`, error);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error(`Error updating status for invoice ${req.params.invoice_id}:`, error);
+        next(error);
     }
 });
 
