@@ -248,6 +248,10 @@ export const getProduceLot = (lotId) => {
   return api.get(`/produce/lots/${lotId}`);
 };
 
+export const createFiatRampLink = (data) => {
+  return api.post('/fiat-ramp/create-link', data); 
+};
+
 export const transferProduce = (transferData) => {
   return api.post('/produce/transfer', transferData);
 };

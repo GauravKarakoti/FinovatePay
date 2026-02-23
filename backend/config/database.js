@@ -7,12 +7,6 @@ require("dotenv").config();
 
 const isProduction = process.env.NODE_ENV === "production";
 
-// --------------------------------------------------
-// Database Configuration
-// --------------------------------------------------
-
-const isProduction = process.env.NODE_ENV === "production";
-
 // Enhanced Database Configuration with Resilience
 const dbConfig = {
   user: process.env.DB_USER,
@@ -23,10 +17,8 @@ const dbConfig = {
     ? parseInt(process.env.DB_PORT)
     : 5432,
 
-  // Enable SSL only in production
-  ssl: isProduction
-    ? { rejectUnauthorized: false }
-    : false,
+  // Enable SSL
+  ssl: { rejectUnauthorized: false },
 
   // Pool configuration (valid pg options only)
   max: process.env.DB_POOL_MAX
