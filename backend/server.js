@@ -67,6 +67,9 @@ app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
 
+// --- DATABASE CONNECTION ---
+const { pool, getConnection } = require('./config/database');
+const listenForTokenization = require('./listeners/contractListener');
 /* ---------------- RATE LIMITING ---------------- */
 
 app.use("/api/", globalLimiter);

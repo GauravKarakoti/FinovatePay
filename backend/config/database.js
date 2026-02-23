@@ -11,6 +11,9 @@ const isProduction = process.env.NODE_ENV === "production";
 // Database Configuration
 // --------------------------------------------------
 
+const isProduction = process.env.NODE_ENV === "production";
+
+// Enhanced Database Configuration with Resilience
 const dbConfig = {
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
@@ -37,6 +40,11 @@ const dbConfig = {
   connectionTimeoutMillis: process.env.DB_CONNECTION_TIMEOUT
     ? parseInt(process.env.DB_CONNECTION_TIMEOUT)
     : 20000,
+  query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT) || 60000,
+  min: parseInt(process.env.DB_POOL_MIN) || 2,
+  acquireTimeoutMillis: parseInt(process.env.DB_ACQUIRE_TIMEOUT) || 60000,
+  reapIntervalMillis: parseInt(process.env.DB_REAP_INTERVAL) || 1000,
+  maxLifetimeSeconds: parseInt(process.env.DB_MAX_LIFETIME) || 3600,
 };
 
 // --------------------------------------------------
