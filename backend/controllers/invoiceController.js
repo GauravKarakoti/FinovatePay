@@ -239,7 +239,7 @@ exports.createInvoice = async (req, res) => {
         token_address,
         quotation.lot_id,
         quotation_id,
-        tx_hash,
+        tx_hash || null,
         discount_rate,
         discount_deadline,
         annual_apr
@@ -334,12 +334,15 @@ exports.getEarlyPaymentOffer = async (req, res) => {
   }
 };
 
+/*//////////////////////////////////////////////////////////////
+                SETTLE INVOICE EARLY
+//////////////////////////////////////////////////////////////*/
 exports.settleInvoiceEarly = async (req, res) => {
   const client = await pool.connect();
 
   try {
     const { invoiceId } = req.params;
-    const { tx_hash } = req.body; // Usually passed from the frontend after the blockchain tx succeeds
+    const { tx_hash } = req.body;
 
     await client.query('BEGIN');
 
@@ -362,12 +365,10 @@ exports.settleInvoiceEarly = async (req, res) => {
     /*----------------------------------------------------------
       2. Authorization & Status Check
     ----------------------------------------------------------*/
-    // Ensure the user owns this invoice (if they are a buyer)
     if (req.user.role === 'buyer' && invoice.buyer_address !== req.user.wallet_address) {
       throw new Error('Not authorized to settle this invoice');
     }
 
-    // Ensure it's not already paid/settled
     if (['settled', 'paid', 'completed'].includes(invoice.escrow_status)) {
       throw new Error('Invoice is already settled or paid');
     }
@@ -385,7 +386,6 @@ exports.settleInvoiceEarly = async (req, res) => {
       throw new Error('Invoice is due or overdue, cannot settle early');
     }
 
-    // Calculate the final amounts for the response
     const amount = Number(invoice.amount);
     const apr = Number(invoice.annual_apr || 18.0) / 100;
     const discountAmount = (amount * apr * daysRemaining) / 365;
