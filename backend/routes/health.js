@@ -38,12 +38,13 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Health check failed:', error);
     
+    const isDev = process.env.NODE_ENV === 'development';
     res.status(500).json({
       status: 'error',
       timestamp: new Date().toISOString(),
       error: {
         message: 'Health check failed',
-        details: error.message
+        details: isDev ? error.message : undefined
       }
     });
   }
@@ -71,12 +72,13 @@ router.get('/database', async (req, res) => {
   } catch (error) {
     console.error('Database health check failed:', error);
     
+    const isDev = process.env.NODE_ENV === 'development';
     res.status(500).json({
       status: 'error',
       timestamp: new Date().toISOString(),
       error: {
         message: 'Database health check failed',
-        details: error.message
+        details: isDev ? error.message : undefined
       }
     });
   }
@@ -104,10 +106,11 @@ router.get('/circuit-breaker', (req, res) => {
   } catch (error) {
     console.error('Circuit breaker status check failed:', error);
     
+    const isDev = process.env.NODE_ENV === 'development';
     res.status(500).json({
       error: {
         message: 'Circuit breaker status check failed',
-        details: error.message
+        details: isDev ? error.message : undefined
       }
     });
   }

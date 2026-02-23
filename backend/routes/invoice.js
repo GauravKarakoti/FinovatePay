@@ -10,34 +10,34 @@ const { pool } = require("../config/database");
 router.use(authenticateToken);
 
 // Create a new invoice
-router.post('/', requireKYC, async (req, res) => {
+router.post('/', requireKYC, async (req, res, next) => {
   console.log("Creating invoice with data:", req.body);
-  await createInvoice(req, res);
+  await createInvoice(req, res, next);
 });
 
 // Get seller's invoices
-router.get('/seller', async (req, res) => {
+router.get('/seller', async (req, res, next) => {
   try {
     const invoices = await Invoice.findBySeller(req.user.wallet_address);
     res.json(invoices);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 // Get buyer's invoices
-router.get('/buyer', async (req, res) => {
+router.get('/buyer', async (req, res, next) => {
   try {
     console.log("Buyer:",req.user.wallet_address)
     const invoices = await Invoice.findByBuyer(req.user.wallet_address);
     res.json(invoices);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 // Get specific invoice
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     
@@ -53,11 +53,11 @@ router.get('/:id', async (req, res) => {
     
     res.json(invoice);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
-router.post('/:invoice_id/status', requireKYC, async (req, res) => {
+router.post('/:invoice_id/status', requireKYC, async (req, res, next) => {
     try {
         const { invoice_id } = req.params;
         const { status, tx_hash, dispute_reason } = req.body; // <-- Added dispute_reason
@@ -99,7 +99,7 @@ router.post('/:invoice_id/status', requireKYC, async (req, res) => {
         res.json({ success: true, invoice: updatedInvoice });
     } catch (error) {
         console.error(`Error updating status for invoice ${req.params.invoice_id}:`, error);
-        res.status(500).json({ error: 'Internal server error' });
+        next(error);
     }
 });
 

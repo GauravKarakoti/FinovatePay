@@ -5,7 +5,7 @@ const { pool } = require('../config/database');
 const produceController = require('../controllers/produceController');
 const marketService = require('../services/marketService');
 
-router.get('/lots/available', authenticateToken, async (req, res) => {
+router.get('/lots/available', authenticateToken, async (req, res, next) => {
     try {
         const query = `
           SELECT 
@@ -32,13 +32,12 @@ router.get('/lots/available', authenticateToken, async (req, res) => {
         
         res.json(lotsWithMarketPrice);
     } catch (error) {
-        console.error('Error getting available lots:', error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 });
 
 // Get producer's own lots
-router.get('/lots/producer', authenticateToken, async (req, res) => {
+router.get('/lots/producer', authenticateToken, async (req, res, next) => {
   try {
     const result = await pool.query(
       'SELECT * FROM produce_lots WHERE farmer_address = $1 ORDER BY created_at DESC',
@@ -46,14 +45,13 @@ router.get('/lots/producer', authenticateToken, async (req, res) => {
     );
     res.json(result.rows);
   } catch (error) {
-    console.error('Error getting producer lots:', error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 
 router.get('/lots/seller', authenticateToken, produceController.getSellerLots);
 
-router.get('/lots/:lotId', async (req, res) => {
+router.get('/lots/:lotId', async (req, res, next) => {
   try {
     const { lotId } = req.params;
     
@@ -86,8 +84,7 @@ router.get('/lots/:lotId', async (req, res) => {
       locations: locationHistoryResult.rows // <-- Send locations to frontend
     });
   } catch (error) {
-    console.error('Error getting produce lot:', error);
-    res.status(500).json({ error: error.message });
+    next(error);
   }
 });
 

@@ -12,7 +12,7 @@ const uuidToBytes32 = (uuid) => {
   return ethers.zeroPadValue(hex, 32);
 };
 
-exports.setInvoiceSpread = async (req, res) => {
+exports.setInvoiceSpread = async (req, res, next) => {
   if (req.user.role !== 'admin') {
     return res.status(401).json({ msg: 'Not authorized' });
   }
@@ -32,47 +32,43 @@ exports.setInvoiceSpread = async (req, res) => {
 
     res.json({ msg: 'Invoice spread updated successfully', tokenId, spreadBps });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    next(err);
   }
 };
 
 // --- USER MANAGEMENT ---
-exports.getAllUsers = async (req, res) => {
+exports.getAllUsers = async (req, res, next) => {
     console.log("getAllUsers called");
     try {
         const result = await pool.query('SELECT id, email, wallet_address, role, kyc_status, is_frozen FROM users ORDER BY created_at DESC');
         console.log("Users fetched:", result.rows);
         res.json({ success: true, data: result.rows });
     } catch (error) {
-        console.error("Error in getAllUsers:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
 
-exports.freezeAccount = async (req, res) => {
+exports.freezeAccount = async (req, res, next) => {
     try {
         const { userId } = req.params; // FIX: Get userId from req.params
         await pool.query('UPDATE users SET is_frozen = TRUE WHERE id = $1', [userId]);
         res.json({ success: true, message: 'Account frozen successfully' });
     } catch (error) {
-        console.error("Error in freezeAccount:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
 
-exports.unfreezeAccount = async (req, res) => {
+exports.unfreezeAccount = async (req, res, next) => {
     try {
         const { userId } = req.params; // FIX: Get userId from req.params
         await pool.query('UPDATE users SET is_frozen = FALSE WHERE id = $1', [userId]);
         res.json({ success: true, message: 'Account unfrozen successfully' });
     } catch (error) {
-        console.error("Error in unfreezeAccount:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
 
-exports.updateUserRole = async (req, res) => {
+exports.updateUserRole = async (req, res, next) => {
     try {
         const { userId } = req.params;
         const { role } = req.body;
@@ -86,25 +82,23 @@ exports.updateUserRole = async (req, res) => {
         await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
         res.json({ success: true, message: 'User role updated successfully' });
     } catch (error) {
-        console.error("Error in updateUserRole:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
 
 // --- INVOICE MANAGEMENT ---
-exports.getInvoices = async (req, res) => {
+exports.getInvoices = async (req, res, next) => {
     try {
         const result = await pool.query('SELECT * FROM invoices ORDER BY created_at DESC');
         res.json({ success: true, data: result.rows });
     } catch (error) {
-        console.error("Error in getInvoices:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
 
 
 // --- COMPLIANCE ---
-exports.checkCompliance = async (req, res) => {
+exports.checkCompliance = async (req, res, next) => {
     try {
         const { walletAddress } = req.body;
         // Your compliance check logic here
@@ -118,14 +112,13 @@ exports.checkCompliance = async (req, res) => {
             }
         });
     } catch (error) {
-        console.error("Error in checkCompliance:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
 
 
 // --- DISPUTE RESOLUTION ---
-exports.resolveDispute = async (req, res) => {
+exports.resolveDispute = async (req, res, next) => {
     try {
         const { invoiceId, sellerWins } = req.body;
         const signer = getSigner();
@@ -152,7 +145,6 @@ exports.resolveDispute = async (req, res) => {
 
         res.json({ success: true, txHash: tx.hash });
     } catch (error) {
-        console.error("Error in resolveDispute:", error);
-        res.status(500).json({ error: error.message });
+        next(error);
     }
 };
