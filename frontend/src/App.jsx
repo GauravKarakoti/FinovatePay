@@ -187,14 +187,14 @@ function App() {
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9] relative">
           {isSidebarOpen && (
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+              className="fixed inset-0 bg-black bg-opacity-50 z-[90] md:hidden"
               onClick={() => setIsSidebarOpen(false)}
             />
           )}
 
           <div className={`
             fixed top-0 bottom-0 left-0 md:relative md:top-auto md:bottom-auto md:left-auto
-            z-40 h-full md:h-auto
+            z-[100] h-full md:h-auto
             transition-transform duration-300 ease-in-out
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
             md:w-64 flex-shrink-0
@@ -286,7 +286,7 @@ function App() {
                 path="/shipment" 
                 element={
                   <RequireAuth allowedRoles={['shipment', 'warehouse']}>
-                      <ShipmentDashboard />
+                      {renderDashboard(<ShipmentDashboard />)}
                   </RequireAuth>
                 } 
               />
