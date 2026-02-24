@@ -323,9 +323,45 @@ const validateTransferProduce = [
   handleValidationErrors
 ];
 
-/**
- * FINANCING VALIDATORS
- */
+const validateFinancingRequest = [
+  body('invoiceId')
+    .trim()
+    .custom(isUUID).withMessage('Invalid invoice ID format'),
+  
+  body('amount')
+    .isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0'),
+  
+  body('asset')
+    .trim()
+    .notEmpty().withMessage('Asset is required'),
+    
+  body('collateralTokenId')
+    .trim()
+    .notEmpty().withMessage('Collateral Token ID is required'),
+    
+  handleValidationErrors
+];
+
+const validateFinancingRepay = [
+  body('amount')
+    .isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0'),
+    
+  body('asset')
+    .trim()
+    .notEmpty().withMessage('Asset is required'),
+    
+  body('financingId')
+    .optional()
+    .trim(),
+    
+  body('invoiceId')
+    .optional()
+    .trim()
+    .custom(isUUID).withMessage('Invalid invoice ID format'),
+    
+  handleValidationErrors
+];
+
 const validateTokenizeInvoice = [
   body('invoiceId')
     .trim()
@@ -360,6 +396,62 @@ const validateRelayTransaction = [
   body('nonce')
     .optional()
     .isInt({ min: 0 }).withMessage('Nonce must be a non-negative integer'),
+  
+const validateInvoiceStatus = [
+  body('status')
+    .trim()
+    .isIn(['released', 'shipped', 'disputed', 'deposited']).withMessage('Invalid status'),
+  
+  body('tx_hash')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 255 }).withMessage('Invalid transaction hash'),
+  
+  body('dispute_reason')
+    .optional()
+    .trim()
+    .isLength({ min: 10, max: 1000 }).withMessage('Dispute reason must be 10-1000 characters')
+    .escape(),
+  
+  handleValidationErrors
+];
+
+const validateOnramp = [
+  body('amount')
+    .isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0'),
+  
+  body('currency')
+    .trim()
+    .isIn(['USD', 'EUR', 'GBP']).withMessage('Invalid currency'),
+  
+  handleValidationErrors
+];
+
+const validateKYCOverride = [
+  body('user_id')
+    .isInt({ min: 1 }).withMessage('Invalid user ID'),
+  
+  body('status')
+    .trim()
+    .isIn(['verified', 'rejected', 'pending', 'failed']).withMessage('Invalid status'),
+  
+  body('risk_level')
+    .trim()
+    .isIn(['low', 'medium', 'high']).withMessage('Invalid risk level'),
+  
+  body('reason')
+    .trim()
+    .isLength({ min: 3, max: 1000 }).withMessage('Reason must be provided (3-1000 characters)')
+    .escape(),
+  
+  handleValidationErrors
+];
+
+const validateWalletAddress = [
+  param('wallet')
+    .trim()
+    .custom(isEthereumAddress).withMessage('Invalid wallet address format'),
+  
   handleValidationErrors
 ];
 
@@ -372,13 +464,17 @@ module.exports = {
   // Invoice
   validateCreateInvoice,
   validateInvoiceId,
+  validateInvoiceStatus,
   // Payment
   validateDeposit,
   validateRelease,
   validateDispute,
+  validateOnramp,
   // KYC
   validateInitiateKYC,
   validateVerifyKYC,
+  validateKYCOverride,    // <-- ADD THIS
+  validateWalletAddress,
   // Admin
   validateUserId,
   validateUpdateUserRole,
@@ -392,6 +488,8 @@ module.exports = {
   validateTransferProduce,
   // Financing
   validateTokenizeInvoice,
+  validateFinancingRequest, // <-- ADD THIS
+  validateFinancingRepay,
   // Relayer
   validateRelayTransaction,
   // Custom validators (export for reuse)

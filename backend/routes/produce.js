@@ -4,8 +4,10 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { pool } = require('../config/database');
 const produceController = require('../controllers/produceController');
 const marketService = require('../services/marketService');
+
+// Corrected import to match what is exported in validators.js
 const { 
-  validateProduceLotId, 
+  validateLotId, 
   validateCreateProduceLot 
 } = require('../middleware/validators');
 
@@ -67,7 +69,8 @@ router.get('/lots/producer', authenticateToken, requireRole(['seller', 'admin'])
 
 router.get('/lots/seller', authenticateToken, requireRole(['seller', 'admin']), produceController.getSellerLots);
 
-router.get('/lots/:lotId', authenticateToken, validateProduceLotId, async (req, res) => {
+// Replaced validateProduceLotId with validateLotId here
+router.get('/lots/:lotId', authenticateToken, validateLotId, async (req, res) => {
   try {
     const { lotId } = req.params;
     
