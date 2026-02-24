@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@reown/appkit": "^1.8.18",
+    "@reown/appkit-adapter-ethers": "^1.8.18",
+    "@tanstack/react-query": "^5.90.21",
     "@transak/transak-sdk": "^4.0.2",
-    "@web3modal/ethers": "^5.1.11",
     "@zxing/browser": "^0.1.5",
     "axios": "^1.13.2",
     "ethers": "^6.13.4",

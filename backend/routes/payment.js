@@ -7,10 +7,11 @@ const {
   releaseEscrow,
   raiseDispute
 } = require('../controllers/escrowController');
+
+// Corrected validator imports
 const { 
-  validatePaymentDeposit, 
-  validatePaymentRelease, 
-  validatePaymentDispute,
+  validateRelease, 
+  validateDispute,
   validateOnramp 
 } = require('../middleware/validators');
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -22,13 +23,13 @@ router.use(requireKYC);
 // Apply payment rate limiter to all payment routes
 router.use(paymentLimiter);
 
-// Release escrow funds
-router.post('/escrow/release', requireRole(['buyer', 'admin']), validatePaymentRelease, async (req, res) => {
+// Release escrow funds (using validateRelease instead of validatePaymentRelease)
+router.post('/escrow/release', requireRole(['buyer', 'admin']), validateRelease, async (req, res) => {
   await releaseEscrow(req, res);
 });
 
-// Raise a dispute (buyer or seller)
-router.post('/escrow/dispute', requireRole(['buyer', 'seller', 'admin']), validatePaymentDispute, async (req, res) => {
+// Raise a dispute (using validateDispute instead of validatePaymentDispute)
+router.post('/escrow/dispute', requireRole(['buyer', 'seller', 'admin']), validateDispute, async (req, res) => {
   await raiseDispute(req, res);
 });
 

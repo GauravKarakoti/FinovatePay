@@ -198,7 +198,7 @@ contract EscrowContract is
         if (escrow.token == address(0)) {
             require(msg.value == payableAmount, "Bad ETH amount");
         } else {
-            IERC20(escrow.token).transferFrom(
+            IERC20(escrow.token).safeTransferFrom(
                 _msgSender(),
                 address(this),
                 payableAmount
@@ -265,20 +265,16 @@ contract EscrowContract is
         IERC20 token = IERC20(escrow.token);
 
         if (_sellerWins) {
-            // Seller wins: Get paid. Buyer gets the goods (NFT).
-            require(token.transfer(escrow.seller, escrow.amount), "Transfer to seller failed");
+            token.safeTransfer(escrow.seller, escrow.amount);
             
-            // Release NFT to Buyer (Ownership Transfer)
             if (escrow.rwaNftContract != address(0)) {
-                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
+                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
             }
         } else {
-            // Buyer wins: Get refund. Seller gets the goods (NFT) back.
-            require(token.transfer(escrow.buyer, escrow.amount), "Transfer to buyer failed");
+            token.safeTransfer(escrow.buyer, escrow.amount);
 
-            // Return NFT to Seller
             if (escrow.rwaNftContract != address(0)) {
-                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.seller, escrow.rwaTokenId); //
+                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.seller, escrow.rwaTokenId);
             }
         }
         
@@ -289,12 +285,10 @@ contract EscrowContract is
         Escrow storage escrow = escrows[_invoiceId];
         IERC20 token = IERC20(escrow.token);
         
-        // Transfer funds to Seller
-        require(token.transfer(escrow.seller, escrow.amount), "Transfer failed");
+        token.safeTransfer(escrow.seller, escrow.amount);
         
-        // --- NEW: Release RWA NFT to Buyer ---
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
+            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
         }
         
         emit EscrowReleased(_invoiceId, escrow.amount);
@@ -320,7 +314,7 @@ contract EscrowContract is
         if (token == address(0)) {
             payable(to).transfer(amount);
         } else {
-            IERC20(token).transfer(to, amount);
+            IERC20(token).safeTransfer(to, amount);
         }
     }
 
@@ -553,15 +547,12 @@ contract EscrowContract is
 
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
-        // INTERACTIONS
-        // Transfer fee to treasury first
         if (fee > 0) {
-            IERC20(token).transfer(treasury, fee);
+            IERC20(token).safeTransfer(treasury, fee);
             emit FeeCollected(invoiceId, fee);
         }
 
-        // Transfer remaining amount to winner
-        IERC20(token).transfer(sellerWins ? seller : buyer, amount);
+        IERC20(token).safeTransfer(sellerWins ? seller : buyer, amount);
 
         if (nft != address(0)) {
             IERC721(nft).transferFrom(
