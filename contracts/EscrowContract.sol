@@ -54,6 +54,15 @@ contract EscrowContract is
         address rwaNftContract; // Address of the ProduceTracking contract
         uint256 rwaTokenId;     // The tokenId of the produce lot
         uint256 feeAmount;      // Platform fee amount
+        uint256 discountRate;   // Discount rate in basis points (e.g. 50 = 0.5%)
+        uint256 discountDeadline; // Timestamp deadline for early payment discount
+    }
+
+    struct DisputeVoting {
+        uint256 snapshotArbitratorCount;
+        uint256 votesForBuyer;
+        uint256 votesForSeller;
+        bool resolved;
     }
 
     struct DisputeVoting {
@@ -73,13 +82,17 @@ contract EscrowContract is
     address public admin;
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
-    uint256 public quorumPercentage; // Quorum percentage for dispute resolution
-    
+    uint256 public quorumPercentage = 51; // Quorum percentage (e.g. 51%)
+
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount); // Overload
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer); // Overload
+    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool votedForSeller);
+    event SafeEscape(bytes32 indexed invoiceId, address escapedBy);
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
@@ -119,6 +132,7 @@ contract EscrowContract is
         complianceManager = ComplianceManager(_complianceManager);
         treasury = msg.sender; // Default treasury to admin
         feePercentage = 50;    // Default 0.5% fee (50 basis points)
+        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
     }
     
     /**
@@ -187,7 +201,9 @@ contract EscrowContract is
             expiresAt: block.timestamp + _duration,
             rwaNftContract: _rwaNftContract,
             rwaTokenId: _rwaTokenId,
-            feeAmount: calculatedFee
+            feeAmount: calculatedFee,
+            discountRate: 0,
+            discountDeadline: 0
         });
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
@@ -209,7 +225,7 @@ contract EscrowContract is
         if (escrow.token == address(0)) {
             require(msg.value == payableAmount, "Bad ETH amount");
         } else {
-            IERC20(escrow.token).transferFrom(
+            IERC20(escrow.token).safeTransferFrom(
                 _msgSender(),
                 address(this),
                 payableAmount
@@ -270,35 +286,19 @@ contract EscrowContract is
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
         Escrow storage escrow = escrows[_invoiceId];
-        require(escrow.disputeRaised, "No dispute raised");
+        require(escrow.status == EscrowStatus.Disputed, "Not disputed");
         
-        escrow.disputeResolver = msg.sender;
-
-        if (_sellerWins) {
-            // Seller wins: Get paid. Buyer gets the goods (NFT).
-            _payout(escrow.seller, escrow.token, escrow.amount);
-            
-            // Release NFT to Buyer (Ownership Transfer)
-            _transferNFT(address(this), escrow.buyer, escrow);
-        } else {
-            // Buyer wins: Get refund. Seller gets the goods (NFT) back.
-            _payout(escrow.buyer, escrow.token, escrow.amount);
-
-            // Return NFT to Seller
-            _transferNFT(address(this), escrow.seller, escrow);
-        }
-        
-        emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
+        _resolveEscrow(_invoiceId, _sellerWins);
     }
 
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
         
-        // Transfer funds to Seller
-        _payout(escrow.seller, escrow.token, escrow.amount);
+        token.safeTransfer(escrow.seller, escrow.amount);
         
-        // --- NEW: Release RWA NFT to Buyer ---
-        _transferNFT(address(this), escrow.buyer, escrow);
+        if (escrow.rwaNftContract != address(0)) {
+            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
+        }
         
         emit EscrowReleased(_invoiceId, escrow.amount);
     }
@@ -323,7 +323,7 @@ contract EscrowContract is
         if (token == address(0)) {
             payable(to).transfer(amount);
         } else {
-            IERC20(token).transfer(to, amount);
+            IERC20(token).safeTransfer(to, amount);
         }
     }
 
@@ -553,15 +553,14 @@ contract EscrowContract is
 
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
-        // INTERACTIONS
-        // Transfer fee to treasury first
+        uint256 payoutAmount = amount;
         if (fee > 0) {
-            _payout(treasury, e.token, fee);
+            IERC20(token).safeTransfer(treasury, fee);
             emit FeeCollected(invoiceId, fee);
+            payoutAmount -= fee;
         }
 
-        // Transfer remaining amount to winner
-        _payout(sellerWins ? seller : buyer, e.token, amount);
+        IERC20(token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
 
         // Transfer NFT to winner
         _transferNFT(address(this), sellerWins ? buyer : seller, e);
