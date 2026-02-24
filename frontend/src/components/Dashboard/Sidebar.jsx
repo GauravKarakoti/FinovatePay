@@ -48,6 +48,7 @@ const tabs = [
     { id: 'produce', label: 'Produce', icon: '🌱' }, // Add this tab
     { id: 'payments', label: 'Payments', icon: '💳' },
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
+    { id: 'analytics', label: 'Analytics', icon: '📈' },
   ];
 
   // Add Streaming Payments tab for seller role
