@@ -560,8 +560,8 @@ contract EscrowContract is
             emit FeeCollected(invoiceId, fee);
         }
 
-        // Transfer remaining amount to winner
-        _payout(sellerWins ? seller : buyer, e.token, amount);
+        // Transfer remaining amount to winner (amount minus fee)
+        _payout(sellerWins ? seller : buyer, e.token, amount - fee);
 
         // Transfer NFT to winner
         _transferNFT(address(this), sellerWins ? buyer : seller, e);
