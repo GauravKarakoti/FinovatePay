@@ -71,6 +71,13 @@ contract EscrowContract is
         uint256 votesForSeller;
         bool resolved;
     }
+
+    struct DisputeVoting {
+        uint256 snapshotArbitratorCount;
+        uint256 votesForBuyer;
+        uint256 votesForSeller;
+        bool resolved;
+    }
     
     mapping(bytes32 => Escrow) public escrows;
     mapping(bytes32 => DisputeVoting) public disputeVotings;
