@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 console.log("API Base URL:", API_BASE_URL);
@@ -40,9 +41,11 @@ api.interceptors.response.use(
       // Check if it's a timeout error
       if (error.code === 'ECONNABORTED') {
         console.error('Request timeout');
+        const message = 'Request timed out. Please try again.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: 'Request timed out. Please try again.',
+          message,
           isTimeout: true
         });
       }
@@ -50,30 +53,37 @@ api.interceptors.response.use(
       // Check if user is offline
       if (!navigator.onLine) {
         console.error('User is offline');
+        const message = 'You are offline. Please check your internet connection.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: 'You are offline. Please check your internet connection.',
+          message,
           isOffline: true
         });
       }
       
+      const message = 'Network error. Please check your connection and try again.';
+      toast.error(message);
       return Promise.reject({
         ...error,
-        message: 'Network error. Please check your connection and try again.',
+        message,
         isNetworkError: true
       });
     }
     
     const status = error.response.status;
     const errorData = error.response.data;
+    let message = '';
     
     // Handle specific HTTP status codes
     switch (status) {
       case 400:
         console.error('Bad request:', errorData);
+        message = errorData?.message || errorData?.error || 'Invalid request. Please check your input.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Invalid request. Please check your input.',
+          message,
           isValidationError: true
         });
         
@@ -88,50 +98,62 @@ api.interceptors.response.use(
         } else {
           window.location.href = '/login';
         }
+        message = 'Session expired. Please log in again.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: 'Session expired. Please log in again.',
+          message,
           isAuthError: true
         });
         
       case 403:
         console.error('Forbidden:', errorData);
+        message = errorData?.message || errorData?.error || 'You do not have permission to perform this action.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'You do not have permission to perform this action.',
+          message,
           isForbidden: true
         });
         
       case 404:
         console.error('Not found:', errorData);
+        message = errorData?.message || errorData?.error || 'The requested resource was not found.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'The requested resource was not found.',
+          message,
           isNotFound: true
         });
         
       case 409:
         console.error('Conflict:', errorData);
+        message = errorData?.message || errorData?.error || 'A conflict occurred. The resource may already exist.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'A conflict occurred. The resource may already exist.',
+          message,
           isConflict: true
         });
         
       case 422:
         console.error('Validation error:', errorData);
+        message = errorData?.message || errorData?.error || 'Validation failed. Please check your input.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Validation failed. Please check your input.',
+          message,
           isValidationError: true,
           validationErrors: errorData?.errors
         });
         
       case 429:
         console.error('Rate limited:', errorData);
+        message = errorData?.message || errorData?.error || 'Too many requests. Please try again later.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Too many requests. Please try again later.',
+          message,
           isRateLimited: true
         });
         
@@ -152,17 +174,21 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
         
+        message = errorData?.message || errorData?.error || 'Server error. Please try again later.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Server error. Please try again later.',
+          message,
           isServerError: true
         });
         
       default:
         console.error(`HTTP ${status} error:`, errorData);
+        message = errorData?.message || errorData?.error || `An error occurred (HTTP ${status}). Please try again.`;
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || `An error occurred (HTTP ${status}). Please try again.`,
+          message,
           status
         });
     }
@@ -220,6 +246,10 @@ export const createProduceLot = (produceData) => {
 
 export const getProduceLot = (lotId) => {
   return api.get(`/produce/lots/${lotId}`);
+};
+
+export const createFiatRampLink = (data) => {
+  return api.post('/fiat-ramp/create-link', data); 
 };
 
 export const transferProduce = (transferData) => {

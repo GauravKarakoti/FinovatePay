@@ -6,10 +6,12 @@ const { requireKYC } = require('../middleware/kycValidation');
 const { getFractionTokenContract } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const { ethers } = require('ethers');
+
+// Corrected the imported validator names
 const { 
   validateFinancingRequest, 
   validateFinancingRepay, 
-  validateFinancingTokenize 
+  validateTokenizeInvoice 
 } = require('../middleware/validators');
 
 // Get marketplace listings
@@ -151,8 +153,8 @@ router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requi
     }
 });
 
-// Tokenize invoice
-router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateFinancingTokenize, async (req, res) => {
+// Tokenize invoice (Updated validator name here)
+router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateTokenizeInvoice, async (req, res) => {
     try {
         const { invoiceId, faceValue, maturityDate, yieldBps } = req.body;
         const userId = req.user.id;
