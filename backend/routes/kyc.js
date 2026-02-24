@@ -1,6 +1,6 @@
 const express = require('express');
 const { pool } = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 const { kycLimiter } = require('../middleware/rateLimiter');
 
 // Corrected the imported validator names
@@ -119,7 +119,7 @@ router.post('/admin/override', authenticateToken, validateKYCOverride, async (re
 });
 
 // Verify or upsert wallet-level KYC mapping
-router.post('/verify-wallet', authenticateToken, kycController.verifyWallet);
+router.post('/verify-wallet', authenticateToken, requireRole('admin'), kycController.verifyWallet);
 
 // Get wallet status
 router.get('/wallet-status/:wallet', validateWalletAddress, async (req, res) => {

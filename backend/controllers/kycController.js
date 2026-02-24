@@ -31,7 +31,7 @@ exports.verifyWallet = async (req, res) => {
     });
 
     // Optionally trigger on-chain verification (admin only)
-    if (onChain && req.user && req.user.role === 'admin') {
+    if (onChain) {
       const signer = getSigner();
       const complianceManager = new ethers.Contract(
         contractAddresses.complianceManager,
