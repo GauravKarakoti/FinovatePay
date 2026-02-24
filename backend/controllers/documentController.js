@@ -1,9 +1,10 @@
 const storageService = require('../services/storageService');
+const errorResponse = require('../utils/errorResponse');
 
 exports.uploadDocument = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return errorResponse(res, 'No file uploaded', 400);
     }
 
     // upload to IPFS
@@ -19,6 +20,6 @@ exports.uploadDocument = async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'Upload failed' });
+    return errorResponse(res, 'Upload failed', 500);
   }
 };
