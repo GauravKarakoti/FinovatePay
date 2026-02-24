@@ -547,12 +547,14 @@ contract EscrowContract is
 
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
+        uint256 payoutAmount = amount;
         if (fee > 0) {
             IERC20(token).safeTransfer(treasury, fee);
             emit FeeCollected(invoiceId, fee);
+            payoutAmount -= fee;
         }
 
-        IERC20(token).safeTransfer(sellerWins ? seller : buyer, amount);
+        IERC20(token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
 
         if (nft != address(0)) {
             IERC721(nft).transferFrom(
