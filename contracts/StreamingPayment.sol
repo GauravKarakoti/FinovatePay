@@ -237,6 +237,7 @@ contract StreamingPayment is ReentrancyGuard, Pausable, ERC2771Context {
      */
     function approveStream(bytes32 _streamId)
         external
+        payable
         onlyCompliant(_msgSender())
         nonReentrant
         whenNotPaused

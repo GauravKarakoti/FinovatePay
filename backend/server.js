@@ -26,6 +26,9 @@ const { startSyncWorker } = require("./services/escrowSyncService");
 const app = express();
 const server = http.createServer(app);
 
+// Import graceful shutdown utility
+const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
+
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
 const io = socketIo(server, {
@@ -99,6 +102,10 @@ app.use("/api/notifications", notificationRoutes);
 
 app.use("/api/financing", require("./routes/financing"));
 app.use("/api/investor", require("./routes/investor"));
+
+/* ---------------- ANALYTICS ---------------- */
+
+app.use('/api/analytics', require('./routes/analytics'));
 
 /* ---------------- FIAT ON-RAMP ---------------- */
 
@@ -201,7 +208,8 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-/* ---------------- BACKGROUND WORKERS ---------------- */
+// Set up graceful shutdown handlers
+setupGracefulShutdown(server, io);
 
 listenForTokenization();
 startSyncWorker();
