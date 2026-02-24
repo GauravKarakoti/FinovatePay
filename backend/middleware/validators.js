@@ -340,6 +340,29 @@ const validateTokenizeInvoice = [
   handleValidationErrors
 ];
 
+// ============================================
+// RELAYER VALIDATORS
+// ============================================
+
+const validateRelayTransaction = [
+  body('user')
+    .trim()
+    .notEmpty().withMessage('User address is required')
+    .custom(isEthereumAddress).withMessage('Invalid Ethereum address format'),
+  body('functionData')
+    .trim()
+    .notEmpty().withMessage('Function data is required')
+    .matches(/^0x[a-fA-F0-9]+$/).withMessage('Invalid function data format'),
+  body('signature')
+    .trim()
+    .notEmpty().withMessage('Signature is required')
+    .matches(/^0x[a-fA-F0-9]{130}$/).withMessage('Invalid signature format (must be 65 bytes)'),
+  body('nonce')
+    .optional()
+    .isInt({ min: 0 }).withMessage('Nonce must be a non-negative integer'),
+  handleValidationErrors
+];
+
 module.exports = {
   handleValidationErrors,
   // Auth
@@ -369,6 +392,8 @@ module.exports = {
   validateTransferProduce,
   // Financing
   validateTokenizeInvoice,
+  // Relayer
+  validateRelayTransaction,
   // Custom validators (export for reuse)
   isEthereumAddress,
   isUUID,

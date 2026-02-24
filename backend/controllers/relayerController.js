@@ -1,5 +1,6 @@
 const { ethers } = require('ethers');
 const path = require('path');
+const { pool } = require('../config/database');
 
 // Load artifact
 // Try to load from artifacts (dev) first, then deployed (prod)
@@ -14,16 +15,130 @@ try {
     }
 }
 
-const relayTransaction = async (req, res) => {
+/**
+ * Verify EIP-712 signature for meta-transaction
+ * @param {string} user - User address
+ * @param {string} functionData - Encoded function call data
+ * @param {string} signature - EIP-712 signature
+ * @param {number} nonce - Transaction nonce
+ * @returns {boolean} - True if signature is valid
+ */
+const verifySignature = async (user, functionData, signature, nonce) => {
     try {
-        const { user, functionData, signature } = req.body;
+        // Reconstruct the message hash that was signed
+        const messageHash = ethers.solidityPackedKeccak256(
+            ['address', 'bytes', 'uint256'],
+            [user, functionData, nonce]
+        );
 
-        if (!user || !functionData || !signature) {
-            return res.status(400).json({ error: "Missing required fields: user, functionData, signature" });
+        // Recover the signer from the signature
+        const recoveredAddress = ethers.verifyMessage(
+            ethers.getBytes(messageHash),
+            signature
+        );
+
+        // Verify the signer matches the user
+        return recoveredAddress.toLowerCase() === user.toLowerCase();
+    } catch (error) {
+        console.error('Signature verification failed:', error);
+        return false;
+    }
+};
+
+/**
+ * Get the current nonce for a user from database
+ * @param {string} userAddress - User's Ethereum address
+ * @returns {number} - Current nonce
+ */
+const getUserNonce = async (userAddress) => {
+    try {
+        const result = await pool.query(
+            'SELECT nonce FROM meta_transaction_nonces WHERE user_address = $1',
+            [userAddress.toLowerCase()]
+        );
+
+        if (result.rows.length === 0) {
+            // Initialize nonce for new user
+            await pool.query(
+                'INSERT INTO meta_transaction_nonces (user_address, nonce) VALUES ($1, 0)',
+                [userAddress.toLowerCase()]
+            );
+            return 0;
+        }
+
+        return parseInt(result.rows[0].nonce);
+    } catch (error) {
+        console.error('Error fetching nonce:', error);
+        throw new Error('Failed to fetch user nonce');
+    }
+};
+
+/**
+ * Increment the nonce for a user
+ * @param {string} userAddress - User's Ethereum address
+ */
+const incrementNonce = async (userAddress) => {
+    try {
+        await pool.query(
+            'UPDATE meta_transaction_nonces SET nonce = nonce + 1 WHERE user_address = $1',
+            [userAddress.toLowerCase()]
+        );
+    } catch (error) {
+        console.error('Error incrementing nonce:', error);
+        throw new Error('Failed to increment nonce');
+    }
+};
+
+/**
+ * Log relay transaction for audit trail
+ * @param {object} data - Transaction data
+ */
+const logRelayTransaction = async (data) => {
+    try {
+        await pool.query(
+            `INSERT INTO relay_transaction_logs 
+             (user_address, function_data, tx_hash, status, relayer_address, gas_used, error_message, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+            [
+                data.userAddress,
+                data.functionData,
+                data.txHash || null,
+                data.status,
+                data.relayerAddress,
+                data.gasUsed || null,
+                data.errorMessage || null
+            ]
+        );
+    } catch (error) {
+        console.error('Error logging relay transaction:', error);
+        // Don't throw - logging failure shouldn't break the relay
+    }
+};
+
+const relayTransaction = async (req, res) => {
+    const startTime = Date.now();
+    let txHash = null;
+    let gasUsed = null;
+
+    try {
+        const { user, functionData, signature, nonce: providedNonce } = req.body;
+
+        // Verify user is authenticated and matches the transaction user
+        if (req.user.wallet_address.toLowerCase() !== user.toLowerCase()) {
+            await logRelayTransaction({
+                userAddress: user,
+                functionData,
+                status: 'REJECTED',
+                relayerAddress: req.user.wallet_address,
+                errorMessage: 'User mismatch: authenticated user does not match transaction user'
+            });
+            return res.status(403).json({ 
+                error: "Forbidden: You can only relay transactions for your own address" 
+            });
         }
 
         if (!EscrowContractArtifact) {
-             return res.status(500).json({ error: "Contract artifact not found" });
+            return res.status(500).json({ error: "Contract artifact not found" });
         }
 
         // Initialize provider and signer (Relayer)
@@ -36,7 +151,7 @@ const relayTransaction = async (req, res) => {
         const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
 
         if (!privateKey) {
-             return res.status(500).json({ error: "Relayer wallet not configured" });
+            return res.status(500).json({ error: "Relayer wallet not configured" });
         }
 
         const wallet = new ethers.Wallet(privateKey, provider);
@@ -56,26 +171,95 @@ const relayTransaction = async (req, res) => {
             return res.status(500).json({ error: "Contract address not configured" });
         }
 
+        // Get and verify nonce
+        const currentNonce = await getUserNonce(user);
+        const nonceToUse = providedNonce !== undefined ? providedNonce : currentNonce;
+
+        if (nonceToUse !== currentNonce) {
+            await logRelayTransaction({
+                userAddress: user,
+                functionData,
+                status: 'REJECTED',
+                relayerAddress: wallet.address,
+                errorMessage: `Invalid nonce: expected ${currentNonce}, got ${nonceToUse}`
+            });
+            return res.status(400).json({ 
+                error: `Invalid nonce. Expected: ${currentNonce}, Provided: ${nonceToUse}` 
+            });
+        }
+
+        // Verify signature
+        const isValidSignature = await verifySignature(user, functionData, signature, nonceToUse);
+        if (!isValidSignature) {
+            await logRelayTransaction({
+                userAddress: user,
+                functionData,
+                status: 'REJECTED',
+                relayerAddress: wallet.address,
+                errorMessage: 'Invalid signature'
+            });
+            return res.status(401).json({ error: "Invalid signature" });
+        }
+
         const contract = new ethers.Contract(contractAddress, EscrowContractArtifact.abi, wallet);
 
-        // Optional: Verify signature locally before sending to save gas on failed txs
-        // (omitted for brevity, relying on contract check)
-
-        console.log(`Relaying transaction for user ${user} to contract ${contractAddress}`);
+        console.log(`✅ Relaying transaction for user ${user} to contract ${contractAddress}`);
+        console.log(`   Nonce: ${nonceToUse}, Relayer: ${wallet.address}`);
 
         // Call executeMetaTx
-        // Note: ethers.js automatically estimates gas. Relayer pays it.
         const tx = await contract.executeMetaTx(user, functionData, signature);
+        txHash = tx.hash;
 
-        console.log(`Transaction sent: ${tx.hash}`);
+        console.log(`📤 Transaction sent: ${txHash}`);
 
-        // Return immediately with the hash
-        res.json({ success: true, txHash: tx.hash });
+        // Wait for confirmation
+        const receipt = await tx.wait();
+        gasUsed = receipt.gasUsed.toString();
+
+        console.log(`✅ Transaction confirmed: ${txHash}, Gas used: ${gasUsed}`);
+
+        // Increment nonce after successful transaction
+        await incrementNonce(user);
+
+        // Log successful transaction
+        await logRelayTransaction({
+            userAddress: user,
+            functionData,
+            txHash,
+            status: 'SUCCESS',
+            relayerAddress: wallet.address,
+            gasUsed
+        });
+
+        // Return success response
+        res.json({ 
+            success: true, 
+            txHash,
+            gasUsed,
+            newNonce: currentNonce + 1,
+            executionTime: Date.now() - startTime
+        });
 
     } catch (error) {
-        console.error("Relay error:", error);
-        // Return 500 with error message
-        res.status(500).json({ error: error.message || "Relay transaction failed" });
+        console.error("❌ Relay error:", error);
+
+        // Log failed transaction
+        await logRelayTransaction({
+            userAddress: req.body.user,
+            functionData: req.body.functionData,
+            txHash,
+            status: 'FAILED',
+            relayerAddress: req.user?.wallet_address,
+            gasUsed,
+            errorMessage: error.message || 'Unknown error'
+        });
+
+        // Return detailed error for debugging (only in development)
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        res.status(500).json({ 
+            error: isDevelopment ? error.message : "Relay transaction failed",
+            ...(isDevelopment && { stack: error.stack })
+        });
     }
 };
 
