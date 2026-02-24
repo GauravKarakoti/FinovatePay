@@ -396,7 +396,8 @@ const validateRelayTransaction = [
   body('nonce')
     .optional()
     .isInt({ min: 0 }).withMessage('Nonce must be a non-negative integer'),
-  
+];
+
 const validateInvoiceStatus = [
   body('status')
     .trim()
