@@ -122,7 +122,7 @@ router.post('/admin/override', authenticateToken, validateKYCOverride, async (re
 router.post('/verify-wallet', authenticateToken, kycController.verifyWallet);
 
 // Get wallet status
-router.get('/wallet-status/:wallet', validateWalletAddress, async (req, res) => {
+router.get('/wallet-status/:wallet', authenticateToken, validateWalletAddress, async (req, res) => {
   try {
     const wallet = req.params.wallet;
     // Call controller handler directly with wallet parameter
