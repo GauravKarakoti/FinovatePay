@@ -93,12 +93,11 @@ router.get('/:id', validateInvoiceId, async (req, res) => {
   }
 });
 
-// Update Invoice Status (Escrow/Shipping/Dispute)
-router.post('/:invoice_id/status', validateInvoiceId, validateInvoiceStatus, requireKYC, async (req, res) => {
+router.post('/:invoiceId/status', validateInvoiceId, validateInvoiceStatus, requireKYC, async (req, res) => {
     try {
-        const { invoice_id } = req.params;
+        const { invoiceId } = req.params; // Changed to match the route param
         const { status, tx_hash, dispute_reason } = req.body;
-        console.log(`Updating status for invoice ${invoice_id} to ${status} with tx_hash ${tx_hash} and dispute_reason ${dispute_reason}`);
+        console.log(`Updating status for invoice ${invoiceId} to ${status} with tx_hash ${tx_hash} and dispute_reason ${dispute_reason}`);
 
         // Status configuration: field to update and required parameter
         const statusConfig = {
@@ -120,7 +119,7 @@ router.post('/:invoice_id/status', validateInvoiceId, validateInvoiceStatus, req
         }
 
         const query = `UPDATE invoices SET escrow_status = $1, ${config.field} = $2 WHERE invoice_id = $3 RETURNING *`;
-        const values = [status, config.requiredParam, invoice_id];
+        const values = [status, config.requiredParam, invoiceId];
         
         const result = await pool.query(query, values);
         if (result.rows.length === 0) {
@@ -134,12 +133,12 @@ router.post('/:invoice_id/status', validateInvoiceId, validateInvoiceStatus, req
         if (io) {
             io.to(`user-${updatedInvoice.seller_address}`).emit('invoice-update', updatedInvoice);
             io.to(`user-${updatedInvoice.buyer_address}`).emit('invoice-update', updatedInvoice);
-            console.log(`Emitted invoice-update for invoice ${invoice_id}`);
+            console.log(`Emitted invoice-update for invoice ${invoiceId}`);
         }
 
         res.json({ success: true, invoice: updatedInvoice });
     } catch (error) {
-        console.error(`Error updating status for invoice ${req.params.invoice_id}:`, error);
+        console.error(`Error updating status for invoice ${req.params.invoiceId}:`, error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

@@ -2,20 +2,23 @@ const express = require('express');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { kycLimiter } = require('../middleware/rateLimiter');
+
+// Corrected the imported validator names
 const { 
-  validateKYCInitiate, 
-  validateKYCVerifyOTP, 
+  validateInitiateKYC, 
+  validateVerifyKYC, 
   validateKYCOverride,
   validateWalletAddress 
 } = require('../middleware/validators');
+
 const router = express.Router();
 const kycController = require('../controllers/kycController');
 
-// Route to initiate Aadhaar verification
-router.post('/initiate', authenticateToken, kycLimiter, validateKYCInitiate, kycController.initiateKYC);
+// Route to initiate Aadhaar verification (Updated validator name)
+router.post('/initiate', authenticateToken, kycLimiter, validateInitiateKYC, kycController.initiateKYC);
 
-// Route to verify OTP and complete process
-router.post('/verify-otp', authenticateToken, kycLimiter, validateKYCVerifyOTP, kycController.verifyKYCOtp);
+// Route to verify OTP and complete process (Updated validator name)
+router.post('/verify-otp', authenticateToken, kycLimiter, validateVerifyKYC, kycController.verifyKYCOtp);
 
 // Check KYC status
 router.get('/status', authenticateToken, async (req, res) => {
@@ -115,14 +118,10 @@ router.post('/admin/override', authenticateToken, validateKYCOverride, async (re
   }
 });
 
-
-
 // Verify or upsert wallet-level KYC mapping
-// POST /api/kyc/verify-wallet { walletAddress, status, riskLevel, provider, onChain }
 router.post('/verify-wallet', authenticateToken, kycController.verifyWallet);
 
 // Get wallet status
-// GET /api/kyc/wallet-status/:wallet
 router.get('/wallet-status/:wallet', validateWalletAddress, async (req, res) => {
   try {
     const wallet = req.params.wallet;
@@ -133,6 +132,5 @@ router.get('/wallet-status/:wallet', validateWalletAddress, async (req, res) => 
     res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
-
 
 module.exports = router;
