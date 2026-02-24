@@ -64,6 +64,13 @@ contract EscrowContract is
         uint256 votesForSeller;
         bool resolved;
     }
+
+    struct DisputeVoting {
+        uint256 snapshotArbitratorCount;
+        uint256 votesForBuyer;
+        uint256 votesForSeller;
+        bool resolved;
+    }
     
     mapping(bytes32 => Escrow) public escrows;
     mapping(bytes32 => DisputeVoting) public disputeVotings;
@@ -89,6 +96,8 @@ contract EscrowContract is
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
+    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool voteForBuyer);
+    event SafeEscape(bytes32 indexed invoiceId, address indexed admin);
 
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
@@ -284,7 +293,6 @@ contract EscrowContract is
 
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
-        IERC20 token = IERC20(escrow.token);
         
         token.safeTransfer(escrow.seller, escrow.amount);
         
@@ -542,9 +550,6 @@ contract EscrowContract is
         address buyer = e.buyer;
         uint256 amount = e.amount;
         uint256 fee = e.feeAmount;
-        address token = e.token;
-        address nft = e.rwaNftContract;
-        uint256 nftId = e.rwaTokenId;
 
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
@@ -557,13 +562,8 @@ contract EscrowContract is
 
         IERC20(token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
 
-        if (nft != address(0)) {
-            IERC721(nft).transferFrom(
-                address(this),
-                sellerWins ? buyer : seller,
-                nftId
-            );
-        }
+        // Transfer NFT to winner
+        _transferNFT(address(this), sellerWins ? buyer : seller, e);
 
         delete escrows[invoiceId];
     }
