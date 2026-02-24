@@ -12,7 +12,22 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
       const response = await updateCurrentUserRole(newRole);
       if (response && response.data.user) {
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        window.location.reload();
+        
+        // Navigate to the appropriate dashboard based on new role
+        const dashboardRoutes = {
+          buyer: '/buyer',
+          seller: '/',
+          admin: '/admin',
+          investor: '/investor',
+          shipment: '/shipment',
+          warehouse: '/shipment'
+        };
+        
+        const targetRoute = dashboardRoutes[newRole] || '/';
+        navigate(targetRoute);
+        
+        // Force a re-render by updating the page
+        window.location.href = targetRoute;
       }
     } catch (error) {
       console.error('Failed to switch role:', error);

@@ -1,4 +1,5 @@
-import { createWeb3Modal, defaultConfig } from '@web3modal/ethers/react';
+import { createAppKit } from '@reown/appkit/react';
+import { EthersAdapter } from '@reown/appkit-adapter-ethers';
 import { BrowserProvider, Contract } from 'ethers';
 
 // Import contract ABIs and addresses
@@ -17,13 +18,28 @@ export const stablecoinAddresses = {
   BRLC: '0x6DEf515A0419D4613c7A3950796339A4405d4191',
 };
 
-// Polygon Amoy Testnet Configuration
-const amoyTestnet = {
-  chainId: 80002,
+// Define Polygon Amoy Testnet as a custom chain for Reown AppKit
+const polygonAmoy = {
+  id: 80002,
   name: 'Polygon Amoy Testnet',
-  currency: 'MATIC',
-  explorerUrl: 'https://www.oklink.com/amoy',
-  rpcUrl: import.meta.env.VITE_RPC_URL || 'https://rpc.ankr.com/polygon_amoy',
+  system: 'evm',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Matic',
+    symbol: 'MATIC',
+  },
+  rpcUrls: {
+    default: {
+      http: [import.meta.env.VITE_RPC_URL || 'https://rpc.ankr.com/polygon_amoy'],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'OKLink',
+      url: 'https://www.oklink.com/amoy',
+    },
+  },
+  testnet: true,
 };
 
 // App Metadata
@@ -34,7 +50,7 @@ const metadata = {
   icons: [typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : 'https://finovatepay.com/logo.png'],
 };
 
-// Create Web3Modal instance
+// Create Reown AppKit instance
 let modal;
 if (typeof window !== 'undefined') {
   const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
@@ -45,35 +61,41 @@ if (typeof window !== 'undefined') {
     console.error('Get your Project ID from: https://cloud.walletconnect.com');
   } else {
     try {
-      modal = createWeb3Modal({
-        ethersConfig: defaultConfig({ metadata }),
-        chains: [amoyTestnet],
+      modal = createAppKit({
+        adapters: [new EthersAdapter()],
+        networks: [polygonAmoy],
+        metadata: metadata,
         projectId: projectId,
-        enableAnalytics: false,
+        defaultNetwork: polygonAmoy,
+        features: {
+          analytics: true,
+        },
         themeMode: 'light',
         themeVariables: {
           '--w3m-accent': '#2980B9',
         },
       });
     } catch (error) {
-      console.error('Failed to initialize Web3Modal:', error);
+      console.error('Failed to initialize Reown AppKit:', error);
     }
   }
 }
 
-// Get Web3Modal instance
-export function getWeb3Modal() {
+// Get Reown AppKit instance
+export function getAppKit() {
   return modal;
 }
 
 // Check if wallet is connected
 export function isWalletConnected() {
-  return modal?.getIsConnected?.() || false;
+  if (!modal) return false;
+  return modal.getIsConnected() || false;
 }
 
 // Get connected wallet address
 export function getConnectedAddress() {
-  return modal?.getAddress?.() || null;
+  if (!modal) return null;
+  return modal.getAddress() || null;
 }
 
 // Ensure user is on Amoy network
@@ -83,9 +105,9 @@ async function ensureAmoyNetwork(provider) {
     
     // Compare chainId (ethers v6 returns BigInt)
     if (network.chainId !== 80002n) {
-      // Request network switch via modal
+      // Request network switch
       if (modal) {
-        await modal.switchNetwork(80002);
+        await modal.switchNetwork(polygonAmoy);
       }
     }
   } catch (error) {
@@ -98,11 +120,11 @@ async function ensureAmoyNetwork(provider) {
 export async function connectWallet() {
   try {
     if (!modal) {
-      throw new Error('Web3Modal not initialized');
+      throw new Error('Reown AppKit not initialized');
     }
 
     // Open modal if not connected
-    const isConnected = modal.getIsConnected?.() || false;
+    const isConnected = modal.getIsConnected() || false;
     if (!isConnected) {
       await modal.open();
       
@@ -173,7 +195,7 @@ async function getWalletInfo() {
 export async function disconnectWallet() {
   try {
     if (modal) {
-      // In Web3Modal v3, use the disconnect method from the modal instance
+      // Reown AppKit disconnect method
       await modal.disconnect();
     }
   } catch (error) {

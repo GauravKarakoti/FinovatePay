@@ -388,7 +388,7 @@ const AnalyticsDashboard = ({ userRole }) => {
                     <Area type="monotone" dataKey="amount" stroke="#10B981" fill="#6EE7B7" />
                   </AreaChart>
                
- } : </ResponsiveContainer> (
+      </ResponsiveContainer> ) : (
                 <p className="text-gray-500 text-center py-8">No financing data available</p>
               )}
             </div>
