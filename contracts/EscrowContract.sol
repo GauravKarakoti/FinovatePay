@@ -55,9 +55,17 @@ contract EscrowContract is
         uint256 rwaTokenId;     // The tokenId of the produce lot
         uint256 feeAmount;      // Platform fee amount
     }
+
+    struct DisputeVoting {
+        uint256 snapshotArbitratorCount;
+        uint256 votesForBuyer;
+        uint256 votesForSeller;
+        bool resolved;
+    }
     
     mapping(bytes32 => Escrow) public escrows;
     mapping(bytes32 => mapping(address => bool)) public hasVoted;
+    mapping(bytes32 => DisputeVoting) public disputeVotings;
 
     ComplianceManager public complianceManager;
     ArbitratorsRegistry public arbitratorsRegistry;
@@ -70,11 +78,13 @@ contract EscrowContract is
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
-    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
+    event ArbitratorVoted(bytes32 indexed invoiceId, address arbitrator, bool voteForBuyer);
+    event SafeEscape(bytes32 indexed invoiceId, address caller);
 
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
