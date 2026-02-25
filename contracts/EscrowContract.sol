@@ -65,6 +65,7 @@ contract EscrowContract is
     address public admin;
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
+    uint256 public quorumPercentage; // Quorum percentage for dispute voting (e.g., 50 = 50%)
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -108,6 +109,7 @@ contract EscrowContract is
         complianceManager = ComplianceManager(_complianceManager);
         treasury = msg.sender; // Default treasury to admin
         feePercentage = 50;    // Default 0.5% fee (50 basis points)
+        quorumPercentage = 50; // Default 50% quorum for dispute voting
     }
     
     /**
