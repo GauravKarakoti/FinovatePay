@@ -36,7 +36,6 @@
     "jsonwebtoken": "^9.0.2",
     "mailersend": "^2.6.0",
     "multer": "^2.0.2",
-    "nodemon": "^3.1.10",
     "pg": "^8.18.0",
     "socket.io": "^4.8.1",
     "sonner": "^2.0.7",
@@ -44,6 +43,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "nodemon": "^3.1.10",
     "chai": "^4.3.10",
     "jest": "^30.2.0",
     "mocha": "^10.2.0",

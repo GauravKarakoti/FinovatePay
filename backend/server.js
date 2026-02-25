@@ -26,6 +26,9 @@ const { startSyncWorker } = require("./services/escrowSyncService");
 const app = express();
 const server = http.createServer(app);
 
+// Import graceful shutdown utility
+const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
+
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
 const io = socketIo(server, {
@@ -205,7 +208,8 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-/* ---------------- BACKGROUND WORKERS ---------------- */
+// Set up graceful shutdown handlers
+setupGracefulShutdown(server, io);
 
 listenForTokenization();
 startSyncWorker();

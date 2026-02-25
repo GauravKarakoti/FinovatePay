@@ -22,6 +22,24 @@ contract ArbitratorsRegistry is Ownable {
     }
     
     /**
+     * @dev Add multiple arbitrators to the registry
+     * @param _arbitrators Array of arbitrator addresses to add
+     */
+    function addArbitrators(address[] calldata _arbitrators) external onlyOwner {
+        require(_arbitrators.length > 0, "No arbitrators provided");
+        
+        for (uint256 i = 0; i < _arbitrators.length; i++) {
+            address arbitrator = _arbitrators[i];
+            require(arbitrator != address(0), "Invalid arbitrator address");
+            require(!isArbitrator[arbitrator], "Already an arbitrator");
+            _addArbitrator(arbitrator);
+        }
+        
+        // Ensure total count is odd to prevent voting deadlocks
+        require(arbitratorCount % 2 != 0, "Arbitrator count must be odd");
+    }
+
+    /**
      * @dev Add a new arbitrator to the registry
      * @param _arbitrator Address of the arbitrator to add
      */
@@ -30,13 +48,41 @@ contract ArbitratorsRegistry is Ownable {
         require(!isArbitrator[_arbitrator], "Already an arbitrator");
         
         _addArbitrator(_arbitrator);
+        
+        // Fix for deadlock issue: Ensure odd number of arbitrators
+        require(arbitratorCount % 2 != 0, "Arbitrator count must be odd");
     }
     
+    /**
+     * @dev Remove multiple arbitrators from the registry
+     * @param _arbitrators Array of arbitrator addresses to remove
+     */
+    function removeArbitrators(address[] calldata _arbitrators) external onlyOwner {
+        require(_arbitrators.length > 0, "No arbitrators provided");
+        
+        for (uint256 i = 0; i < _arbitrators.length; i++) {
+            _removeArbitrator(_arbitrators[i]);
+        }
+        
+        // Ensure total count is odd to prevent voting deadlocks
+        require(arbitratorCount % 2 != 0, "Arbitrator count must be odd");
+    }
+
     /**
      * @dev Remove an arbitrator from the registry
      * @param _arbitrator Address of the arbitrator to remove
      */
     function removeArbitrator(address _arbitrator) external onlyOwner {
+        _removeArbitrator(_arbitrator);
+        
+        // Fix for deadlock issue: Ensure odd number of arbitrators
+        require(arbitratorCount % 2 != 0, "Arbitrator count must be odd");
+    }
+    
+    /**
+     * @dev Internal function to remove arbitrator
+     */
+    function _removeArbitrator(address _arbitrator) private {
         require(isArbitrator[_arbitrator], "Not an arbitrator");
         require(arbitratorCount > 1, "Cannot remove last arbitrator");
         

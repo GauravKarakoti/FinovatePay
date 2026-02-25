@@ -92,9 +92,34 @@ const paymentLimiter = rateLimit({
   }
 });
 
+/**
+ * Relayer Rate Limiter
+ * Applies to meta-transaction relay endpoints
+ * Default: 10 requests per 15 minutes per IP
+ * Strict limit to prevent gas draining attacks
+ */
+const relayerLimiter = rateLimit({
+  windowMs: parseInt(process.env.RELAYER_RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.RELAYER_RATE_LIMIT_MAX_REQUESTS) || 10,
+  message: {
+    error: 'Too many relay requests, please try again later.',
+    retryAfter: 'Check the Retry-After header for wait time.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.warn(`Relayer rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many relay requests from this IP. Please try again later.',
+      retryAfter: req.rateLimit.resetTime
+    });
+  }
+});
+
 module.exports = {
   globalLimiter,
   authLimiter,
   kycLimiter,
-  paymentLimiter
+  paymentLimiter,
+  relayerLimiter
 };
