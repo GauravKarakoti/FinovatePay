@@ -14,7 +14,7 @@ const {
   verifyInvoiceAccess,
   verifyMarketplaceAccess,
 } = require("./middleware/socketAuth");
-const { globalLimiter } = require("./middleware/rateLimiter");
+const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
 
@@ -70,6 +70,7 @@ app.use(express.json());
 
 /* ---------------- RATE LIMITING ---------------- */
 
+// Global rate limiter for all API routes
 app.use("/api/", globalLimiter);
 
 /* ---------------- DATABASE ---------------- */
@@ -83,16 +84,16 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 /* ---------------- API ROUTES ---------------- */
 
 app.use("/api/health", require("./routes/health"));
-app.use("/api/auth", require("./routes/auth"));
+app.use("/api/auth", authLimiter, require("./routes/auth"));
 app.use("/api/invoices", require("./routes/invoice"));
-app.use("/api/payments", require("./routes/payment"));
+app.use("/api/payments", paymentLimiter, require("./routes/payment"));
 app.use("/api/admin", require("./routes/admin"));
-app.use("/api/kyc", require("./routes/kyc"));
+app.use("/api/kyc", kycLimiter, require("./routes/kyc"));
 app.use("/api/produce", require("./routes/produce"));
 app.use("/api/quotations", require("./routes/quotation"));
 app.use("/api/market", require("./routes/market"));
 app.use("/api/dispute", require("./routes/dispute"));
-app.use("/api/relayer", require("./routes/relayer"));
+app.use("/api/relayer", relayerLimiter, require("./routes/relayer"));
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/shipment", shipmentRoutes);
 app.use("/api/meta-tx", require("./routes/metaTransaction"));
