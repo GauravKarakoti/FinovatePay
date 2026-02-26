@@ -2,6 +2,7 @@ const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
+const errorResponse = require('../utils/errorResponse');
 
 // Helper function to convert UUID to bytes32 using ethers v6 syntax
 const uuidToBytes32 = (uuid) => {
@@ -45,7 +46,7 @@ exports.releaseEscrow = async (req, res) => {
 
   } catch (error) {
     console.error("Error in releaseEscrow:", error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -84,6 +85,6 @@ exports.raiseDispute = async (req, res) => {
 
   } catch (error) {
     console.error("Error in raiseDispute:", error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };

@@ -3,6 +3,7 @@ const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 const { getFinancingManagerContract } = require('../config/blockchain');
+const errorResponse = require('../utils/errorResponse');
 
 // Helper function to convert UUID to bytes32
 const uuidToBytes32 = (uuid) => {
@@ -14,13 +15,13 @@ const uuidToBytes32 = (uuid) => {
 
 exports.setInvoiceSpread = async (req, res) => {
   if (req.user.role !== 'admin') {
-    return res.status(401).json({ msg: 'Not authorized' });
+    return errorResponse(res, 'Not authorized', 401);
   }
 
   const { tokenId, spreadBps } = req.body;
 
   if (!tokenId || !spreadBps) {
-    return res.status(400).json({ msg: 'Token ID and spreadBps are required' });
+    return errorResponse(res, 'Token ID and spreadBps are required', 400);
   }
 
   try {
@@ -33,7 +34,7 @@ exports.setInvoiceSpread = async (req, res) => {
     res.json({ msg: 'Invoice spread updated successfully', tokenId, spreadBps });
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server error');
+    return errorResponse(res, 'Server error', 500);
   }
 };
 
@@ -46,7 +47,7 @@ exports.getAllUsers = async (req, res) => {
         res.json({ success: true, data: result.rows });
     } catch (error) {
         console.error("Error in getAllUsers:", error);
-        res.status(500).json({ error: error.message });
+        return errorResponse(res, error, 500);
     }
 };
 
@@ -57,7 +58,7 @@ exports.freezeAccount = async (req, res) => {
         res.json({ success: true, message: 'Account frozen successfully' });
     } catch (error) {
         console.error("Error in freezeAccount:", error);
-        res.status(500).json({ error: error.message });
+        return errorResponse(res, error, 500);
     }
 };
 
@@ -68,7 +69,7 @@ exports.unfreezeAccount = async (req, res) => {
         res.json({ success: true, message: 'Account unfrozen successfully' });
     } catch (error) {
         console.error("Error in unfreezeAccount:", error);
-        res.status(500).json({ error: error.message });
+        return errorResponse(res, error, 500);
     }
 };
 
@@ -80,14 +81,14 @@ exports.updateUserRole = async (req, res) => {
         // Add validation for allowed roles
         const allowedRoles = ['admin', 'buyer', 'seller', 'shipment'];
         if (!allowedRoles.includes(role)) {
-            return res.status(400).json({ error: 'Invalid role specified' });
+            return errorResponse(res, 'Invalid role specified', 400);
         }
 
         await pool.query('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
         res.json({ success: true, message: 'User role updated successfully' });
     } catch (error) {
         console.error("Error in updateUserRole:", error);
-        res.status(500).json({ error: error.message });
+        return errorResponse(res, error, 500);
     }
 };
 
@@ -98,7 +99,7 @@ exports.getInvoices = async (req, res) => {
         res.json({ success: true, data: result.rows });
     } catch (error) {
         console.error("Error in getInvoices:", error);
-        res.status(500).json({ error: error.message });
+        return errorResponse(res, error, 500);
     }
 };
 
@@ -119,7 +120,7 @@ exports.checkCompliance = async (req, res) => {
         });
     } catch (error) {
         console.error("Error in checkCompliance:", error);
-        res.status(500).json({ error: error.message });
+        return errorResponse(res, error, 500);
     }
 };
 
@@ -153,6 +154,6 @@ exports.resolveDispute = async (req, res) => {
         res.json({ success: true, txHash: tx.hash });
     } catch (error) {
         console.error("Error in resolveDispute:", error);
-        res.status(500).json({ error: error.message });
+        return errorResponse(res, error, 500);
     }
 };
