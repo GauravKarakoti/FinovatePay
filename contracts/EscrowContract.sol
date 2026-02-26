@@ -301,6 +301,7 @@ contract EscrowContract is
     
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
         Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.disputeRaised, "No dispute raised");
         require(escrow.status == EscrowStatus.Disputed, "Not disputed");
         
         _resolveEscrow(_invoiceId, _sellerWins);
