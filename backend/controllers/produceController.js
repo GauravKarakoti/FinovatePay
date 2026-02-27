@@ -2,6 +2,7 @@ const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const ProduceTrackingArtifact = require('../../deployed/ProduceTracking.json');
+const errorResponse = require('../utils/errorResponse');
 
 exports.createProduceLot = async (req, res) => {
   try {
@@ -10,7 +11,7 @@ exports.createProduceLot = async (req, res) => {
 
     // Basic validation to ensure data is coming from the frontend correctly
     if (lotId === undefined || !txHash) {
-        return res.status(400).json({ error: 'Missing lotId or transaction hash.' });
+        return errorResponse(res, 'Missing lotId or transaction hash.', 400);
     }
 
     const query = `
@@ -38,9 +39,9 @@ exports.createProduceLot = async (req, res) => {
     console.error("Error syncing produce lot:", error);
     // Handle potential duplicate key errors if the same lot is synced twice
     if (error.code === '23505') { 
-        return res.status(409).json({ error: 'This produce lot has already been synced.' });
+        return errorResponse(res, 'This produce lot has already been synced.', 409);
     }
-    res.status(500).json({ error: 'Failed to sync produce lot to the database.' });
+    return errorResponse(res, 'Failed to sync produce lot to the database.', 500);
   }
 };
 
@@ -87,7 +88,7 @@ exports.transferProduce = async (req, res) => {
     res.json({ success: true, txHash: tx.hash });
   } catch (error) {
     console.error("Error transferring produce:", error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -117,7 +118,7 @@ exports.getProduceLot = async (req, res) => {
     });
   } catch (error) {
     console.error("Error getting produce lot:", error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -133,6 +134,6 @@ exports.getSellerLots = async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching seller lots:', error);
-    res.status(500).json({ error: 'Failed to fetch seller lots.' });
+    return errorResponse(res, 'Failed to fetch seller lots.', 500);
   }
 };

@@ -135,7 +135,21 @@ const validateCreateInvoice = [
   
   body('due_date')
     .optional()
-    .isISO8601().withMessage('Invalid date format'),
+    .isISO8601().withMessage('Invalid date format')
+    .custom(value => {
+      if (new Date(value) < new Date()) {
+        throw new Error('Due date must be in future');
+      }
+      return true;
+    }),
+
+  body('discount_rate')
+    .optional()
+    .isFloat({ min: 0, max: 100 }).withMessage('Discount rate must be between 0 and 100'),
+
+  body('annual_apr')
+    .optional()
+    .isFloat({ min: 0, max: 100 }).withMessage('Annual APR must be between 0 and 100'),
   
   handleValidationErrors
 ];

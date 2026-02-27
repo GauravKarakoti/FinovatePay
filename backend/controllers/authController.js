@@ -1,6 +1,7 @@
 const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const errorResponse = require('../utils/errorResponse');
 
 // Utility function to sanitize user object (remove sensitive fields)
 const sanitizeUser = (user) => {
@@ -24,7 +25,7 @@ exports.register = async (req, res) => {
 
     
     if (userCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'User already exists with this Email or Wallet' });
+      return errorResponse(res, 'User already exists with this Email or Wallet', 400);
     }
 
     // 3. Encrypt the password
@@ -62,7 +63,7 @@ exports.register = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Registration Error:", err.message);
-    res.status(500).json({ error: 'Server error during registration' });
+    return errorResponse(res, 'Server error during registration', 500);
   }
 };
 
@@ -74,13 +75,13 @@ exports.login = async (req, res) => {
     // 1. Find user by email
     const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (user.rows.length === 0) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+      return errorResponse(res, 'Invalid credentials', 400);
     }
 
     // 2. Check password
     const isMatch = await bcrypt.compare(password, user.rows[0].password);
     if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid credentials' });
+      return errorResponse(res, 'Invalid credentials', 400);
     }
 
     // 3. Create and set token in HttpOnly cookie
@@ -105,6 +106,6 @@ exports.login = async (req, res) => {
 
   } catch (err) {
     console.error("❌ Login Error:", err.message);
-    res.status(500).json({ error: 'Server error' });
+    return errorResponse(res, 'Server error', 500);
   }
 };

@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const errorResponse = require('../utils/errorResponse');
 
 /*//////////////////////////////////////////////////////////////
                 CREATE INVOICE (FROM QUOTATION)
@@ -134,7 +135,7 @@ exports.createInvoice = async (req, res) => {
         if (error.message.includes('Insufficient quantity')) statusCode = 400;
         if (error.message === 'Missing quotation_id or required on-chain data.') statusCode = 400;
 
-        return res.status(statusCode).json({ error: error.message || 'Internal server error.' });
+        return errorResponse(res, error, statusCode);
     } finally {
         client.release();
     }
@@ -153,7 +154,7 @@ exports.getEarlyPaymentOffer = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Invoice not found' });
+      return errorResponse(res, 'Invoice not found', 404);
     }
 
     const invoice = result.rows[0];
@@ -187,7 +188,7 @@ exports.getEarlyPaymentOffer = async (req, res) => {
 
   } catch (error) {
     console.error('Early payment offer error:', error);
-    return res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -279,7 +280,7 @@ exports.settleInvoiceEarly = async (req, res) => {
     if (error.message.includes('Not authorized')) statusCode = 403;
     if (error.message.includes('overdue') || error.message.includes('already settled')) statusCode = 400;
 
-    return res.status(statusCode).json({ error: error.message });
+    return errorResponse(res, error, statusCode);
   } finally {
     client.release();
   }
