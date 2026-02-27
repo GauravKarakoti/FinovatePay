@@ -108,6 +108,10 @@ app.use("/api/investor", require("./routes/investor"));
 
 app.use('/api/analytics', require('./routes/analytics'));
 
+/* ---------------- CURRENCIES ---------------- */
+
+app.use('/api/currencies', require('./routes/currency'));
+
 /* ---------------- FIAT ON-RAMP ---------------- */
 
 app.use("/api/fiat-ramp", require("./routes/fiatRamp"));
