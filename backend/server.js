@@ -112,6 +112,10 @@ app.use('/api/analytics', require('./routes/analytics'));
 
 app.use('/api/currencies', require('./routes/currency'));
 
+/* ---------------- CREDIT SCORES ---------------- */
+
+app.use('/api/credit-scores', require('./routes/creditScore'));
+
 /* ---------------- FIAT ON-RAMP ---------------- */
 
 app.use("/api/fiat-ramp", require("./routes/fiatRamp"));
