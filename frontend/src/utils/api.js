@@ -476,4 +476,21 @@ export const cancelAuction = (auctionId) => {
   return api.post(`/auctions/${auctionId}/cancel`);
 };
 
+// --- Analytics API ---
+export const getAnalyticsOverview = () => {
+  return api.get('/analytics/overview');
+};
+
+export const getPaymentAnalytics = () => {
+  return api.get('/analytics/payments');
+};
+
+export const getFinancingAnalytics = () => {
+  return api.get('/analytics/financing');
+};
+
+export const getRiskScore = (invoiceId) => {
+  return api.get(`/analytics/risk/${invoiceId}`);
+};
+
 export default api;

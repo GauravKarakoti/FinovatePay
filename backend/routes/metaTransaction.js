@@ -56,7 +56,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
  * GET /api/meta-tx/nonce/:address
  * Get current nonce for an address
  */
-router.get('/nonce/:address', async (req, res) => {
+router.get('/nonce/:address', authenticateToken, async (req, res) => {
   try {
     const { address } = req.params;
 
