@@ -34,6 +34,7 @@ import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
 import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
+import AnalyticsPage from '../pages/AnalyticsPage';
 
 // ------------------ HELPER COMPONENTS ------------------
 
