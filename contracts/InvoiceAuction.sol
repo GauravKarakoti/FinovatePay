@@ -14,6 +14,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 contract InvoiceAuction is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    constructor() Ownable(msg.sender) {}
+
     // Auction status enum
     enum AuctionStatus { Created, Active, Ended, Cancelled, Settled }
 
