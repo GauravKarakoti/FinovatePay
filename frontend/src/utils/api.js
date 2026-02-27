@@ -414,20 +414,73 @@ export const cancelStream = (streamId) => {
   return api.post(`/streaming/${streamId}/cancel`);
 };
 
+// --- Auction API ---
+
+// Create a new auction
+export const createAuction = (auctionData) => {
+  return api.post('/auctions', auctionData);
+};
+
+// Get all active auctions
+export const getAuctions = (params) => {
+  return api.get('/auctions', { params });
+};
+
+// Get auctions for current seller
+export const getSellerAuctions = () => {
+  return api.get('/auctions/seller');
+};
+
+// Get auctions the user has bid on
+export const getBidderAuctions = () => {
+  return api.get('/auctions/bidder');
+};
+
+// Get auction statistics
+export const getAuctionStats = () => {
+  return api.get('/auctions/stats');
+};
+
+// Get auction details
+export const getAuction = (auctionId) => {
+  return api.get(`/auctions/${auctionId}`);
+};
+
+// Get bids for an auction
+export const getAuctionBids = (auctionId) => {
+  return api.get(`/auctions/${auctionId}/bids`);
+};
+
+// Start an auction
+export const startAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/start`);
+};
+
+// Place a bid on an auction
+export const placeBid = (auctionId, bidData) => {
+  return api.post(`/auctions/${auctionId}/bid`, bidData);
+};
+
+// End an auction
+export const endAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/end`);
+};
+
+// Settle an auction
+export const settleAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/settle`);
+};
+
+// Cancel an auction
+export const cancelAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/cancel`);
+};
+
 // --- Analytics API ---
 export const getAnalyticsOverview = () => {
   return api.get('/analytics/overview');
 };
 
-export const getPaymentAnalytics = () => {
-  return api.get('/analytics/payments');
-};
-
-export const getFinancingAnalytics = () => {
-  return api.get('/analytics/financing');
-};
-
-export const getRiskScore = (invoiceId) => {
   return api.get(`/analytics/risk/${invoiceId}`);
 };
 

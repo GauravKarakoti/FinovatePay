@@ -104,6 +104,10 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/financing", require("./routes/financing"));
 app.use("/api/investor", require("./routes/investor"));
 
+/* ---------------- AUCTIONS ---------------- */
+
+app.use("/api/auctions", require("./routes/auction"));
+
 /* ---------------- ANALYTICS ---------------- */
 
 app.use('/api/analytics', require('./routes/analytics'));
