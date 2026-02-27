@@ -1,6 +1,7 @@
 const { ethers } = require('ethers');
 const path = require('path');
 const { pool } = require('../config/database');
+const errorResponse = require('../utils/errorResponse');
 
 // Load artifact
 // Try to load from artifacts (dev) first, then deployed (prod)
@@ -132,26 +133,24 @@ const relayTransaction = async (req, res) => {
                 relayerAddress: req.user.wallet_address,
                 errorMessage: 'User mismatch: authenticated user does not match transaction user'
             });
-            return res.status(403).json({ 
-                error: "Forbidden: You can only relay transactions for your own address" 
-            });
+            return errorResponse(res, "Forbidden: You can only relay transactions for your own address", 403);
         }
 
         if (!EscrowContractArtifact) {
-            return res.status(500).json({ error: "Contract artifact not found" });
+            return errorResponse(res, "Contract artifact not found", 500);
         }
 
         // Initialize provider and signer (Relayer)
         const providerUrl = process.env.ALCHEMY_AMOY_URL;
         if (!providerUrl) {
-            return res.status(500).json({ error: "RPC URL not configured" });
+            return errorResponse(res, "RPC URL not configured", 500);
         }
 
         const provider = new ethers.JsonRpcProvider(providerUrl);
         const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
 
         if (!privateKey) {
-            return res.status(500).json({ error: "Relayer wallet not configured" });
+            return errorResponse(res, "Relayer wallet not configured", 500);
         }
 
         const wallet = new ethers.Wallet(privateKey, provider);
@@ -168,7 +167,7 @@ const relayTransaction = async (req, res) => {
         }
 
         if (!contractAddress) {
-            return res.status(500).json({ error: "Contract address not configured" });
+            return errorResponse(res, "Contract address not configured", 500);
         }
 
         // Get and verify nonce
@@ -183,9 +182,7 @@ const relayTransaction = async (req, res) => {
                 relayerAddress: wallet.address,
                 errorMessage: `Invalid nonce: expected ${currentNonce}, got ${nonceToUse}`
             });
-            return res.status(400).json({ 
-                error: `Invalid nonce. Expected: ${currentNonce}, Provided: ${nonceToUse}` 
-            });
+            return errorResponse(res, `Invalid nonce. Expected: ${currentNonce}, Provided: ${nonceToUse}`, 400);
         }
 
         // Verify signature
@@ -198,7 +195,7 @@ const relayTransaction = async (req, res) => {
                 relayerAddress: wallet.address,
                 errorMessage: 'Invalid signature'
             });
-            return res.status(401).json({ error: "Invalid signature" });
+            return errorResponse(res, "Invalid signature", 401);
         }
 
         const contract = new ethers.Contract(contractAddress, EscrowContractArtifact.abi, wallet);
@@ -255,11 +252,8 @@ const relayTransaction = async (req, res) => {
         });
 
         // Return detailed error for debugging (only in development)
-        const isDevelopment = process.env.NODE_ENV === 'development';
-        res.status(500).json({ 
-            error: isDevelopment ? error.message : "Relay transaction failed",
-            ...(isDevelopment && { stack: error.stack })
-        });
+        // Note: errorResponse handles production masking, so we just pass the error
+        return errorResponse(res, error, 500);
     }
 };
 
