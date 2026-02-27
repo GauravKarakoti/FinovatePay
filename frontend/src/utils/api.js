@@ -476,4 +476,26 @@ export const cancelAuction = (auctionId) => {
   return api.post(`/auctions/${auctionId}/cancel`);
 };
 
+// --- Analytics API ---
+
+// Get analytics overview (dashboard summary)
+export const getAnalyticsOverview = () => {
+  return api.get('/analytics/overview');
+};
+
+// Get payment analytics
+export const getPaymentAnalytics = (params) => {
+  return api.get('/analytics/payments', { params });
+};
+
+// Get financing analytics
+export const getFinancingAnalytics = () => {
+  return api.get('/analytics/financing');
+};
+
+// Get risk assessment for an invoice
+export const getRiskScore = (invoiceId) => {
+  return api.get(`/analytics/risk/${invoiceId}`);
+};
+
 export default api;
