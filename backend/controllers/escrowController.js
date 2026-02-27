@@ -3,6 +3,11 @@ const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 const { logAudit, logFinancialTransaction } = require('../middleware/auditLogger');
+const { 
+  createTransactionState, 
+  updateTransactionState, 
+  addToRecoveryQueue 
+} = require('../services/recoveryService');
 
 // Helper function to convert UUID to bytes32 using ethers v6 syntax
 const uuidToBytes32 = (uuid) => {
@@ -14,10 +19,23 @@ const uuidToBytes32 = (uuid) => {
 
 exports.releaseEscrow = async (req, res) => {
   const client = await pool.connect();
+  let correlationId = null;
   
   try {
     const { invoiceId } = req.body;
     const io = req.app.get("io");
+
+    // Create transaction state
+    correlationId = await createTransactionState({
+      operationType: 'ESCROW_RELEASE',
+      entityType: 'INVOICE',
+      entityId: invoiceId,
+      stepsRemaining: ['BLOCKCHAIN_TX', 'DB_UPDATE', 'AUDIT_LOG'],
+      contextData: { invoiceId, userId: req.user.id },
+      initiatedBy: req.user.id
+    });
+
+    await updateTransactionState(correlationId, 'PROCESSING');
 
     await client.query('BEGIN');
 
@@ -56,18 +74,33 @@ exports.releaseEscrow = async (req, res) => {
       amount: invoice.amount,
       status: 'PENDING',
       initiatedBy: req.user.id,
-      metadata: { reason: 'Escrow release confirmed' }
+      metadata: { reason: 'Escrow release confirmed', correlationId }
     });
 
+    // Execute blockchain transaction
     const tx = await escrowContract.confirmRelease(bytes32InvoiceId);
     await tx.wait();
 
+    // Mark blockchain step as completed
+    await updateTransactionState(correlationId, 'PROCESSING', {
+      stepsCompleted: ['BLOCKCHAIN_TX'],
+      stepsRemaining: ['DB_UPDATE', 'AUDIT_LOG'],
+      contextData: { invoiceId, txHash: tx.hash, userId: req.user.id }
+    });
+
+    // Update database
     await client.query(
       'UPDATE invoices SET escrow_status = $1, release_tx_hash = $2 WHERE invoice_id = $3',
       ['released', tx.hash, invoiceId]
     );
 
     await client.query('COMMIT');
+
+    // Mark DB update as completed
+    await updateTransactionState(correlationId, 'PROCESSING', {
+      stepsCompleted: ['BLOCKCHAIN_TX', 'DB_UPDATE'],
+      stepsRemaining: ['AUDIT_LOG']
+    });
 
     // Update financial transaction to CONFIRMED
     if (financialTx) {
@@ -89,9 +122,14 @@ exports.releaseEscrow = async (req, res) => {
       status: 'SUCCESS',
       oldValues: { escrow_status: invoice.escrow_status },
       newValues: { escrow_status: 'released', tx_hash: tx.hash },
-      metadata: { blockchain_tx: tx.hash },
+      metadata: { blockchain_tx: tx.hash, correlationId },
       ipAddress: req.ip,
       userAgent: req.get('user-agent')
+    });
+
+    // Mark transaction as completed
+    await updateTransactionState(correlationId, 'COMPLETED', {
+      stepsCompleted: ['BLOCKCHAIN_TX', 'DB_UPDATE', 'AUDIT_LOG']
     });
 
     // Real-time event
@@ -101,11 +139,33 @@ exports.releaseEscrow = async (req, res) => {
       status: "released"
     });
 
-    res.json({ success: true, txHash: tx.hash });
+    res.json({ success: true, txHash: tx.hash, correlationId });
 
   } catch (error) {
     await client.query('ROLLBACK');
     console.error("Error in releaseEscrow:", error);
+
+    // Check if blockchain tx succeeded but DB failed
+    const blockchainSucceeded = error.message.includes('UPDATE') || error.message.includes('database');
+
+    if (blockchainSucceeded && correlationId) {
+      // Add to recovery queue for DB update retry
+      await addToRecoveryQueue(
+        correlationId,
+        {
+          operationType: 'ESCROW_RELEASE',
+          invoiceId: req.body.invoiceId,
+          txHash: error.txHash || null,
+          stepsCompleted: ['BLOCKCHAIN_TX']
+        },
+        0,
+        error.message
+      );
+
+      await updateTransactionState(correlationId, 'FAILED');
+    } else if (correlationId) {
+      await updateTransactionState(correlationId, 'FAILED');
+    }
 
     // Log failed audit entry
     await logAudit({
@@ -118,11 +178,12 @@ exports.releaseEscrow = async (req, res) => {
       action: 'RELEASE',
       status: 'FAILED',
       errorMessage: error.message,
+      metadata: { correlationId },
       ipAddress: req.ip,
       userAgent: req.get('user-agent')
     });
 
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message, correlationId });
   } finally {
     client.release();
   }

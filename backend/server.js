@@ -203,8 +203,11 @@ server.listen(PORT, () => {
 
 /* ---------------- BACKGROUND WORKERS ---------------- */
 
+const { startRecoveryWorker } = require('./services/recoveryService');
+
 listenForTokenization();
 startSyncWorker();
+startRecoveryWorker(); // Start transaction recovery worker
 
 try {
   startComplianceListeners();
