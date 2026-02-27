@@ -79,11 +79,17 @@ api.interceptors.response.use(
         });
         
       case 401:
+        // Call backend logout to clear HttpOnly cookie, then clear localStorage
+        try {
+          await api.post('/auth/logout');
+        } catch (logoutError) {
+          console.error('Logout request failed:', logoutError);
+        }
+        
         // Clear user data from localStorage
         localStorage.removeItem('user');
         
         // Use React Router navigation if available, fallback to hard redirect
-
         if (navigateFunction) {
           navigateFunction('/login', { replace: true });
         } else {
@@ -96,6 +102,7 @@ api.interceptors.response.use(
           message,
           isAuthError: true
         });
+
         
       case 403:
         console.error('Forbidden:', errorData);
@@ -209,7 +216,12 @@ export const register = (userData) => {
   return api.post('/auth/register', userData);
 };
 
+export const logout = () => {
+  return api.post('/auth/logout');
+};
+
 export const updateCurrentUserRole = (role) => {
+
   return api.put('/auth/role', { role });
 };
 
