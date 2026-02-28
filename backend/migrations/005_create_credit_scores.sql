@@ -1,9 +1,6 @@
--- Credit Scores Table
--- Stores user credit/trust scores based on payment history, disputes, KYC, and transaction volume
-
 CREATE TABLE IF NOT EXISTS credit_scores (
     id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     score INTEGER NOT NULL DEFAULT 0 CHECK (score >= 0 AND score <= 100),
     payment_history_score INTEGER NOT NULL DEFAULT 0 CHECK (payment_history_score >= 0 AND payment_history_score <= 100),
     dispute_ratio_score INTEGER NOT NULL DEFAULT 0 CHECK (dispute_ratio_score >= 0 AND dispute_ratio_score <= 100),
@@ -34,7 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_credit_scores_score ON credit_scores(score DESC);
 -- Credit score history table for tracking score changes over time
 CREATE TABLE IF NOT EXISTS credit_score_history (
     id SERIAL PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
     score_change INTEGER NOT NULL,
     payment_history_score INTEGER NOT NULL,
