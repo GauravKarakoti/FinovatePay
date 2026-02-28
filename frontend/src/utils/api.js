@@ -18,17 +18,8 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
-
 // Handle API errors with comprehensive error handling
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -88,11 +79,11 @@ api.interceptors.response.use(
         });
         
       case 401:
-        // Clear user data and token from localStorage
+        // Clear user data from localStorage
         localStorage.removeItem('user');
-        localStorage.removeItem('token'); // Add this line
         
         // Use React Router navigation if available, fallback to hard redirect
+
         if (navigateFunction) {
           navigateFunction('/login', { replace: true });
         } else {
@@ -481,6 +472,7 @@ export const getAnalyticsOverview = () => {
   return api.get('/analytics/overview');
 };
 
+export const getInvoiceRisk = (invoiceId) => {
   return api.get(`/analytics/risk/${invoiceId}`);
 };
 
