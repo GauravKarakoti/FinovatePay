@@ -472,8 +472,19 @@ export const getAnalyticsOverview = () => {
   return api.get('/analytics/overview');
 };
 
+export const getPaymentAnalytics = () => {
+  return api.get('/analytics/payments');
+};
+
+export const getFinancingAnalytics = () => {
+  return api.get('/analytics/financing');
+};
+
 export const getInvoiceRisk = (invoiceId) => {
   return api.get(`/analytics/risk/${invoiceId}`);
 };
+
+// Alias for getInvoiceRisk used by AnalyticsDashboard
+export const getRiskScore = getInvoiceRisk;
 
 export default api;
