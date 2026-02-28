@@ -224,8 +224,11 @@ server.listen(PORT, () => {
 // Set up graceful shutdown handlers
 setupGracefulShutdown(server, io);
 
+const { startRecoveryWorker } = require('./services/recoveryService');
+
 listenForTokenization();
 startSyncWorker();
+startRecoveryWorker(); // Start transaction recovery worker
 
 try {
   startComplianceListeners();
