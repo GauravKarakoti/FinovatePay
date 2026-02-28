@@ -171,11 +171,18 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Logout (client-side token removal)
+// Logout - clears the HttpOnly cookie server-side
 router.post('/logout', (req, res) => {
-  // Since we're using JWT, logout is handled client-side by removing the token
+  // Clear the HttpOnly cookie by setting maxAge to 0
+  res.cookie('token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 0 // Expire immediately
+  });
   res.json({ message: 'Logout successful' });
 });
+
 
 // Verify token validity
 router.get('/verify', authenticateToken, (req, res) => {
