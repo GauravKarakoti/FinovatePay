@@ -62,6 +62,11 @@ const tabs = [
     tabs.push({ id: 'financing', label: 'Financing', icon: '💸' });
   }
 
+  // Add Auctions tab for investor and seller roles
+  if (user?.role === 'investor' || user?.role === 'seller' || user?.role === 'admin') {
+    tabs.push({ id: 'auctions', label: 'Auctions', icon: '🏷️' });
+  }
+
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
   }

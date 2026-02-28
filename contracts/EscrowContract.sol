@@ -84,13 +84,11 @@ contract EscrowContract is
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount); // Overload
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
     event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer); // Overload
-    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool votedForSeller);
-    event SafeEscape(bytes32 indexed invoiceId, address escapedBy);
+    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool voteForBuyer);
+    event SafeEscape(bytes32 indexed invoiceId, address indexed admin);
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
-    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool voteForBuyer);
-    event SafeEscape(bytes32 indexed invoiceId, address indexed admin);
 
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
@@ -288,7 +286,7 @@ contract EscrowContract is
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
         
-        token.safeTransfer(escrow.seller, escrow.amount);
+        IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
         
         if (escrow.rwaNftContract != address(0)) {
             IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
@@ -296,6 +294,7 @@ contract EscrowContract is
         
         emit EscrowReleased(_invoiceId, escrow.amount);
     }
+
 
     function _getPayableAmount(Escrow storage escrow)
         internal
@@ -549,12 +548,13 @@ contract EscrowContract is
 
         uint256 payoutAmount = amount;
         if (fee > 0) {
-            IERC20(token).safeTransfer(treasury, fee);
+            IERC20(e.token).safeTransfer(treasury, fee);
             emit FeeCollected(invoiceId, fee);
             payoutAmount -= fee;
         }
 
-        IERC20(token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
+        IERC20(e.token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
+
 
         // Transfer NFT to winner
         _transferNFT(address(this), sellerWins ? buyer : seller, e);

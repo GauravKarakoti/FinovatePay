@@ -18,17 +18,8 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
-
 // Handle API errors with comprehensive error handling
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -88,9 +79,15 @@ api.interceptors.response.use(
         });
         
       case 401:
-        // Clear user data and token from localStorage
+        // Call backend logout to clear HttpOnly cookie, then clear localStorage
+        try {
+          await api.post('/auth/logout');
+        } catch (logoutError) {
+          console.error('Logout request failed:', logoutError);
+        }
+        
+        // Clear user data from localStorage
         localStorage.removeItem('user');
-        localStorage.removeItem('token'); // Add this line
         
         // Use React Router navigation if available, fallback to hard redirect
         if (navigateFunction) {
@@ -105,6 +102,7 @@ api.interceptors.response.use(
           message,
           isAuthError: true
         });
+
         
       case 403:
         console.error('Forbidden:', errorData);
@@ -218,7 +216,12 @@ export const register = (userData) => {
   return api.post('/auth/register', userData);
 };
 
+export const logout = () => {
+  return api.post('/auth/logout');
+};
+
 export const updateCurrentUserRole = (role) => {
+
   return api.put('/auth/role', { role });
 };
 
@@ -414,6 +417,68 @@ export const cancelStream = (streamId) => {
   return api.post(`/streaming/${streamId}/cancel`);
 };
 
+// --- Auction API ---
+
+// Create a new auction
+export const createAuction = (auctionData) => {
+  return api.post('/auctions', auctionData);
+};
+
+// Get all active auctions
+export const getAuctions = (params) => {
+  return api.get('/auctions', { params });
+};
+
+// Get auctions for current seller
+export const getSellerAuctions = () => {
+  return api.get('/auctions/seller');
+};
+
+// Get auctions the user has bid on
+export const getBidderAuctions = () => {
+  return api.get('/auctions/bidder');
+};
+
+// Get auction statistics
+export const getAuctionStats = () => {
+  return api.get('/auctions/stats');
+};
+
+// Get auction details
+export const getAuction = (auctionId) => {
+  return api.get(`/auctions/${auctionId}`);
+};
+
+// Get bids for an auction
+export const getAuctionBids = (auctionId) => {
+  return api.get(`/auctions/${auctionId}/bids`);
+};
+
+// Start an auction
+export const startAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/start`);
+};
+
+// Place a bid on an auction
+export const placeBid = (auctionId, bidData) => {
+  return api.post(`/auctions/${auctionId}/bid`, bidData);
+};
+
+// End an auction
+export const endAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/end`);
+};
+
+// Settle an auction
+export const settleAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/settle`);
+};
+
+// Cancel an auction
+export const cancelAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/cancel`);
+};
+
 // --- Analytics API ---
 export const getAnalyticsOverview = () => {
   return api.get('/analytics/overview');
@@ -427,8 +492,11 @@ export const getFinancingAnalytics = () => {
   return api.get('/analytics/financing');
 };
 
-export const getRiskScore = (invoiceId) => {
+export const getInvoiceRisk = (invoiceId) => {
   return api.get(`/analytics/risk/${invoiceId}`);
 };
+
+// Alias for getInvoiceRisk used by AnalyticsDashboard
+export const getRiskScore = getInvoiceRisk;
 
 export default api;

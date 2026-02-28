@@ -9,6 +9,7 @@ import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
 import { useStatsActions } from '../context/StatsContext';
+import AuctionList from '../components/Auction/AuctionList';
 
 // --- Reusable UI Components ---
 
@@ -511,7 +512,7 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     </div>
   );
 
-  const FinancingTab = () => (
+const FinancingTab = () => (
     <div className="space-y-8">
       {/* Header with Buy Button */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -588,14 +589,52 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
     </div>
   );
 
+  // Auction Tab Component
+  const AuctionTab = () => (
+    <div className="space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Invoice Auctions</h2>
+          <p className="text-sm text-gray-500 mt-1">Bid on invoices for best yield rates</p>
+        </div>
+      </div>
+
+      {/* Info Card */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <div className="text-blue-600 text-xl">🏷️</div>
+          <div>
+            <h3 className="font-medium text-blue-900">How Invoice Auctions Work</h3>
+            <ul className="text-sm text-blue-700 mt-2 space-y-1">
+              <li>• <strong>Sellers:</strong> List invoices for auction with minimum yield requirements</li>
+              <li>• <strong>Investors:</strong> Place bids offering lower yields (better for seller)</li>
+              <li>• <strong>Winner:</strong> Lowest yield bidder wins and pays the invoice</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Auction List */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="font-semibold text-gray-900">Active Auctions</h3>
+        </div>
+        <div className="p-4">
+          <AuctionList userRole="investor" />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Tab Content */}
         <main className="animate-fadeIn">
-          {activeTab === 'overview' && <OverviewTab />}
+{activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'financing' && <FinancingTab />}
-          {activeTab !== 'overview' && activeTab !== 'financing' && (
+          {activeTab === 'auctions' && <AuctionTab />}
+          {activeTab !== 'overview' && activeTab !== 'financing' && activeTab !== 'auctions' && (
             <EmptyState message="Section under construction" icon="🚧" />
           )}
         </main>

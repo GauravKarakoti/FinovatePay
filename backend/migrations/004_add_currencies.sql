@@ -65,7 +65,6 @@ CREATE TRIGGER update_user_prefs_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_currency_updated_at_column();
 
--- Insert default currencies (USD as base)
 INSERT INTO currencies (code, name, symbol, decimal_places, is_crypto, is_active, is_default) VALUES
     ('USD', 'US Dollar', '$', 2, FALSE, TRUE, TRUE),
     ('EUR', 'Euro', '€', 2, FALSE, TRUE, FALSE),
@@ -76,8 +75,8 @@ INSERT INTO currencies (code, name, symbol, decimal_places, is_crypto, is_active
     ('CAD', 'Canadian Dollar', 'C$', 2, FALSE, TRUE, FALSE),
     ('CHF', 'Swiss Franc', 'CHF', 2, FALSE, TRUE, FALSE),
     ('CNY', 'Chinese Yuan', '¥', 2, FALSE, TRUE, FALSE),
-    ('USDC', 'USD Coin', 'USDC', 6, TRUE, TRUE, FALSE),
-    ('USDT', 'Tether', 'USDT', 6, TRUE, TRUE, FALSE),
+    ('USC', 'USD Coin', 'USDC', 6, TRUE, TRUE, FALSE),
+    ('UDT', 'Tether', 'USDT', 6, TRUE, TRUE, FALSE),
     ('ETH', 'Ethereum', 'ETH', 18, TRUE, TRUE, FALSE),
     ('BTC', 'Bitcoin', 'BTC', 8, TRUE, TRUE, FALSE)
 ON CONFLICT (code) DO NOTHING;
@@ -94,8 +93,8 @@ INSERT INTO exchange_rates (currency_code, rate) VALUES
     ('CAD', 1.36),
     ('CHF', 0.88),
     ('CNY', 7.24),
-    ('USDC', 1.0),
-    ('USDT', 1.0),
+    ('USC', 1.0),
+    ('UDT', 1.0),
     ('ETH', 0.00042),
     ('BTC', 0.000015)
 ON CONFLICT (currency_code) DO NOTHING;
