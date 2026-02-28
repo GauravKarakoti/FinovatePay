@@ -17,6 +17,7 @@ const LANGUAGE_COLORS = {
   'Shell': '#4eaa25', 'SQL': '#cc2927', 'JSON': '#f7df1e',
 };
 
+
 const TIER_CONFIG = [
   { label: 'Core Maintainer', min: 200, color: '#f97316', bg: 'from-orange-500/20 to-red-500/20', border: 'border-orange-400/50', glow: '0 0 30px rgba(249,115,22,0.35)' },
   { label: 'Top Contributor', min: 50,  color: '#a855f7', bg: 'from-purple-500/20 to-indigo-500/20', border: 'border-purple-400/50', glow: '0 0 30px rgba(168,85,247,0.35)' },
