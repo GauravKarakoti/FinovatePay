@@ -9,7 +9,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/SafeERC721.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
@@ -76,6 +78,7 @@ contract EscrowContract is
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
     uint256 public quorumPercentage = 51; // Quorum percentage (e.g. 51%)
+    uint256 public minimumEscrowAmount = 100; // Minimum escrow amount to prevent zero-fee edge cases
 
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -89,6 +92,7 @@ contract EscrowContract is
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
+    event MinimumEscrowAmountUpdated(uint256 oldMinimum, uint256 newMinimum);
 
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
@@ -148,6 +152,17 @@ contract EscrowContract is
         emit FeePercentageUpdated(oldFee, _feePercentage);
     }
 
+    /**
+     * @notice Set the minimum escrow amount to prevent zero-fee edge cases
+     * @param _minimumEscrowAmount Minimum amount required to create an escrow
+     */
+    function setMinimumEscrowAmount(uint256 _minimumEscrowAmount) external onlyAdmin {
+        require(_minimumEscrowAmount > 0, "Minimum amount must be > 0");
+        uint256 oldMinimum = minimumEscrowAmount;
+        minimumEscrowAmount = _minimumEscrowAmount;
+        emit MinimumEscrowAmountUpdated(oldMinimum, _minimumEscrowAmount);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             ESCROW LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -164,13 +179,19 @@ contract EscrowContract is
     ) external onlyAdmin returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
 
+        // Validate minimum escrow amount to prevent zero-fee edge cases
+        require(_amount >= minimumEscrowAmount, "Amount below minimum");
+
         // Calculate fee amount
         uint256 calculatedFee = (_amount * feePercentage) / 10000; // Basis points calculation
+
+        // Ensure fee is not zero (prevent dust transactions with no platform fee)
+        require(calculatedFee > 0, "Fee amount is zero");
 
         // --- NEW: Lock the Produce NFT as Collateral ---
         // The seller must have approved the EscrowContract to spend this NFT beforehand.
         if (_rwaNftContract != address(0)) {
-            IERC721(_rwaNftContract).transferFrom(
+            IERC721(_rwaNftContract).safeTransferFrom(
                 _seller,
                 address(this),
                 _rwaTokenId
@@ -289,7 +310,7 @@ contract EscrowContract is
         IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
         
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
+            IERC721(escrow.rwaNftContract).safeTransferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
         }
         
         emit EscrowReleased(_invoiceId, escrow.amount);
@@ -326,7 +347,7 @@ contract EscrowContract is
         Escrow storage escrow
     ) internal {
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(
+            IERC721(escrow.rwaNftContract).safeTransferFrom(
                 from,
                 to,
                 escrow.rwaTokenId
