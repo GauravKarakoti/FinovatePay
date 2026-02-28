@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'sonner';
+import { checkOnlineStatus } from './network';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 console.log("API Base URL:", API_BASE_URL);
@@ -41,8 +42,9 @@ api.interceptors.response.use(
         });
       }
       
-      // Check if user is offline
-      if (!navigator.onLine) {
+      // Check if user is offline using robust connectivity detection
+      const isOnline = await checkOnlineStatus();
+      if (!isOnline) {
         console.error('User is offline');
         const message = 'You are offline. Please check your internet connection.';
         toast.error(message);
