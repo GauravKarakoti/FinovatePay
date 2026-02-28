@@ -9,7 +9,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC721/utils/SafeERC721.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
@@ -170,7 +172,7 @@ contract EscrowContract is
         // --- NEW: Lock the Produce NFT as Collateral ---
         // The seller must have approved the EscrowContract to spend this NFT beforehand.
         if (_rwaNftContract != address(0)) {
-            IERC721(_rwaNftContract).transferFrom(
+            IERC721(_rwaNftContract).safeTransferFrom(
                 _seller,
                 address(this),
                 _rwaTokenId
@@ -289,7 +291,7 @@ contract EscrowContract is
         IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
         
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
+            IERC721(escrow.rwaNftContract).safeTransferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
         }
         
         emit EscrowReleased(_invoiceId, escrow.amount);
@@ -326,7 +328,7 @@ contract EscrowContract is
         Escrow storage escrow
     ) internal {
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(
+            IERC721(escrow.rwaNftContract).safeTransferFrom(
                 from,
                 to,
                 escrow.rwaTokenId
