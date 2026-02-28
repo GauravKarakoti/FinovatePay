@@ -18,6 +18,13 @@ export const api = axios.create({
   withCredentials: true,
 });
 
+// Raw axios instance without interceptors for logout requests
+// This prevents recursive 401 loops when logout endpoint also returns 401
+const rawAxios = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+});
+
 // Handle API errors with comprehensive error handling
 
 api.interceptors.response.use(
@@ -79,9 +86,10 @@ api.interceptors.response.use(
         });
         
       case 401:
-        // Call backend logout to clear HttpOnly cookie, then clear localStorage
+        // Call backend logout to clear HttpOnly cookie using raw axios (without interceptor)
+        // to prevent recursive 401 loops if logout endpoint also returns 401
         try {
-          await api.post('/auth/logout');
+          await rawAxios.post('/auth/logout');
         } catch (logoutError) {
           console.error('Logout request failed:', logoutError);
         }
