@@ -54,6 +54,8 @@ contract EscrowContract is
         address rwaNftContract; // Address of the ProduceTracking contract
         uint256 rwaTokenId;     // The tokenId of the produce lot
         uint256 feeAmount;      // Platform fee amount
+        uint256 discountRate;
+        uint256 discountDeadline;
     }
     
     mapping(bytes32 => Escrow) public escrows;
@@ -65,12 +67,26 @@ contract EscrowContract is
     address public admin;
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
+    uint256 public quorumPercentage = 51; // Quorum percentage (e.g. 51%)
+
+    struct DisputeVoting {
+        uint256 snapshotArbitratorCount;
+        uint256 votesForBuyer;
+        uint256 votesForSeller;
+        bool resolved;
+    }
+    
+    mapping(bytes32 => DisputeVoting) public disputeVotings;
     
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
-    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
+    // Updated events to include extra data for voting
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer);
+    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool voteForBuyer);
+    event SafeEscape(bytes32 indexed invoiceId, address indexed admin);
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
@@ -106,6 +122,7 @@ contract EscrowContract is
     {
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
+        arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
         treasury = msg.sender; // Default treasury to admin
         feePercentage = 50;    // Default 0.5% fee (50 basis points)
     }
@@ -144,9 +161,17 @@ contract EscrowContract is
         address _token,
         uint256 _duration,
         address _rwaNftContract,
-        uint256 _rwaTokenId
+        uint256 _rwaTokenId,
+        uint256 _discountRate,
+        uint256 _discountDeadline,
+        address _assignedResolver
     ) external onlyAdmin returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
+        require(
+            _assignedResolver != address(0) && 
+            arbitratorsRegistry.isArbitrator(_assignedResolver), 
+            "Invalid Arbitrator"
+        );
 
         // Calculate fee amount
         uint256 calculatedFee = (_amount * feePercentage) / 10000; // Basis points calculation
@@ -171,12 +196,14 @@ contract EscrowContract is
             sellerConfirmed: false,
             buyerConfirmed: false,
             disputeRaised: false,
-            disputeResolver: address(0),
+            disputeResolver: _assignedResolver,
             createdAt: block.timestamp,
             expiresAt: block.timestamp + _duration,
             rwaNftContract: _rwaNftContract,
             rwaTokenId: _rwaTokenId,
-            feeAmount: calculatedFee
+            feeAmount: calculatedFee,
+            discountRate: _discountRate,
+            discountDeadline: _discountDeadline
         });
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
