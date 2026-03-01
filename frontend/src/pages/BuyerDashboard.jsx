@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
+import { formatEther, zeroPadValue, isAddress } from '../utils/formatters';
 import {
   getBuyerInvoices,
   updateInvoiceStatus,
@@ -136,17 +137,17 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
         setLoading(true);
         try {
             const contract = await getEscrowContract();
-            const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+            const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
             const amount = await contract.getCurrentPayableAmount(bytes32Id);
             setPayableAmount(amount);
 
             const escrow = await contract.escrows(bytes32Id);
-            const rate = escrow.discountRate ? escrow.discountRate.toNumber() : 0;
+            const rate = escrow.discountRate ? Number(escrow.discountRate) : 0;
             setDiscountBps(rate);
 
             if (rate > 0) {
                  const now = Math.floor(Date.now() / 1000);
-                 const deadline = escrow.discountDeadline.toNumber();
+                 const deadline = Number(escrow.discountDeadline);
                  if (deadline > now) {
                      setTimeLeft(deadline - now);
                  } else {
@@ -169,7 +170,7 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
 
     if (!isOpen || !invoice) return null;
 
-    const formatEth = (bn) => bn ? ethers.utils.formatEther(bn) : '0';
+    const formatEth = (bn) => bn ? formatEther(bn) : '0';
     const originalAmountEth = invoice.amount; // Assuming invoice.amount is string/number from DB
 
     return (
@@ -469,7 +470,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, []);
 
   const handleConfirmPayment = useCallback(async (invoice, payableAmount) => {
-    if (!ethers.utils.isAddress(invoice.contract_address)) {
+    if (!isAddress(invoice.contract_address)) {
       toast.error('Invalid contract address');
       return;
     }
@@ -480,18 +481,44 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       const { signer } = await connectWallet();
       const { currency, contract_address, token_address } = invoice;
-      const amountWei = payableAmount; // Already BigNumber from modal fetch
+      const amountWei = payableAmount; // Already BigInt from modal fetch
       
       // Use EscrowContract
       const contract = await getEscrowContract();
       // Need bytes32 ID
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
       let tx;
 
       if (currency === 'MATIC') {
-        const balance = await signer.getBalance();
-        if (balance.lt(amountWei)) {
+        const balance = await signer.PROVIDER.getBalance(signer.address); // Wait, provider.getBalance(address) in v6
+        // Actually signer.provider.getBalance(signer.address)
+        // Or specific to v6: provider.getBalance(address)
+        // But referencing signer.getBalance() works in v5? In v6 signer has no getBalance?
+        // Let's check docs.
+        // v6: AbstractSigner has no getBalance. Provider has getBalance.
+        // So: await signer.provider.getBalance(await signer.getAddress())
+        
+        // However, I will check what code was there before. "signer.getBalance()"
+        // I need to change this logic too.
+        
+        // Wait, I will edit `handleConfirmPayment` fully.
+        
+        // Getting signer:
+        // const { signer } = await connectWallet();
+        // connectWallet returns { signer, address, provider }
+        
+        // So I can use provider.getBalance(address).
+        
+        // But first let's replace `ethers.utils.*` calls.
+
+
+      let tx;
+
+      if (currency === 'MATIC') {
+        const address = await signer.getAddress();
+        const balance = await signer.provider.getBalance(address);
+        if (balance < amountWei) {
             toast.error("Insufficient MATIC balance.", { id: toastId });
             return;
         }
@@ -502,7 +529,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         const userAddress = await signer.getAddress();
         const balance = await tokenContract.balanceOf(userAddress);
 
-        if (balance.lt(amountWei)) {
+        if (balance < amountWei) {
             toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
             return;
         }
@@ -537,7 +564,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       // Use EscrowContract
       const contract = await getEscrowContract();
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
       const tx = await contract.confirmRelease(bytes32Id);
       await tx.wait();
@@ -560,7 +587,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       // Use EscrowContract
       const contract = await getEscrowContract();
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
       const tx = await contract.raiseDispute(bytes32Id);
       await tx.wait();

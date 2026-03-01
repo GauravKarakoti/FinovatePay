@@ -1,6 +1,7 @@
 import { createAppKit } from '@reown/appkit/react';
 import { EthersAdapter } from '@reown/appkit-adapter-ethers';
-import { BrowserProvider, Contract } from 'ethers';
+import { BrowserProvider, Contract, ethers } from 'ethers';
+import { keccak256, toUtf8Bytes } from './formatters';
 
 // Import contract ABIs and addresses
 import EscrowContractArtifact from '../../../deployed/EscrowContract.json';
@@ -294,6 +295,54 @@ export async function buyFractions(tokenId, amount) {
 export async function buyFractionsNative(tokenId, amount) {
   const contract = await getFinancingManagerContract();
   const tx = await contract.buyFractionsNative(tokenId, amount, { value: amount });
+  return tx.wait();
+}
+
+export async function tokenizeInvoice(
+  invoiceId,
+  sellerAddress,
+  totalFractions,
+  pricePerFraction,
+  maturityDateStr,
+  totalValue,
+  yieldBps
+) {
+  const contract = await getFractionTokenContract();
+  
+  // Create bytes32 ID from invoiceId (assuming it's a UUID string)
+  // We use keccak256 hash of the ID to fit in bytes32
+  const bytes32InvoiceId = keccak256(toUtf8Bytes(invoiceId));
+  
+  // Convert dates and values
+  // Maturity Date String (YYYY-MM-DD) -> Timestamp (seconds)
+  const maturityDateTs = Math.floor(new Date(maturityDateStr).getTime() / 1000);
+  
+  // Ensure we are sending BigInts
+  const fractions = BigInt(totalFractions);
+  const price = BigInt(pricePerFraction);
+  const value = BigInt(totalValue); 
+  const yieldVal = BigInt(yieldBps);
+
+  console.log("Tokenizing Invoice:", {
+    bytes32InvoiceId,
+    sellerAddress,
+    fractions,
+    price,
+    maturityDateTs,
+    value,
+    yieldVal
+  });
+
+  const tx = await contract.tokenizeInvoice(
+    bytes32InvoiceId,
+    sellerAddress,
+    fractions,
+    price,
+    maturityDateTs,
+    value,
+    yieldVal
+  );
+  
   return tx.wait();
 }
 
