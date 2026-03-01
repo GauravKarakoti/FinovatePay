@@ -7,6 +7,14 @@ const { getFractionTokenContract } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 
+// Corrected the imported validator names
+const { 
+  validateFinancingRequest, 
+  validateFinancingRepay, 
+  validateTokenizeInvoice 
+} = require('../middleware/validators');
+const { idempotencyMiddleware, logAudit, logFinancialTransaction } = require('../middleware/auditLogger');
+
 // Get marketplace listings
 router.get('/marketplace', authenticateToken, async (req, res) => {
     try {
@@ -31,7 +39,9 @@ router.get('/marketplace', authenticateToken, async (req, res) => {
 });
 
 // Request financing using Katana liquidity
-router.post('/request', authenticateToken, requireRole(['seller', 'admin']), requireKYC, async (req, res) => {
+router.post('/request', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateFinancingRequest, idempotencyMiddleware('FINANCING_REQUEST'), async (req, res) => {
+    const client = await pool.connect();
+    
     try {
         const { invoiceId, amount, asset, collateralTokenId } = req.body;
         const userId = req.user.id;
@@ -40,21 +50,36 @@ router.post('/request', authenticateToken, requireRole(['seller', 'admin']), req
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
+        await client.query('BEGIN');
+
         // 1. Validate invoice exists, belongs to user, and is eligible
-        const invoiceQuery = await pool.query(
-            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_id = $2',
+        const invoiceQuery = await client.query(
+            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_id = $2 FOR UPDATE',
             [invoiceId, userId]
         );
 
         if (invoiceQuery.rows.length === 0) {
-            return res.status(404).json({ error: 'Invoice not found or unauthorized' });
+            throw new Error('Invoice not found or unauthorized');
         }
 
         const invoice = invoiceQuery.rows[0];
 
         if (invoice.financing_status === 'financed' || invoice.financing_status === 'listed') {
-            return res.status(400).json({ error: 'Invoice is already financed or listed' });
+            throw new Error('Invoice is already financed or listed');
         }
+
+        // Log financial transaction as PENDING
+        const financialTx = await logFinancialTransaction({
+            transactionType: 'FINANCING_DISBURSEMENT',
+            invoiceId,
+            fromAddress: 'KATANA_LIQUIDITY_POOL',
+            toAddress: req.user.wallet_address,
+            amount,
+            currency: asset,
+            status: 'PENDING',
+            initiatedBy: userId,
+            metadata: { collateralTokenId }
+        });
 
         // 2. Bridge collateral to Katana if needed
         const bridgeResult = await bridgeService.bridgeToKatana(collateralTokenId, amount, userId);
@@ -63,13 +88,40 @@ router.post('/request', authenticateToken, requireRole(['seller', 'admin']), req
         const borrowResult = await bridgeService.borrowFromKatana(asset, amount, collateralTokenId);
 
         // 4. Record financing in DB
-        await pool.query(
+        await client.query(
             `UPDATE invoices 
              SET financing_status = 'financed', 
                  updated_at = NOW() 
              WHERE invoice_id = $1`,
             [invoiceId]
         );
+
+        await client.query('COMMIT');
+
+        // Update financial transaction to CONFIRMED
+        if (financialTx) {
+            await pool.query(
+                'UPDATE financial_transactions SET status = $1, confirmed_at = NOW() WHERE transaction_id = $2',
+                ['CONFIRMED', financialTx.transaction_id]
+            );
+        }
+
+        // Log audit entry
+        await logAudit({
+            operationType: 'FINANCING_REQUEST',
+            entityType: 'INVOICE',
+            entityId: invoiceId,
+            actorId: userId,
+            actorWallet: req.user.wallet_address,
+            actorRole: req.user.role,
+            action: 'REQUEST_FINANCING',
+            status: 'SUCCESS',
+            oldValues: { financing_status: invoice.financing_status },
+            newValues: { financing_status: 'financed' },
+            metadata: { amount, asset, collateralTokenId, bridgeResult, borrowResult },
+            ipAddress: req.ip,
+            userAgent: req.get('user-agent')
+        });
 
         res.json({
             success: true,
@@ -78,8 +130,27 @@ router.post('/request', authenticateToken, requireRole(['seller', 'admin']), req
             borrowResult
         });
     } catch (error) {
+        await client.query('ROLLBACK');
         console.error('Financing request failed:', error);
+
+        await logAudit({
+            operationType: 'FINANCING_REQUEST',
+            entityType: 'INVOICE',
+            entityId: req.body.invoiceId,
+            actorId: req.user?.id,
+            actorWallet: req.user?.wallet_address,
+            actorRole: req.user?.role,
+            action: 'REQUEST_FINANCING',
+            status: 'FAILED',
+            errorMessage: error.message,
+            metadata: req.body,
+            ipAddress: req.ip,
+            userAgent: req.get('user-agent')
+        });
+
         res.status(500).json({ error: 'Financing request failed. Please try again.' });
+    } finally {
+        client.release();
     }
 });
 
@@ -96,7 +167,7 @@ router.get('/rates/:asset', authenticateToken, async (req, res) => {
 });
 
 // Repay financing
-router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requireKYC, async (req, res) => {
+router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateFinancingRepay, async (req, res) => {
     try {
         const { financingId, invoiceId, amount, asset } = req.body;
         const userId = req.user.id;
@@ -146,8 +217,8 @@ router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requi
     }
 });
 
-// Tokenize invoice
-router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), requireKYC, async (req, res) => {
+// Tokenize invoice (Updated validator name here)
+router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateTokenizeInvoice, async (req, res) => {
     try {
         const { invoiceId, faceValue, maturityDate, yieldBps } = req.body;
         const userId = req.user.id;

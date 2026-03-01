@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { connectWallet, getFinancingManagerContract, stablecoinAddresses } from '../../utils/web3';
 import api from '../../utils/api';
+import { toast } from 'sonner';
 
 const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => {
     const [loading, setLoading] = useState(false);
@@ -41,11 +42,11 @@ const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => 
                 collateralTokenId: parseInt(collateralTokenId)
             });
 
-            alert('Financing request submitted successfully!');
+            toast.success('Financing request submitted successfully!');
             onClose();
         } catch (error) {
             console.error('Financing request failed:', error);
-            alert('Financing request failed. Please try again.');
+            toast.error('Financing request failed. Please try again.');
         } finally {
             setLoading(false);
         }

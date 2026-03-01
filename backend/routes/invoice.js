@@ -5,6 +5,11 @@ const { requireKYC } = require('../middleware/kycValidation');
 const Invoice = require('../models/Invoice');
 const { pool } = require("../config/database");
 const { syncInvoiceStatus } = require('../services/escrowSyncService');
+const { 
+  validateCreateInvoice, 
+  validateInvoiceId, 
+  validateInvoiceStatus 
+} = require('../middleware/validators');
 
 // --- UPDATED IMPORT ---
 // Import the new functions you added to the controller
@@ -18,7 +23,7 @@ const {
 router.use(authenticateToken);
 
 // Create a new invoice - Only sellers can create invoices
-router.post('/', requireKYC, requireRole(['seller', 'admin']), async (req, res) => {
+router.post('/', requireKYC, requireRole(['seller', 'admin']), validateCreateInvoice, async (req, res) => {
   console.log("Creating invoice with data:", req.body);
   await createInvoice(req, res);
 });
@@ -34,7 +39,7 @@ router.get('/seller', requireRole(['seller', 'admin']), async (req, res) => {
 });
 
 // Sync invoice status from blockchain
-router.post('/:id/sync', async (req, res) => {
+router.post('/:id/sync', validateInvoiceId, async (req, res) => {
   try {
     await syncInvoiceStatus(req.params.id);
     const invoice = await Invoice.findById(req.params.id);
@@ -58,17 +63,17 @@ router.get('/buyer', requireRole(['buyer', 'admin']), async (req, res) => {
 
 // 1. Get Early Payment Offer (Check discount details)
 // Note: using :invoiceId to match controller param
-router.get('/:invoiceId/offer', requireRole(['buyer', 'seller', 'admin']), getEarlyPaymentOffer);
+router.get('/:invoiceId/offer', validateInvoiceId, requireRole(['buyer', 'seller', 'admin']), getEarlyPaymentOffer);
 
 // 2. Accept Early Settlement (Process payment)
 // We add requireKYC here because it involves a financial transaction
 // Only buyers settle invoices
-router.post('/:invoiceId/settle-early', requireKYC, requireRole(['buyer', 'admin']), settleInvoiceEarly);
+router.post('/:invoiceId/settle-early', validateInvoiceId, requireKYC, requireRole(['buyer', 'admin']), settleInvoiceEarly);
 
 // --------------------------------------
 
 // Get specific invoice
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateInvoiceId, async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
     
@@ -88,12 +93,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Update Invoice Status (Escrow/Shipping/Dispute)
-router.post('/:invoice_id/status', requireKYC, async (req, res) => {
+router.post('/:invoiceId/status', validateInvoiceId, validateInvoiceStatus, requireKYC, async (req, res) => {
     try {
-        const { invoice_id } = req.params;
+        const { invoiceId } = req.params; // Changed to match the route param
         const { status, tx_hash, dispute_reason } = req.body;
-        console.log(`Updating status for invoice ${invoice_id} to ${status} with tx_hash ${tx_hash} and dispute_reason ${dispute_reason}`);
+        console.log(`Updating status for invoice ${invoiceId} to ${status} with tx_hash ${tx_hash} and dispute_reason ${dispute_reason}`);
 
         // Status configuration: field to update and required parameter
         const statusConfig = {
@@ -115,7 +119,7 @@ router.post('/:invoice_id/status', requireKYC, async (req, res) => {
         }
 
         const query = `UPDATE invoices SET escrow_status = $1, ${config.field} = $2 WHERE invoice_id = $3 RETURNING *`;
-        const values = [status, config.requiredParam, invoice_id];
+        const values = [status, config.requiredParam, invoiceId];
         
         const result = await pool.query(query, values);
         if (result.rows.length === 0) {
@@ -129,12 +133,12 @@ router.post('/:invoice_id/status', requireKYC, async (req, res) => {
         if (io) {
             io.to(`user-${updatedInvoice.seller_address}`).emit('invoice-update', updatedInvoice);
             io.to(`user-${updatedInvoice.buyer_address}`).emit('invoice-update', updatedInvoice);
-            console.log(`Emitted invoice-update for invoice ${invoice_id}`);
+            console.log(`Emitted invoice-update for invoice ${invoiceId}`);
         }
 
         res.json({ success: true, invoice: updatedInvoice });
     } catch (error) {
-        console.error(`Error updating status for invoice ${req.params.invoice_id}:`, error);
+        console.error(`Error updating status for invoice ${req.params.invoiceId}:`, error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });

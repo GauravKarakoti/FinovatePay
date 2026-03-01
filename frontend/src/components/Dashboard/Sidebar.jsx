@@ -12,7 +12,22 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
       const response = await updateCurrentUserRole(newRole);
       if (response && response.data.user) {
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        window.location.reload();
+        
+        // Navigate to the appropriate dashboard based on new role
+        const dashboardRoutes = {
+          buyer: '/buyer',
+          seller: '/',
+          admin: '/admin',
+          investor: '/investor',
+          shipment: '/shipment',
+          warehouse: '/shipment'
+        };
+        
+        const targetRoute = dashboardRoutes[newRole] || '/';
+        navigate(targetRoute);
+        
+        // Force a re-render by updating the page
+        window.location.href = targetRoute;
       }
     } catch (error) {
       console.error('Failed to switch role:', error);
@@ -35,6 +50,11 @@ const tabs = [
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
   ];
 
+  // Add Analytics tab for admin, seller, investor roles
+  if (['admin', 'seller', 'investor'].includes(user?.role)) {
+    tabs.push({ id: 'analytics', label: 'Analytics', icon: '📈' });
+  }
+
   // Add Streaming Payments tab for seller role
   if (user?.role === 'seller') {
     tabs.push({ id: 'streaming', label: 'Streaming', icon: '📺' });
@@ -44,6 +64,11 @@ const tabs = [
   // Add Financing tab for relevant roles
   if (user?.role === 'seller' || user?.role === 'investor' || user?.role === 'admin') {
     tabs.push({ id: 'financing', label: 'Financing', icon: '💸' });
+  }
+
+  // Add Auctions tab for investor and seller roles
+  if (user?.role === 'investor' || user?.role === 'seller' || user?.role === 'admin') {
+    tabs.push({ id: 'auctions', label: 'Auctions', icon: '🏷️' });
   }
 
   if (user?.role === 'admin') {

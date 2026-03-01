@@ -2,9 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract Treasury {
+    using SafeERC20 for IERC20;
     address public timelock;
 
     event TimelockUpdated(address indexed newTimelock);
@@ -43,7 +45,7 @@ contract Treasury {
         uint256 amount
     ) external onlyTimelock {
         require(to != address(0), "Invalid recipient");
-        require(IERC20(token).transfer(to, amount), "ERC20 transfer failed");
+        IERC20(token).safeTransfer(to, amount);
         emit ERC20Withdrawn(token, to, amount);
     }
 

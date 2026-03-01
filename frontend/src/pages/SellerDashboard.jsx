@@ -34,6 +34,8 @@ import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
 import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
+import AnalyticsPage from '../pages/AnalyticsPage';
+import AuctionList from '../components/Auction/AuctionList';
 
 // ------------------ HELPER COMPONENTS ------------------
 
@@ -624,6 +626,8 @@ const FinancingTabComponent = () => (
       case 'escrow': return <EscrowTab />;
       case 'financing': return <FinancingTabComponent />;
       case 'streaming': return <StreamingTabComponent />;
+      case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
+      case 'auctions': return <AuctionList />;
       default: return <OverviewTab />;
     }
   };
@@ -715,6 +719,7 @@ const FinancingTabComponent = () => (
       {showFiatModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <FiatOnRampModal
+            walletAddress={walletAddress}
             onClose={() => setShowFiatModal(false)}
             onSuccess={amount => {
               toast.success(`Successfully purchased ${amount} USDC`);

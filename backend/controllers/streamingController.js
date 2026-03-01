@@ -1,4 +1,5 @@
 const { ethers } = require('ethers');
+const errorResponse = require('../utils/errorResponse');
 const StreamingPayment = require('../models/StreamingPayment');
 const {
   createStreamOnChain,
@@ -36,11 +37,11 @@ exports.createStream = async (req, res) => {
     
     // Validate input
     if (!buyerAddress || !totalAmount || !interval || !numPayments || !tokenAddress) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return errorResponse(res, 'Missing required fields', 400);
     }
     
     if (!['daily', 'weekly', 'monthly'].includes(interval.toLowerCase())) {
-      return res.status(400).json({ error: 'Invalid interval. Must be daily, weekly, or monthly' });
+      return errorResponse(res, 'Invalid interval. Must be daily, weekly, or monthly', 400);
     }
     
     // Generate stream ID
@@ -82,7 +83,7 @@ exports.createStream = async (req, res) => {
     
   } catch (error) {
     console.error('Error creating stream:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -98,15 +99,15 @@ exports.approveStream = async (req, res) => {
     const stream = await StreamingPayment.findById(streamId);
     
     if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
+      return errorResponse(res, 'Stream not found', 404);
     }
     
     if (stream.buyer_address !== buyerAddress) {
-      return res.status(403).json({ error: 'Not authorized' });
+      return errorResponse(res, 'Not authorized', 403);
     }
     
     if (stream.status !== 'pending') {
-      return res.status(400).json({ error: 'Stream is not pending' });
+      return errorResponse(res, 'Stream is not pending', 400);
     }
     
     // Approve on chain
@@ -128,7 +129,7 @@ exports.approveStream = async (req, res) => {
     
   } catch (error) {
     console.error('Error approving stream:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -143,11 +144,11 @@ exports.releasePayment = async (req, res) => {
     const stream = await StreamingPayment.findById(streamId);
     
     if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
+      return errorResponse(res, 'Stream not found', 404);
     }
     
     if (stream.status !== 'active') {
-      return res.status(400).json({ error: 'Stream is not active' });
+      return errorResponse(res, 'Stream is not active', 400);
     }
     
     // Release on chain
@@ -175,7 +176,7 @@ exports.releasePayment = async (req, res) => {
     
   } catch (error) {
     console.error('Error releasing payment:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -190,11 +191,11 @@ exports.pauseStream = async (req, res) => {
     const stream = await StreamingPayment.findById(streamId);
     
     if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
+      return errorResponse(res, 'Stream not found', 404);
     }
     
     if (stream.buyer_address !== userAddress) {
-      return res.status(403).json({ error: 'Only buyer can pause' });
+      return errorResponse(res, 'Only buyer can pause', 403);
     }
     
     const result = await pauseStreamOnChain(streamId);
@@ -207,7 +208,7 @@ exports.pauseStream = async (req, res) => {
     
   } catch (error) {
     console.error('Error pausing stream:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -222,11 +223,11 @@ exports.resumeStream = async (req, res) => {
     const stream = await StreamingPayment.findById(streamId);
     
     if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
+      return errorResponse(res, 'Stream not found', 404);
     }
     
     if (stream.buyer_address !== userAddress) {
-      return res.status(403).json({ error: 'Only buyer can resume' });
+      return errorResponse(res, 'Only buyer can resume', 403);
     }
     
     const result = await resumeStreamOnChain(streamId);
@@ -242,7 +243,7 @@ exports.resumeStream = async (req, res) => {
     
   } catch (error) {
     console.error('Error resuming stream:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -257,11 +258,11 @@ exports.cancelStream = async (req, res) => {
     const stream = await StreamingPayment.findById(streamId);
     
     if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
+      return errorResponse(res, 'Stream not found', 404);
     }
     
     if (stream.seller_address !== userAddress && stream.buyer_address !== userAddress) {
-      return res.status(403).json({ error: 'Not authorized' });
+      return errorResponse(res, 'Not authorized', 403);
     }
     
     const result = await cancelStreamOnChain(streamId);
@@ -276,7 +277,7 @@ exports.cancelStream = async (req, res) => {
     
   } catch (error) {
     console.error('Error cancelling stream:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -302,20 +303,20 @@ exports.getStream = async (req, res) => {
     }
     
     if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
+      return errorResponse(res, 'Stream not found', 404);
     }
     
     // Check authorization
     if (stream.seller_address !== req.user.wallet_address && 
         stream.buyer_address !== req.user.wallet_address) {
-      return res.status(403).json({ error: 'Not authorized' });
+      return errorResponse(res, 'Not authorized', 403);
     }
     
     res.json(stream);
     
   } catch (error) {
     console.error('Error getting stream:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -328,7 +329,7 @@ exports.getSellerStreams = async (req, res) => {
     res.json(streams);
   } catch (error) {
     console.error('Error getting seller streams:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -341,7 +342,7 @@ exports.getBuyerStreams = async (req, res) => {
     res.json(streams);
   } catch (error) {
     console.error('Error getting buyer streams:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -370,7 +371,7 @@ exports.getMyStreams = async (req, res) => {
     res.json(uniqueStreams);
   } catch (error) {
     console.error('Error getting my streams:', error);
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };
 

@@ -7,6 +7,13 @@ const {
   releaseEscrow,
   raiseDispute
 } = require('../controllers/escrowController');
+
+// Corrected validator imports
+const { 
+  validateRelease, 
+  validateDispute,
+  validateOnramp 
+} = require('../middleware/validators');
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 // All payment routes require authentication and KYC
@@ -16,18 +23,18 @@ router.use(requireKYC);
 // Apply payment rate limiter to all payment routes
 router.use(paymentLimiter);
 
-// Release escrow funds
-router.post('/escrow/release', requireRole(['buyer', 'admin']), async (req, res) => {
+// Release escrow funds (using validateRelease instead of validatePaymentRelease)
+router.post('/escrow/release', requireRole(['buyer', 'admin']), validateRelease, async (req, res) => {
   await releaseEscrow(req, res);
 });
 
-// Raise a dispute (buyer or seller)
-router.post('/escrow/dispute', requireRole(['buyer', 'seller', 'admin']), async (req, res) => {
+// Raise a dispute (using validateDispute instead of validatePaymentDispute)
+router.post('/escrow/dispute', requireRole(['buyer', 'seller', 'admin']), validateDispute, async (req, res) => {
   await raiseDispute(req, res);
 });
 
 // Calculate fiat to crypto conversion
-router.post('/onramp', requireRole(['buyer', 'seller', 'investor', 'admin']), async (req, res) => {
+router.post('/onramp', requireRole(['buyer', 'seller', 'investor', 'admin']), validateOnramp, async (req, res) => {
     try {
         const { amount, currency } = req.body;
         const userId = req.user.id; // From authenticateToken middleware

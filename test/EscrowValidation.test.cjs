@@ -4,10 +4,10 @@ const { ethers } = require("hardhat");
 describe("EscrowContract - Validation Fix", function () {
   let EscrowContract, ComplianceManager, ArbitratorsRegistry;
   let escrow, compliance, registry, mockToken, mockNFT;
-  let owner, seller, buyer, arbitrator, other;
+  let owner, seller, buyer, arbitrator, other, nonArbitrator;
 
   beforeEach(async function () {
-    [owner, seller, buyer, arbitrator, other] = await ethers.getSigners();
+    [owner, seller, buyer, arbitrator, other, nonArbitrator] = await ethers.getSigners();
 
     // Deploy Mock ERC20
     const MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
@@ -42,8 +42,9 @@ describe("EscrowContract - Validation Fix", function () {
     );
     await escrow.waitForDeployment();
 
-    // Setup: Add arbitrator
-    await registry.addArbitrator(arbitrator.address);
+    // Setup: Add arbitrators (must be odd number total)
+    // Constructor adds deployer (1). Adding 2 more makes 3.
+    await registry.addArbitrators([arbitrator.address, other.address]);
     
     // Setup: Mock KYC
     await compliance.verifyKYC(seller.address);
@@ -67,7 +68,7 @@ describe("EscrowContract - Validation Fix", function () {
                 0,
                 0,
                 0,
-                other.address // Non-arbitrator
+                nonArbitrator.address // Non-arbitrator
             )
         ).to.be.revertedWith("Invalid Arbitrator");
     });

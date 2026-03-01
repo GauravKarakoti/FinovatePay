@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { useWeb3ModalAccount } from '@web3modal/ethers/react';
+import { useAppKitAccount } from '@reown/appkit/react';
 import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
+import ContributorsPage from './pages/ContributorsPage';
 import './App.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
@@ -137,7 +138,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { resetStats } = useStatsActions();
   
-  const { isConnected } = useWeb3ModalAccount();
+  const { address, isConnected } = useAppKitAccount();
 
   /* -------------------- Effects -------------------- */
   useEffect(() => {
@@ -187,14 +188,14 @@ function App() {
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9] relative">
           {isSidebarOpen && (
             <div
-              className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden"
+              className="fixed inset-0 bg-black bg-opacity-50 z-[90] md:hidden"
               onClick={() => setIsSidebarOpen(false)}
             />
           )}
 
           <div className={`
             fixed top-0 bottom-0 left-0 md:relative md:top-auto md:bottom-auto md:left-auto
-            z-40 h-full md:h-auto
+            z-[100] h-full md:h-auto
             transition-transform duration-300 ease-in-out
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
             md:w-64 flex-shrink-0
@@ -286,7 +287,7 @@ function App() {
                 path="/shipment" 
                 element={
                   <RequireAuth allowedRoles={['shipment', 'warehouse']}>
-                      <ShipmentDashboard />
+                      {renderDashboard(<ShipmentDashboard />)}
                   </RequireAuth>
                 } 
               />
@@ -328,6 +329,11 @@ function App() {
                 element={<ProduceHistory />}
               />
               
+              <Route
+                path="/contributors"
+                element={<ContributorsPage />}
+              />
+
               <Route 
                 path="/login" 
                 element={

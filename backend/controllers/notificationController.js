@@ -1,6 +1,7 @@
 const EmailService = require('../services/emailService');
 const NotificationPreference = require('../models/NotificationPreference');
 const EmailLog = require('../models/EmailLog');
+const errorResponse = require('../utils/errorResponse');
 
 /**
  * Send test email
@@ -11,10 +12,7 @@ exports.sendTestEmail = async (req, res) => {
     const { recipientEmail, templateName } = req.body;
 
     if (!recipientEmail || !templateName) {
-      return res.status(400).json({
-        success: false,
-        error: 'recipientEmail and templateName are required'
-      });
+      return errorResponse(res, 'recipientEmail and templateName are required', 400);
     }
 
     const result = await EmailService.sendFromTemplate(
@@ -39,10 +37,7 @@ exports.sendTestEmail = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error sending test email:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -67,10 +62,7 @@ exports.getNotificationPreferences = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error fetching preferences:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -95,10 +87,7 @@ exports.updateNotificationPreferences = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error updating preferences:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -123,10 +112,7 @@ exports.getEmailHistory = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error fetching email history:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -148,10 +134,7 @@ exports.getEmailStats = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error fetching email stats:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -164,10 +147,7 @@ exports.unsubscribe = async (req, res) => {
     const { token } = req.params;
 
     if (!token) {
-      return res.status(400).json({
-        success: false,
-        error: 'Unsubscribe token is required'
-      });
+      return errorResponse(res, 'Unsubscribe token is required', 400);
     }
 
     await NotificationPreference.unsubscribe(token);
@@ -178,10 +158,7 @@ exports.unsubscribe = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error unsubscribing:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -200,9 +177,6 @@ exports.retryFailedEmails = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error retrying emails:', error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return errorResponse(res, error, 500);
   }
 };

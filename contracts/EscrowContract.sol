@@ -9,7 +9,9 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
@@ -54,11 +56,19 @@ contract EscrowContract is
         address rwaNftContract; // Address of the ProduceTracking contract
         uint256 rwaTokenId;     // The tokenId of the produce lot
         uint256 feeAmount;      // Platform fee amount
-        uint256 discountRate;
-        uint256 discountDeadline;
+        uint256 discountRate;   // Discount rate in basis points (e.g. 50 = 0.5%)
+        uint256 discountDeadline; // Timestamp deadline for early payment discount
+    }
+
+    struct DisputeVoting {
+        uint256 snapshotArbitratorCount;
+        uint256 votesForBuyer;
+        uint256 votesForSeller;
+        bool resolved;
     }
     
     mapping(bytes32 => Escrow) public escrows;
+    mapping(bytes32 => DisputeVoting) public disputeVotings;
     mapping(bytes32 => mapping(address => bool)) public hasVoted;
 
     ComplianceManager public complianceManager;
@@ -68,28 +78,22 @@ contract EscrowContract is
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
     uint256 public quorumPercentage = 51; // Quorum percentage (e.g. 51%)
+    uint256 public minimumEscrowAmount = 100; // Minimum escrow amount to prevent zero-fee edge cases
 
-    struct DisputeVoting {
-        uint256 snapshotArbitratorCount;
-        uint256 votesForBuyer;
-        uint256 votesForSeller;
-        bool resolved;
-    }
-    
-    mapping(bytes32 => DisputeVoting) public disputeVotings;
-    
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
-    // Updated events to include extra data for voting
-    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount);
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount); // Overload
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
-    event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer);
+    event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer); // Overload
     event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool voteForBuyer);
     event SafeEscape(bytes32 indexed invoiceId, address indexed admin);
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
+    event MinimumEscrowAmountUpdated(uint256 oldMinimum, uint256 newMinimum);
+    event EscrowExpired(bytes32 indexed invoiceId, address indexed buyer, uint256 amountReclaimed);
 
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
@@ -125,6 +129,11 @@ contract EscrowContract is
         arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
         treasury = msg.sender; // Default treasury to admin
         feePercentage = 50;    // Default 0.5% fee (50 basis points)
+        
+        // Calculate minimum escrow amount dynamically based on fee percentage
+        // For 50 basis points (0.5%), minimum = ceil(10000 / 50) = 200
+        // This ensures (amount * 50) / 10000 >= 1
+        minimumEscrowAmount = (10000 + feePercentage - 1) / feePercentage;
     }
     
     /**
@@ -146,7 +155,46 @@ contract EscrowContract is
         require(_feePercentage <= 1000, "Fee cannot exceed 10%"); // Max 10% fee
         uint256 oldFee = feePercentage;
         feePercentage = _feePercentage;
+        
+        // Dynamically update minimum escrow amount to ensure fee > 0
+        // Calculate: minimumAmount = ceil(10000 / feePercentage)
+        // This ensures (minimumAmount * feePercentage) / 10000 >= 1
+        if (_feePercentage > 0) {
+            minimumEscrowAmount = (10000 + _feePercentage - 1) / _feePercentage;
+        } else {
+            minimumEscrowAmount = 1; // If no fee, minimum is 1
+        }
+        
         emit FeePercentageUpdated(oldFee, _feePercentage);
+        emit MinimumEscrowAmountUpdated(oldFee > 0 ? (10000 + oldFee - 1) / oldFee : 1, minimumEscrowAmount);
+    }
+
+    /**
+     * @notice Set the minimum escrow amount to prevent zero-fee edge cases
+     * @param _minimumEscrowAmount Minimum amount required to create an escrow
+     * @dev This will be overridden if it's less than the calculated minimum based on fee percentage
+     */
+    function setMinimumEscrowAmount(uint256 _minimumEscrowAmount) external onlyAdmin {
+        require(_minimumEscrowAmount > 0, "Minimum amount must be > 0");
+        
+        // Calculate the absolute minimum based on current fee percentage
+        uint256 calculatedMinimum = feePercentage > 0 ? (10000 + feePercentage - 1) / feePercentage : 1;
+        
+        // Ensure the new minimum is at least the calculated minimum
+        require(_minimumEscrowAmount >= calculatedMinimum, "Minimum too low for current fee");
+        
+        uint256 oldMinimum = minimumEscrowAmount;
+        minimumEscrowAmount = _minimumEscrowAmount;
+        emit MinimumEscrowAmountUpdated(oldMinimum, _minimumEscrowAmount);
+    }
+    
+    /**
+     * @notice Get the calculated minimum escrow amount based on current fee percentage
+     * @return The minimum amount required to ensure fee > 0
+     */
+    function getCalculatedMinimumAmount() external view returns (uint256) {
+        if (feePercentage == 0) return 1;
+        return (10000 + feePercentage - 1) / feePercentage;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -173,13 +221,19 @@ contract EscrowContract is
             "Invalid Arbitrator"
         );
 
+        // Validate minimum escrow amount to prevent zero-fee edge cases
+        require(_amount >= minimumEscrowAmount, "Amount below minimum");
+
         // Calculate fee amount
         uint256 calculatedFee = (_amount * feePercentage) / 10000; // Basis points calculation
+
+        // Ensure fee is not zero (prevent dust transactions with no platform fee)
+        require(calculatedFee > 0, "Fee amount is zero");
 
         // --- NEW: Lock the Produce NFT as Collateral ---
         // The seller must have approved the EscrowContract to spend this NFT beforehand.
         if (_rwaNftContract != address(0)) {
-            IERC721(_rwaNftContract).transferFrom(
+            IERC721(_rwaNftContract).safeTransferFrom(
                 _seller,
                 address(this),
                 _rwaTokenId
@@ -219,13 +273,17 @@ contract EscrowContract is
         Escrow storage escrow = escrows[_invoiceId];
         require(_msgSender() == escrow.buyer, "Not buyer");
         require(!escrow.buyerConfirmed, "Already paid");
+        require(escrow.status == EscrowStatus.Created, "Invalid escrow status");
+        
+        // Check if escrow has expired
+        require(block.timestamp <= escrow.expiresAt, "Escrow expired");
 
         uint256 payableAmount = _getPayableAmount(escrow);
 
         if (escrow.token == address(0)) {
             require(msg.value == payableAmount, "Bad ETH amount");
         } else {
-            IERC20(escrow.token).transferFrom(
+            IERC20(escrow.token).safeTransferFrom(
                 _msgSender(),
                 address(this),
                 payableAmount
@@ -245,6 +303,13 @@ contract EscrowContract is
             _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
             "Not party"
         );
+        require(escrow.status == EscrowStatus.Funded, "Not funded");
+        
+        // Allow release even if expired (parties can still complete the transaction)
+        // But update status to Expired if past deadline
+        if (block.timestamp > escrow.expiresAt && escrow.status != EscrowStatus.Disputed) {
+            escrow.status = EscrowStatus.Expired;
+        }
 
         if (_msgSender() == escrow.seller) {
             escrow.sellerConfirmed = true;
@@ -255,6 +320,44 @@ contract EscrowContract is
         if (escrow.sellerConfirmed && escrow.buyerConfirmed) {
             _releaseFunds(_invoiceId);
         }
+    }
+
+    /**
+     * @notice Allows buyer to reclaim funds from an expired, funded escrow
+     * @param _invoiceId The invoice ID of the expired escrow
+     * @dev Can only be called after expiration and if escrow is still funded
+     */
+    function reclaimExpiredFunds(bytes32 _invoiceId) external nonReentrant {
+        Escrow storage escrow = escrows[_invoiceId];
+        
+        require(_msgSender() == escrow.buyer, "Not buyer");
+        require(escrow.status == EscrowStatus.Funded || escrow.status == EscrowStatus.Expired, "Invalid status");
+        require(block.timestamp > escrow.expiresAt, "Not expired yet");
+        
+        uint256 reclaimAmount = escrow.amount;
+        address buyer = escrow.buyer;
+        address token = escrow.token;
+        
+        // Update status before transfer (CEI pattern)
+        escrow.status = EscrowStatus.Expired;
+        
+        // Return funds to buyer
+        if (token == address(0)) {
+            payable(buyer).transfer(reclaimAmount);
+        } else {
+            IERC20(token).safeTransfer(buyer, reclaimAmount);
+        }
+        
+        // Return NFT collateral to seller if exists
+        if (escrow.rwaNftContract != address(0)) {
+            IERC721(escrow.rwaNftContract).safeTransferFrom(
+                address(this),
+                escrow.seller,
+                escrow.rwaTokenId
+            );
+        }
+        
+        emit EscrowExpired(_invoiceId, buyer, reclaimAmount);
     }
 
     function raiseDispute(bytes32 invoiceId) external {
@@ -287,45 +390,23 @@ contract EscrowContract is
     function resolveDispute(bytes32 _invoiceId, bool _sellerWins) external onlyAdmin {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.disputeRaised, "No dispute raised");
+        require(escrow.status == EscrowStatus.Disputed, "Not disputed");
         
-        escrow.disputeResolver = msg.sender;
-        IERC20 token = IERC20(escrow.token);
-
-        if (_sellerWins) {
-            // Seller wins: Get paid. Buyer gets the goods (NFT).
-            require(token.transfer(escrow.seller, escrow.amount), "Transfer to seller failed");
-            
-            // Release NFT to Buyer (Ownership Transfer)
-            if (escrow.rwaNftContract != address(0)) {
-                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
-            }
-        } else {
-            // Buyer wins: Get refund. Seller gets the goods (NFT) back.
-            require(token.transfer(escrow.buyer, escrow.amount), "Transfer to buyer failed");
-
-            // Return NFT to Seller
-            if (escrow.rwaNftContract != address(0)) {
-                IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.seller, escrow.rwaTokenId); //
-            }
-        }
-        
-        emit DisputeResolved(_invoiceId, msg.sender, _sellerWins);
+        _resolveEscrow(_invoiceId, _sellerWins);
     }
 
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
-        IERC20 token = IERC20(escrow.token);
         
-        // Transfer funds to Seller
-        require(token.transfer(escrow.seller, escrow.amount), "Transfer failed");
+        IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
         
-        // --- NEW: Release RWA NFT to Buyer ---
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(address(this), escrow.buyer, escrow.rwaTokenId); //
+            IERC721(escrow.rwaNftContract).safeTransferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
         }
         
         emit EscrowReleased(_invoiceId, escrow.amount);
     }
+
 
     function _getPayableAmount(Escrow storage escrow)
         internal
@@ -345,9 +426,12 @@ contract EscrowContract is
 
     function _payout(address to, address token, uint256 amount) internal {
         if (token == address(0)) {
-            payable(to).transfer(amount);
+            // Use .call() instead of .transfer() to support smart contract wallets
+            // .transfer() has a 2300 gas limit which fails for contracts with fallback logic
+            (bool success, ) = payable(to).call{value: amount}("");
+            require(success, "ETH transfer failed");
         } else {
-            IERC20(token).transfer(to, amount);
+            IERC20(token).safeTransfer(to, amount);
         }
     }
 
@@ -357,7 +441,7 @@ contract EscrowContract is
         Escrow storage escrow
     ) internal {
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).transferFrom(
+            IERC721(escrow.rwaNftContract).safeTransferFrom(
                 from,
                 to,
                 escrow.rwaTokenId
@@ -574,29 +658,21 @@ contract EscrowContract is
         address buyer = e.buyer;
         uint256 amount = e.amount;
         uint256 fee = e.feeAmount;
-        address token = e.token;
-        address nft = e.rwaNftContract;
-        uint256 nftId = e.rwaTokenId;
 
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
-        // INTERACTIONS
-        // Transfer fee to treasury first
+        uint256 payoutAmount = amount;
         if (fee > 0) {
-            IERC20(token).transfer(treasury, fee);
+            IERC20(e.token).safeTransfer(treasury, fee);
             emit FeeCollected(invoiceId, fee);
+            payoutAmount -= fee;
         }
 
-        // Transfer remaining amount to winner
-        IERC20(token).transfer(sellerWins ? seller : buyer, amount);
+        IERC20(e.token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
 
-        if (nft != address(0)) {
-            IERC721(nft).transferFrom(
-                address(this),
-                sellerWins ? buyer : seller,
-                nftId
-            );
-        }
+
+        // Transfer NFT to winner
+        _transferNFT(address(this), sellerWins ? buyer : seller, e);
 
         delete escrows[invoiceId];
     }
