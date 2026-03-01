@@ -3,6 +3,7 @@ const sandboxService = require('../services/sandboxService');
 const { ethers } = require('ethers');
 const { getSigner, contractAddresses } = require('../config/blockchain');
 const ComplianceManagerArtifact = require('../../deployed/ComplianceManager.json');
+const errorResponse = require('../utils/errorResponse');
 
 /**
  * Verify or upsert a wallet-level KYC mapping
@@ -14,7 +15,7 @@ exports.verifyWallet = async (req, res) => {
   const caller = req.user?.id || null;
 
   if (!walletAddress) {
-    return res.status(400).json({ success: false, error: 'walletAddress is required' });
+    return errorResponse(res, 'walletAddress is required', 400);
   }
 
   try {
@@ -31,7 +32,7 @@ exports.verifyWallet = async (req, res) => {
     });
 
     // Optionally trigger on-chain verification (admin only)
-    if (onChain && req.user && req.user.role === 'admin') {
+    if (onChain) {
       const signer = getSigner();
       const complianceManager = new ethers.Contract(
         contractAddresses.complianceManager,
@@ -65,10 +66,7 @@ exports.verifyWallet = async (req, res) => {
     });
   } catch (error) {
     console.error('[kycController] verifyWallet error:', error.message || error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Internal server error' 
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -84,10 +82,7 @@ exports.getWalletStatus = async (req, res, walletParam) => {
     const walletAddress = walletParam || req.params?.wallet || req.query?.wallet || req.body?.wallet;
     
     if (!walletAddress) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'wallet address required' 
-      });
+      return errorResponse(res, 'wallet address required', 400);
     }
 
     // Query service for wallet status
@@ -99,10 +94,7 @@ exports.getWalletStatus = async (req, res, walletParam) => {
     });
   } catch (error) {
     console.error('[kycController] getWalletStatus error:', error.message || error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Internal server error' 
-    });
+    return errorResponse(res, error, 500);
   }
 };
 
@@ -135,10 +127,8 @@ exports.initiateKYC = async (req, res) => {
       referenceId: kycReferenceId // Update this variable
     });
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.response?.data?.message || 'Failed to initiate KYC' 
-    });
+    const errorMsg = error.response?.data?.message || 'Failed to initiate KYC';
+    return errorResponse(res, errorMsg, 500);
   }
 };
 
@@ -202,10 +192,8 @@ exports.verifyKYCOtp = async (req, res) => {
     }
   } catch (error) {
     console.error('KYC Verification Error:', error);
-    res.status(400).json({ 
-      success: false, 
-      error: error.response?.data?.message || error.message || 'Verification failed' 
-    });
+    const errorMsg = error.response?.data?.message || error.message || 'Verification failed';
+    return errorResponse(res, errorMsg, 400);
   }
 };
 
@@ -231,6 +219,6 @@ exports.checkCompliance = async (req, res) => {
       reason: compliant ? '' : `KYC status: ${user.kyc_status}, Risk level: ${user.kyc_risk_level}`
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return errorResponse(res, error, 500);
   }
 };

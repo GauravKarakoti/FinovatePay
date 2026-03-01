@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../utils/api';
+import { toast } from 'sonner';
 import { io } from 'socket.io-client';
 import EvidenceUpload from '../components/Dispute/EvidenceUpload';
 import EvidenceList from '../components/Dispute/EvidenceList';
@@ -75,7 +76,7 @@ const DisputeDashboard = () => {
 
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to raise dispute');
+      toast.error(err.response?.data?.error || 'Failed to raise dispute');
     }
   };
 

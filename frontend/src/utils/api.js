@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { toast } from 'sonner';
+import { checkOnlineStatus } from './network';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 console.log("API Base URL:", API_BASE_URL);
@@ -17,17 +19,28 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
+// Raw axios instance without interceptors for logout requests
+// This prevents recursive 401 loops when logout endpoint also returns 401
+const rawAxios = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
 });
 
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Handle API errors with comprehensive error handling
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -40,47 +53,64 @@ api.interceptors.response.use(
       // Check if it's a timeout error
       if (error.code === 'ECONNABORTED') {
         console.error('Request timeout');
+        const message = 'Request timed out. Please try again.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: 'Request timed out. Please try again.',
+          message,
           isTimeout: true
         });
       }
       
-      // Check if user is offline
-      if (!navigator.onLine) {
+      // Check if user is offline using robust connectivity detection
+      const isOnline = await checkOnlineStatus();
+      if (!isOnline) {
         console.error('User is offline');
+        const message = 'You are offline. Please check your internet connection.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: 'You are offline. Please check your internet connection.',
+          message,
           isOffline: true
         });
       }
       
+      const message = 'Network error. Please check your connection and try again.';
+      toast.error(message);
       return Promise.reject({
         ...error,
-        message: 'Network error. Please check your connection and try again.',
+        message,
         isNetworkError: true
       });
     }
     
     const status = error.response.status;
     const errorData = error.response.data;
+    let message = '';
     
     // Handle specific HTTP status codes
     switch (status) {
       case 400:
         console.error('Bad request:', errorData);
+        message = errorData?.message || errorData?.error || 'Invalid request. Please check your input.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Invalid request. Please check your input.',
+          message,
           isValidationError: true
         });
         
       case 401:
-        // Clear user data and token from localStorage
+        // Call backend logout to clear HttpOnly cookie using raw axios (without interceptor)
+        // to prevent recursive 401 loops if logout endpoint also returns 401
+        try {
+          await rawAxios.post('/auth/logout');
+        } catch (logoutError) {
+          console.error('Logout request failed:', logoutError);
+        }
+        
+        // Clear user data from localStorage
         localStorage.removeItem('user');
-        localStorage.removeItem('token'); // Add this line
         
         // Use React Router navigation if available, fallback to hard redirect
         if (navigateFunction) {
@@ -88,50 +118,63 @@ api.interceptors.response.use(
         } else {
           window.location.href = '/login';
         }
+        message = 'Session expired. Please log in again.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: 'Session expired. Please log in again.',
+          message,
           isAuthError: true
         });
+
         
       case 403:
         console.error('Forbidden:', errorData);
+        message = errorData?.message || errorData?.error || 'You do not have permission to perform this action.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'You do not have permission to perform this action.',
+          message,
           isForbidden: true
         });
         
       case 404:
         console.error('Not found:', errorData);
+        message = errorData?.message || errorData?.error || 'The requested resource was not found.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'The requested resource was not found.',
+          message,
           isNotFound: true
         });
         
       case 409:
         console.error('Conflict:', errorData);
+        message = errorData?.message || errorData?.error || 'A conflict occurred. The resource may already exist.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'A conflict occurred. The resource may already exist.',
+          message,
           isConflict: true
         });
         
       case 422:
         console.error('Validation error:', errorData);
+        message = errorData?.message || errorData?.error || 'Validation failed. Please check your input.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Validation failed. Please check your input.',
+          message,
           isValidationError: true,
           validationErrors: errorData?.errors
         });
         
       case 429:
         console.error('Rate limited:', errorData);
+        message = errorData?.message || errorData?.error || 'Too many requests. Please try again later.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Too many requests. Please try again later.',
+          message,
           isRateLimited: true
         });
         
@@ -152,17 +195,21 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
         
+        message = errorData?.message || errorData?.error || 'Server error. Please try again later.';
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || 'Server error. Please try again later.',
+          message,
           isServerError: true
         });
         
       default:
         console.error(`HTTP ${status} error:`, errorData);
+        message = errorData?.message || errorData?.error || `An error occurred (HTTP ${status}). Please try again.`;
+        toast.error(message);
         return Promise.reject({
           ...error,
-          message: errorData?.message || errorData?.error || `An error occurred (HTTP ${status}). Please try again.`,
+          message,
           status
         });
     }
@@ -192,7 +239,12 @@ export const register = (userData) => {
   return api.post('/auth/register', userData);
 };
 
+export const logout = () => {
+  return api.post('/auth/logout');
+};
+
 export const updateCurrentUserRole = (role) => {
+
   return api.put('/auth/role', { role });
 };
 
@@ -220,6 +272,10 @@ export const createProduceLot = (produceData) => {
 
 export const getProduceLot = (lotId) => {
   return api.get(`/produce/lots/${lotId}`);
+};
+
+export const createFiatRampLink = (data) => {
+  return api.post('/fiat-ramp/create-link', data); 
 };
 
 export const transferProduce = (transferData) => {
@@ -286,6 +342,23 @@ export const confirmRelease = (invoiceId) => {
 
 export const raiseDispute = (invoiceId, reason) => {
   return api.post('/payments/escrow/dispute', { invoiceId, reason });
+};
+
+// --- Multi-Signature Escrow API ---
+
+// Add multi-signature approval for an escrow
+export const approveMultiSig = (invoiceId) => {
+  return api.post(`/escrow/${invoiceId}/approve`);
+};
+
+// Get multi-signature approval status for an escrow
+export const getMultiSigApprovals = (invoiceId) => {
+  return api.get(`/escrow/${invoiceId}/approvals`);
+};
+
+// Get full escrow status including multi-sig details
+export const getEscrowStatus = (invoiceId) => {
+  return api.get(`/escrow/${invoiceId}/status`);
 };
 
 // --- KYC API ---
@@ -382,6 +455,140 @@ export const resumeStream = (streamId) => {
 // Cancel a stream (seller or buyer)
 export const cancelStream = (streamId) => {
   return api.post(`/streaming/${streamId}/cancel`);
+};
+
+// --- Auction API ---
+
+// Create a new auction
+export const createAuction = (auctionData) => {
+  return api.post('/auctions', auctionData);
+};
+
+// Get all active auctions
+export const getAuctions = (params) => {
+  return api.get('/auctions', { params });
+};
+
+// Get auctions for current seller
+export const getSellerAuctions = () => {
+  return api.get('/auctions/seller');
+};
+
+// Get auctions the user has bid on
+export const getBidderAuctions = () => {
+  return api.get('/auctions/bidder');
+};
+
+// Get auction statistics
+export const getAuctionStats = () => {
+  return api.get('/auctions/stats');
+};
+
+// Get auction details
+export const getAuction = (auctionId) => {
+  return api.get(`/auctions/${auctionId}`);
+};
+
+// Get bids for an auction
+export const getAuctionBids = (auctionId) => {
+  return api.get(`/auctions/${auctionId}/bids`);
+};
+
+// Start an auction
+export const startAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/start`);
+};
+
+// Place a bid on an auction
+export const placeBid = (auctionId, bidData) => {
+  return api.post(`/auctions/${auctionId}/bid`, bidData);
+};
+
+// End an auction
+export const endAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/end`);
+};
+
+// Settle an auction
+export const settleAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/settle`);
+};
+
+// Cancel an auction
+export const cancelAuction = (auctionId) => {
+  return api.post(`/auctions/${auctionId}/cancel`);
+};
+
+// --- Analytics API ---
+export const getAnalyticsOverview = () => {
+  return api.get('/analytics/overview');
+};
+
+export const getPaymentAnalytics = () => {
+  return api.get('/analytics/payments');
+};
+
+export const getFinancingAnalytics = () => {
+  return api.get('/analytics/financing');
+};
+
+export const getInvoiceRisk = (invoiceId) => {
+  return api.get(`/analytics/risk/${invoiceId}`);
+};
+
+// Alias for getInvoiceRisk used by AnalyticsDashboard
+export const getRiskScore = getInvoiceRisk;
+
+// --- Insurance API ---
+
+// Get insurance configuration
+export const getInsuranceConfig = () => {
+  return api.get('/insurance/config');
+};
+
+// Calculate premium for given coverage and duration
+export const calculateInsurancePremium = (coverageAmount, durationSeconds) => {
+  return api.get('/insurance/calculate-premium', { params: { coverageAmount, durationSeconds } });
+};
+
+// Purchase insurance for an escrow
+export const purchaseInsurance = (data) => {
+  return api.post('/insurance/purchase', data);
+};
+
+// Get user's insurance policies
+export const getInsurancePolicies = () => {
+  return api.get('/insurance/policies');
+};
+
+// Get specific policy details
+export const getInsurancePolicy = (policyId) => {
+  return api.get(`/insurance/policy/${policyId}`);
+};
+
+// Get insurance policies for an invoice
+export const getInvoiceInsurance = (invoiceId) => {
+  return api.get(`/insurance/invoice/${invoiceId}`);
+};
+
+// File a claim on an insurance policy
+export const fileInsuranceClaim = (data) => {
+  return api.post('/insurance/claim', data);
+};
+
+// Approve a claim (admin only)
+export const approveInsuranceClaim = (data) => {
+  return api.post('/insurance/approve-claim', data);
+};
+
+// Get insurance statistics (admin only)
+export const getInsuranceStats = () => {
+  return api.get('/insurance/stats');
+};
+
+// Get all pending claims (admin only)
+export const getPendingClaims = () => {
+  return api.get('/insurance/claims');
 };
 
 export default api;

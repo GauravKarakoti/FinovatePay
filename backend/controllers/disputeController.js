@@ -1,6 +1,7 @@
 const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 const { getSigner, getEscrowContract } = require('../config/blockchain');
+const errorResponse = require('../utils/errorResponse');
 
 // Helper function to create a log entry
 const createLog = async (client, invoiceId, action, performedBy, notes) => {
@@ -54,7 +55,7 @@ exports.raiseDispute = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error raising dispute:', err);
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err, 500);
   } finally {
     client.release();
   }
@@ -66,7 +67,7 @@ exports.uploadEvidence = async (req, res) => {
   const user = req.user;
 
   if (!file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+    return errorResponse(res, 'No file uploaded', 400);
   }
 
   const client = await pool.connect();
@@ -108,7 +109,7 @@ exports.uploadEvidence = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error uploading evidence:', err);
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err, 500);
   } finally {
     client.release();
   }
@@ -121,7 +122,7 @@ exports.getEvidence = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching evidence:', err);
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err, 500);
   }
 };
 
@@ -132,7 +133,7 @@ exports.getLogs = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching logs:', err);
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err, 500);
   }
 };
 
@@ -143,7 +144,7 @@ exports.resolveDispute = async (req, res) => {
 
   // Additional role check just in case, though middleware should handle it
   if (user.role !== 'arbitrator') {
-    return res.status(403).json({ error: 'Only arbitrators can resolve disputes' });
+    return errorResponse(res, 'Only arbitrators can resolve disputes', 403);
   }
 
   // Determine winner for Smart Contract
@@ -153,7 +154,7 @@ exports.resolveDispute = async (req, res) => {
   } else if (status === 'rejected') {
       sellerWins = true; // Dispute Rejected, Seller keeps funds
   } else {
-      return res.status(400).json({ error: 'Invalid resolution status' });
+      return errorResponse(res, 'Invalid resolution status', 400);
   }
 
   const client = await pool.connect();
@@ -206,7 +207,7 @@ exports.resolveDispute = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error resolving dispute:', err);
-    res.status(500).json({ error: err.message });
+    return errorResponse(res, err, 500);
   } finally {
     client.release();
   }
@@ -222,6 +223,6 @@ exports.getDisputeStatus = async (req, res) => {
         res.json(result.rows[0]);
     } catch (err) {
         console.error('Error fetching dispute status:', err);
-        res.status(500).json({ error: err.message });
+        return errorResponse(res, err, 500);
     }
 };

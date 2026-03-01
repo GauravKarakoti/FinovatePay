@@ -47,7 +47,7 @@ const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => 
             onClose();
         } catch (error) {
             console.error('Financing request failed:', error);
-            alert('Financing request failed. Please try again.');
+            toast.error('Financing request failed. Please try again.');
         } finally {
             setLoading(false);
         }

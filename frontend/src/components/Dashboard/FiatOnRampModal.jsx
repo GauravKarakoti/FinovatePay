@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import api from '../../utils/api';
+import api, { createFiatRampLink } from '../../utils/api';
+import CurrencySelector from '../Settings/CurrencySelector';
 
-const FiatOnRampModal = ({ onClose, onSuccess }) => {
+const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
     const [amount, setAmount] = useState('');
     const [currency, setCurrency] = useState('USD');
+    const [cryptoCurrency, setCryptoCurrency] = useState('USDC');
+    const [provider, setProvider] = useState('moonpay'); // Default to MoonPay
     const [isProcessing, setIsProcessing] = useState(false);
     
     // State for live exchange rate
     const [exchangeRate, setExchangeRate] = useState(1.0);
     const [isLoadingRate, setIsLoadingRate] = useState(false);
 
-    const FEE_PERCENT = 0.015; // 1.5% fee
+    // Fee percentages by provider
+    const FEE_PERCENT = provider === 'moonpay' ? 0.0149 : 0.015;
 
     // --- 1. ACTUAL IMPLEMENTATION: Live Exchange Rate Fetching ---
     useEffect(() => {
@@ -48,7 +52,7 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
         fetchExchangeRate();
     }, [currency]);
 
-    // --- 2. ACTUAL IMPLEMENTATION: Handle Purchase ---
+    // --- 2. Handle Purchase with Provider Selection ---
     const handlePurchase = async (e) => {
         e.preventDefault();
         
@@ -57,39 +61,63 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
             return;
         }
 
+        if (!walletAddress) {
+            toast.error("Please connect your wallet first");
+            return;
+        }
+
         setIsProcessing(true);
 
         try {
-            // Step 1: Create a Stripe Checkout Session via your Backend
-            // This endpoint (payment.js) should create a Stripe session and return the 'url'
-            const response = await api.post('/payments/onramp', {
-                amount: parseFloat(amount),
-                currency: currency,
-                targetToken: 'USDC',
-                exchangeRate: exchangeRate // Pass rate to lock it in backend if needed
-            });
+            let paymentUrl;
 
-            const { paymentUrl, sessionUrl } = response.data;
-            const targetUrl = paymentUrl || sessionUrl;
+            if (provider === 'moonpay') {
+                // Use MoonPay backend endpoint
+                const response = await createFiatRampLink({
+                    amount: parseFloat(amount),
+                    currency,
+                    cryptoCurrency,
+                    walletAddress
+                });
 
-            if (targetUrl) {
-                // Step 2: Redirect user to the secure Payment Provider (e.g., Stripe Hosted Page)
-                toast.loading("Redirecting to secure payment gateway...");
-                window.location.href = targetUrl;
+                const { paymentUrl: moonpayUrl } = response.data;
+                paymentUrl = moonpayUrl;
+
+                if (paymentUrl) {
+                    toast.loading("Redirecting to MoonPay...", { duration: 2000 });
+                    window.location.href = paymentUrl;
+                    return;
+                }
             } else {
-                // Fallback for simulation/testing if backend isn't fully configured with Stripe keys
-                console.warn("No payment URL returned. Falling back to simulation.");
-                toast.success("Payment successful! (Simulated)");
-                if (onSuccess) onSuccess(parseFloat(amount));
-                onClose();
+                // Use Stripe backend endpoint
+                const response = await api.post('/payments/onramp', {
+                    amount: parseFloat(amount),
+                    currency: currency,
+                    targetToken: cryptoCurrency,
+                    exchangeRate: exchangeRate
+                });
+
+                const { paymentUrl: stripeUrl, sessionUrl } = response.data;
+                paymentUrl = stripeUrl || sessionUrl;
+
+                if (paymentUrl) {
+                    toast.loading("Redirecting to Stripe...", { duration: 2000 });
+                    window.location.href = paymentUrl;
+                    return;
+                }
             }
+
+            // Fallback for simulation/testing
+            console.warn("No payment URL returned. Falling back to simulation.");
+            toast.success("Payment successful! (Simulated)");
+            if (onSuccess) onSuccess(parseFloat(amount));
+            onClose();
 
         } catch (error) {
             console.error('Payment initialization failed:', error);
             const errorMessage = error.response?.data?.error || "Payment connection failed. Please try again.";
             toast.error(errorMessage);
         } finally {
-            // Only stop processing if we didn't redirect (redirect unmounts the component anyway)
             setIsProcessing(false);
         }
     };
@@ -132,30 +160,76 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
                 </div>
 
                 <form onSubmit={handlePurchase}>
+                    {/* Provider Selection */}
+                    <div className="mb-5">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Payment Provider
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setProvider('moonpay')}
+                                className={`py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1
+                                    ${provider === 'moonpay' 
+                                        ? 'border-green-500 bg-green-50 text-green-700' 
+                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                                    }`}
+                            >
+                                <span className="font-bold">MoonPay</span>
+                                <span className="text-xs opacity-75">1.49% fee</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setProvider('stripe')}
+                                className={`py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1
+                                    ${provider === 'stripe' 
+                                        ? 'border-green-500 bg-green-50 text-green-700' 
+                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                                    }`}
+                            >
+                                <span className="font-bold">Stripe</span>
+                                <span className="text-xs opacity-75">1.5% fee</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Crypto Selection */}
+                    <div className="mb-5">
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Buy Crypto
+                        </label>
+                        <select
+                            value={cryptoCurrency}
+                            onChange={(e) => setCryptoCurrency(e.target.value)}
+                            className="block w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium bg-white"
+                        >
+                            <option value="USDC">USDC</option>
+                            <option value="USDT">USDT</option>
+                        </select>
+                    </div>
+
                     <div className="mb-5">
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                             You Pay (Fiat)
                         </label>
-                        <div className="relative group">
-                            <input
-                                type="number"
-                                min="10"
-                                step="any"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="block w-full pl-4 pr-20 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium"
-                                placeholder="0.00"
-                            />
-                            <div className="absolute inset-y-0 right-0 flex items-center border-l border-gray-300">
-                                <select
+                        <div className="flex gap-3">
+                            <div className="flex-1">
+                                <input
+                                    type="number"
+                                    min="10"
+                                    step="any"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    className="block w-full pl-4 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div className="w-36">
+                                <CurrencySelector
                                     value={currency}
-                                    onChange={(e) => setCurrency(e.target.value)}
-                                    className="h-full py-0 pl-3 pr-8 bg-gray-50 text-gray-600 font-medium rounded-r-lg focus:ring-0 border-transparent cursor-pointer hover:bg-gray-100"
-                                >
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="GBP">GBP</option>
-                                </select>
+                                    onChange={setCurrency}
+                                    showFiatOnly={true}
+                                />
                             </div>
                         </div>
                     </div>
@@ -203,12 +277,12 @@ const FiatOnRampModal = ({ onClose, onSuccess }) => {
                                 </svg>
                                 Processing...
                             </span>
-                        ) : 'Proceed to Payment'}
+                        ) : `Pay with ${provider === 'moonpay' ? 'MoonPay' : 'Stripe'}`}
                     </button>
                     
                     <p className="text-xs text-center text-gray-400 mt-4 flex items-center justify-center gap-2">
                         <span>Powered by</span> 
-                        <span className="font-bold text-gray-500">Stripe</span>
+                        <span className="font-bold text-gray-500">{provider === 'moonpay' ? 'MoonPay' : 'Stripe'}</span>
                     </p>
                 </form>
             </div>

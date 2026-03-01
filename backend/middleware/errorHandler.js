@@ -1,3 +1,5 @@
+const errorResponse = require('../utils/errorResponse');
+
 const errorHandler = (err, req, res, next) => {
   // Preserve CORS-specific handling
   if (err.message === 'Not allowed by CORS') {
@@ -9,10 +11,8 @@ const errorHandler = (err, req, res, next) => {
 
   const statusCode = err.statusCode || 500;
 
-  res.status(statusCode).json({
-    success: false,
-    message: err.message || 'Internal Server Error'
-  });
+  // Use the centralized error response utility
+  return errorResponse(res, err, statusCode);
 };
 
 module.exports = errorHandler;

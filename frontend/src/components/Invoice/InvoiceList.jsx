@@ -1,4 +1,5 @@
 import AmountDisplay from '../common/AmountDisplay';
+import { toast } from 'sonner';
 
 const InvoiceList = ({
     invoices,
@@ -27,11 +28,11 @@ const InvoiceList = ({
         e.stopPropagation(); // Prevent the row's onClick from firing
         navigator.clipboard.writeText(textToCopy)
             .then(() => {
-                alert(`Copied to clipboard: ${textToCopy}`);
+                toast.success(`Copied to clipboard: ${textToCopy}`);
             })
             .catch(err => {
                 console.error('Failed to copy text: ', err);
-                alert('Failed to copy.');
+                toast.error('Failed to copy.');
             });
     };
 
