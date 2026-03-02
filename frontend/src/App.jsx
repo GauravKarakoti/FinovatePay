@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
+import PermissionBanner from './components/Notifications/PermissionBanner';
 import './App.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
@@ -361,6 +362,7 @@ function App() {
                   </svg>
                 ) : '💬'}
               </button>
+              <PermissionBanner />
             </>
           )}
         </div>
