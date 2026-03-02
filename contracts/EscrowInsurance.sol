@@ -198,7 +198,7 @@ contract EscrowInsurance is ReentrancyGuard, Pausable, Ownable {
         uint256 _coverageAmount,
         uint256 _duration,
         address _paymentToken
-    ) external nonReentrant whenNotPaused returns (bytes32 policyId) {
+    ) external payable nonReentrant whenNotPaused returns (bytes32 policyId) {
         require(_invoiceId != bytes32(0), "Invalid invoice ID");
         require(_coverageAmount >= minCoverageAmount, "Coverage below minimum");
         require(_coverageAmount <= maxCoverageAmount, "Coverage exceeds maximum");
@@ -393,8 +393,8 @@ contract EscrowInsurance is ReentrancyGuard, Pausable, Ownable {
         external 
         onlyOwner 
     {
-        require(_minCoverageAmount > 0, "Min coverage must be > require(_maxCoverageAmount > 0");
-        _minCoverageAmount, "Max must exceed min");
+        require(_minCoverageAmount > 0, "Min coverage must be > 0");
+        require(_maxCoverageAmount > _minCoverageAmount, "Max must exceed min");
         
         uint256 oldMax = maxCoverageAmount;
         uint256 oldMin = minCoverageAmount;

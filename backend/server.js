@@ -7,6 +7,10 @@ const path = require("path");
 const socketIo = require("socket.io");
 require("dotenv").config();
 
+// CRITICAL: Validate environment variables before starting application
+const { validateAndExit } = require("./utils/envValidator");
+validateAndExit();
+
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
 const {
@@ -59,6 +63,7 @@ const corsOptions = {
 
     return callback(new Error("Not allowed by CORS"));
   },
+  // origin: "http://localhost:5173",
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   credentials: true,
   optionsSuccessStatus: 204,
@@ -240,8 +245,11 @@ server.listen(PORT, () => {
 // Set up graceful shutdown handlers
 setupGracefulShutdown(server, io);
 
+const { startRecoveryWorker } = require('./services/recoveryService');
+
 listenForTokenization();
 startSyncWorker();
+startRecoveryWorker(); // Start transaction recovery worker
 
 try {
   startComplianceListeners();
