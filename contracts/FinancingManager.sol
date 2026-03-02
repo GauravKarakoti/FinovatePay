@@ -19,6 +19,15 @@ interface IFractionToken is IERC1155 {
         uint256 yieldBps;
     }
     function tokenDetails(uint256 tokenId) external view returns (TokenDetails memory);
+    function tokenizeInvoice(
+        bytes32 _invoiceId,
+        address _seller,
+        uint256 _totalFractions,
+        uint256 _pricePerFraction,
+        uint256 _maturityDate,
+        uint256 _totalValue,
+        uint256 _yieldBps
+    ) external returns (uint256);
 }
 
 interface IBridgeAdapter {
@@ -48,6 +57,23 @@ interface IEscrowContract {
         uint256 _discountDeadline
     ) external;
     function confirmRelease(bytes32 invoiceId) external;
+    function escrows(bytes32 invoiceId) external view returns (
+        address seller,
+        address buyer,
+        uint256 amount,
+        address tokenAddress,
+        uint8 status,
+        bool buyerConfirmed,
+        bool disputeRaised,
+        address disputeResolver,
+        uint256 createdAt,
+        uint256 expiresAt,
+        address rwaNftContract,
+        uint256 rwaTokenId,
+        uint256 feeAmount,
+        uint256 discountRate,
+        uint256 discountDeadline 
+    );
 }
 
 /**

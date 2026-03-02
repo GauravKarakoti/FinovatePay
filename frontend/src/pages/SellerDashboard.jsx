@@ -10,12 +10,13 @@ import {
   getKYCStatus,
   createInvoice,
   updateInvoiceStatus,
+  tokenizeInvoice,
   getQuotations,
   sellerApproveQuotation,
   rejectQuotation,
   raiseDispute
 } from '../utils/api';
-import { 
+import {
   connectWallet, getEscrowContract
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
@@ -33,6 +34,7 @@ import QuotationList from '../components/Dashboard/QuotationList';
 import CreateProduceLot from '../components/Produce/CreateProduceLot';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
+import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
 import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
 import AnalyticsPage from '../pages/AnalyticsPage';
@@ -244,6 +246,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [confirmingShipment, setConfirmingShipment] = useState(null);
   const [proofFile, setProofFile] = useState(null);
   const [invoiceQuotation, setInvoiceQuotation] = useState(null); 
+  const [tokenizingInvoice, setTokenizingInvoice] = useState(null); // <-- NEW STATE
   const { setStats: setGlobalStats } = useStatsActions();
 
   // ------------------ DATA LOADERS ------------------
@@ -450,6 +453,29 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     }
   }, [loadInvoices]);
 
+  const handleTokenizeSubmit = useCallback(async (invoiceId, { faceValue, maturityDate, yieldBps }) => {
+    setIsSubmitting(true);
+    const toastId = toast.loading('Tokenizing invoice...');
+    
+    try {
+      await tokenizeInvoice(
+        invoiceId,
+        faceValue,
+        maturityDate,
+        yieldBps // Passed as string/number, the API handles conversion on the backend
+      );
+
+      toast.success('Invoice tokenized successfully!', { id: toastId });
+      setTokenizingInvoice(null);
+      await loadInvoices();
+    } catch (error) {
+      console.error('Tokenization failed:', error);
+      toast.error(error.response?.data?.error || error.message || "Tokenization failed", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadInvoices]);
+
   // ------------------ DERIVED STATS ------------------
 
   const stats = useMemo(() => [
@@ -604,9 +630,13 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     </div>
   );
 
-const FinancingTabComponent = () => (
+  const FinancingTabComponent = () => (
     <div className="space-y-6">
-      <FinancingTab invoices={invoices} userRole="seller" />
+      <FinancingTab 
+        invoices={invoices} 
+        userRole="seller" 
+        onTokenizeClick={(invoice) => setTokenizingInvoice(invoice)}
+      />
     </div>
   );
 
@@ -703,6 +733,15 @@ const FinancingTabComponent = () => (
         isSubmitting={isSubmitting}
       />
 
+      {tokenizingInvoice && (
+        <TokenizeInvoiceModal
+          invoice={tokenizingInvoice}
+          onClose={() => setTokenizingInvoice(null)}
+          onSubmit={(invoiceId, data) => handleTokenizeSubmit(invoiceId, data)}
+          isSubmitting={isSubmitting}
+        />
+      )}
+
       <Modal
         isOpen={!!selectedQRCode}
         onClose={() => setSelectedQRCode(null)}
@@ -734,7 +773,7 @@ const FinancingTabComponent = () => (
 };
 
 SellerDashboard.propTypes = {
-  activeTab: PropTypes.string
+  activeTab: PropTypes.string,
 };
 
 export default SellerDashboard;

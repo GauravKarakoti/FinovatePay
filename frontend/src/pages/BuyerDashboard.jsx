@@ -508,6 +508,11 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
           return;
         }
 
+        if (balance < amountWei) {
+            toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
+            return;
+        }
+        
         // Approve and deposit tokens via escrow contract
         const allowance = await tokenContract.allowance(buyerAddress, contract_address);
         if (allowance < amountWei) {
