@@ -326,13 +326,15 @@ contract EscrowContract is
         require(_msgSender() == escrow.buyer, "Not buyer");
         require(escrow.status == EscrowStatus.Funded || escrow.status == EscrowStatus.Expired, "Invalid status");
         require(block.timestamp > escrow.expiresAt, "Not expired yet");
+        require(escrow.amount > 0, "No funds to reclaim"); // Prevent double reclaim
         
         uint256 reclaimAmount = escrow.amount;
         address buyer = escrow.buyer;
         address token = escrow.token;
         
-        // Update status before transfer (CEI pattern)
+        // Update status and zero out amount before transfer (CEI pattern)
         escrow.status = EscrowStatus.Expired;
+        escrow.amount = 0; // Zero out to prevent re-entrancy attacks
         
         // Return funds to buyer
         if (token == address(0)) {
@@ -656,12 +658,12 @@ contract EscrowContract is
 
         uint256 payoutAmount = amount;
         if (fee > 0) {
-            IERC20(e.token).safeTransfer(treasury, fee);
+            _payout(treasury, e.token, fee);
             emit FeeCollected(invoiceId, fee);
             payoutAmount -= fee;
         }
 
-        IERC20(e.token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
+        _payout(sellerWins ? seller : buyer, e.token, payoutAmount);
 
 
         // Transfer NFT to winner
