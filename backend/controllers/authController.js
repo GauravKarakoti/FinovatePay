@@ -9,56 +9,61 @@ const sanitizeUser = (user) => {
   return sanitizedUser;
 };
 
+// Valid user roles
+const VALID_ROLES = ['buyer', 'seller', 'arbitrator', 'investor'];
+
+// Valid user roles
+const VALID_ROLES = ['buyer', 'seller', 'arbitrator', 'investor'];
 
 // --- REGISTER USER ---
 exports.register = async (req, res) => {
   // 1. Get data from the form
-  const { name, email, password, walletAddress, companyName, phone } = req.body;
-
+  const { name, email, password, walletAddress, companyName, phone, role } = req.body;
 
   try {
-    // 2. Check if user already exists
+    // 2. Validate role parameter (default to 'seller' if not provided)
+    const userRole = role && VALID_ROLES.includes(role) ? role : 'seller';
+
+    // 3. Check if user already exists
     const userCheck = await pool.query(
-      'SELECT * FROM users WHERE email = $1 OR wallet_address = $2', 
+      'SELECT * FROM users WHERE email = $1 OR wallet_address = $2',
       [email, walletAddress]
     );
 
-    
     if (userCheck.rows.length > 0) {
       return errorResponse(res, 'User already exists with this Email or Wallet', 400);
     }
 
-    // 3. Encrypt the password
+    // 4. Encrypt the password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 4. Save to Database (Force role to 'seller')
+    // 5. Save to Database with the specified role
     const newUser = await pool.query(
       `INSERT INTO users (name, email, password, wallet_address, company_name, phone, role, kyc_status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'seller', 'pending') 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending') 
        RETURNING *`,
-      [name, email, hashedPassword, walletAddress, companyName, phone]
+      [name, email, hashedPassword, walletAddress, companyName, phone, userRole]
     );
 
-
-    // 5. Create Login Token
+    // 6. Create Login Token
     const token = jwt.sign(
-      { id: newUser.rows[0].id, role: newUser.rows[0].role }, 
-      process.env.JWT_SECRET, 
+      { id: newUser.rows[0].id, role: newUser.rows[0].role },
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    // 6. Set HttpOnly cookie
+    // 7. Set HttpOnly cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 365 * 24 * 60 * 60 * 1000 // 1 year
+      maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
     });
 
     res.json({ user: sanitizeUser(newUser.rows[0]), token });
   } catch (err) {
-    console.error("❌ Registration Error:", err.message);
+    console.error('❌ Registration Error:', err.message);
     return errorResponse(res, 'Server error during registration', 500);
   }
 };
@@ -82,8 +87,8 @@ exports.login = async (req, res) => {
 
     // 3. Create and set token in HttpOnly cookie
     const token = jwt.sign(
-      { id: user.rows[0].id, role: user.rows[0].role }, 
-      process.env.JWT_SECRET, 
+      { id: user.rows[0].id, role: user.rows[0].role },
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
@@ -92,12 +97,12 @@ exports.login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 365 * 24 * 60 * 60 * 1000 // 1 year
+      maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
     });
 
     res.json({ user: sanitizeUser(user.rows[0]), token });
   } catch (err) {
-    console.error("❌ Login Error:", err.message);
+    console.error('❌ Login Error:', err.message);
     return errorResponse(res, 'Server error', 500);
   }
 };

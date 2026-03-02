@@ -7,6 +7,10 @@ const path = require("path");
 const socketIo = require("socket.io");
 require("dotenv").config();
 
+// CRITICAL: Validate environment variables before starting application
+const { validateAndExit } = require("./utils/envValidator");
+validateAndExit();
+
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
 const {
