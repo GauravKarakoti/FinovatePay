@@ -5,12 +5,13 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
   {
-    ignores: ['dist']
+    ignores: ['dist', 'node_modules', '**/BridgeFinancingModal.jsx']
   },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 2020,
+      sourceType: 'module',
       globals: globals.browser,
       parserOptions: {
         ecmaVersion: 'latest',
@@ -34,5 +35,10 @@ export default [
       'react-hooks/rules-of-hooks': 'warn',
       'react-hooks/exhaustive-deps': 'warn',
     },
+    settings: {
+      react: {
+        version: 'detect'
+      }
+    }
   },
 ]
