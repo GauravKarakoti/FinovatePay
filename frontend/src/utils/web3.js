@@ -298,6 +298,12 @@ export async function buyFractionsNative(tokenId, amount) {
   return tx.wait();
 }
 
+/**
+ * @deprecated Tokenization is now handled via the backend API (/financing/tokenize),
+ * which calls the contract. Using the frontend signer is not recommended as it requires
+ * owner permissions on the FractionToken contract.
+ */
+/*
 export async function tokenizeInvoice(
   invoiceId,
   sellerAddress,
@@ -345,6 +351,7 @@ export async function tokenizeInvoice(
   
   return tx.wait();
 }
+*/
 
 // Export ERC20 ABI for compatibility
 export const erc20ABI = ERC20Artifact.abi;

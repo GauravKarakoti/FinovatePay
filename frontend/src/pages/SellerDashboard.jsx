@@ -10,13 +10,14 @@ import {
   getKYCStatus,
   createInvoice,
   updateInvoiceStatus,
+  tokenizeInvoice,
   getQuotations,
   sellerApproveQuotation,
   rejectQuotation,
   raiseDispute
 } from '../utils/api';
-import { 
-  connectWallet, getEscrowContract, tokenizeInvoice
+import {
+  connectWallet, getEscrowContract
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 
@@ -457,73 +458,19 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     const toastId = toast.loading('Tokenizing invoice...');
     
     try {
-      const { address } = await connectWallet();
-      
-      // Convert faceValue to Wei (18 decimals) for the total value
-      const totalValueWei = parseUnits(faceValue.toString(), 18);
-      
-      // Determine total fractions (Supply).
-      // Strategy: 1 Token = 1 Unit of Currency (e.g., 1 USDC).
-      // If faceValue is decimal (e.g., 100.50), we scale it to avoid partial tokens?
-      // Or we just round down?
-      // Safe bet: 1 Token = 1.00 USDC. If 100.50, we issue 100 tokens? 
-      // Better: 1 Token = 0.01 USDC (cents). So 100.50 -> 10050 tokens.
-      // But let's stick to 1 Token = 1 USDC for now, assuming integer inputs or handling it.
-      // Actually, let's make it 1 Token = 1e18 units of "share"?
-      // No, ERC1155 `amount` is uint256.
-      // "pricePerFraction" is in paymentToken base units.
-      
-      // New Strategy: Total Fractions = Face Value (in major units).
-      // If Face Value = 100.50, we round to 100?
-      // Let's use Math.ceil(faceValue) for Total Fractions.
-      const totalFractions = BigInt(Math.ceil(parseFloat(faceValue)));
-      
-      // Price per fraction = Face Value / Total Fractions (Initial offering is at par or discounted?)
-      // Actually, if yield is 5%, price should be discounted?
-      // "pricePerFraction" in `tokenizeInvoice` seems to be the "initial listing price"?
-      // Or is it just metadata?
-      // In `FractionToken.sol`:
-      // `tokenizeInvoice` takes `_totalValue` and `_pricePerFraction`.
-      // `buyFractions` uses `_tokenAmount * details.faceValue / details.totalSupply`.
-      // Wait, `FinancingManager.sol` `buyFractions` calculates `paymentAmount` dynamically.
-      // The `FractionToken.sol` `_pricePerFraction` might be legacy or for direct sales?
-      // Looking at `FinancingManager.sol`:
-      // `uint256 paymentAmount = (faceValueShare * (10 ** stablecoinDecimals)) / 1e18;`
-      // It DOES NOT use `pricePerFraction` from metadata.
-      // It derives price from Face Value.
-      // And `buyFractionsNative` applies `yieldBps` discount.
-      
-      // So `pricePerFraction` passed to `tokenizeInvoice` might be irrelevant for `FinancingManager` logic,
-      // but let's set it to 1e18 (1 unit) just in case.
-      const pricePerFraction = parseUnits('1', 18);
-
       await tokenizeInvoice(
         invoiceId,
-        address,
-        totalFractions,
-        pricePerFraction,
+        faceValue,
         maturityDate,
-        totalValueWei,
-        yieldBps // Passed as string/number, web3.js handles BigInt conversion
+        yieldBps // Passed as string/number, the API handles conversion on the backend
       );
-
-      // Backend update to mark as tokenized
-      await updateInvoiceStatus(invoiceId, 'tokenized'); 
-      // Note: check if updateInvoiceStatus supports 'tokenized' or if we need a new API call.
-      // The backend `processTokenizedEvent` listener should ideally handle this,
-      // but we might want to update UI immediately.
 
       toast.success('Invoice tokenized successfully!', { id: toastId });
       setTokenizingInvoice(null);
       await loadInvoices();
     } catch (error) {
       console.error('Tokenization failed:', error);
-      toast.error(error.reason || error.message || "Tokenization failed", { id: toastId });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [loadInvoices]);
-
+      toast.error(error.response?.data?.error || error.message || "Tokenization failed", { id: toastId });
   // ------------------ DERIVED STATS ------------------
 
   const stats = useMemo(() => [
