@@ -84,10 +84,10 @@ contract EscrowContract is
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
-    event DisputeResolvedByQuorum(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer);
+    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount); // Overload
+    event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
+    event DisputeResolvedByQuorum(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer); 
     event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool voteForSeller);
-    event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer); // Overload
-    event ArbitratorVoted(bytes32 indexed invoiceId, address indexed arbitrator, bool voteForBuyer);
     event SafeEscape(bytes32 indexed invoiceId, address indexed admin);
     event FeeCollected(bytes32 indexed invoiceId, uint256 feeAmount);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
@@ -124,6 +124,9 @@ contract EscrowContract is
         ERC2771Context(_trustedForwarder)
         EIP712("EscrowContract", "1")
     {
+        require(_complianceManager != address(0), "Invalid compliance manager");
+        require(_arbitratorsRegistry != address(0), "Invalid arbitrators registry");
+        
         admin = msg.sender;
         complianceManager = ComplianceManager(_complianceManager);
         arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
@@ -211,9 +214,38 @@ contract EscrowContract is
         address _rwaNftContract,
         uint256 _rwaTokenId,
         uint256 _discountRate,
+        uint256 _discountDeadline
+    ) external onlyAdmin returns (bool) {
+        // Fetch first arbitrator from registry to use as default for backward compatibility
+        address defaultResolver = arbitratorsRegistry.arbitratorList(0);
+        return this.createEscrow(
+            _invoiceId,
+            _seller,
+            _buyer,
+            _amount,
+            _token,
+            _duration,
+            _rwaNftContract,
+            _rwaTokenId,
+            _discountRate,
+            _discountDeadline,
+            defaultResolver
+        );
+    }
+
+    function createEscrow(
+        bytes32 _invoiceId,
+        address _seller,
+        address _buyer,
+        uint256 _amount,
+        address _token,
+        uint256 _duration,
+        address _rwaNftContract,
+        uint256 _rwaTokenId,
+        uint256 _discountRate,
         uint256 _discountDeadline,
         address _assignedResolver
-    ) external onlyAdmin returns (bool) {
+    ) public onlyAdmin returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
         require(
             _assignedResolver != address(0) && 
@@ -568,7 +600,7 @@ contract EscrowContract is
         if (voting.resolved) return;
 
         uint256 quorumRequired =
-            (voting.snapshotArbitratorCount * quorumPercentage) / 100;
+            (voting.snapshotArbitratorCount * quorumPercentage + 99) / 100;
 
         if (quorumRequired == 0) quorumRequired = 1;
 
@@ -582,7 +614,7 @@ contract EscrowContract is
             voting.resolved = true;
             _resolveEscrow(invoiceId, sellerWins);
 
-            emit DisputeResolved(
+            emit DisputeResolvedByQuorum(
                 invoiceId,
                 sellerWins,
                 voting.votesForSeller,
