@@ -491,31 +491,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       let tx;
 
       if (currency === 'MATIC') {
-        const balance = await signer.PROVIDER.getBalance(signer.address); // Wait, provider.getBalance(address) in v6
-        // Actually signer.provider.getBalance(signer.address)
-        // Or specific to v6: provider.getBalance(address)
-        // But referencing signer.getBalance() works in v5? In v6 signer has no getBalance?
-        // Let's check docs.
-        // v6: AbstractSigner has no getBalance. Provider has getBalance.
-        // So: await signer.provider.getBalance(await signer.getAddress())
-        
-        // However, I will check what code was there before. "signer.getBalance()"
-        // I need to change this logic too.
-        
-        // Wait, I will edit `handleConfirmPayment` fully.
-        
-        // Getting signer:
-        // const { signer } = await connectWallet();
-        // connectWallet returns { signer, address, provider }
-        
-        // So I can use provider.getBalance(address).
-        
-        // But first let's replace `ethers.utils.*` calls.
-
-
-      let tx;
-
-      if (currency === 'MATIC') {
         const address = await signer.getAddress();
         const balance = await signer.provider.getBalance(address);
         if (balance < amountWei) {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
-import { parseUnits, keccak256, toUtf8Bytes, zeroPadValue } from '../../utils/formatters';
+import { parseUnits, keccak256, toUtf8Bytes, zeroPadValue } from '../utils/formatters';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
@@ -471,6 +471,11 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     } catch (error) {
       console.error('Tokenization failed:', error);
       toast.error(error.response?.data?.error || error.message || "Tokenization failed", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadInvoices]);
+
   // ------------------ DERIVED STATS ------------------
 
   const stats = useMemo(() => [
@@ -768,7 +773,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 };
 
 SellerDashboard.propTypes = {
-  activeTab: PropTypes.string
+  activeTab: PropTypes.string,
 };
 
 export default SellerDashboard;
