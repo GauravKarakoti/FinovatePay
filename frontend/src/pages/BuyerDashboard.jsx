@@ -517,30 +517,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
         tx = await contract.deposit(bytes32Id);
       }
-        if (balance < amountWei) {
-            toast.error("Insufficient MATIC balance.", { id: toastId });
-            return;
-        }
-        // New deposit signature: deposit(bytes32) payable
-        tx = await contract.deposit(bytes32Id, { value: amountWei });
-      } else {
-        const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
-        const userAddress = await signer.getAddress();
-        const balance = await tokenContract.balanceOf(userAddress);
-
-        if (balance < amountWei) {
-            toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
-            return;
-        }
-
-        toast.loading('Approving tokens...', { id: toastId });
-        
-        const approveTx = await tokenContract.approve(contract.address, amountWei);
-        await approveTx.wait();
-        
-        toast.loading('Confirming deposit...', { id: toastId });
-        tx = await contract.deposit(bytes32Id);
-      }
       
       await tx.wait();
       await updateInvoiceStatus(invoice.invoice_id, 'deposited', tx.hash);
