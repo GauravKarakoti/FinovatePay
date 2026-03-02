@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
-import { parseUnits, keccak256, toUtf8Bytes, zeroPadValue } from '../../utils/formatters';
+import { parseUnits, keccak256, toUtf8Bytes, zeroPadValue } from '../utils/formatters';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
