@@ -25,7 +25,10 @@ jobs:
       - name: Lint backend
         run: cd backend && npm run lint
       - name: Test backend
-        run: cd backend && npm run test:backend
+        run: cd backend && npm test
+        env:
+          NODE_ENV: test
+          CI: true
       - name: Compile contracts
         run: npx hardhat compile
       - name: Test contracts
