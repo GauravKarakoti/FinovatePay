@@ -112,6 +112,10 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/financing", require("./routes/financing"));
 app.use("/api/investor", require("./routes/investor"));
 
+/* ---------------- CROSS-CHAIN FRACTIONALIZATION ---------------- */
+
+app.use("/api/crosschain", require("./routes/crossChain"));
+
 /* ---------------- AUCTIONS ---------------- */
 
 app.use("/api/auctions", require("./routes/auction"));
