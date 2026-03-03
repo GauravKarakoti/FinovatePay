@@ -14,6 +14,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
+import "./EscrowYieldPool.sol";
 
 
 contract EscrowContract is
@@ -73,12 +74,25 @@ contract EscrowContract is
     ComplianceManager public complianceManager;
     ArbitratorsRegistry public arbitratorsRegistry;
 
+    // --- NEW: Yield Pool Integration ---
+    EscrowYieldPool public yieldPool;
+    bool public yieldPoolEnabled = false;
+    // Track which escrows have funds in yield pool
+    mapping(bytes32 => bool) public escrowInYieldPool;
+    // Track yield earned per escrow
+    mapping(bytes32 => uint256) public escrowYieldEarned;
+
     address public admin;
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
     uint256 public quorumPercentage = 51; // Quorum percentage (e.g. 51%)
     uint256 public minimumEscrowAmount = 100; // Minimum escrow amount to prevent zero-fee edge cases
 
+    // Yield pool events
+    event YieldPoolUpdated(address indexed oldPool, address indexed newPool);
+    event YieldPoolEnabled(bool enabled);
+    event FundsDepositedToYield(bytes32 indexed invoiceId, uint256 amount);
+    event FundsWithdrawnFromYield(bytes32 indexed invoiceId, uint256 principal, uint256 yield);
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
     event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
@@ -197,6 +211,62 @@ contract EscrowContract is
     function getCalculatedMinimumAmount() external view returns (uint256) {
         if (feePercentage == 0) return 1;
         return (10000 + feePercentage - 1) / feePercentage;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    YIELD POOL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function setYieldPool(address _yieldPool) external onlyAdmin {
+        require(_yieldPool != address(0), "Invalid yield pool");
+        address oldPool = address(yieldPool);
+        yieldPool = EscrowYieldPool(_yieldPool);
+        emit YieldPoolUpdated(oldPool, _yieldPool);
+    }
+
+    function setYieldPoolEnabled(bool _enabled) external onlyAdmin {
+        yieldPoolEnabled = _enabled;
+        emit YieldPoolEnabled(_enabled);
+    }
+
+    function depositToYieldPool(bytes32 _invoiceId) external onlyAdmin {
+        require(yieldPoolEnabled, "Yield pool not enabled");
+        require(address(yieldPool) != address(0), "Yield pool not set");
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
+        require(!escrowInYieldPool[_invoiceId], "Already in yield pool");
+        uint256 amount = escrow.amount;
+        require(amount > 0, "No funds to deposit");
+        IERC20(escrow.token).approve(address(yieldPool), amount);
+        yieldPool.deposit(_invoiceId, escrow.token, amount);
+        escrowInYieldPool[_invoiceId] = true;
+        emit FundsDepositedToYield(_invoiceId, amount);
+    }
+
+    function withdrawFromYieldPool(bytes32 _invoiceId) external onlyAdmin {
+        require(escrowInYieldPool[_invoiceId], "Not in yield pool");
+        Escrow storage escrow = escrows[_invoiceId];
+        yieldPool.withdraw(_invoiceId, escrow.token, address(this));
+        escrowInYieldPool[_invoiceId] = false;
+        (uint256 principal, uint256 yieldEarned, , ) = yieldPool.getDepositDetails(_invoiceId);
+        emit FundsWithdrawnFromYield(_invoiceId, principal, yieldEarned);
+    }
+
+    function claimYield(bytes32 _invoiceId) external onlyAdmin {
+        require(escrowInYieldPool[_invoiceId], "Not in yield pool");
+        Escrow storage escrow = escrows[_invoiceId];
+        yieldPool.withdraw(_invoiceId, escrow.token, address(this));
+        escrowInYieldPool[_invoiceId] = false;
+        (uint256 principal, uint256 yieldEarned, , ) = yieldPool.getDepositDetails(_invoiceId);
+        escrow.amount = principal + yieldEarned;
+        emit FundsWithdrawnFromYield(_invoiceId, principal, yieldEarned);
+    }
+
+    function getYieldInfo(bytes32 _invoiceId) external view returns (bool inYieldPool, uint256 estimatedYield) {
+        inYieldPool = escrowInYieldPool[_invoiceId];
+        if (inYieldPool && address(yieldPool) != address(0)) {
+            estimatedYield = yieldPool.calculateCurrentYield(_invoiceId);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
