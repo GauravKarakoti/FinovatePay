@@ -7,6 +7,16 @@ const path = require("path");
 const socketIo = require("socket.io");
 require("dotenv").config();
 
+const requiredEnvVars = ["FRONTEND_URL","ALLOWED_ORIGINS"];
+
+if (process.env.NODE_ENV === "production") {
+  requiredEnvVars.forEach((envVar) => {
+    if(!process.env[envVar]){
+      console.error(`Missing required environment variable: ${envVar}`);
+      process.exit(1);
+    }
+    })
+}
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
 const {
@@ -34,7 +44,7 @@ const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
 
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: process.env.FRONTEND_URL,
     methods: ["GET", "POST"],
   },
 });
@@ -42,10 +52,8 @@ const io = socketIo(server, {
 /* ---------------- CORS CONFIG ---------------- */
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map((o) =>
-      o.trim().replace(/\/$/, "")
-    )
-  : ["http://localhost:5173"];
+  .split(",")
+  .map((o)=>o.trim().replace(/\/$/,""));
 
 const corsOptions = {
   origin: (origin, callback) => {
