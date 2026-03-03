@@ -17,6 +17,9 @@ if (!process.env.ALLOWED_ORIGINS) {
   console.error("FATAL ERROR: ALLOWED_ORIGINS is not defined in environment variables.");
   process.exit(1);
 }
+// CRITICAL: Validate environment variables before starting application
+const { validateAndExit } = require("./utils/envValidator");
+validateAndExit();
 
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
