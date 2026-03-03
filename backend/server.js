@@ -149,6 +149,10 @@ app.use('/api/currencies', require('./routes/currency'));
 
 app.use('/api/credit-scores', require('./routes/creditScore'));
 
+/* ---------------- REVOLVING CREDIT LINE ---------------- */
+
+app.use('/api/credit-line', require('./routes/creditLine'));
+
 /* ---------------- INSURANCE ---------------- */
 
 app.use('/api/insurance', require('./routes/insurance'));
