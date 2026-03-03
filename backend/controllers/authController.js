@@ -12,9 +12,6 @@ const sanitizeUser = (user) => {
 // Valid user roles
 const VALID_ROLES = ['buyer', 'seller', 'arbitrator', 'investor'];
 
-// Valid user roles
-const VALID_ROLES = ['buyer', 'seller', 'arbitrator', 'investor'];
-
 // --- REGISTER USER ---
 exports.register = async (req, res) => {
   // 1. Get data from the form
