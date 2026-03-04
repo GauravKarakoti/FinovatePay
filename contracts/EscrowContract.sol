@@ -16,6 +16,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
 import "./EscrowYieldPool.sol";
+import "./MultiSigWallet.sol";
 
 
 contract EscrowContract is
@@ -82,6 +83,29 @@ contract EscrowContract is
     mapping(bytes32 => bool) public escrowInYieldPool;
     // Track yield earned per escrow
     mapping(bytes32 => uint256) public escrowYieldEarned;
+
+    // --- Multi-Sig Wallet Integration for High-Value Transactions ---
+    // Threshold above which multi-sig is required (in USD equivalent, 1e8 = $10,000)
+    uint256 public multiSigThreshold = 1000000000; // ~$10,000 with 8 decimal precision
+    // Number of required confirmations for high-value transactions
+    uint256 public multiSigRequiredConfirmations = 2;
+    // Linked MultiSigWallet for high-value transactions
+    MultiSigWallet public multiSigWallet;
+    // Track multi-sig approvals per escrow
+    mapping(bytes32 => address[]) public multiSigApprovers;
+    mapping(bytes32 => mapping(address => bool)) public hasMultiSigApproved;
+    // Track if escrow requires multi-sig
+    mapping(bytes32 => bool) public requiresMultiSig;
+    // Track high-value transaction status
+    mapping(bytes32 => bool) public highValueTxReleased;
+
+    // Events for multi-sig
+    event MultiSigThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
+    event MultiSigRequiredConfirmationsUpdated(uint256 oldConfirmations, uint256 newConfirmations);
+    event MultiSigWalletSet(address indexed oldWallet, address indexed newWallet);
+    event HighValueTransactionCreated(bytes32 indexed invoiceId, uint256 amount);
+    event HighValueTransactionApproved(bytes32 indexed invoiceId, address indexed approver);
+    event HighValueTransactionReleased(bytes32 indexed invoiceId);
 
     address public admin;
     address public treasury;        // Platform treasury address for fee collection
@@ -231,6 +255,148 @@ contract EscrowContract is
         if (inYieldPool && address(yieldPool) != address(0)) {
             estimatedYield = yieldPool.calculateCurrentYield(_invoiceId);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    MULTI-SIG FUNCTIONS FOR HIGH-VALUE TRANSACTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Set the multi-sig wallet address
+     * @param _multiSigWallet Address of the MultiSigWallet contract
+     */
+    function setMultiSigWallet(address _multiSigWallet) external onlyAdmin {
+        require(_multiSigWallet != address(0), "Invalid wallet address");
+        address oldWallet = address(multiSigWallet);
+        multiSigWallet = MultiSigWallet(_multiSigWallet);
+        emit MultiSigWalletSet(oldWallet, _multiSigWallet);
+    }
+
+    /**
+     * @notice Update the multi-sig threshold
+     * @param _threshold New threshold value
+     */
+    function setMultiSigThreshold(uint256 _threshold) external onlyAdmin {
+        require(_threshold > 0, "Threshold must be > 0");
+        uint256 oldThreshold = multiSigThreshold;
+        multiSigThreshold = _threshold;
+        emit MultiSigThresholdUpdated(oldThreshold, _threshold);
+    }
+
+    /**
+     * @notice Update the required confirmations for multi-sig
+     * @param _requiredConfirmations New number of required confirmations
+     */
+    function setMultiSigRequiredConfirmations(uint256 _requiredConfirmations) external onlyAdmin {
+        require(_requiredConfirmations > 0, "Confirmations must be > 0");
+        uint256 oldConfirmations = multiSigRequiredConfirmations;
+        multiSigRequiredConfirmations = _requiredConfirmations;
+        emit MultiSigRequiredConfirmationsUpdated(oldConfirmations, _requiredConfirmations);
+    }
+
+    /**
+     * @notice Check if an escrow requires multi-sig approval
+     * @param _invoiceId The escrow invoice ID
+     * @return bool True if multi-sig is required
+     */
+    function checkMultiSigRequired(bytes32 _invoiceId) external view returns (bool) {
+        Escrow storage escrow = escrows[_invoiceId];
+        return escrow.amount >= multiSigThreshold;
+    }
+
+    /**
+     * @notice Get multi-sig approval status for an escrow
+     * @param _invoiceId The escrow invoice ID
+     * @return approvers Array of approver addresses
+     * @return approvalCount Number of approvals received
+     * @return required Number of approvals required
+     */
+    function getMultiSigApprovals(bytes32 _invoiceId) external view returns (
+        address[] memory approvers,
+        uint256 approvalCount,
+        uint256 required
+    ) {
+        approvers = multiSigApprovers[_invoiceId];
+        approvalCount = approvers.length;
+        required = multiSigRequiredConfirmations;
+    }
+
+    /**
+     * @notice Add multi-sig approval for a high-value escrow
+     * @param _invoiceId The escrow invoice ID
+     */
+    function addMultiSigApproval(bytes32 _invoiceId) external {
+        Escrow storage escrow = escrows[_invoiceId];
+        
+        // Check if this is a high-value transaction requiring multi-sig
+        require(escrow.amount >= multiSigThreshold, "Not a high-value transaction");
+        
+        // Only allow buyer or seller to approve
+        require(
+            _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
+            "Not authorized"
+        );
+        
+        // Check if already approved
+        require(!hasMultiSigApproved[_invoiceId][_msgSender()], "Already approved");
+        
+        hasMultiSigApproved[_invoiceId][_msgSender()] = true;
+        multiSigApprovers[_invoiceId].push(_msgSender());
+        
+        emit HighValueTransactionApproved(_invoiceId, _msgSender());
+        
+        // Check if we have enough approvals to release
+        if (multiSigApprovers[_invoiceId].length >= multiSigRequiredConfirmations) {
+            _releaseHighValueFunds(_invoiceId);
+        }
+    }
+
+    /**
+     * @notice Internal function to release high-value funds
+     * @param _invoiceId The escrow invoice ID
+     */
+    function _releaseHighValueFunds(bytes32 _invoiceId) internal {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
+        require(!highValueTxReleased[_invoiceId], "Already released");
+        
+        highValueTxReleased[_invoiceId] = true;
+        
+        IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
+        
+        if (escrow.rwaNftContract != address(0)) {
+            IERC721(escrow.rwaNftContract).safeTransferFrom(
+                address(this), 
+                escrow.buyer, 
+                escrow.rwaTokenId
+            );
+        }
+        
+        escrow.status = EscrowStatus.Released;
+        
+        emit HighValueTransactionReleased(_invoiceId);
+        emit EscrowReleased(_invoiceId, escrow.amount);
+    }
+
+    /**
+     * @notice Cancel a high-value transaction
+     * @param _invoiceId The escrow invoice ID
+     */
+    function cancelHighValueTransaction(bytes32 _invoiceId) external onlyAdmin {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.amount >= multiSigThreshold, "Not a high-value transaction");
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
+        
+        // Reset approvals
+        delete multiSigApprovers[_invoiceId];
+        
+        // Clear approval mappings
+        address[] memory approvers = multiSigApprovers[_invoiceId];
+        for (uint256 i = 0; i < approvers.length; i++) {
+            delete hasMultiSigApproved[_invoiceId][approvers[i]];
+        }
+        
+        emit HighValueTransactionCreated(_invoiceId, 0); // Signal cancellation
     }
 
     /*//////////////////////////////////////////////////////////////
