@@ -501,13 +501,21 @@ contract EscrowContract is
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
         
-        IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
+        // Deduct platform fee before transferring to seller
+        uint256 payoutAmount = escrow.amount;
+        if (escrow.feeAmount > 0) {
+            IERC20(escrow.token).safeTransfer(treasury, escrow.feeAmount);
+            emit FeeCollected(_invoiceId, escrow.feeAmount);
+            payoutAmount -= escrow.feeAmount;
+        }
+        
+        IERC20(escrow.token).safeTransfer(escrow.seller, payoutAmount);
         
         if (escrow.rwaNftContract != address(0)) {
             IERC721(escrow.rwaNftContract).safeTransferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
         }
         
-        emit EscrowReleased(_invoiceId, escrow.amount);
+        emit EscrowReleased(_invoiceId, payoutAmount);
     }
 
 
