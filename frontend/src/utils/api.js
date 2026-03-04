@@ -382,6 +382,38 @@ export const getEscrowStatus = (invoiceId) => {
   return api.get(`/escrow/${invoiceId}/status`);
 };
 
+// --- High-Value Transaction Multi-Sig API ---
+
+// Check if a transaction requires multi-sig
+export const checkHighValueRequired = (invoiceId) => {
+  return api.get(`/multi-sig/check-require/${invoiceId}`);
+};
+
+// Get high-value transaction status
+export const getHighValueStatus = (invoiceId) => {
+  return api.get(`/multi-sig/status/${invoiceId}`);
+};
+
+// Add approval for high-value transaction
+export const approveHighValue = (invoiceId) => {
+  return api.post(`/multi-sig/approve/${invoiceId}`);
+};
+
+// Get all high-value transactions
+export const getHighValueTransactions = (status) => {
+  return api.get('/multi-sig/transactions', { params: { status } });
+};
+
+// Get multi-sig configuration
+export const getMultiSigConfig = () => {
+  return api.get('/multi-sig/config');
+};
+
+// Update multi-sig configuration (admin)
+export const updateMultiSigConfig = (key, value) => {
+  return api.put('/multi-sig/config', { key, value });
+};
+
 // --- KYC API ---
 export const verifyKYC = (userData) => {
   return api.post('/kyc/verify', userData);
