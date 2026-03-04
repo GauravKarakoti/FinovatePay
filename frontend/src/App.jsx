@@ -5,6 +5,8 @@ import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Invoices from './pages/Invoices';
 import InvoiceDetails from './pages/InvoiceDetails';
 import DisputeDashboard from './pages/DisputeDashboard';
@@ -344,6 +346,18 @@ function App() {
                 path="/register" 
                 element={
                   user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
+                } 
+              />
+              <Route 
+                path="/forgot-password" 
+                element={
+                  user ? <Navigate to="/" /> : <ForgotPassword />
+                } 
+              />
+              <Route 
+                path="/reset-password/:token" 
+                element={
+                  user ? <Navigate to="/" /> : <ResetPassword />
                 } 
               />
             </Routes>
