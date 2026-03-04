@@ -249,8 +249,16 @@ router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), re
         // Convert maturity date to timestamp
         const maturityTimestamp = Math.floor(new Date(maturityDate).getTime() / 1000);
 
-        // Convert invoiceId to bytes32
-        const bytes32InvoiceId = ethers.zeroPadValue(ethers.toUtf8Bytes(invoiceId), 32);
+        // Convert invoiceId to bytes32 (Use stored hash)
+        // If we want consistency, we should use invoice.invoice_hash (from escrow ID)
+        let bytes32InvoiceId;
+        if (invoice.invoice_hash && invoice.invoice_hash.startsWith('0x')) {
+             bytes32InvoiceId = invoice.invoice_hash;
+        } else {
+             // Fallback if not available, though for tokenization we generally expect the invoice to be on-chain 
+             // (and thus have an invoice_hash).
+             bytes32InvoiceId = ethers.zeroPadValue(ethers.toUtf8Bytes(invoiceId), 32);
+        }
 
         // Calculate total supply (faceValue in wei)
         const totalSupply = ethers.parseUnits(faceValue.toString(), 18);
