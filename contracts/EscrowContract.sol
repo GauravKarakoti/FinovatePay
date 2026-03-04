@@ -310,6 +310,7 @@ contract EscrowContract is
             escrow.buyerConfirmed = true;
         }
 
+        // Only release if both parties have confirmed
         if (escrow.sellerConfirmed && escrow.buyerConfirmed) {
             _releaseFunds(_invoiceId);
         }
@@ -336,7 +337,10 @@ contract EscrowContract is
         
         // Return funds to buyer
         if (token == address(0)) {
-            payable(buyer).transfer(reclaimAmount);
+            // Use .call() instead of .transfer() to support smart contract wallets
+            // .transfer() has a 2300 gas limit which fails for contracts with fallback logic
+            (bool success, ) = payable(buyer).call{value: reclaimAmount}("");
+            require(success, "ETH transfer failed");
         } else {
             IERC20(token).safeTransfer(buyer, reclaimAmount);
         }
@@ -390,6 +394,9 @@ contract EscrowContract is
 
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
+        
+        // Update status before transfer (CEI pattern) to prevent re-entrancy
+        escrow.status = EscrowStatus.Released;
         
         IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
         

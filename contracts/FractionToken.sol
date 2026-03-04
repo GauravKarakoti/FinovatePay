@@ -12,12 +12,19 @@ import "@openzeppelin/contracts/utils/Strings.sol";
  * @title FractionToken
  * @author FinovatePay Team
  * @notice Mints and manages fractionalized invoice tokens (ERC1155) representing future revenue claims.
+ * @dev Enhanced with cross-chain support for bridging fractions to other chains.
  */
 contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Strings for uint256;
 
     IERC20 public paymentToken; // USDC
+
+    // Chain identifiers for cross-chain operations
+    bytes32 public constant FINOVATE_CHAIN = keccak256("finovate-cdk");
+    bytes32 public constant KATANA_CHAIN = keccak256("katana");
+    bytes32 public constant POLYGON_POS_CHAIN = keccak256("polygon-pos");
+    bytes32 public constant POLYGON_ZKEVM_CHAIN = keccak256("polygon-zkevm");
 
     struct InvoiceMeta {
         address seller;
@@ -30,6 +37,16 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 yieldBps; // Yield/interest rate in basis points
     }
 
+    // Cross-chain metadata structure
+    struct CrossChainMeta {
+        bool isBridged;
+        bytes32 destinationChain;
+        uint256 bridgedAmount;
+        uint256 bridgedAt;
+        bytes32 bridgeLockId;
+        bool isReturned;
+    }
+
     // Required for compatibility with FinancingManager IFractionToken interface
     struct TokenDetails {
         bytes32 invoiceId;
@@ -40,18 +57,29 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         address issuer;
         bool isRedeemed;
         uint256 yieldBps;
+        bytes32 originChain;
+        bool isCrossChain;
     }
 
     mapping(uint256 => InvoiceMeta) public invoiceMetadata;
     mapping(uint256 => bool) public isActive;
     mapping(bytes32 => uint256) public invoiceToTokenId;
+    
+    // Cross-chain tracking: tokenId => CrossChainMeta
+    mapping(uint256 => CrossChainMeta) public crossChainMetadata;
+    // Track total bridged amount per token
+    mapping(uint256 => uint256) public totalBridgedAmount;
+    // Track bridged amount per user per token
+    mapping(uint256 => mapping(address => uint256)) public userBridgedAmount;
 
     event InvoiceFractionalized(
         bytes32 indexed invoiceId,
         uint256 tokenId,
         address seller,
         uint256 totalFractions,
-        uint256 pricePerFraction
+        uint256 pricePerFraction,
+        uint256 TotalValue,
+        uint256 yieldBps
     );
     event FractionsPurchased(
         uint256 indexed tokenId,
@@ -70,6 +98,29 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 payout
     );
     event InvoiceClosed(uint256 indexed tokenId);
+    
+    // Cross-chain events
+    event FractionsBridged(
+        uint256 indexed tokenId,
+        address indexed owner,
+        uint256 amount,
+        bytes32 destinationChain,
+        bytes32 lockId
+    );
+    event FractionsBridgeReturned(
+        uint256 indexed tokenId,
+        address indexed owner,
+        uint256 amount,
+        bytes32 sourceChain
+    );
+    event CrossChainTrade(
+        uint256 indexed tokenId,
+        address indexed seller,
+        address indexed buyer,
+        uint256 amount,
+        uint256 price,
+        bytes32 destinationChain
+    );
 
     constructor(address _paymentToken)
         ERC1155("https://api.finovatepay.com/token/{id}.json") 
@@ -118,11 +169,21 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         isActive[tokenId] = true;
         invoiceToTokenId[_invoiceId] = tokenId;
 
+        // Initialize cross-chain metadata
+        crossChainMetadata[tokenId] = CrossChainMeta({
+            isBridged: false,
+            destinationChain: bytes32(0),
+            bridgedAmount: 0,
+            bridgedAt: 0,
+            bridgeLockId: bytes32(0),
+            isReturned: false
+        });
+
         // Mint tokens to THIS contract.
         // The contract acts as the marketplace custodian.
         _mint(address(this), tokenId, _totalFractions, "");
 
-        emit InvoiceFractionalized(_invoiceId, tokenId, _seller, _totalFractions, _pricePerFraction);
+        emit InvoiceFractionalized(_invoiceId, tokenId, _seller, _totalFractions, _pricePerFraction, _totalValue, _yieldBps);
         return tokenId;
     }
 
@@ -131,6 +192,8 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
      */
     function tokenDetails(uint256 tokenId) external view returns (TokenDetails memory) {
         InvoiceMeta memory meta = invoiceMetadata[tokenId];
+        CrossChainMeta memory crossMeta = crossChainMetadata[tokenId];
+        
         return TokenDetails({
             invoiceId: bytes32(tokenId),
             totalSupply: meta.totalFractions,
@@ -139,8 +202,17 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
             maturityDate: meta.maturityDate,
             issuer: meta.seller,
             isRedeemed: meta.repaymentFunded,
-            yieldBps: meta.yieldBps
+            yieldBps: meta.yieldBps,
+            originChain: FINOVATE_CHAIN,
+            isCrossChain: crossMeta.isBridged || crossMeta.bridgedAmount > 0
         });
+    }
+
+    /**
+     * @notice Returns cross-chain metadata for a specific token.
+     */
+    function getCrossChainMeta(uint256 tokenId) external view returns (CrossChainMeta memory) {
+        return crossChainMetadata[tokenId];
     }
 
     /**
@@ -214,6 +286,162 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     function closeInvoice(uint256 _tokenId) external onlyOwner {
         isActive[_tokenId] = false;
         emit InvoiceClosed(_tokenId);
+    }
+
+    /**
+     * @notice Bridge fractions to another chain (for cross-chain trading).
+     * @dev Called by BridgeAdapter when bridging ERC1155 tokens.
+     * @param _tokenId The token ID to bridge.
+     * @param _amount The amount of fractions to bridge.
+     * @param _destinationChain The destination chain identifier.
+     * @param _owner The owner who initiated the bridge.
+     * @param _lockId The bridge lock ID.
+     */
+    function bridgeOut(
+        uint256 _tokenId,
+        uint256 _amount,
+        bytes32 _destinationChain,
+        address _owner,
+        bytes32 _lockId
+    ) external onlyOwner nonReentrant {
+        require(isActive[_tokenId], "Invoice not active");
+        require(_amount > 0, "Amount must be positive");
+        require(_destinationChain != FINOVATE_CHAIN, "Cannot bridge to same chain");
+        require(
+            _destinationChain == KATANA_CHAIN || 
+            _destinationChain == POLYGON_POS_CHAIN || 
+            _destinationChain == POLYGON_ZKEVM_CHAIN,
+            "Unsupported destination chain"
+        );
+
+        InvoiceMeta storage meta = invoiceMetadata[_tokenId];
+        CrossChainMeta storage crossMeta = crossChainMetadata[_tokenId];
+
+        // Check if owner has enough tokens
+        uint256 ownerBalance = balanceOf(_owner, _tokenId);
+        uint256 previouslyBridged = userBridgedAmount[_tokenId][_owner];
+        require(ownerBalance - previouslyBridged >= _amount, "Insufficient unlocked fractions");
+
+        // Transfer tokens from owner to contract (locked)
+        _safeTransferFrom(_owner, address(this), _tokenId, _amount, "");
+
+        // Update cross-chain metadata
+        crossMeta.isBridged = true;
+        crossMeta.destinationChain = _destinationChain;
+        crossMeta.bridgedAmount += _amount;
+        crossMeta.bridgedAt = block.timestamp;
+        crossMeta.bridgeLockId = _lockId;
+
+        // Track per-user bridged amount
+        userBridgedAmount[_tokenId][_owner] += _amount;
+        totalBridgedAmount[_tokenId] += _amount;
+
+        emit FractionsBridged(_tokenId, _owner, _amount, _destinationChain, _lockId);
+    }
+
+    /**
+     * @notice Return bridged fractions back from another chain.
+     * @dev Called when bridging back to origin chain.
+     * @param _tokenId The token ID.
+     * @param _amount The amount to return.
+     * @param _owner The original owner.
+     * @param _sourceChain The source chain identifier.
+     */
+    function bridgeIn(
+        uint256 _tokenId,
+        uint256 _amount,
+        address _owner,
+        bytes32 _sourceChain
+    ) external onlyOwner nonReentrant {
+        require(_amount > 0, "Amount must be positive");
+        require(
+            _sourceChain == KATANA_CHAIN || 
+            _sourceChain == POLYGON_POS_CHAIN || 
+            _sourceChain == POLYGON_ZKEVM_CHAIN,
+            "Unsupported source chain"
+        );
+
+        CrossChainMeta storage crossMeta = crossChainMetadata[_tokenId];
+        require(crossMeta.isBridged, "No bridged fractions");
+
+        // Transfer tokens back to owner
+        _safeTransferFrom(address(this), _owner, _tokenId, _amount, "");
+
+        // Update metadata
+        crossMeta.bridgedAmount -= _amount;
+        userBridgedAmount[_tokenId][_owner] -= _amount;
+        totalBridgedAmount[_tokenId] -= _amount;
+
+        if (crossMeta.bridgedAmount == 0) {
+            crossMeta.isBridged = false;
+            crossMeta.isReturned = true;
+        }
+
+        emit FractionsBridgeReturned(_tokenId, _owner, _amount, _sourceChain);
+    }
+
+    /**
+     * @notice Execute cross-chain trade (sell fractions on destination chain).
+     * @param _tokenId The token ID.
+     * @param _seller The seller address.
+     * @param _buyer The buyer address.
+     * @param _amount The amount traded.
+     * @param _price The price per fraction.
+     * @param _destinationChain The destination chain.
+     */
+    function executeCrossChainTrade(
+        uint256 _tokenId,
+        address _seller,
+        address _buyer,
+        uint256 _amount,
+        uint256 _price,
+        bytes32 _destinationChain
+    ) external onlyOwner nonReentrant {
+        require(isActive[_tokenId], "Invoice not active");
+        require(_amount > 0 && _price > 0, "Invalid amount or price");
+        require(_destinationChain != FINOVATE_CHAIN, "Cannot trade on same chain");
+
+        uint256 totalCost = _amount * _price;
+        
+        // Transfer payment token from buyer to seller
+        paymentToken.safeTransferFrom(_buyer, _seller, totalCost);
+
+        // Transfer fractions from seller to buyer (cross-chain settlement)
+        _safeTransferFrom(_seller, _buyer, _tokenId, _amount, "");
+
+        emit CrossChainTrade(_tokenId, _seller, _buyer, _amount, totalCost, _destinationChain);
+    }
+
+    /**
+     * @notice Get the available (non-bridged) balance for a user.
+     * @param _tokenId The token ID.
+     * @param _owner The owner address.
+     * @return Available balance that can be traded or bridged.
+     */
+    function getAvailableBalance(uint256 _tokenId, address _owner) external view returns (uint256) {
+        uint256 totalBalance = balanceOf(_owner, _tokenId);
+        uint256 bridged = userBridgedAmount[_tokenId][_owner];
+        return totalBalance > bridged ? totalBalance - bridged : 0;
+    }
+
+    /**
+     * @notice Get total bridged amount for a token.
+     * @param _tokenId The token ID.
+     * @return Total amount bridged to other chains.
+     */
+    function getTotalBridged(uint256 _tokenId) external view returns (uint256) {
+        return totalBridgedAmount[_tokenId];
+    }
+
+    /**
+     * @notice Check if a chain is supported for bridging.
+     * @param _chain The chain identifier.
+     * @return True if supported.
+     */
+    function isSupportedChain(bytes32 _chain) external pure returns (bool) {
+        return _chain == KATANA_CHAIN || 
+               _chain == POLYGON_POS_CHAIN || 
+               _chain == POLYGON_ZKEVM_CHAIN;
     }
 
     // Boilerplate for receiving ERC1155 tokens

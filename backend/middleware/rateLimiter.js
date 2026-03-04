@@ -123,3 +123,37 @@ module.exports = {
   paymentLimiter,
   relayerLimiter
 };
+
+/**
+ * Forgot Password Rate Limiter
+ * Applies to password reset request endpoint
+ * Default: 3 requests per hour per IP
+ * Prevents abuse of password reset functionality
+ */
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  message: {
+    error: 'Too many password reset requests, please try again later.',
+    retryAfter: 'Check the Retry-After header for wait time.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  handler: (req, res) => {
+    console.warn(`Forgot password rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many password reset requests from this IP. Please try again in an hour.',
+      retryAfter: req.rateLimit.resetTime
+    });
+  }
+});
+
+module.exports = {
+  globalLimiter,
+  authLimiter,
+  kycLimiter,
+  paymentLimiter,
+  relayerLimiter,
+  forgotPasswordLimiter
+};
