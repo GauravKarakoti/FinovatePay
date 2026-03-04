@@ -785,6 +785,8 @@ contract EscrowContract is
         // Transfer NFT to winner
         _transferNFT(address(this), sellerWins ? buyer : seller, e);
 
+        // Clean up state for gas refund
         delete escrows[invoiceId];
+        delete disputeVotings[invoiceId];
     }
 }
