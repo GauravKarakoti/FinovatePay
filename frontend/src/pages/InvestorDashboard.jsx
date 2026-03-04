@@ -10,6 +10,7 @@ import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
 import { useStatsActions } from '../context/StatsContext';
 import AuctionList from '../components/Auction/AuctionList';
+import AnalyticsPage from './AnalyticsPage';
 
 // --- Reusable UI Components ---
 
@@ -98,11 +99,41 @@ Card.propTypes = { children: PropTypes.node, className: PropTypes.string };
 
 // --- Feature Components ---
 
-const InvoiceCard = ({ invoice, onPurchaseSuccess }) => {
-  const { invoice_id, amount, due_date, currency, remaining_supply, token_id } = invoice;
+const ListingRow = ({ invoice, onPurchaseSuccess }) => {
+  const { invoice_id, amount, due_date, currency, remaining_supply, token_id, yield_bps } = invoice;
+  const [fetchedDetails, setFetchedDetails] = useState(null);
 
-  const maturity = useMemo(() => new Date(due_date).toLocaleDateString(), [due_date]);
-  
+  useEffect(() => {
+    let active = true;
+    if (yield_bps === undefined || yield_bps === null) {
+      const fetchDetails = async () => {
+        try {
+          const contract = await getFractionTokenContract();
+          const details = await contract.tokenDetails(token_id);
+          if (active && details) {
+            // Ethers v6 results are proxy objects or arrays, accessing by name usually works if ABI has names
+            // yieldBps is defined in ABI
+             setFetchedDetails({
+               yield: Number(details.yieldBps),
+               maturity: Number(details.maturityDate)
+             });
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch details for token ${token_id}`, err);
+        }
+      };
+      if (token_id) fetchDetails();
+    }
+    return () => { active = false; };
+  }, [token_id, yield_bps]);
+
+  const maturityDate = useMemo(() => {
+     if(fetchedDetails && fetchedDetails.maturity) {
+         return new Date(fetchedDetails.maturity * 1000).toLocaleDateString();
+     }
+     return new Date(due_date).toLocaleDateString();
+  }, [due_date, fetchedDetails]);
+
   const stablecoinConfig = useMemo(() => {
     const isNative = currency === 'MATIC' || currency === 'ETH';
     const address = stablecoinAddresses[currency] || stablecoinAddresses["USDC"];
@@ -114,56 +145,92 @@ const InvoiceCard = ({ invoice, onPurchaseSuccess }) => {
     };
   }, [currency]);
 
-  return (
-    <Card className="p-5 hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900">
-            Invoice #{invoice_id.substring(0, 8)}...
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">Matures: {maturity}</p>
-        </div>
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-          {currency}
-        </span>
-      </div>
-      
-      <div className="space-y-2 mb-5 bg-gray-50 p-3 rounded-lg">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Face Value:</span>
-          <span className="font-semibold text-gray-900">{amount} {currency}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Available:</span>
-          <span className="font-semibold text-green-600">
-            {Number(remaining_supply).toFixed(2)} {currency}
-          </span>
-        </div>
-      </div>
+  // Format yield percentage
+  const currentYieldBps = yield_bps !== undefined && yield_bps !== null ? yield_bps : fetchedDetails?.yield;
+  const yieldPercent = currentYieldBps !== undefined && currentYieldBps !== null 
+    ? (currentYieldBps / 100).toFixed(2) + '%' 
+    : (yield_bps === undefined ? 'Loading...' : 'N/A');
 
-      <BuyFractionToken
-        tokenId={token_id}
-        stablecoinAddress={stablecoinConfig.address}
-        stablecoinDecimals={stablecoinConfig.decimals}
-        tokenDecimals={18}
-        maxAmount={remaining_supply}
-        onSuccess={onPurchaseSuccess}
-      />
-    </Card>
+  return (
+    <tr className="hover:bg-gray-50 transition-colors">
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+        #{invoice_id.substring(0, 8)}...
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {amount} {currency}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+        {yieldPercent}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {maturityDate}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        <span className="font-medium text-gray-900">{Number(remaining_supply).toFixed(2)}</span> {currency}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right">
+        <div className="flex justify-end w-full">
+             <BuyFractionToken
+                tokenId={token_id}
+                stablecoinAddress={stablecoinConfig.address}
+                stablecoinDecimals={stablecoinConfig.decimals}
+                tokenDecimals={18}
+                maxAmount={remaining_supply}
+                onSuccess={onPurchaseSuccess}
+            />
+        </div>
+      </td>
+    </tr>
   );
 };
 
-InvoiceCard.propTypes = {
+ListingRow.propTypes = {
   invoice: PropTypes.shape({
     invoice_id: PropTypes.string.isRequired,
     amount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
     due_date: PropTypes.string.isRequired,
     currency: PropTypes.string.isRequired,
     remaining_supply: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-    token_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired
+    token_id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    yield_bps: PropTypes.number
   }).isRequired,
   onPurchaseSuccess: PropTypes.func.isRequired
 };
+
+const MarketplaceTable = ({ listings, onPurchaseSuccess }) => {
+    if (!listings || listings.length === 0) {
+        return <EmptyState message="No available listings" />;
+    }
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice ID</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Face Value</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Yield</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Maturity</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available</th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {listings.map(invoice => (
+                            <ListingRow 
+                                key={invoice.invoice_id} 
+                                invoice={invoice}
+                                onPurchaseSuccess={onPurchaseSuccess}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 
 const PortfolioItem = ({ item, onRedeem, isRedeeming }) => {
   const { invoice, total_tokens, holdings } = item;
@@ -542,15 +609,10 @@ const FinancingTab = () => (
           {isLoading ? (
             <LoadingSpinner />
           ) : marketplaceListings.length > 0 ? (
-            <div className="space-y-4">
-              {marketplaceListings.map(invoice => (
-                <InvoiceCard
-                  key={invoice.invoice_id}
-                  invoice={invoice}
-                  onPurchaseSuccess={handlePurchaseSuccess}
-                />
-              ))}
-            </div>
+            <MarketplaceTable 
+                listings={marketplaceListings} 
+                onPurchaseSuccess={handlePurchaseSuccess} 
+            />
           ) : (
             <EmptyState 
               message="No invoices currently listed for financing" 
@@ -634,7 +696,8 @@ const FinancingTab = () => (
 {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'financing' && <FinancingTab />}
           {activeTab === 'auctions' && <AuctionTab />}
-          {activeTab !== 'overview' && activeTab !== 'financing' && activeTab !== 'auctions' && (
+          {activeTab === 'analytics' && <AnalyticsPage activeTab={activeTab} />}
+          {activeTab !== 'overview' && activeTab !== 'financing' && activeTab !== 'auctions' && activeTab !== 'analytics' && (
             <EmptyState message="Section under construction" icon="🚧" />
           )}
         </main>
