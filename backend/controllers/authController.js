@@ -2,6 +2,7 @@ const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const errorResponse = require('../utils/errorResponse');
+const { generateToken } = require('../utils/jwt');
 
 // Utility function to sanitize user object (remove sensitive fields)
 const sanitizeUser = (user) => {
@@ -42,11 +43,7 @@ exports.register = async (req, res) => {
 
 
     // 5. Create Login Token
-    const token = jwt.sign(
-      { id: newUser.rows[0].id, role: newUser.rows[0].role }, 
-      process.env.JWT_SECRET, 
-      { expiresIn: '24h' }
-    );
+    const token = generateToken(newUser.rows[0]);
 
     // 6. Set HttpOnly cookie
     res.cookie('token', token, {
@@ -85,11 +82,7 @@ exports.login = async (req, res) => {
     }
 
     // 3. Create and set token in HttpOnly cookie
-    const token = jwt.sign(
-      { id: user.rows[0].id, role: user.rows[0].role }, 
-      process.env.JWT_SECRET, 
-      { expiresIn: '24h' }
-    );
+    const token = generateToken(user.rows[0]);
 
     // Set HttpOnly cookie
     res.cookie('token', token, {

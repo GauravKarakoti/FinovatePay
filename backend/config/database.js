@@ -49,15 +49,18 @@ const pool = new Pool(dbConfig);
 // Initial Connection Test (Fail-Fast)
 // --------------------------------------------------
 
-pool
-  .connect()
-  .then((client) => {
+async function testConnection() {
+  try {
+    const client = await pool.connect();
     console.log("🔌 Connected to PostgreSQL");
     client.release();
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error("❌ Failed to connect to PostgreSQL:", error.message);
-  });
+    process.exit(1);
+  }
+}
+
+testConnection();
 
 // --------------------------------------------------
 // Export
