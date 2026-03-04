@@ -15,10 +15,12 @@ import AdminDashboard from './pages/AdminDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
+import ContributorsPage from './pages/ContributorsPage';
 import './App.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
 import { setNavigateFunction } from './utils/api';
+import PermissionBanner from './components/Notifications/PermissionBanner';
 
 /* -------------------- Error Boundary Component -------------------- */
 class ErrorBoundary extends React.Component {
@@ -328,6 +330,11 @@ function App() {
                 element={<ProduceHistory />}
               />
               
+              <Route
+                path="/contributors"
+                element={<ContributorsPage />}
+              />
+
               <Route 
                 path="/login" 
                 element={
@@ -361,6 +368,7 @@ function App() {
                   </svg>
                 ) : '💬'}
               </button>
+              <PermissionBanner />
             </>
           )}
         </div>

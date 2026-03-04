@@ -470,6 +470,49 @@ const validateWalletAddress = [
   handleValidationErrors
 ];
 
+/**
+ * PASSWORD RESET VALIDATORS
+ */
+const validateForgotPassword = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Invalid email format')
+    .normalizeEmail(),
+  handleValidationErrors
+];
+
+const validateResetPassword = [
+  body('token')
+    .trim()
+    .notEmpty().withMessage('Reset token is required')
+    .isLength({ min: 32, max: 255 }).withMessage('Invalid token format'),
+  body('newPassword')
+    .trim()
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain uppercase, lowercase, and number'),
+  handleValidationErrors
+];
+
+const validateChangePassword = [
+  body('currentPassword')
+    .trim()
+    .notEmpty().withMessage('Current password is required'),
+  body('newPassword')
+    .trim()
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain uppercase, lowercase, and number'),
+  body('newPassword').custom((value, { req }) => {
+    if (value === req.body.currentPassword) {
+      throw new Error('New password must be different from current password');
+    }
+    return true;
+  }),
+  handleValidationErrors
+];
+
 module.exports = {
   handleValidationErrors,
   // Auth
@@ -507,6 +550,10 @@ module.exports = {
   validateFinancingRepay,
   // Relayer
   validateRelayTransaction,
+  // Password Reset
+  validateForgotPassword,
+  validateResetPassword,
+  validateChangePassword,
   // Custom validators (export for reuse)
   isEthereumAddress,
   isUUID,
