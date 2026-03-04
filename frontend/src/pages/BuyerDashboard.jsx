@@ -501,20 +501,25 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         tx = await contract.deposit(bytes32Id, { value: amountWei });
       } else {
         const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
-        const userAddress = await signer.getAddress();
-        const balance = await tokenContract.balanceOf(userAddress);
+        const buyerAddress = await signer.getAddress();
+        const tokenBalance = await tokenContract.balanceOf(buyerAddress);
+        if (tokenBalance < amountWei) {
+          toast.error(`Insufficient ${currency} token balance.`, { id: toastId });
+          return;
+        }
 
         if (balance < amountWei) {
             toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
             return;
         }
+        
+        // Approve and deposit tokens via escrow contract
+        const allowance = await tokenContract.allowance(buyerAddress, contract_address);
+        if (allowance < amountWei) {
+          const approveTx = await tokenContract.approve(contract_address, amountWei);
+          await approveTx.wait();
+        }
 
-        toast.loading('Approving tokens...', { id: toastId });
-        
-        const approveTx = await tokenContract.approve(contract.address, amountWei);
-        await approveTx.wait();
-        
-        toast.loading('Confirming deposit...', { id: toastId });
         tx = await contract.deposit(bytes32Id);
       }
       

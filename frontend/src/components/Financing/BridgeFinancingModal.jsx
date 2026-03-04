@@ -38,7 +38,7 @@ const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => 
             // Request financing via backend
             const response = await api.post('/financing/request', {
                 invoiceId,
-                amount: parseUnits(borrowAmount, 6), // Assuming 6 decimals for stablecoins
+                amount: parseUnits(borrowAmount, 6).toString(), // Assuming 6 decimals for stablecoins
                 asset: selectedAsset,
                 collateralTokenId: parseInt(collateralTokenId)
             });

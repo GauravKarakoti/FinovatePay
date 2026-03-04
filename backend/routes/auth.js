@@ -24,7 +24,46 @@ router.put('/role', authenticateToken, validateRoleUpdate, async (req, res) => {
   }
 
   try {
-    // FIX: Use pool.query instead of User.updateRole
+    // Get current user info
+    const userResult = await pool.query(
+      'SELECT id, email, role, kyc_status FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const currentUser = userResult.rows[0];
+    const currentRole = currentUser.role;
+
+    // Prevent no-op updates
+    if (currentRole === role) {
+      return res.status(400).json({ error: 'User already has this role' });
+    }
+
+    // SECURITY: Restrict role escalation to 'investor'
+    // 'investor' role requires KYC verification or admin approval
+    if (role === 'investor') {
+      // Check if user has completed KYC verification
+      if (currentUser.kyc_status !== 'verified') {
+        return res.status(403).json({
+          error: 'Access Denied',
+          reason: 'Investor role requires KYC verification. Please complete KYC before upgrading to investor.'
+        });
+      }
+    }
+
+    // SECURITY: Prevent direct role changes to 'shipment' without admin
+    // 'shipment' role is for arbitrators and should only be granted by admin
+    if (role === 'shipment') {
+      return res.status(403).json({
+        error: 'Access Denied',
+        reason: 'Shipment role can only be assigned by administrators.'
+      });
+    }
+
+    // FIX: Update role with proper authorization checks
     const updateResult = await pool.query(
       `UPDATE users SET role = $1 WHERE id = $2 
        RETURNING id, email, wallet_address, company_name, first_name, last_name, role, created_at`,
@@ -34,15 +73,76 @@ router.put('/role', authenticateToken, validateRoleUpdate, async (req, res) => {
     if (updateResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    // Log the role change for audit trail
+    console.log(`[AUDIT] User ${userId} changed role from ${currentRole} to ${role}`);
     
-    res.json({ message: 'Role updated successfully', user: updateResult.rows[0] });
+    res.json({
+      message: 'Role updated successfully',
+      user: updateResult.rows[0]
+    });
   } catch (error) {
     console.error('Role update error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// Register new user
+// Admin-only endpoint to assign roles (bypasses user self-service restrictions)
+// This allows admins to grant restricted roles like 'shipment' or 'investor'
+router.put('/admin/assign-role', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is admin
+    const adminCheck = await pool.query(
+      'SELECT role FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'admin') {
+      return res.status(403).json({ error: 'Access Denied. Admin privileges required.' });
+    }
+
+    const { userId, role } = req.body;
+
+    if (!userId || !role) {
+      return res.status(400).json({ error: 'userId and role are required' });
+    }
+
+    const allowedRoles = ['buyer', 'seller', 'shipment', 'investor'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role specified' });
+    }
+
+    // Verify target user exists
+    const userResult = await pool.query(
+      'SELECT id, email, role FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    const targetUser = userResult.rows[0];
+
+    // Update the role
+    const updateResult = await pool.query(
+      `UPDATE users SET role = $1 WHERE id = $2 
+       RETURNING id, email, wallet_address, company_name, first_name, last_name, role, created_at`,
+      [role, userId]
+    );
+
+    // Log the admin role assignment for security audit
+    console.log(`[AUDIT] Admin ${req.user.id} assigned role '${role}' to user ${userId} (previous: ${targetUser.role})`);
+
+    res.json({
+      message: 'Role assigned successfully by admin',
+      user: updateResult.rows[0]
+    });
+  } catch (error) {
+    console.error('Admin role assignment error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 router.post('/register', authLimiter, validateRegister, async (req, res) => {
   console.log('Registration request body:', req.body);
   const { email, password, walletAddress, company_name, tax_id, first_name, last_name, role } = req.body;

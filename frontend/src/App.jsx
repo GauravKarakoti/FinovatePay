@@ -367,6 +367,7 @@ function App() {
                   </svg>
                 ) : '💬'}
               </button>
+              <PermissionBanner />
             </>
           )}
         </div>
