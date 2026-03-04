@@ -1,17 +1,22 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/sanitize');
 const { 
   validateRegister, 
   validateLogin, 
-  validateRoleUpdate 
+  validateRoleUpdate,
+  validateForgotPassword,
+  validateResetPassword,
+  validateChangePassword
 } = require('../middleware/validators');
+const { sendEmail } = require('../services/emailService');
 
 const router = express.Router();
-const { authLimiter } = require('../middleware/rateLimiter');
+const { authLimiter, forgotPasswordLimiter } = require('../middleware/rateLimiter');
 
 router.put('/role', authenticateToken, validateRoleUpdate, async (req, res) => {
   const { role } = req.body;
@@ -187,6 +192,158 @@ router.post('/logout', (req, res) => {
 // Verify token validity
 router.get('/verify', authenticateToken, (req, res) => {
   res.json({ valid: true, user: sanitizeUser(req.user) });
+});
+
+// Forgot Password - Request password reset
+router.post('/forgot-password', forgotPasswordLimiter, validateForgotPassword, async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Check if user exists
+    const userResult = await pool.query(
+      'SELECT id, email, first_name FROM users WHERE email = $1',
+      [email]
+    );
+
+    // Always return success to prevent email enumeration
+    if (userResult.rows.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'If an account exists with this email, a password reset link has been sent.' 
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    // Generate secure random token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    // Store token in database
+    await pool.query(
+      'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, resetToken, expiresAt]
+    );
+
+    // Create reset link
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+    // Send email
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset Your Password - FinovatePay',
+      template: 'password-reset',
+      context: {
+        resetLink,
+        userName: user.first_name || 'User'
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'If an account exists with this email, a password reset link has been sent.' 
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Reset Password - Reset password with token
+router.post('/reset-password', authLimiter, validateResetPassword, async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    // Find valid token
+    const tokenResult = await pool.query(
+      `SELECT user_id, expires_at, used 
+       FROM password_reset_tokens 
+       WHERE token = $1`,
+      [token]
+    );
+
+    if (tokenResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+
+    const resetToken = tokenResult.rows[0];
+
+    // Check if token is already used
+    if (resetToken.used) {
+      return res.status(400).json({ error: 'Reset token has already been used' });
+    }
+
+    // Check if token is expired
+    if (new Date() > new Date(resetToken.expires_at)) {
+      return res.status(400).json({ error: 'Reset token has expired' });
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [passwordHash, resetToken.user_id]
+    );
+
+    // Mark token as used
+    await pool.query(
+      'UPDATE password_reset_tokens SET used = TRUE, used_at = CURRENT_TIMESTAMP WHERE token = $1',
+      [token]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Password reset successful. You can now login with your new password.' 
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Change Password - Authenticated users can change their password
+router.put('/change-password', authenticateToken, validateChangePassword, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const userId = req.user.id;
+
+  try {
+    // Get current password hash
+    const userResult = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify current password
+    const validPassword = await bcrypt.compare(currentPassword, userResult.rows[0].password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [passwordHash, userId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Password changed successfully' 
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;
