@@ -55,7 +55,7 @@ describe("EscrowUnderflow", function () {
     await escrow.connect(owner).setTreasury(treasury.address);
   });
 
-  it("Should reproduce underflow when discount reduces amount below fixed fee", async function () {
+  it("Should prevent underflow when discount reduces amount below fixed fee", async function () {
     // 1. Create Escrow
     const duration = 86400;
     await escrow.connect(owner).createEscrow(
