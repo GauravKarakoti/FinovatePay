@@ -25,11 +25,11 @@ jobs:
       - name: Lint backend
         run: cd backend && npm run lint
       # TODO: Fix failing tests in separate PR
-      # - name: Test backend
-      #   run: cd backend && npm run test:backend
+      - name: Test backend
+        run: cd backend && npm run test:backend
       # TODO: Fix contract compilation errors in separate PR
-      # - name: Compile contracts
-      #   run: npx hardhat compile
+      - name: Compile contracts
+        run: npx hardhat compile
       # TODO: Fix contract tests in separate PR  
-      # - name: Test contracts
-      #   run: npx hardhat test
+      - name: Test contracts
+        run: npx hardhat test
