@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "test": "jest",
+    "test:backend": "jest",
     "dev": "nodemon server.js",
     "start": "node server.js",
     "test:manual": "node test/manual-event-sync-test.js",
