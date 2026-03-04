@@ -29,6 +29,17 @@ jest.mock('jsonwebtoken', () => ({
   sign: jest.fn()
 }));
 
+jest.mock('../middleware/rateLimiter', () => ({
+  authLimiter: (req, res, next) => next(),
+  globalLimiter: (req, res, next) => next()
+}));
+
+jest.mock('../middleware/validators', () => ({
+  validateRegister: (req, res, next) => next(),
+  validateLogin: (req, res, next) => next(),
+  validateRoleUpdate: (req, res, next) => next()
+}));
+
 describe('Auth Registration Tests', () => {
   let app;
   const mockUser = {
@@ -127,7 +138,7 @@ describe('Auth Registration Tests', () => {
       
       // Verify the SQL was called with 'seller' as the role (in the parameters array)
       const insertParams = mockQuery.mock.calls[1][1];
-      expect(insertParams[6]).toBe('seller');
+      expect(insertParams[7]).toBe('seller');
     });
 
     it('should default to "seller" role when invalid role is provided', async () => {
@@ -185,7 +196,7 @@ describe('Auth Registration Tests', () => {
       expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
     });
 
-    it('should return token on successful registration', async () => {
+    it('should NOT return token in body on successful registration', async () => {
       const jwt = require('jsonwebtoken');
       
       mockQuery
@@ -198,7 +209,7 @@ describe('Auth Registration Tests', () => {
         .post('/auth/register')
         .send({ ...validUserData });
 
-      expect(response.body.token).toBe('mock-jwt-token');
+      expect(response.body.token).toBeUndefined();
     });
 
     it('should not allow arbitrator role (admin-only)', async () => {
@@ -215,7 +226,7 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should allow investor role when provided', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'investor' }] });
 
@@ -231,7 +242,7 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should allow shipment role when provided', async () => {
-      mockPool.query
+      mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'shipment' }] });
 

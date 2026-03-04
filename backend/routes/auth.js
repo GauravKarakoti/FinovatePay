@@ -85,8 +85,7 @@ router.post('/register', authLimiter, validateRegister, async (req, res) => {
 
     res.status(201).json({
       message: 'User created successfully',
-      user: sanitizeUser(newUser.rows[0]),
-      token
+      user: sanitizeUser(newUser.rows[0])
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -141,8 +140,7 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
     // Return user data (excluding password)
     res.json({
       message: 'Login successful',
-      user: sanitizeUser(user),
-      token
+      user: sanitizeUser(user)
     });
   } catch (error) {
     console.error('Login error:', error);
