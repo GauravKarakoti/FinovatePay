@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/sanitize');
+const { generateToken } = require('../utils/jwt');
 const { 
   validateRegister, 
   validateLogin, 
@@ -182,11 +183,7 @@ router.post('/register', authLimiter, validateRegister, async (req, res) => {
       [email, passwordHash, walletAddress, company_name, tax_id, first_name, last_name, userRole]
     );
 
-    const token = jwt.sign(
-      { id: newUser.rows[0].id }, // Changed from userId to id
-      process.env.JWT_SECRET,
-      { expiresIn: '1Y' }
-    );
+    const token = generateToken(newUser.rows[0]);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -237,11 +234,7 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
     const user = userResult.rows[0];
 
-    const token = jwt.sign(
-      { id: user.id }, // Changed from userId to id
-      process.env.JWT_SECRET,
-      { expiresIn: '1Y' }
-    );
+    const token = generateToken(user);
 
     // Return user data (excluding password)
     res.json({
