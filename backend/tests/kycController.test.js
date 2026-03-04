@@ -282,7 +282,7 @@ describe('KYC Controller Tests', () => {
 
       const response = await request(app)
         .post('/kyc/check-compliance')
-        .send({ walletAddress:d35Cc663 '0x7424C0532925a3b844Bc9e7595f0fE00' });
+        .send({ walletAddress: '0x7424C0532925a3b844Bc9e7595f0fE00d35Cc663' });
 
       expect(response.status).toBe(200);
       expect(response.body.compliant).toBe(true);

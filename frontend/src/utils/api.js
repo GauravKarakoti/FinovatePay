@@ -270,6 +270,18 @@ export const updateCurrentUserRole = (role) => {
   return api.put('/auth/role', { role });
 };
 
+export const forgotPassword = (email) => {
+  return api.post('/auth/forgot-password', { email });
+};
+
+export const resetPassword = (token, newPassword) => {
+  return api.post('/auth/reset-password', { token, newPassword });
+};
+
+export const changePassword = (currentPassword, newPassword) => {
+  return api.put('/auth/change-password', { currentPassword, newPassword });
+};
+
 // --- Invoice API ---
 export const createInvoice = (invoiceData) => {
   return api.post('/invoices', invoiceData);
