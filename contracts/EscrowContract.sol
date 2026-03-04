@@ -198,6 +198,23 @@ contract EscrowContract is
         return (10000 + feePercentage - 1) / feePercentage;
     }
 
+    /**
+     * @notice Set early payment discount for an escrow
+     * @param _invoiceId The invoice ID
+     * @param _discountRate Discount rate in basis points
+     * @param _deadline Timestamp deadline for the discount
+     */
+    function setEarlyPaymentDiscount(bytes32 _invoiceId, uint256 _discountRate, uint256 _deadline) external {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(_msgSender() == escrow.seller, "Not seller");
+        require(escrow.status == EscrowStatus.Created, "Invalid status");
+        require(_discountRate <= 10000, "Invalid rate");
+        require(_deadline > block.timestamp, "Invalid deadline");
+        
+        escrow.discountRate = _discountRate;
+        escrow.discountDeadline = _deadline;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             ESCROW LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -281,6 +298,11 @@ contract EscrowContract is
                 address(this),
                 payableAmount
             );
+        }
+
+        // Fix for issue #400: Recalculate fee if discount applied to prevent underflow
+        if (payableAmount < escrow.amount && escrow.amount > 0) {
+            escrow.feeAmount = (escrow.feeAmount * payableAmount) / escrow.amount;
         }
 
         escrow.amount = payableAmount;
