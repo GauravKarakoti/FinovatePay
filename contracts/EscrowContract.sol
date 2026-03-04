@@ -310,6 +310,7 @@ contract EscrowContract is
             escrow.buyerConfirmed = true;
         }
 
+        // Only release if both parties have confirmed
         if (escrow.sellerConfirmed && escrow.buyerConfirmed) {
             _releaseFunds(_invoiceId);
         }
@@ -390,6 +391,9 @@ contract EscrowContract is
 
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
+        
+        // Update status before transfer (CEI pattern) to prevent re-entrancy
+        escrow.status = EscrowStatus.Released;
         
         IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
         
