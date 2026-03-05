@@ -144,6 +144,10 @@ app.use('/api/credit-line', require('./routes/creditLine'));
 
 app.use('/api/insurance', require('./routes/insurance'));
 
+/* ---------------- GOVERNANCE ---------------- */
+
+app.use('/api/governance', require('./routes/governance'));
+
 /* ---------------- FIAT ON-RAMP ---------------- */
 
 app.use("/api/fiat-ramp", require("./routes/fiatRamp"));

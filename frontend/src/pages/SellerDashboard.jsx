@@ -35,6 +35,7 @@ import FinancingTab from '../components/Financing/FinancingTab';
 import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
 import AnalyticsPage from '../pages/AnalyticsPage';
+import GovernanceDashboard from '../pages/GovernanceDashboard';
 
 // ------------------ HELPER COMPONENTS ------------------
 
@@ -625,6 +626,7 @@ const FinancingTabComponent = () => (
       case 'escrow': return <EscrowTab />;
       case 'financing': return <FinancingTabComponent />;
       case 'streaming': return <StreamingTabComponent />;
+      case 'governance': return <GovernanceDashboard />;
       default: return <OverviewTab />;
     }
   };

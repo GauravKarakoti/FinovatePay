@@ -602,4 +602,56 @@ export const getPendingClaims = () => {
   return api.get('/insurance/claims');
 };
 
+// --- Governance API ---
+
+// Get all proposals
+export const getProposals = (params) => {
+  return api.get('/governance/proposals', { params });
+};
+
+// Get a specific proposal
+export const getProposal = (proposalId) => {
+  return api.get(`/governance/proposals/${proposalId}`);
+};
+
+// Create a new proposal
+export const createProposal = (proposalData) => {
+  return api.post('/governance/proposals', proposalData);
+};
+
+// Cast a vote on a proposal
+export const castVote = (voteData) => {
+  return api.post('/governance/vote', voteData);
+};
+
+// Get governance parameters
+export const getGovernanceParameters = () => {
+  return api.get('/governance/parameters');
+};
+
+// Update a governance parameter (admin)
+export const updateGovernanceParameter = (name, value) => {
+  return api.put(`/governance/parameters/${name}`, { value });
+};
+
+// Get voting power for a wallet
+export const getVotingPower = (wallet) => {
+  return api.get(`/governance/voting-power/${wallet}`);
+};
+
+// Get delegation info
+export const getDelegation = (wallet) => {
+  return api.get(`/governance/delegation/${wallet}`);
+};
+
+// Get governance statistics
+export const getGovernanceStats = () => {
+  return api.get('/governance/stats');
+};
+
+// Execute a parameter change
+export const executeParameterChange = (parameterName) => {
+  return api.post('/governance/execute', { parameterName });
+};
+
 export default api;

@@ -107,6 +107,36 @@ contract EscrowContract is
     event HighValueTransactionApproved(bytes32 indexed invoiceId, address indexed approver);
     event HighValueTransactionReleased(bytes32 indexed invoiceId);
 
+    // --- Governance Integration ---
+    address public governanceManager; // Governance manager contract
+    bool public governanceEnabled = false;
+    
+    // Pending parameter changes (to be applied after governance approval)
+    struct PendingParameterChange {
+        uint256 newValue;
+        uint256 executionTime;
+        bool executed;
+        bytes32 proposalId;
+    }
+    
+    mapping(bytes32 => PendingParameterChange) public pendingParameterChanges;
+    
+    // Parameter change types
+    bytes32 public constant FEE_PERCENTAGE_CHANGE = keccak256("FEE_PERCENTAGE");
+    bytes32 public constant MINIMUM_ESCROW_CHANGE = keccak256("MINIMUM_ESCROW");
+    bytes32 public constant TREASURY_CHANGE = keccak256("TREASURY");
+    bytes32 public constant QUORUM_CHANGE = keccak256("QUORUM");
+    bytes32 public constant TIMELOCK_CHANGE = keccak256("TIMELOCK");
+    
+    // Pending values
+    uint256 public pendingFeePercentage;
+    uint256 public pendingMinimumEscrowAmount;
+    address public pendingTreasury;
+    uint256 public pendingQuorumPercentage;
+    
+    // Delay before parameter changes take effect (after governance approval)
+    uint256 public parameterChangeDelay = 2 days;
+
     address public admin;
     address public treasury;        // Platform treasury address for fee collection
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
@@ -818,4 +848,172 @@ contract EscrowContract is
 
         delete escrows[invoiceId];
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    GOVERNANCE INTEGRATION FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Set the governance manager address
+     * @param _governanceManager Address of the governance manager
+     */
+    function setGovernanceManager(address _governanceManager) external onlyAdmin {
+        require(_governanceManager != address(0), "Invalid governance manager");
+        governanceManager = _governanceManager;
+        governanceEnabled = true;
+        emit GovernanceManagerSet(_governanceManager);
+    }
+
+    /**
+     * @notice Enable/disable governance integration
+     * @param _enabled Enable state
+     */
+    function setGovernanceEnabled(bool _enabled) external onlyAdmin {
+        governanceEnabled = _enabled;
+        emit GovernanceEnabled(_enabled);
+    }
+
+    /**
+     * @notice Set parameter change delay
+     * @param _delay New delay in seconds
+     */
+    function setParameterChangeDelay(uint256 _delay) external onlyAdmin {
+        require(_delay >= 1 days && _delay <= 30 days, "Invalid delay");
+        parameterChangeDelay = _delay;
+    }
+
+    /**
+     * @notice Queue a parameter change from governance
+     * @param parameterType Type of parameter to change
+     * @param newValue New value
+     * @param proposalId Related proposal ID
+     */
+    function queueParameterChange(
+        bytes32 parameterType,
+        uint256 newValue,
+        bytes32 proposalId
+    ) external {
+        require(governanceEnabled, "Governance not enabled");
+        require(msg.sender == governanceManager, "Only governance");
+
+        if (parameterType == FEE_PERCENTAGE_CHANGE) {
+            require(newValue <= 1000, "Fee too high");
+            pendingFeePercentage = newValue;
+        } else if (parameterType == MINIMUM_ESCROW_CHANGE) {
+            require(newValue > 0, "Minimum must be > 0");
+            pendingMinimumEscrowAmount = newValue;
+        } else if (parameterType == QUORUM_CHANGE) {
+            require(newValue > 0 && newValue <= 100, "Invalid quorum");
+            pendingQuorumPercentage = newValue;
+        } else {
+            revert("Unknown parameter");
+        }
+
+        pendingParameterChanges[parameterType] = PendingParameterChange({
+            newValue: newValue,
+            executionTime: block.timestamp + parameterChangeDelay,
+            executed: false,
+            proposalId: proposalId
+        });
+
+        emit ParameterChangeQueued(parameterType, newValue, proposalId);
+    }
+
+    /**
+     * @notice Execute a queued parameter change
+     * @param parameterType Type of parameter to change
+     */
+    function executeParameterChange(bytes32 parameterType) external {
+        PendingParameterChange storage change = pendingParameterChanges[parameterType];
+        require(change.executionTime > 0, "No pending change");
+        require(block.timestamp >= change.executionTime, "Too early");
+        require(!change.executed, "Already executed");
+
+        change.executed = true;
+
+        if (parameterType == FEE_PERCENTAGE_CHANGE) {
+            uint256 oldFee = feePercentage;
+            feePercentage = change.newValue;
+            emit FeePercentageUpdated(oldFee, change.newValue);
+        } else if (parameterType == MINIMUM_ESCROW_CHANGE) {
+            uint256 oldMinimum = minimumEscrowAmount;
+            minimumEscrowAmount = change.newValue;
+            emit MinimumEscrowAmountUpdated(oldMinimum, change.newValue);
+        } else if (parameterType == QUORUM_CHANGE) {
+            uint256 oldQuorum = quorumPercentage;
+            quorumPercentage = change.newValue;
+            emit QuorumPercentageUpdated(oldQuorum, change.newValue);
+        }
+
+        emit ParameterChangeExecuted(parameterType, change.newValue);
+    }
+
+    /**
+     * @notice Queue treasury change from governance
+     * @param newTreasury New treasury address
+     * @param proposalId Related proposal ID
+     */
+    function queueTreasuryChange(address newTreasury, bytes32 proposalId) external {
+        require(governanceEnabled, "Governance not enabled");
+        require(msg.sender == governanceManager, "Only governance");
+        require(newTreasury != address(0), "Invalid treasury");
+
+        pendingTreasury = newTreasury;
+        pendingParameterChanges[TREASURY_CHANGE] = PendingParameterChange({
+            newValue: 0,
+            executionTime: block.timestamp + parameterChangeDelay,
+            executed: false,
+            proposalId: proposalId
+        });
+
+        emit TreasuryChangeQueued(newTreasury, proposalId);
+    }
+
+    /**
+     * @notice Execute queued treasury change
+     */
+    function executeTreasuryChange() external {
+        PendingParameterChange storage change = pendingParameterChanges[TREASURY_CHANGE];
+        require(change.executionTime > 0, "No pending change");
+        require(block.timestamp >= change.executionTime, "Too early");
+        require(!change.executed, "Already executed");
+
+        change.executed = true;
+        address oldTreasury = treasury;
+        treasury = pendingTreasury;
+        emit TreasuryUpdated(oldTreasury, pendingTreasury);
+        emit TreasuryChangeExecuted(pendingTreasury);
+    }
+
+    /**
+     * @notice Get pending parameter change details
+     * @param parameterType Type of parameter
+     * @return Pending parameter change details
+     */
+    function getPendingChange(bytes32 parameterType) external view returns (
+        uint256 newValue,
+        uint256 executionTime,
+        bool executed,
+        bytes32 proposalId
+    ) {
+        PendingParameterChange storage change = pendingParameterChanges[parameterType];
+        return (change.newValue, change.executionTime, change.executed, change.proposalId);
+    }
+
+    /**
+     * @notice Check if governance can update parameters
+     * @return Whether governance controls parameters
+     */
+    function isGovernanceActive() external view returns (bool) {
+        return governanceEnabled && governanceManager != address(0);
+    }
+
+    // Governance events
+    event GovernanceManagerSet(address indexed governanceManager);
+    event GovernanceEnabled(bool enabled);
+    event ParameterChangeQueued(bytes32 indexed parameterType, uint256 newValue, bytes32 indexed proposalId);
+    event ParameterChangeExecuted(bytes32 indexed parameterType, uint256 newValue);
+    event TreasuryChangeQueued(address indexed newTreasury, bytes32 indexed proposalId);
+    event TreasuryChangeExecuted(address indexed newTreasury);
+    event QuorumPercentageUpdated(uint256 oldQuorum, uint256 newQuorum);
 }

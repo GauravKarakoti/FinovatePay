@@ -10,6 +10,7 @@ import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
 import { useStatsActions } from '../context/StatsContext';
 import AuctionList from '../components/Auction/AuctionList';
+import GovernanceDashboard from '../pages/GovernanceDashboard';
 
 // --- Reusable UI Components ---
 
@@ -634,7 +635,8 @@ const FinancingTab = () => (
 {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'financing' && <FinancingTab />}
           {activeTab === 'auctions' && <AuctionTab />}
-          {activeTab !== 'overview' && activeTab !== 'financing' && activeTab !== 'auctions' && (
+          {activeTab === 'governance' && <GovernanceDashboard />}
+          {activeTab !== 'overview' && activeTab !== 'financing' && activeTab !== 'auctions' && activeTab !== 'governance' && (
             <EmptyState message="Section under construction" icon="🚧" />
           )}
         </main>
