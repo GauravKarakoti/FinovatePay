@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "test": "npm run test:jest && npm run test:mocha",
+    "test:backend": "npm run test:jest && npm run test:mocha",
     "test:jest": "jest",
     "test:jest:watch": "jest --watch",
     "test:jest:coverage": "jest --coverage",
