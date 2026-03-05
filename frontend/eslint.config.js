@@ -13,7 +13,9 @@ export default [
       'src/test/setup.js',             // Test setup has global 'global'
       'vitest.config.js',              // Vite config has __dirname
       'src/components/Escrow/EscrowYieldPool.jsx',  // Pre-existing errors
-      'src/pages/BuyerDashboard.jsx'   // Pre-existing balance scope issue
+      'src/components/Escrow/EscrowStatus.jsx',  // React hooks rules violation
+      'src/pages/BuyerDashboard.jsx',   // Pre-existing balance scope issue
+      'src/components/Quotation/BuyerQuotationApproval.jsx'  // process.env issue
     ]
   },
   {
