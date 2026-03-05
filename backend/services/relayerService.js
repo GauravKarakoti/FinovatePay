@@ -166,7 +166,7 @@ class RelayerService {
       const maticUsdPrice = 0.50; // Placeholder
       const gasCostUsd = gasCostMatic * maticUsdPrice;
 
-      const pool = require('../config/database');
+      const { pool } = require('../config/database');
       await pool.query(
         `INSERT INTO meta_transactions 
          (user_id, tx_hash, from_address, to_address, gas_used, gas_price, gas_cost_matic, gas_cost_usd, status, confirmed_at)
