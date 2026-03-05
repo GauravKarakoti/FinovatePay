@@ -25,11 +25,8 @@ jobs:
       - name: Lint backend
         run: cd backend && npm run lint
       - name: Test backend
-        run: echo "Skipping backend tests - to be fixed in separate PR"
-        env:
-          NODE_ENV: test
-          CI: true
+        run: cd backend && npm run test:backend
       - name: Compile contracts
         run: npx hardhat compile
       - name: Test contracts
-        run: echo "Skipping contract tests - to be fixed in separate PR"
+        run: npx hardhat test
