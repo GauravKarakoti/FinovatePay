@@ -116,10 +116,88 @@ const relayerLimiter = rateLimit({
   }
 });
 
+/**
+ * Forgot Password Rate Limiter
+ * Applies to password reset request endpoint
+ * Default: 3 requests per hour per IP
+ * Prevents abuse of password reset functionality
+ */
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  message: {
+    error: 'Too many password reset requests, please try again later.',
+    retryAfter: 'Check the Retry-After header for wait time.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  handler: (req, res) => {
+    console.warn(`Forgot password rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many password reset requests from this IP. Please try again in an hour.',
+      retryAfter: req.rateLimit.resetTime
+    });
+  }
+});
+
+/**
+ * Email Test Rate Limiter
+ * Applies to test email sending endpoints
+ * Default: 3 requests per hour per IP
+ * Prevents email bombing and abuse of email service
+ */
+const emailTestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3, // Max 3 test emails per hour
+  message: {
+    error: 'Too many test emails sent. Please try again later.',
+    retryAfter: 'Check the Retry-After header for wait time.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  handler: (req, res) => {
+    console.warn(`Email test rate limit exceeded for user: ${req.user?.id || 'unknown'} from IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many test emails sent from this account. Please try again in an hour.',
+      retryAfter: req.rateLimit.resetTime
+    });
+  }
+});
+
+/**
+ * Push Notification Test Rate Limiter
+ * Applies to test push notification endpoints
+ * Default: 5 requests per hour per IP
+ * Prevents abuse of push notification service
+ */
+const pushTestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // Max 5 test push notifications per hour
+  message: {
+    error: 'Too many test push notifications sent. Please try again later.',
+    retryAfter: 'Check the Retry-After header for wait time.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  handler: (req, res) => {
+    console.warn(`Push test rate limit exceeded for user: ${req.user?.id || 'unknown'} from IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many test push notifications sent. Please try again in an hour.',
+      retryAfter: req.rateLimit.resetTime
+    });
+  }
+});
+
 module.exports = {
   globalLimiter,
   authLimiter,
   kycLimiter,
   paymentLimiter,
-  relayerLimiter
+  relayerLimiter,
+  forgotPasswordLimiter,
+  emailTestLimiter,
+  pushTestLimiter
 };

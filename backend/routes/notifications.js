@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
+const { emailTestLimiter, pushTestLimiter } = require('../middleware/rateLimiter');
 const {
   sendTestEmail,
   getNotificationPreferences,
@@ -15,8 +16,8 @@ const {
 // Protected Routes (Require Authentication)
 // ============================================
 
-// Send test email
-router.post('/send-test', authenticateToken, sendTestEmail);
+// Send test email - WITH RATE LIMITING to prevent email bombing
+router.post('/send-test', authenticateToken, emailTestLimiter, sendTestEmail);
 
 // Get user's notification preferences
 router.get('/preferences', authenticateToken, getNotificationPreferences);
@@ -30,8 +31,8 @@ router.get('/history', authenticateToken, getEmailHistory);
 // Get email statistics
 router.get('/stats', authenticateToken, getEmailStats);
 
-// Retry failed emails (admin)
-router.post('/retry-failed', authenticateToken, retryFailedEmails);
+// Retry failed emails (admin) - WITH RATE LIMITING to prevent abuse
+router.post('/retry-failed', authenticateToken, emailTestLimiter, retryFailedEmails);
 
 // ============================================
 // Public Routes (No Authentication)
