@@ -7,24 +7,44 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
     defaultMaturity.setDate(defaultMaturity.getDate() + 30);
     const defaultMaturityString = defaultMaturity.toISOString().split('T')[0];
 
-    // ---
-    // **UPDATE**: Ensure the initial state is always a string
-    // ---
+    const [percentage, setPercentage] = useState('100');
+    // Initialize faceValue based on 100% of invoice amount
     const [faceValue, setFaceValue] = useState(invoice.amount ? String(invoice.amount) : '');
     const [maturityDate, setMaturityDate] = useState(defaultMaturityString);
-    const [yieldBps, setYieldBps] = useState('500'); // Default 5% yield
+    const [yieldPercent, setYieldPercent] = useState('5'); // Default 5% yield
+
+    const handlePercentageChange = (e) => {
+        const val = e.target.value;
+        setPercentage(val);
+        if (val && invoice.amount) {
+            const calculatedValue = (parseFloat(invoice.amount) * parseFloat(val)) / 100;
+            setFaceValue(calculatedValue.toFixed(2));
+        }
+    };
+
+    const handleFaceValueChange = (e) => {
+        const val = e.target.value;
+        setFaceValue(val);
+        if (val && invoice.amount) {
+            const calcPercentage = (parseFloat(val) / parseFloat(invoice.amount)) * 100;
+            setPercentage(calcPercentage.toFixed(2));
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
         
-        if (!faceValue || +faceValue < +invoice.amount) {
-            toast.error("Face value must be equal to or greater than the invoice amount.");
+        if (!faceValue || +faceValue > +invoice.amount) {
+            toast.error("Face value cannot exceed the invoice amount.");
             return;
         }
         if (!maturityDate) {
             toast.error("Please select a maturity date.");
             return;
         }
+
+        // Convert percentage to basis points (1% = 100 bps)
+        const yieldBps = Math.floor(parseFloat(yieldPercent) * 100);
 
         // Pass the data up to the parent component's submit handler
         onSubmit(invoice.invoice_id, {
@@ -42,10 +62,26 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
                     Invoice ID: <span className="font-mono">{invoice.invoice_id.substring(0, 8)}...</span>
                 </p>
                 <p className="text-gray-600 mb-4">
-                    Amount: <span className="font-semibold">{invoice.amount} {invoice.currency}</span>
+                    Total Amount: <span className="font-semibold">{invoice.amount} {invoice.currency}</span>
                 </p>
                 
                 <form onSubmit={handleSubmit}>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="percentage">
+                           Percentage to Tokenize (%)
+                        </label>
+                        <input
+                            id="percentage"
+                            type="number"
+                            min="1"
+                            max="100"
+                            step="1"
+                            value={percentage}
+                            onChange={handlePercentageChange}
+                            className="block w-full text-sm p-2 border rounded-md"
+                        />
+                    </div>
+
                     <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="faceValue">
                             Face Value (Total Token Supply)
@@ -54,9 +90,9 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
                             id="faceValue"
                             type="number"
                             step="0.01"
-                            min={invoice.amount}
+                            max={invoice.amount}
                             value={faceValue}
-                            onChange={(e) => setFaceValue(e.target.value)}
+                            onChange={handleFaceValueChange}
                             className="block w-full text-sm p-2 border rounded-md"
                             placeholder="e.g., 1000.00"
                         />
@@ -77,17 +113,17 @@ const TokenizeInvoiceModal = ({ invoice, onClose, onSubmit, isSubmitting }) => {
                     </div>
 
                     <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="yieldBps">
+                        <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="yieldPercent">
                             Investor Yield (%)
                         </label>
                         <input
-                            id="yieldBps"
+                            id="yieldPercent"
                             type="number"
                             step="0.01"
                             min="0"
                             max="100"
-                            value={yieldBps}
-                            onChange={(e) => setYieldBps(e.target.value)}
+                            value={yieldPercent}
+                            onChange={(e) => setYieldPercent(e.target.value)}
                             className="block w-full text-sm p-2 border rounded-md"
                             placeholder="e.g., 5.00"
                         />

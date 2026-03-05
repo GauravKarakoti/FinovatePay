@@ -19,6 +19,15 @@ interface IFractionToken is IERC1155 {
         uint256 yieldBps;
     }
     function tokenDetails(uint256 tokenId) external view returns (TokenDetails memory);
+    function tokenizeInvoice(
+        bytes32 _invoiceId,
+        address _seller,
+        uint256 _totalFractions,
+        uint256 _pricePerFraction,
+        uint256 _maturityDate,
+        uint256 _totalValue,
+        uint256 _yieldBps
+    ) external returns (uint256);
 }
 
 interface IBridgeAdapter {
@@ -48,6 +57,23 @@ interface IEscrowContract {
         uint256 _discountDeadline
     ) external;
     function confirmRelease(bytes32 invoiceId) external;
+    function escrows(bytes32 invoiceId) external view returns (
+        address seller,
+        address buyer,
+        uint256 amount,
+        address tokenAddress,
+        uint8 status,
+        bool buyerConfirmed,
+        bool disputeRaised,
+        address disputeResolver,
+        uint256 createdAt,
+        uint256 expiresAt,
+        address rwaNftContract,
+        uint256 rwaTokenId,
+        uint256 feeAmount,
+        uint256 discountRate,
+        uint256 discountDeadline 
+    );
 }
 
 /**
@@ -103,6 +129,11 @@ contract FinancingManager is Ownable, ReentrancyGuard {
     event FinancingRequested(bytes32 indexed requestId, address borrower, uint256 tokenId, uint256 loanAmount);
     event FinancingApproved(bytes32 indexed requestId, bytes32 escrowId, bytes32 loanId);
     event FinancingRepaid(bytes32 indexed requestId);
+    
+    // Cross-chain fractionalization events
+    event CrossChainFractionListed(uint256 indexed tokenId, address indexed seller, uint256 amount, bytes32 destinationChain, uint256 pricePerFraction);
+    event CrossChainFractionSold(uint256 indexed tokenId, address indexed seller, address indexed buyer, uint256 amount, uint256 totalPrice, bytes32 destinationChain);
+    event CrossChainFractionReturned(uint256 indexed tokenId, address indexed owner, uint256 amount, bytes32 sourceChain);
 
     constructor(
         address _fractionToken, 
@@ -373,5 +404,122 @@ contract FinancingManager is Ownable, ReentrancyGuard {
         bridgeAdapter = IBridgeAdapter(_bridgeAdapter);
         liquidityAdapter = ILiquidityAdapter(_liquidityAdapter);
         escrowContract = IEscrowContract(_escrowContract);
+    }
+
+    // ============================================
+    // Cross-Chain Invoice Fractionalization
+    // ============================================
+
+    /**
+     * @notice List fractions for cross-chain trading (bridge to destination chain).
+     * @param _tokenId The token ID to list.
+     * @param _amount The amount of fractions to bridge.
+     * @param _destinationChain The destination chain identifier.
+     * @param _pricePerFraction Price per fraction on destination chain.
+     */
+    function listForCrossChainTrade(
+        uint256 _tokenId,
+        uint256 _amount,
+        bytes32 _destinationChain,
+        uint256 _pricePerFraction
+    ) external nonReentrant {
+        require(_amount > 0, "Amount must be positive");
+        require(_pricePerFraction > 0, "Price must be positive");
+        require(
+            _destinationChain == bridgeAdapter.KATANA_CHAIN() ||
+            _destinationChain == keccak256("polygon-pos") ||
+            _destinationChain == keccak256("polygon-zkevm"),
+            "Unsupported destination chain"
+        );
+
+        IFractionToken.TokenDetails memory details = fractionToken.tokenDetails(_tokenId);
+        require(details.issuer == msg.sender || balanceOf(msg.sender, _tokenId) >= _amount, "Not authorized or insufficient balance");
+        
+        require(details.faceValue > 0, "Token not found or not active");
+
+        // Lock fractions in this contract
+        fractionToken.safeTransferFrom(msg.sender, address(this), _tokenId, _amount, "");
+
+        // Bridge fractions to destination chain via BridgeAdapter
+        bytes32 lockId = bridgeAdapter.lockERC1155ForBridge(
+            address(fractionToken),
+            _tokenId,
+            _amount,
+            _destinationChain
+        );
+
+        // Bridge to destination
+        bridgeAdapter.bridgeERC1155Asset(lockId, address(this)); // This would need destination chain handling
+
+        emit CrossChainFractionListed(_tokenId, msg.sender, _amount, _destinationChain, _pricePerFraction);
+    }
+
+    /**
+     * @notice Execute cross-chain trade (settlement after bridge).
+     * @param _tokenId The token ID.
+     * @param _seller The seller address.
+     * @param _buyer The buyer address.
+     * @param _amount The amount traded.
+     * @param _totalPrice The total price.
+     * @param _destinationChain The destination chain.
+     */
+    function executeCrossChainTrade(
+        uint256 _tokenId,
+        address _seller,
+        address _buyer,
+        uint256 _amount,
+        uint256 _totalPrice,
+        bytes32 _destinationChain
+    ) external onlyOwner nonReentrant {
+        require(_amount > 0 && _totalPrice > 0, "Invalid parameters");
+        
+        // Transfer payment from buyer to seller
+        stablecoin.safeTransferFrom(_buyer, _seller, _totalPrice);
+        
+        // Transfer fractions from contract to buyer (settlement)
+        fractionToken.safeTransferFrom(address(this), _buyer, _tokenId, _amount, "");
+
+        emit CrossChainFractionSold(_tokenId, _seller, _buyer, _amount, _totalPrice, _destinationChain);
+    }
+
+    /**
+     * @notice Return fractions from cross-chain back to origin chain.
+     * @param _tokenId The token ID.
+     * @param _owner The owner address.
+     * @param _amount The amount to return.
+     * @param _sourceChain The source chain.
+     */
+    function returnFromCrossChain(
+        uint256 _tokenId,
+        address _owner,
+        uint256 _amount,
+        bytes32 _sourceChain
+    ) external onlyOwner nonReentrant {
+        require(_amount > 0, "Amount must be positive");
+        
+        // Receive from bridge
+        bridgeAdapter.receiveERC1155FromBridge(
+            address(fractionToken),
+            _tokenId,
+            _amount,
+            _owner,
+            _sourceChain
+        );
+
+        emit CrossChainFractionReturned(_tokenId, _owner, _amount, _sourceChain);
+    }
+
+    /**
+     * @notice Get cross-chain listing details.
+     * @param _tokenId The token ID.
+     */
+    function getCrossChainListing(uint256 _tokenId) external view returns (
+        uint256 totalListed,
+        uint256 totalSold,
+        uint256 totalReturned,
+        bytes32 currentChain
+    ) {
+        // This would need additional mapping in a production contract
+        return (0, 0, 0, bytes32(0));
     }
 }
