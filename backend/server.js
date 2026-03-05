@@ -5,7 +5,11 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
+const crypto = require("crypto");
 require("dotenv").config();
+
+// Initialize secrets provider early
+const { getSecretsProvider } = require("./services/secrets");
 
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
@@ -17,6 +21,7 @@ const {
 const { globalLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
+const { logClientIP } = require("./middleware/ipWhitelist");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
@@ -65,6 +70,21 @@ app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
 
+/* ---------------- REQUEST ID MIDDLEWARE ---------------- */
+
+// Add unique request ID to each request for tracking
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  req.requestId = requestId;
+  res.locals.requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+  next();
+});
+
+/* ---------------- CLIENT IP LOGGING ---------------- */
+
+app.use(logClientIP());
+
 /* ---------------- RATE LIMITING ---------------- */
 
 app.use("/api/", globalLimiter);
@@ -94,6 +114,10 @@ app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/shipment", shipmentRoutes);
 app.use("/api/meta-tx", require("./routes/metaTransaction"));
 app.use("/api/notifications", notificationRoutes);
+
+/* ---------------- API KEYS ---------------- */
+
+app.use("/api/api-keys", require("./routes/apiKeys"));
 
 /* ---------------- V2 FINANCING ---------------- */
 
