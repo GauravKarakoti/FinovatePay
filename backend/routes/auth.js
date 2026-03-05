@@ -185,6 +185,14 @@ router.post('/register', authLimiter, validateRegister, async (req, res) => {
 
     const token = generateToken(newUser.rows[0]);
 
+    // Set HttpOnly cookie for additional security (defense-in-depth)
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
     res.status(201).json({
       message: 'User created successfully',
       user: sanitizeUser(newUser.rows[0]),
@@ -236,6 +244,14 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
     const token = generateToken(user);
 
+    // Set HttpOnly cookie for additional security (defense-in-depth)
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
     // Return user data (excluding password)
     res.json({
       message: 'Login successful',
@@ -268,6 +284,25 @@ router.get('/profile', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Logout - clears the HttpOnly cookie server-side
+router.post('/logout', (req, res) => {
+  // Clear the HttpOnly cookie by setting maxAge to 0
+  res.cookie('token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 0 // Expire immediately
+  });
+  
+  // Log logout for security audit
+  if (req.user) {
+    console.log(`[AUDIT] User ${req.user.id} logged out`);
+  }
+  
+  res.json({ message: 'Logout successful' });
+});
+
 
 // Verify token validity
 router.get('/verify', authenticateToken, (req, res) => {
