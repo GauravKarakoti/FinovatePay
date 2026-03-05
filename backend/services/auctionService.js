@@ -88,8 +88,8 @@ const statusToString = (status) => {
 const generateAuctionId = (invoiceId, sellerAddress) => {
   return ethers.keccak256(
     ethers.solidityPacked(
-      ['bytes32', 'address', 'uint256'],
-      [invoiceId, sellerAddress, Date.now()]
+      ['bytes32', 'address', 'bytes32'],
+      [invoiceId, sellerAddress, ethers.randomBytes(32)]
     )
   );
 };

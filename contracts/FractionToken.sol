@@ -77,7 +77,9 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 tokenId,
         address seller,
         uint256 totalFractions,
-        uint256 pricePerFraction
+        uint256 pricePerFraction,
+        uint256 TotalValue,
+        uint256 yieldBps
     );
     event FractionsPurchased(
         uint256 indexed tokenId,
@@ -181,7 +183,7 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         // The contract acts as the marketplace custodian.
         _mint(address(this), tokenId, _totalFractions, "");
 
-        emit InvoiceFractionalized(_invoiceId, tokenId, _seller, _totalFractions, _pricePerFraction);
+        emit InvoiceFractionalized(_invoiceId, tokenId, _seller, _totalFractions, _pricePerFraction, _totalValue, _yieldBps);
         return tokenId;
     }
 

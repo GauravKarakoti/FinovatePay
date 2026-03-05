@@ -5,6 +5,8 @@ import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Invoices from './pages/Invoices';
 import InvoiceDetails from './pages/InvoiceDetails';
 import DisputeDashboard from './pages/DisputeDashboard';
@@ -15,11 +17,12 @@ import AdminDashboard from './pages/AdminDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
-import PermissionBanner from './components/Notifications/PermissionBanner';
+import ContributorsPage from './pages/ContributorsPage';
 import './App.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
 import { setNavigateFunction } from './utils/api';
+import PermissionBanner from './components/Notifications/PermissionBanner';
 
 /* -------------------- Error Boundary Component -------------------- */
 class ErrorBoundary extends React.Component {
@@ -329,6 +332,11 @@ function App() {
                 element={<ProduceHistory />}
               />
               
+              <Route
+                path="/contributors"
+                element={<ContributorsPage />}
+              />
+
               <Route 
                 path="/login" 
                 element={
@@ -339,6 +347,18 @@ function App() {
                 path="/register" 
                 element={
                   user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
+                } 
+              />
+              <Route 
+                path="/forgot-password" 
+                element={
+                  user ? <Navigate to="/" /> : <ForgotPassword />
+                } 
+              />
+              <Route 
+                path="/reset-password/:token" 
+                element={
+                  user ? <Navigate to="/" /> : <ResetPassword />
                 } 
               />
             </Routes>

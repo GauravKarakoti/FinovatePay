@@ -1,6 +1,6 @@
 import { connectWallet, disconnectWallet } from '../../utils/web3';
 import { updateCurrentUserRole } from '../../utils/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 // FIX: Receive the onToggleRole prop
 const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar }) => {
@@ -59,6 +59,12 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
             </button>
           )}
           <h1 className="text-xl font-bold">FinovatePay</h1>
+          <Link
+            to="/contributors"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/20 bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition-all duration-200 hover:scale-105"
+          >
+            <span>👥</span> Contributors
+          </Link>
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-4">

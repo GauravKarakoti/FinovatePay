@@ -11,7 +11,7 @@ const useTokenSymbol = (tokenAddress) => {
             const fetchSymbol = async () => {
                 try {
                     // Use a generic provider for read-only calls
-                    const rpcUrl = import.meta.env.VITE_POLYGON_RPC_URL || process.env.REACT_APP_POLYGON_RPC_URL;
+                    const rpcUrl = import.meta.env.VITE_POLYGON_RPC_URL;
                     if (!rpcUrl) {
                         setSymbol("UNKNOWN");
                         return;

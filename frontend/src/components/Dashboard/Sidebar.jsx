@@ -48,8 +48,12 @@ const tabs = [
     { id: 'produce', label: 'Produce', icon: '🌱' }, // Add this tab
     { id: 'payments', label: 'Payments', icon: '💳' },
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
-    { id: 'analytics', label: 'Analytics', icon: '📈' },
   ];
+
+  // Add Analytics tab for admin, seller, investor roles
+  if (['admin', 'seller', 'investor'].includes(user?.role)) {
+    tabs.push({ id: 'analytics', label: 'Analytics', icon: '📈' });
+  }
 
   // Add Streaming Payments tab for seller role
   if (user?.role === 'seller') {
