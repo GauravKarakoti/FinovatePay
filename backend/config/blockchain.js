@@ -96,6 +96,17 @@ const contractAddresses = {
   multiSigWallet:
     deployedAddresses.MultiSigWallet ||
     process.env.MULTISIG_WALLET_ADDRESS,
+
+  // Governance Contracts
+  governanceToken:
+    deployedAddresses.FinovateToken ||
+    process.env.GOVERNANCE_TOKEN_ADDRESS,
+  governanceManager:
+    deployedAddresses.GovernanceManager ||
+    process.env.GOVERNANCE_MANAGER_ADDRESS,
+  timeLock:
+    deployedAddresses.TimeLock ||
+    process.env.TIMELOCK_ADDRESS,
 };
 
 // --------------------------------------------------
