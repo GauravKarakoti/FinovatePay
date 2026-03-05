@@ -79,6 +79,11 @@ contract EscrowContract is
     uint256 public feePercentage;   // Fee percentage in basis points (e.g., 50 = 0.5%)
     uint256 public quorumPercentage = 51; // Quorum percentage (e.g. 51%)
     uint256 public minimumEscrowAmount = 100; // Minimum escrow amount to prevent zero-fee edge cases
+    uint256 public highValueThreshold; // Threshold for requiring arbitrator approval
+    uint256 public requiredArbitratorApprovals = 1; // Number of arbitrator approvals needed for high-value escrows
+    
+    mapping(bytes32 => mapping(address => bool)) public arbitratorApprovals; // Track arbitrator approvals per escrow
+    mapping(bytes32 => uint256) public arbitratorApprovalCount; // Count of arbitrator approvals
 
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
@@ -94,6 +99,9 @@ contract EscrowContract is
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
     event MinimumEscrowAmountUpdated(uint256 oldMinimum, uint256 newMinimum);
     event EscrowExpired(bytes32 indexed invoiceId, address indexed buyer, uint256 amountReclaimed);
+    event HighValueThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
+    event RequiredArbitratorApprovalsUpdated(uint256 oldCount, uint256 newCount);
+    event ArbitratorApprovalAdded(bytes32 indexed invoiceId, address indexed arbitrator, uint256 approvalCount);
 
     modifier onlyAdmin() {
         require(_msgSender() == admin, "Not admin");
@@ -128,6 +136,8 @@ contract EscrowContract is
         complianceManager = ComplianceManager(_complianceManager);
         treasury = msg.sender; // Default treasury to admin
         feePercentage = 50;    // Default 0.5% fee (50 basis points)
+        highValueThreshold = 100000 * 10**18; // Default 100k tokens for high-value escrows
+        requiredArbitratorApprovals = 1; // Default 1 arbitrator approval for high-value
         
         // Calculate minimum escrow amount dynamically based on fee percentage
         // For 50 basis points (0.5%), minimum = ceil(10000 / 50) = 200
@@ -135,6 +145,64 @@ contract EscrowContract is
         minimumEscrowAmount = (10000 + feePercentage - 1) / feePercentage;
         
         arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
+    }
+    
+    /**
+     * @notice Set the high-value threshold for requiring arbitrator approval
+     * @param _threshold Amount threshold in token units
+     */
+    function setHighValueThreshold(uint256 _threshold) external onlyAdmin {
+        uint256 oldThreshold = highValueThreshold;
+        highValueThreshold = _threshold;
+        emit HighValueThresholdUpdated(oldThreshold, _threshold);
+    }
+    
+    /**
+     * @notice Set the number of required arbitrator approvals for high-value escrows
+     * @param _count Number of arbitrator approvals required
+     */
+    function setRequiredArbitratorApprovals(uint256 _count) external onlyAdmin {
+        require(_count > 0, "Count must be > 0");
+        require(address(arbitratorsRegistry) != address(0), "Registry not set");
+        
+        uint256 arbitratorCount = arbitratorsRegistry.arbitratorCount();
+        require(_count <= arbitratorCount, "Count exceeds available arbitrators");
+        
+        uint256 oldCount = requiredArbitratorApprovals;
+        requiredArbitratorApprovals = _count;
+        emit RequiredArbitratorApprovalsUpdated(oldCount, _count);
+    }
+    
+    /**
+     * @notice Check if an escrow requires arbitrator approval based on amount
+     * @param _invoiceId The invoice ID to check
+     * @return bool True if arbitrator approval is required
+     */
+    function requiresArbitratorApproval(bytes32 _invoiceId) public view returns (bool) {
+        Escrow storage escrow = escrows[_invoiceId];
+        return escrow.amount >= highValueThreshold;
+    }
+    
+    /**
+     * @notice Add arbitrator approval for high-value escrow release
+     * @param _invoiceId The invoice ID to approve
+     */
+    function addArbitratorApproval(bytes32 _invoiceId) external onlyArbitrator nonReentrant {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Not funded");
+        require(requiresArbitratorApproval(_invoiceId), "Not high-value escrow");
+        require(!arbitratorApprovals[_invoiceId][_msgSender()], "Already approved");
+        
+        arbitratorApprovals[_invoiceId][_msgSender()] = true;
+        arbitratorApprovalCount[_invoiceId]++;
+        
+        emit ArbitratorApprovalAdded(_invoiceId, _msgSender(), arbitratorApprovalCount[_invoiceId]);
+        
+        // Auto-release if all conditions met
+        if (escrow.sellerConfirmed && escrow.buyerConfirmed && 
+            arbitratorApprovalCount[_invoiceId] >= requiredArbitratorApprovals) {
+            _releaseFunds(_invoiceId);
+        }
     }
     
     /**
@@ -310,7 +378,15 @@ contract EscrowContract is
             escrow.buyerConfirmed = true;
         }
 
+        // Check if both parties confirmed
         if (escrow.sellerConfirmed && escrow.buyerConfirmed) {
+            // For high-value escrows, also check arbitrator approvals
+            if (requiresArbitratorApproval(_invoiceId)) {
+                require(
+                    arbitratorApprovalCount[_invoiceId] >= requiredArbitratorApprovals,
+                    "Insufficient arbitrator approvals"
+                );
+            }
             _releaseFunds(_invoiceId);
         }
     }
