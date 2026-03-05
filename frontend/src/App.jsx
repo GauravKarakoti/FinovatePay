@@ -5,6 +5,8 @@ import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Invoices from './pages/Invoices';
 import InvoiceDetails from './pages/InvoiceDetails';
 import DisputeDashboard from './pages/DisputeDashboard';
@@ -20,6 +22,7 @@ import './App.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
 import { setNavigateFunction } from './utils/api';
+import PermissionBanner from './components/Notifications/PermissionBanner';
 
 /* -------------------- Error Boundary Component -------------------- */
 class ErrorBoundary extends React.Component {
@@ -346,6 +349,18 @@ function App() {
                   user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
                 } 
               />
+              <Route 
+                path="/forgot-password" 
+                element={
+                  user ? <Navigate to="/" /> : <ForgotPassword />
+                } 
+              />
+              <Route 
+                path="/reset-password/:token" 
+                element={
+                  user ? <Navigate to="/" /> : <ResetPassword />
+                } 
+              />
             </Routes>
           </main>
 
@@ -367,6 +382,7 @@ function App() {
                   </svg>
                 ) : '💬'}
               </button>
+              <PermissionBanner />
             </>
           )}
         </div>
