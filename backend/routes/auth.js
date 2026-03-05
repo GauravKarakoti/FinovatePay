@@ -171,16 +171,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-// Logout - client-side token removal (localStorage)
-// Note: This app uses localStorage for token storage, not HttpOnly cookies
-// The frontend is responsible for removing the token from localStorage
-router.post('/logout', (req, res) => {
-  // Server-side logout logic can be added here if needed
-  // (e.g., token blacklisting, session invalidation)
-  res.json({ message: 'Logout successful' });
-});
-
-
 // Verify token validity
 router.get('/verify', authenticateToken, (req, res) => {
   res.json({ valid: true, user: sanitizeUser(req.user) });

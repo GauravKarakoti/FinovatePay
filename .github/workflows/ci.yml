@@ -30,6 +30,6 @@ jobs:
           NODE_ENV: test
           CI: true
       - name: Compile contracts
-        run: echo "Skipping contract compilation - to be fixed in separate PR"
+        run: npx hardhat compile
       - name: Test contracts
         run: echo "Skipping contract tests - to be fixed in separate PR"
