@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+    .email-wrapper { background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 28px; }
+    .content { padding: 30px; }
+    .content p { margin: 15px 0; }
+    .details { background-color: #f9f9f9; padding: 15px; border-left: 4px solid #764ba2; margin: 20px 0; }
+    .details-row { display: flex; justify-content: space-between; margin: 8px 0; }
+    .details-label { font-weight: bold; color: #666; }
+    .details-value { color: #333; }
+    .success-box { background-color: #e8f5e9; border-radius: 5px; padding: 20px; margin: 20px 0; text-align: center; border: 2px solid #4caf50; }
+    .success-value { font-size: 24px; font-weight: bold; color: #2e7d32; }
+    .info-box { background-color: #fff3e0; border-radius: 5px; padding: 15px; margin: 20px 0; border-left: 4px solid #ff9800; }
+    .button { display: inline-block; background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 20px; font-weight: bold; }
+    .button:hover { background-color: #764ba2; }
+    .footer { background-color: #f5f5f5; padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #ddd; }
+    .footer a { color: #667eea; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="email-wrapper">
+      <div class="header">
+        <h1>🎉 Auction Ended!</h1>
+      </div>
+      
+      <div class="content">
+        <p>Hi {{userName}},</p>
+        
+        {{#if isWinner}}
+        <div class="success-box">
+          <p style="margin: 0; color: #2e7d32; font-size: 18px;">🎊 Congratulations! You Won!</p>
+          <p class="success-value">Your bid was the highest!</p>
+        </div>
+        {{else}}
+        <p>Your invoice auction has ended on <strong>FinovatePay</strong>.</p>
+        {{/if}}
+        
+        <div class="details">
+          <div class="details-row">
+            <span class="details-label">Auction ID:</span>
+            <span class="details-value">{{auctionId}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Invoice Face Value:</span>
+            <span class="details-value">{{faceValue}} {{currency}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Winning Bid:</span>
+            <span class="details-value">{{winningBid}} {{currency}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Winner:</span>
+            <span class="details-value">{{winnerAddress}}</span>
+          </div>
+          <div class="details-row">
+            <span class="details-label">Total Bids:</span>
+            <span class="details-value">{{totalBids}}</span>
+          </div>
+        </div>
+        
+        {{#if isWinner}}
+        <div class="info-box">
+          <p style="margin: 0;"><strong>Next Step:</strong> The auction will be settled soon. You'll receive the invoice tokens once settlement is complete.</p>
+        </div>
+        {{else if isSeller}}
+        <div class="info-box">
+          <p style="margin: 0;"><strong>Next Step:</strong> Please settle the auction to transfer the invoice and receive payment.</p>
+        </div>
+        {{/if}}
+        
+        <a href="{{auctionUrl}}" class="button">View Auction Details</a>
+        
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+          {{#if isWinner}}
+          Thank you for participating in this auction!
+          {{else if isSeller}}
+          Thank you for using FinovatePay for your invoice financing needs.
+          {{else}}
+          Better luck next time! Check out other active auctions.
+          {{/if}}
+        </p>
+      </div>
+      
+      <div class="footer">
+        <p>&copy; 2026 {{companyName}}. All rights reserved.</p>
+        <p><a href="{{unsubscribeUrl}}">Unsubscribe from emails</a></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
