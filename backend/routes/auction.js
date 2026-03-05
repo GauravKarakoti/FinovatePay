@@ -4,6 +4,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const auctionService = require('../services/auctionService');
 const { emitToAuction } = require('../socket');
+const EmailService = require('../services/emailService');
+const { pool } = require('../config/database');
 
 /**
  * @swagger
@@ -310,6 +312,34 @@ router.post('/:auctionId/start', authenticateToken, requireKYC, async (req, res)
     
     // Update database
     await auctionService.getAuction(auctionId); // This would need an update function
+
+    // Send email notifications to investors about new auction
+    try {
+      // Fetch all investors
+      const investorsResult = await pool.query(
+        "SELECT id, email, wallet_address FROM users WHERE role = 'investor' AND kyc_status = 'verified'"
+      );
+
+      const auctionEndTime = new Date(auction.auction_end_time || Date.now() + 86400000);
+      const timeRemaining = getTimeRemaining(auctionEndTime);
+
+      // Send emails to all verified investors (async, don't wait)
+      investorsResult.rows.forEach(investor => {
+        EmailService.sendAuctionStartedEmail(investor.email, {
+          auctionId,
+          faceValue: auction.face_value,
+          minYieldBps: auction.min_yield_bps,
+          auctionEndTime: auctionEndTime.toLocaleString(),
+          timeRemaining,
+          paymentTokenSymbol: 'USDC'
+        }, investor.id).catch(err => {
+          console.error(`Failed to send auction started email to ${investor.email}:`, err.message);
+        });
+      });
+    } catch (emailError) {
+      console.error('Error sending auction started notifications:', emailError.message);
+      // Don't fail the request if email fails
+    }
     
     res.json({
       success: true,
@@ -392,6 +422,62 @@ router.post('/:auctionId/bid', authenticateToken, requireKYC, async (req, res) =
       txHash: chainResult.txHash
     });
 
+    // Send email notifications (async, don't wait)
+    const previousHighestBidder = auction.highest_bidder;
+    const previousHighestBid = auction.highest_bid;
+
+    // Send email to seller about new bid
+    try {
+      const sellerResult = await pool.query(
+        'SELECT id, email FROM users WHERE wallet_address = $1',
+        [auction.seller_address]
+      );
+      if (sellerResult.rows.length > 0) {
+        const seller = sellerResult.rows[0];
+        const bids = await auctionService.getAuctionBids(auctionId);
+        EmailService.sendBidPlacedEmail(seller.email, {
+          auctionId,
+          bidderAddress,
+          faceValue: auction.face_value,
+          bidAmount,
+          yieldBps,
+          highestBid: bidAmount,
+          auctionEndTime: new Date(auction.auction_end_time).toLocaleString(),
+          totalBids: bids.length + 1
+        }, seller.id).catch(err => {
+          console.error('Failed to send bid placed email to seller:', err.message);
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending bid placed email:', emailError.message);
+    }
+
+    // Send outbid notification to previous highest bidder
+    if (previousHighestBidder && previousHighestBidder !== bidderAddress) {
+      try {
+        const previousBidderResult = await pool.query(
+          'SELECT id, email FROM users WHERE wallet_address = $1',
+          [previousHighestBidder]
+        );
+        if (previousBidderResult.rows.length > 0) {
+          const previousBidder = previousBidderResult.rows[0];
+          const auctionEndTime = new Date(auction.auction_end_time);
+          EmailService.sendOutbidEmail(previousBidder.email, {
+            auctionId,
+            yourBid: previousHighestBid,
+            newHighestBid: bidAmount,
+            faceValue: auction.face_value,
+            timeRemaining: getTimeRemaining(auctionEndTime),
+            auctionEndTime: auctionEndTime.toLocaleString()
+          }, previousBidder.id).catch(err => {
+            console.error('Failed to send outbid email:', err.message);
+          });
+        }
+      } catch (emailError) {
+        console.error('Error sending outbid email:', emailError.message);
+      }
+    }
+
     // Emit socket event to all subscribers in the auction room
     const io = req.app.get('io');
     if (io) {
@@ -451,6 +537,53 @@ router.post('/:auctionId/end', authenticateToken, async (req, res) => {
     
     // Update database
     await auctionService.endAuction(auctionId);
+
+    // Send email notifications for auction ended
+    try {
+      const winner = chainResult.winner;
+      const winningBid = chainResult.winningBid;
+      const bids = await auctionService.getAuctionBids(auctionId);
+
+      // Send email to seller
+      const sellerResult = await pool.query(
+        'SELECT id, email FROM users WHERE wallet_address = $1',
+        [auction.seller_address]
+      );
+      if (sellerResult.rows.length > 0) {
+        const seller = sellerResult.rows[0];
+        EmailService.sendAuctionEndedEmail(seller.email, {
+          auctionId,
+          faceValue: auction.face_value,
+          winningBid,
+          winnerAddress: winner,
+          totalBids: bids.length
+        }, false, true, seller.id).catch(err => {
+          console.error('Failed to send auction ended email to seller:', err.message);
+        });
+      }
+
+      // Send email to winner
+      if (winner) {
+        const winnerResult = await pool.query(
+          'SELECT id, email FROM users WHERE wallet_address = $1',
+          [winner]
+        );
+        if (winnerResult.rows.length > 0) {
+          const winnerUser = winnerResult.rows[0];
+          EmailService.sendAuctionEndedEmail(winnerUser.email, {
+            auctionId,
+            faceValue: auction.face_value,
+            winningBid,
+            winnerAddress: winner,
+            totalBids: bids.length
+          }, true, false, winnerUser.id).catch(err => {
+            console.error('Failed to send auction ended email to winner:', err.message);
+          });
+        }
+      }
+    } catch (emailError) {
+      console.error('Error sending auction ended emails:', emailError.message);
+    }
 
     // Emit socket event to all subscribers in the auction room
     const io = req.app.get('io');
@@ -606,5 +739,29 @@ router.post('/:auctionId/cancel', authenticateToken, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+/**
+ * Helper function to calculate time remaining
+ */
+function getTimeRemaining(endTime) {
+  const now = new Date();
+  const diff = endTime - now;
+  
+  if (diff <= 0) {
+    return 'Ended';
+  }
+  
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
 
 module.exports = router;
