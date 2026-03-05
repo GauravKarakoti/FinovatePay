@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const auctionService = require('../services/auctionService');
+const { emitToAuction } = require('../socket');
 
 /**
  * @swagger
@@ -390,6 +391,19 @@ router.post('/:auctionId/bid', authenticateToken, requireKYC, async (req, res) =
       bidAmount,
       txHash: chainResult.txHash
     });
+
+    // Emit socket event to all subscribers in the auction room
+    const io = req.app.get('io');
+    if (io) {
+      emitToAuction(io, auctionId, 'auction:bid', {
+        auctionId,
+        bidderAddress,
+        yieldBps,
+        bidAmount,
+        txHash: chainResult.txHash,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     res.json({
       success: true,
@@ -437,6 +451,18 @@ router.post('/:auctionId/end', authenticateToken, async (req, res) => {
     
     // Update database
     await auctionService.endAuction(auctionId);
+
+    // Emit socket event to all subscribers in the auction room
+    const io = req.app.get('io');
+    if (io) {
+      emitToAuction(io, auctionId, 'auction:ended', {
+        auctionId,
+        winner: chainResult.winner,
+        winningBid: chainResult.winningBid,
+        txHash: chainResult.txHash,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     res.json({
       success: true,
@@ -496,6 +522,19 @@ router.post('/:auctionId/settle', authenticateToken, requireKYC, async (req, res
       platformFee: platformFee.toString(),
       txHash: chainResult.txHash
     });
+
+    // Emit socket event to all subscribers in the auction room
+    const io = req.app.get('io');
+    if (io) {
+      emitToAuction(io, auctionId, 'auction:settled', {
+        auctionId,
+        winner: chainResult.winner,
+        amount: chainResult.amount,
+        platformFee: chainResult.platformFee,
+        txHash: chainResult.txHash,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     res.json({
       success: true,
@@ -547,6 +586,16 @@ router.post('/:auctionId/cancel', authenticateToken, async (req, res) => {
     
     // Update database
     await auctionService.cancelAuction(auctionId);
+
+    // Emit socket event to all subscribers in the auction room
+    const io = req.app.get('io');
+    if (io) {
+      emitToAuction(io, auctionId, 'auction:cancelled', {
+        auctionId,
+        txHash: chainResult.txHash,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     res.json({
       success: true,

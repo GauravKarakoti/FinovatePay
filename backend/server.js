@@ -13,6 +13,7 @@ const {
   socketAuthMiddleware,
   verifyInvoiceAccess,
   verifyMarketplaceAccess,
+  verifyAuctionAccess,
 } = require("./middleware/socketAuth");
 const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
@@ -203,6 +204,38 @@ io.on("connection", (socket) => {
       socket.emit("error", {
         message: "Failed to join marketplace",
         code: "JOIN_MARKETPLACE_ERROR",
+      });
+    }
+  });
+
+  socket.on("join-auction", async (auctionId) => {
+    try {
+      const isAuthorized = await verifyAuctionAccess(
+        socket.user.id,
+        socket.user.role,
+        socket.user.wallet_address,
+        auctionId
+      );
+
+      if (!isAuthorized) {
+        socket.emit("error", {
+          message: "Not authorized to access this auction",
+          code: "UNAUTHORIZED_AUCTION_ACCESS",
+        });
+        return;
+      }
+
+      socket.join(`auction-${auctionId}`);
+      socket.emit("joined-auction", { auctionId, success: true });
+
+      console.log(
+        `User ${socket.user.id} joined auction room ${auctionId}`
+      );
+    } catch (err) {
+      console.error("join-auction error:", err);
+      socket.emit("error", {
+        message: "Failed to join auction room",
+        code: "JOIN_AUCTION_ERROR",
       });
     }
   });
