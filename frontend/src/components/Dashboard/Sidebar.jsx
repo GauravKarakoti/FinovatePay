@@ -71,6 +71,9 @@ const tabs = [
     tabs.push({ id: 'auctions', label: 'Auctions', icon: '🏷️' });
   }
 
+  // Add Governance tab for all roles (as it's important for protocol)
+  tabs.push({ id: 'governance', label: 'Governance', icon: '🏛️' });
+
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
   }

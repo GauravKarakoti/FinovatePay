@@ -7,12 +7,27 @@ const path = require("path");
 const socketIo = require("socket.io");
 require("dotenv").config();
 
+// Validate critical environment variables
+if (!process.env.FRONTEND_URL) {
+  console.error("FATAL ERROR: FRONTEND_URL is not defined in environment variables.");
+  process.exit(1);
+}
+
+if (!process.env.ALLOWED_ORIGINS) {
+  console.error("FATAL ERROR: ALLOWED_ORIGINS is not defined in environment variables.");
+  process.exit(1);
+}
+// CRITICAL: Validate environment variables before starting application
+const { validateAndExit } = require("./utils/envValidator");
+validateAndExit();
+
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
 const {
   socketAuthMiddleware,
   verifyInvoiceAccess,
   verifyMarketplaceAccess,
+  verifyAuctionAccess,
 } = require("./middleware/socketAuth");
 const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
@@ -48,6 +63,10 @@ const io = socketIo(server, {
 });
 
 /* ---------------- CORS CONFIG ---------------- */
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS.split(",").map((o) =>
+  o.trim().replace(/\/$/, "")
+);
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -115,6 +134,10 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/financing", require("./routes/financing"));
 app.use("/api/investor", require("./routes/investor"));
 
+/* ---------------- CROSS-CHAIN FRACTIONALIZATION ---------------- */
+
+app.use("/api/crosschain", require("./routes/crossChain"));
+
 /* ---------------- AUCTIONS ---------------- */
 
 app.use("/api/auctions", require("./routes/auction"));
@@ -135,9 +158,17 @@ app.use('/api/currencies', require('./routes/currency'));
 
 app.use('/api/credit-scores', require('./routes/creditScore'));
 
+/* ---------------- REVOLVING CREDIT LINE ---------------- */
+
+app.use('/api/credit-line', require('./routes/creditLine'));
+
 /* ---------------- INSURANCE ---------------- */
 
 app.use('/api/insurance', require('./routes/insurance'));
+
+/* ---------------- GOVERNANCE ---------------- */
+
+app.use('/api/governance', require('./routes/governance'));
 
 /* ---------------- FIAT ON-RAMP ---------------- */
 
@@ -205,6 +236,38 @@ io.on("connection", (socket) => {
       socket.emit("error", {
         message: "Failed to join marketplace",
         code: "JOIN_MARKETPLACE_ERROR",
+      });
+    }
+  });
+
+  socket.on("join-auction", async (auctionId) => {
+    try {
+      const isAuthorized = await verifyAuctionAccess(
+        socket.user.id,
+        socket.user.role,
+        socket.user.wallet_address,
+        auctionId
+      );
+
+      if (!isAuthorized) {
+        socket.emit("error", {
+          message: "Not authorized to access this auction",
+          code: "UNAUTHORIZED_AUCTION_ACCESS",
+        });
+        return;
+      }
+
+      socket.join(`auction-${auctionId}`);
+      socket.emit("joined-auction", { auctionId, success: true });
+
+      console.log(
+        `User ${socket.user.id} joined auction room ${auctionId}`
+      );
+    } catch (err) {
+      console.error("join-auction error:", err);
+      socket.emit("error", {
+        message: "Failed to join auction room",
+        code: "JOIN_AUCTION_ERROR",
       });
     }
   });
