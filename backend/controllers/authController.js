@@ -56,7 +56,7 @@ exports.register = async (req, res) => {
       maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
     });
 
-    res.json({ user: sanitizeUser(newUser.rows[0]), token });
+    res.json({ user: sanitizeUser(newUser.rows[0]) });
   } catch (err) {
     console.error('❌ Registration Error:', err.message);
     return errorResponse(res, 'Server error during registration', 500);
@@ -91,7 +91,7 @@ exports.login = async (req, res) => {
       maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
     });
 
-    res.json({ user: sanitizeUser(user.rows[0]), token });
+    res.json({ user: sanitizeUser(user.rows[0]) });
   } catch (err) {
     console.error('❌ Login Error:', err.message);
     return errorResponse(res, 'Server error', 500);

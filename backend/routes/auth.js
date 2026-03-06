@@ -218,8 +218,7 @@ router.post('/register', authLimiter, validateRegister, async (req, res) => {
 
     res.status(201).json({
       message: 'User created successfully',
-      user: sanitizeUser(newUser.rows[0]),
-      token
+      user: sanitizeUser(newUser.rows[0])
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -296,13 +295,26 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
       ...clientInfo
     });
 
-    // Return user data with tokens
+    // Set HttpOnly cookies for tokens
+    res.cookie('token', tokens.accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Return user data (excluding tokens)
     res.json({
       success: true,
       message: 'Login successful',
-      user: sanitizeUser(user),
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken
+      user: sanitizeUser(user)
     });
   } catch (error) {
     console.error('Login error:', error);
