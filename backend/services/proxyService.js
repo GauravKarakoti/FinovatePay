@@ -1,52 +1,37 @@
 /**
  * Proxy Service - Handles upgradeable proxy contract operations
  * @author FinovatePay Team
- * @description Manages UUPS proxy deployments, upgrades, and tracking
+ * @description Manages UUPS proxy deployments, upgrades, and tracking via standard OpenZeppelin patterns
  */
 
 const { ethers } = require('ethers');
+const fs = require('fs');
+const path = require('path');
 const { pool } = require('../config/database');
 const { getSigner, contractAddresses } = require('../config/blockchain');
 const errorResponse = require('../utils/errorResponse');
 
-// ABI fragments needed for proxy operations
-const ERC1967_PROXY_ABI = [
-  'function implementation() view returns (address)',
+// Standard UUPS Upgradeable ABI for proxy interaction
+const UUPS_ABI = [
   'function upgradeToAndCall(address newImplementation, bytes data) payable',
   'function upgradeTo(address newImplementation)'
 ];
 
-const PROXY_DEPLOYER_ABI = [
-  'function deployProxy(address _implementation, string _contractName, address _admin, uint256 _version, bytes _data) returns (address)',
-  'function upgradeProxy(address _proxyAddress, address _newImplementation, uint256 _newVersion, string _reason)',
-  'function getProxyInfo(string _contractName) view returns (tuple(address proxyAddress, address implementationAddress, string contractName, uint256 version, address admin, bool isActive, uint256 deployedAt))',
-  'function getLatestProxy(string _contractName) view returns (address)',
-  'function getUpgradeHistory(address _proxyAddress) view returns (tuple(address proxyAddress, address oldImplementation, address newImplementation, uint256 newVersion, address upgradedBy, uint256 upgradedAt, string reason)[])'
-];
+// EIP-1967 implementation storage slot: bytes32(uint256(keccak256('eip1967.proxy.implementation')) - 1)
+const IMPLEMENTATION_SLOT = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
 
 /**
- * Get the ProxyDeployer contract instance
- */
-const getProxyDeployerContract = (signer) => {
-  const address = contractAddresses.proxyDeployer;
-  if (!address) {
-    throw new Error('ProxyDeployer address not configured');
-  }
-  return new ethers.Contract(address, PROXY_DEPLOYER_ABI, signer || getSigner());
-};
-
-/**
- * Get a generic proxy contract instance
+ * Get a generic proxy contract instance using the UUPS interface
  */
 const getProxyContract = (proxyAddress, signer) => {
-  return new ethers.Contract(proxyAddress, ERC1967_PROXY_ABI, signer || getSigner());
+  return new ethers.Contract(proxyAddress, UUPS_ABI, signer || getSigner());
 };
 
 /**
- * Deploy a new proxy contract
+ * Deploy a new proxy contract (ERC1967Proxy)
  * @param {string} contractName - Name of the contract (e.g., 'EscrowContractV2')
  * @param {string} implementationAddress - Address of the implementation contract
- * @param {string} adminAddress - Address that will be admin of the proxy
+ * @param {string} adminAddress - Address that will be admin of the proxy (Not used directly in UUPS, kept for DB tracking)
  * @param {number} version - Initial version number
  * @param {object} initData - Initialization data for the proxy (encoded function call)
  * @param {string} deployerAddress - Address of the deployer
@@ -57,37 +42,27 @@ const deployProxy = async (contractName, implementationAddress, adminAddress, ve
   
   try {
     const signer = getSigner();
-    const proxyDeployer = getProxyDeployerContract(signer);
     
-    // Deploy the proxy
-    const tx = await proxyDeployer.deployProxy(
+    // Load the standard OpenZeppelin ERC1967Proxy artifact deployed during setup
+    const artifactPath = path.join(__dirname, '../../deployed/ERC1967Proxy.json');
+    if (!fs.existsSync(artifactPath)) {
+      throw new Error("ERC1967Proxy artifact not found. Make sure you ran the deployment script first.");
+    }
+    const artifact = JSON.parse(fs.readFileSync(artifactPath, 'utf8'));
+    
+    // Create Contract Factory to deploy the Proxy
+    const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, signer);
+    
+    // Deploy the proxy pointing to the implementation address
+    const proxy = await factory.deploy(
       implementationAddress,
-      contractName,
-      adminAddress,
-      version,
       initData || '0x'
     );
     
-    const receipt = await tx.wait();
+    await proxy.waitForDeployment();
+    const receipt = await proxy.deploymentTransaction().wait();
     
-    // Find the proxy address from the logs
-    const proxyDeployedEvent = receipt.logs.find(log => {
-      try {
-        const parsed = proxyDeployer.interface.parseLog(log);
-        return parsed?.name === 'ProxyDeployed';
-      } catch {
-        return false;
-      }
-    });
-    
-    let proxyAddress;
-    if (proxyDeployedEvent) {
-      const parsed = proxyDeployer.interface.parseLog(proxyDeployedEvent);
-      proxyAddress = parsed.args.proxyAddress;
-    } else {
-      // Fallback: get the proxy address from the contract
-      proxyAddress = await proxyDeployer.getLatestProxy(contractName);
-    }
+    const proxyAddress = proxy.target;
     
     // Store in database
     await client.query('BEGIN');
@@ -102,7 +77,7 @@ const deployProxy = async (contractName, implementationAddress, adminAddress, ve
         version = $6,
         is_active = true,
         updated_at = CURRENT_TIMESTAMP`,
-      [contractName, proxyAddress, implementationAddress, deployerAddress, adminAddress, version, true, JSON.stringify({ deploymentTx: tx.hash })]
+      [contractName, proxyAddress, implementationAddress, deployerAddress, adminAddress, version, true, JSON.stringify({ deploymentTx: receipt.hash })]
     );
     
     await client.query('COMMIT');
@@ -113,7 +88,7 @@ const deployProxy = async (contractName, implementationAddress, adminAddress, ve
       proxyAddress,
       implementationAddress,
       version,
-      txHash: tx.hash,
+      txHash: receipt.hash,
       blockNumber: receipt.blockNumber
     };
   } catch (error) {
@@ -126,23 +101,21 @@ const deployProxy = async (contractName, implementationAddress, adminAddress, ve
 };
 
 /**
- * Upgrade an existing proxy to a new implementation
+ * Upgrade an existing proxy to a new implementation using UUPS upgradeToAndCall
  * @param {string} proxyAddress - Address of the proxy to upgrade
  * @param {string} newImplementationAddress - Address of the new implementation
  * @param {number} newVersion - New version number
  * @param {string} reason - Reason for the upgrade
- * @param {string} upgradeTxHash - Transaction hash of the upgrade (optional, for tracking)
  * @returns {object} - Upgrade result
  */
-const upgradeProxy = async (proxyAddress, newImplementationAddress, newVersion, reason, upgradeTxHash = null) => {
+const upgradeProxy = async (proxyAddress, newImplementationAddress, newVersion, reason) => {
   const client = await pool.connect();
   
   try {
     const signer = getSigner();
-    const proxyDeployer = getProxyDeployerContract(signer);
     
-    // Get current implementation before upgrade
-    const oldImplementation = await proxyDeployer.getImplementation(proxyAddress);
+    // Get current implementation before upgrade by reading the storage slot
+    const oldImplementation = await getCurrentImplementation(proxyAddress);
     
     // Get contract name from database
     const contractResult = await client.query(
@@ -157,14 +130,9 @@ const upgradeProxy = async (proxyAddress, newImplementationAddress, newVersion, 
     const contractName = contractResult.rows[0].contract_name;
     const previousVersion = contractResult.rows[0].version;
     
-    // Perform the upgrade
-    const tx = await proxyDeployer.upgradeProxy(
-      proxyAddress,
-      newImplementationAddress,
-      newVersion,
-      reason
-    );
-    
+    // Perform the upgrade directly on the Proxy (UUPS pattern)
+    const proxyContract = getProxyContract(proxyAddress, signer);
+    const tx = await proxyContract.upgradeToAndCall(newImplementationAddress, "0x");
     const receipt = await tx.wait();
     
     // Store upgrade in database
@@ -283,14 +251,23 @@ const getUpgradeHistory = async (proxyAddress) => {
 };
 
 /**
- * Get current implementation address from blockchain
+ * Get current implementation address from blockchain directly via the EIP-1967 storage slot
  * @param {string} proxyAddress - Address of the proxy
  * @returns {string} - Current implementation address
  */
 const getCurrentImplementation = async (proxyAddress) => {
   try {
-    const proxy = getProxyContract(proxyAddress);
-    return await proxy.implementation();
+    const provider = getSigner().provider;
+    // Read the specific EIP-1967 storage slot for the proxy's implementation
+    const storageValue = await provider.getStorage(proxyAddress, IMPLEMENTATION_SLOT);
+    
+    // If empty slot, return the Zero Address
+    if (storageValue === '0x' || storageValue === '0x0') {
+      return ethers.ZeroAddress;
+    }
+    
+    // Parse the 20-byte address from the 32-byte storage slot
+    return ethers.getAddress("0x" + storageValue.slice(-40));
   } catch (error) {
     console.error('Error getting current implementation:', error);
     throw error;
@@ -334,7 +311,7 @@ const verifyProxyIntegrity = async (contractName) => {
 };
 
 /**
- * Pause a proxy (deactivate)
+ * Pause a proxy (deactivate) in the database
  * @param {string} contractName - Name of the contract
  * @returns {object} - Result
  */
@@ -373,7 +350,7 @@ const pauseProxy = async (contractName) => {
 };
 
 /**
- * Unpause a proxy (reactivate)
+ * Unpause a proxy (reactivate) in the database
  * @param {string} contractName - Name of the contract
  * @returns {object} - Result
  */
@@ -443,7 +420,5 @@ module.exports = {
   pauseProxy,
   unpauseProxy,
   getProxyStats,
-  getProxyDeployerContract,
   getProxyContract
 };
-

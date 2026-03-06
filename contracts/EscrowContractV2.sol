@@ -3,19 +3,17 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC721/utils/SafeERC721.sol";
-import "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "./ComplianceManager.sol";
 import "./ArbitratorsRegistry.sol";
 import "./EscrowYieldPool.sol";
@@ -31,13 +29,12 @@ contract EscrowContractV2 is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
-    ReentrancyGuardUpgradeable,
+    ReentrancyGuard,
     PausableUpgradeable,
-    ERC2771Context,
+    ERC2771ContextUpgradeable,
     IERC721Receiver,
-    EIP712
+    EIP712Upgradeable
 {
-
     using ECDSA for bytes32;
     using SafeERC20 for IERC20;
 
@@ -185,28 +182,19 @@ contract EscrowContractV2 is
         _;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            INITIALIZER
-    //////////////////////////////////////////////////////////////*/
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor(address _trustedForwarder) ERC2771ContextUpgradeable(_trustedForwarder) {
+        _disableInitializers();
+    }
     
-    /**
-     * @notice Initialize the upgradeable EscrowContractV2
-     * @param _trustedForwarder ERC2771 trusted forwarder address
-     * @param _complianceManager ComplianceManager contract address
-     * @param _arbitratorsRegistry ArbitratorsRegistry contract address
-     * @param _initialAdmin Initial admin address
-     */
     function initialize(
         address _trustedForwarder,
         address _complianceManager,
         address _arbitratorsRegistry,
         address _initialAdmin
     ) external initializer {
-        __UUPSUpgradeable_init();
         __Ownable_init(_initialAdmin);
-        __ReentrancyGuard_init();
         __Pausable_init();
-        __ERC2771Context_init(_trustedForwarder);
         __EIP712_init("EscrowContractV2", "1");
         
         admin = _initialAdmin;
@@ -320,14 +308,11 @@ contract EscrowContractV2 is
         }
     }
 
-    /*//////////////////////////////////////////////////////////////
-                    MULTI-SIG FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
     function setMultiSigWallet(address _multiSigWallet) external onlyAdmin {
         require(_multiSigWallet != address(0), "Invalid wallet address");
         address oldWallet = address(multiSigWallet);
-        multiSigWallet = MultiSigWallet(_multiSigWallet);
+        // FIX: Cast address to payable before casting to the contract type
+        multiSigWallet = MultiSigWallet(payable(_multiSigWallet));
         emit MultiSigWalletSet(oldWallet, _multiSigWallet);
     }
 
@@ -606,28 +591,28 @@ contract EscrowContractV2 is
     function _msgSender()
         internal
         view
-        override(ERC2771Context, Context)
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
         returns (address)
     {
-        return ERC2771Context._msgSender();
+        return ERC2771ContextUpgradeable._msgSender();
     }
 
     function _msgData()
         internal
         view
-        override(ERC2771Context, Context)
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
         returns (bytes calldata)
     {
-        return ERC2771Context._msgData();
+        return ERC2771ContextUpgradeable._msgData();
     }
 
     function _contextSuffixLength()
         internal
         view
-        override(ERC2771Context, Context)
+        override(ERC2771ContextUpgradeable, ContextUpgradeable)
         returns (uint256)
     {
-        return ERC2771Context._contextSuffixLength();
+        return ERC2771ContextUpgradeable._contextSuffixLength();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -914,4 +899,3 @@ contract EscrowContractV2 is
         return version;
     }
 }
-
