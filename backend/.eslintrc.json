@@ -1,0 +1,28 @@
+{
+  "env": {
+    "node": true,
+    "es2021": true,
+    "jest": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module"
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "tests/kycController.test.js",
+    "controllers/authController.js"
+  ],
+  "rules": {
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "no-console": "off",
+    "no-undef": "warn",
+    "indent": "off",
+    "quotes": "off",
+    "semi": "off",
+    "no-dupe-class-members": "warn",
+    "no-useless-catch": "warn",
+    "no-unreachable": "warn"
+  }
+}

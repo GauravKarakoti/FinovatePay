@@ -17,8 +17,13 @@ const dbConfig = {
     ? parseInt(process.env.DB_PORT)
     : 5432,
 
-  // Enable SSL
-  ssl: { rejectUnauthorized: false },
+  // Enable SSL with proper certificate validation in production
+  ssl: isProduction
+    ? {
+        rejectUnauthorized: true,
+        ca: process.env.DB_CA_CERT ? [process.env.DB_CA_CERT] : undefined,
+      }
+    : { rejectUnauthorized: false }, // Only allow in development
 
   // Pool configuration (valid pg options only)
   max: process.env.DB_POOL_MAX
