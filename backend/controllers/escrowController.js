@@ -26,6 +26,8 @@ const uuidToBytes32 = (uuid) => {
 exports.releaseEscrow = async (req, res) => {
   const client = await pool.connect();
   let correlationId = null;
+  let stepsCompleted = []; // Track actual progress for recovery
+  let txHash = null; // Track tx hash if blockchain tx succeeds
 
   try {
     const { invoiceId } = req.body;
@@ -86,6 +88,10 @@ exports.releaseEscrow = async (req, res) => {
     const tx = await escrowContract.confirmRelease(bytes32InvoiceId);
     await tx.wait();
 
+    // Mark blockchain step as completed only after successful tx
+    stepsCompleted = ['BLOCKCHAIN_TX'];
+    txHash = tx.hash;
+
     await updateTransactionState(correlationId, 'PROCESSING', {
       stepsCompleted: ['BLOCKCHAIN_TX'],
       stepsRemaining: ['DB_UPDATE', 'AUDIT_LOG'],
@@ -102,6 +108,9 @@ exports.releaseEscrow = async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // Mark DB update step as completed after successful commit
+    stepsCompleted = ['BLOCKCHAIN_TX', 'DB_UPDATE'];
 
     await updateTransactionState(correlationId, 'PROCESSING', {
       stepsCompleted: ['BLOCKCHAIN_TX', 'DB_UPDATE'],
@@ -159,8 +168,8 @@ exports.releaseEscrow = async (req, res) => {
         {
           operationType: 'ESCROW_RELEASE',
           invoiceId: req.body.invoiceId,
-          txHash: error.txHash || null,
-          stepsCompleted: ['BLOCKCHAIN_TX'],
+          txHash: txHash, // Use tracked txHash (null if tx never happened)
+          stepsCompleted: stepsCompleted, // Use actual progress, not hardcoded
         },
         0,
         error.message

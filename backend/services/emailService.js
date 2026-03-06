@@ -305,6 +305,131 @@ class EmailService {
       return { successful: 0, failed: 0, total: 0 };
     }
   }
+
+  // =====================================================
+  // AUCTION EMAIL METHODS
+  // =====================================================
+
+  /**
+   * Send auction started notification to potential bidders (investors)
+   * @param {string} recipientEmail - Recipient email
+   * @param {object} auctionData - Auction details
+   * @param {integer} userId - User ID
+   */
+  static async sendAuctionStartedEmail(recipientEmail, auctionData, userId = null) {
+    try {
+      const variables = {
+        userName: auctionData.userName || 'Investor',
+        auctionId: auctionData.auctionId,
+        faceValue: auctionData.faceValue,
+        currency: auctionData.currency || 'USDC',
+        minYieldBps: auctionData.minYieldBps,
+        auctionEndTime: auctionData.auctionEndTime,
+        paymentTokenSymbol: auctionData.paymentTokenSymbol || 'USDC',
+        timeRemaining: auctionData.timeRemaining || 'Limited Time',
+        auctionUrl: `${process.env.FRONTEND_URL}/auctions/${auctionData.auctionId}`,
+        companyName: process.env.COMPANY_NAME || 'FinovatePay',
+        unsubscribeUrl: `${process.env.FRONTEND_URL}/settings/notifications`
+      };
+
+      return await this.sendFromTemplate(recipientEmail, 'auction-started', variables, userId);
+    } catch (error) {
+      console.error('Error sending auction started email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send bid placed notification to seller
+   * @param {string} recipientEmail - Recipient email
+   * @param {object} bidData - Bid details
+   * @param {integer} userId - User ID
+   */
+  static async sendBidPlacedEmail(recipientEmail, bidData, userId = null) {
+    try {
+      const variables = {
+        sellerName: bidData.sellerName || 'Seller',
+        auctionId: bidData.auctionId,
+        bidderAddress: bidData.bidderAddress,
+        faceValue: bidData.faceValue,
+        currency: bidData.currency || 'USDC',
+        bidAmount: bidData.bidAmount,
+        yieldBps: bidData.yieldBps,
+        highestBid: bidData.highestBid || bidData.bidAmount,
+        auctionEndTime: bidData.auctionEndTime,
+        totalBids: bidData.totalBids || 1,
+        auctionUrl: `${process.env.FRONTEND_URL}/auctions/${bidData.auctionId}`,
+        companyName: process.env.COMPANY_NAME || 'FinovatePay',
+        unsubscribeUrl: `${process.env.FRONTEND_URL}/settings/notifications`
+      };
+
+      return await this.sendFromTemplate(recipientEmail, 'bid-placed', variables, userId);
+    } catch (error) {
+      console.error('Error sending bid placed email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send auction ended notification to winner and seller
+   * @param {string} recipientEmail - Recipient email
+   * @param {object} auctionData - Auction details
+   * @param {boolean} isWinner - Whether recipient is the winner
+   * @param {boolean} isSeller - Whether recipient is the seller
+   * @param {integer} userId - User ID
+   */
+  static async sendAuctionEndedEmail(recipientEmail, auctionData, isWinner = false, isSeller = false, userId = null) {
+    try {
+      const variables = {
+        userName: auctionData.userName || 'User',
+        auctionId: auctionData.auctionId,
+        faceValue: auctionData.faceValue,
+        currency: auctionData.currency || 'USDC',
+        winningBid: auctionData.winningBid,
+        winnerAddress: auctionData.winnerAddress,
+        totalBids: auctionData.totalBids || 0,
+        isWinner: isWinner,
+        isSeller: isSeller,
+        auctionUrl: `${process.env.FRONTEND_URL}/auctions/${auctionData.auctionId}`,
+        companyName: process.env.COMPANY_NAME || 'FinovatePay',
+        unsubscribeUrl: `${process.env.FRONTEND_URL}/settings/notifications`
+      };
+
+      return await this.sendFromTemplate(recipientEmail, 'auction-ended', variables, userId);
+    } catch (error) {
+      console.error('Error sending auction ended email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send outbid notification to previous highest bidder
+   * @param {string} recipientEmail - Recipient email
+   * @param {object} outbidData - Outbid details
+   * @param {integer} userId - User ID
+   */
+  static async sendOutbidEmail(recipientEmail, outbidData, userId = null) {
+    try {
+      const variables = {
+        userName: outbidData.userName || 'Bidder',
+        auctionId: outbidData.auctionId,
+        yourBid: outbidData.yourBid,
+        newHighestBid: outbidData.newHighestBid,
+        faceValue: outbidData.faceValue,
+        currency: outbidData.currency || 'USDC',
+        timeRemaining: outbidData.timeRemaining || 'Limited Time',
+        auctionEndTime: outbidData.auctionEndTime,
+        auctionUrl: `${process.env.FRONTEND_URL}/auctions/${outbidData.auctionId}`,
+        companyName: process.env.COMPANY_NAME || 'FinovatePay',
+        unsubscribeUrl: `${process.env.FRONTEND_URL}/settings/notifications`
+      };
+
+      return await this.sendFromTemplate(recipientEmail, 'outbid-notification', variables, userId);
+    } catch (error) {
+      console.error('Error sending outbid email:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = EmailService;
