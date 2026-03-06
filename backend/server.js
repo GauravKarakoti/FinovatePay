@@ -5,21 +5,12 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
+const logger = require("./utils/logger")("server");
+const crypto = require("crypto");
 require("dotenv").config();
 
-// Validate critical environment variables
-if (!process.env.FRONTEND_URL) {
-  console.error("FATAL ERROR: FRONTEND_URL is not defined in environment variables.");
-  process.exit(1);
-}
-
-if (!process.env.ALLOWED_ORIGINS) {
-  console.error("FATAL ERROR: ALLOWED_ORIGINS is not defined in environment variables.");
-  process.exit(1);
-}
-// CRITICAL: Validate environment variables before starting application
-const { validateAndExit } = require("./utils/envValidator");
-validateAndExit();
+// Initialize secrets provider early
+const { getSecretsProvider } = require("./services/secrets");
 
 // Import API versioning middleware
 const { apiVersionMiddleware, deprecationMiddleware } = require("./middleware/apiVersion");
@@ -36,12 +27,13 @@ const {
 const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
+const { whitelabelMiddleware } = require("./middleware/whitelabel");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
 const testDbConnection = require("./utils/testDbConnection");
 const { startSyncWorker } = require("./services/escrowSyncService");
-const { startScheduledReconciliation } = require("./services/reconciliationService");
+const { blockchainQueue } = require("./queues/blockchainQueue");
 
 const app = express();
 const server = http.createServer(app);
@@ -51,18 +43,22 @@ const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
 
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
+// Parse allowed origins for consistent CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) =>
+      o.trim().replace(/\/$/, "")
+    )
+  : ["http://localhost:5173"];
+
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL,
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
 /* ---------------- CORS CONFIG ---------------- */
-
-const allowedOrigins = process.env.ALLOWED_ORIGINS.split(",").map((o) =>
-  o.trim().replace(/\/$/, "")
-);
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -86,6 +82,11 @@ app.use(cors(corsOptions));
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
+
+/* ---------------- WHITELABEL MIDDLEWARE ---------------- */
+
+// Apply whitelabel configuration based on domain
+app.use(whitelabelMiddleware);
 
 /* ---------------- RATE LIMITING ---------------- */
 
@@ -121,17 +122,24 @@ app.use("/api/v1/escrow", require("./routes/escrow"));
 
 /* ---------------- ADMIN ---------------- */
 
-app.use("/api/v1/admin", require("./routes/admin"));
-app.use("/api/v1/kyc", kycLimiter, require("./routes/kyc"));
-app.use("/api/v1/produce", require("./routes/produce"));
-app.use("/api/v1/quotations", require("./routes/quotation"));
-app.use("/api/v1/market", require("./routes/market"));
-app.use("/api/v1/dispute", require("./routes/dispute"));
-app.use("/api/v1/relayer", relayerLimiter, require("./routes/relayer"));
-app.use("/api/v1/chatbot", chatbotRoutes);
-app.use("/api/v1/shipment", shipmentRoutes);
-app.use("/api/v1/meta-tx", require("./routes/metaTransaction"));
-app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/admin", require("./routes/admin"));
+app.use("/api/kyc", kycLimiter, require("./routes/kyc"));
+app.use("/api/produce", require("./routes/produce"));
+app.use("/api/quotations", require("./routes/quotation"));
+app.use("/api/market", require("./routes/market"));
+app.use("/api/dispute", require("./routes/dispute"));
+app.use("/api/relayer", relayerLimiter, require("./routes/relayer"));
+app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/shipment", shipmentRoutes);
+app.use("/api/meta-tx", require("./routes/metaTransaction"));
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/webhooks", require("./routes/webhooks"));
+app.use("/api/queue", require("./routes/queue"));
+app.use("/api/whitelabel", require("./routes/whitelabel"));
+
+/* ---------------- API KEYS ---------------- */
+
+app.use("/api/api-keys", require("./routes/apiKeys"));
 
 /* ---------------- V2 FINANCING ---------------- */
 
@@ -162,6 +170,10 @@ app.use('/api/v1/currencies', require('./routes/currency'));
 
 app.use('/api/v1/credit-scores', require('./routes/creditScore'));
 
+/* ---------------- CREDIT RISK (AI-POWERED) ---------------- */
+
+app.use('/api/credit-risk', require('./routes/creditRisk'));
+
 /* ---------------- REVOLVING CREDIT LINE ---------------- */
 
 app.use('/api/v1/credit-line', require('./routes/creditLine'));
@@ -187,7 +199,7 @@ app.use("/api/v1/fiat-ramp", require("./routes/fiatRamp"));
 io.use(socketAuthMiddleware);
 
 io.on("connection", (socket) => {
-  console.log(
+  logger.info(
     `User connected: ${socket.id} | User: ${socket.user?.id} | Role: ${socket.user?.role}`
   );
 
@@ -211,11 +223,11 @@ io.on("connection", (socket) => {
       socket.join(`invoice-${invoiceId}`);
       socket.emit("joined-invoice", { invoiceId, success: true });
 
-      console.log(
+      logger.info(
         `User ${socket.user.id} joined invoice room ${invoiceId}`
       );
     } catch (err) {
-      console.error("join-invoice error:", err);
+      logger.error("join-invoice error:", err);
       socket.emit("error", {
         message: "Failed to join invoice room",
         code: "JOIN_INVOICE_ERROR",
@@ -238,9 +250,9 @@ io.on("connection", (socket) => {
       socket.join("marketplace");
       socket.emit("joined-marketplace", { success: true });
 
-      console.log(`User ${socket.user.id} joined marketplace`);
+      logger.info(`User ${socket.user.id} joined marketplace`);
     } catch (err) {
-      console.error("join-marketplace error:", err);
+      logger.error("join-marketplace error:", err);
       socket.emit("error", {
         message: "Failed to join marketplace",
         code: "JOIN_MARKETPLACE_ERROR",
@@ -281,11 +293,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log(`User disconnected: ${socket.id}`);
+    logger.info(`User disconnected: ${socket.id}`);
   });
 
   socket.on("error", (err) => {
-    console.error(`Socket error (${socket.user?.id}):`, err);
+    logger.error(`Socket error (${socket.user?.id}):`, err);
   });
 });
 
@@ -308,13 +320,22 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
 
 // Set up graceful shutdown handlers
 setupGracefulShutdown(server, io);
 
 const { startRecoveryWorker } = require('./services/recoveryService');
+
+// Initialize Blockchain Transaction Queue
+try {
+  blockchainQueue.initialize(io);
+  blockchainQueue.startWorker();
+  console.log('[server] Blockchain transaction queue initialized');
+} catch (err) {
+  console.error('[server] Blockchain queue initialization failed:', err?.message || err);
+}
 
 listenForTokenization();
 startSyncWorker();
@@ -323,21 +344,37 @@ startRecoveryWorker(); // Start transaction recovery worker
 try {
   startComplianceListeners();
 } catch (err) {
-  console.error(
+  logger.error(
     "[server] Compliance listeners failed:",
     err?.message || err
   );
 }
 
-// Start scheduled reconciliation (every 6 hours)
-try {
-  startScheduledReconciliation();
-  console.log("[Server] Reconciliation scheduler started");
-} catch (err) {
-  console.error(
-    "[server] Reconciliation scheduler failed:",
-    err?.message || err
-  );
-}
+/* ---------------- GRACEFUL SHUTDOWN ---------------- */
+
+const gracefulShutdown = async () => {
+  console.log('[server] Starting graceful shutdown...');
+  
+  try {
+    await blockchainQueue.shutdown();
+    console.log('[server] Blockchain queue shutdown complete');
+  } catch (err) {
+    console.error('[server] Error during blockchain queue shutdown:', err);
+  }
+  
+  server.close(() => {
+    console.log('[server] HTTP server closed');
+    process.exit(0);
+  });
+  
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('[server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 module.exports = app;

@@ -259,8 +259,10 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                             onChange={(e) => setCryptoCurrency(e.target.value)}
                             className="block w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium bg-white"
                         >
-                            <option value="USDC">USDC</option>
-                            <option value="USDT">USDT</option>
+                            <option value="USDC">USDC - USD Coin</option>
+                            <option value="USDT">USDT - Tether</option>
+                            <option value="DAI">DAI - Dai Stablecoin</option>
+                            <option value="PYUSD">PYUSD - PayPal USD</option>
                         </select>
                     </div>
 

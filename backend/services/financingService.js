@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const logger = require('../utils/logger')('financingService');
 const katanaService = require('./katanaService');
 const waltBridgeService = require('./waltBridgeService');
 
@@ -10,7 +11,7 @@ const waltBridgeService = require('./waltBridgeService');
  * @param {number|string} amount - The amount to be financed.
  */
 async function financeInvoice(invoiceHash, tokenId, sellerAddress, amount) {
-    console.log(`[Financing Service] Starting financing for Invoice: ${invoiceHash} (Token ID: ${tokenId})`);
+    logger.info(`[Financing Service] Starting financing for Invoice: ${invoiceHash} (Token ID: ${tokenId})`);
 
     const client = await pool.connect();
 
@@ -41,7 +42,7 @@ async function financeInvoice(invoiceHash, tokenId, sellerAddress, amount) {
             throw new Error("Seller address missing for invoice.");
         }
 
-        console.log(`[Financing Service] Invoice validated. Seller: ${seller}, Amount: ${amount}`);
+        logger.info(`[Financing Service] Invoice validated. Seller: ${seller}, Amount: ${amount}`);
 
         // 2. Request Liquidity from Katana
         const liquidity = await katanaService.requestLiquidity(amount);
@@ -80,8 +81,8 @@ async function financeInvoice(invoiceHash, tokenId, sellerAddress, amount) {
             await client.query(fallbackQuery, [invoiceHash]);
         }
 
-        console.log(`[Financing Service] ✅ Invoice ${invoiceHash} successfully financed!`);
-        console.log(`[Financing Service] Seller paid: ${bridgeReceipt.amount} (Tx: ${bridgeReceipt.txHash})`);
+        logger.info(`[Financing Service] Successfully financed Invoice ${invoiceHash}!`);
+        logger.info(`[Financing Service] Seller paid: ${bridgeReceipt.amount} (Tx: ${bridgeReceipt.txHash})`);
 
         return {
             success: true,

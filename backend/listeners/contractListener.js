@@ -102,12 +102,14 @@ async function replayMissedEvents(contract, fromBlock, toBlock) {
         const [ invoiceId, tokenId, seller, totalFractions, pricePerFraction, totalValue, yieldBps ] = event.args;
 
         try {
+            // Calculate faceValue: totalFractions * pricePerFraction
+            const faceValue = totalFractions * pricePerFraction;
+            
             const success = await processTokenizedEvent(
                 invoiceId,
                 tokenId,
-                totalFractions, 
-                totalValue, 
-                yieldBps,
+                totalFractions, // totalSupply = totalFractions
+                faceValue,      // faceValue = totalFractions * pricePerFraction
                 event.blockNumber
             );
 
@@ -159,12 +161,14 @@ async function listenForTokenization() {
             "InvoiceFractionalized",
             async (invoiceId, tokenId, seller, totalFractions, pricePerFraction, totalValue, yieldBps, event) => {
                 try {
+                    // Calculate faceValue: totalFractions * pricePerFraction
+                    const faceValue = totalFractions * pricePerFraction;
+                    
                     await processTokenizedEvent(
                         invoiceId,
                         tokenId,
-                        totalFractions,
-                        totalValue,
-                        yieldBps,
+                        totalFractions, // totalSupply = totalFractions
+                        faceValue,      // faceValue = totalFractions * pricePerFraction
                         event.log.blockNumber
                     );
                 } catch (err) {
