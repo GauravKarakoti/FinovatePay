@@ -3,12 +3,12 @@ import { EthersAdapter } from '@reown/appkit-adapter-ethers';
 import { BrowserProvider, Contract } from 'ethers';
 
 // Import contract ABIs and addresses
-import EscrowContractArtifact from '../../../deployed/EscrowContract.json';
+import EscrowContractArtifact from '../../../deployed/EscrowContractV2.json';
 import InvoiceFactoryArtifact from '../../../deployed/InvoiceFactory.json';
 import ProduceTrackingArtifact from '../../../deployed/ProduceTracking.json';
 import FractionTokenArtifact from '../../../deployed/FractionToken.json';
 import contractAddresses from '../../../deployed/contract-addresses.json';
-import FinancingManagerArtifact from '../../../deployed/FinancingManager.json';
+import FinancingManagerArtifact from '../../../deployed/FinancingManagerV2.json';
 import ERC20Artifact from '../../../deployed/ERC20.json';
 
 // Stablecoin addresses on Polygon Amoy
@@ -208,12 +208,16 @@ export async function disconnectWallet() {
 // Contract helper functions
 export async function getEscrowContract() {
   const { signer } = await connectWallet();
-  return new Contract(contractAddresses.EscrowContract, EscrowContractArtifact.abi, signer);
+  // Support both V2 and legacy V1 addresses
+  const escrowAddress = contractAddresses.EscrowContractV2 || contractAddresses.EscrowContract;
+  return new Contract(escrowAddress, EscrowContractArtifact.abi, signer);
 }
 
 export async function getFinancingManagerContract() {
   const { signer } = await connectWallet();
-  return new Contract(contractAddresses.FinancingManager, FinancingManagerArtifact.abi, signer);
+  // Support both V2 and legacy V1 addresses
+  const financingAddress = contractAddresses.FinancingManagerV2 || contractAddresses.FinancingManager;
+  return new Contract(financingAddress, FinancingManagerArtifact.abi, signer);
 }
 
 export async function getInvoiceFactoryContract() {

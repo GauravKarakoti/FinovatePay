@@ -4,8 +4,8 @@ require("dotenv").config();
 // 1️⃣ Import ABIs and Deployed Addresses
 const FractionTokenABI = require("../../deployed/FractionToken.json").abi;
 const ComplianceManagerABI = require("../../deployed/ComplianceManager.json").abi;
-const FinancingManagerABI = require("../../deployed/FinancingManager.json").abi;
-const EscrowContractABI = require("../../deployed/EscrowContract.json").abi;
+const FinancingManagerABI = require("../../deployed/FinancingManagerV2.json").abi;
+const EscrowContractABI = require("../../deployed/EscrowContractV2.json").abi;
 const deployedAddresses = require("../../deployed/contract-addresses.json");
 
 // --------------------------------------------------
@@ -73,6 +73,7 @@ const contractAddresses = {
     process.env.INVOICE_FACTORY_ADDRESS,
 
   escrowContract:
+    deployedAddresses.EscrowContractV2 ||
     deployedAddresses.EscrowContract ||
     process.env.ESCROW_CONTRACT_ADDRESS,
 
@@ -89,8 +90,14 @@ const contractAddresses = {
     process.env.FRACTION_TOKEN_ADDRESS,
 
   financingManager:
+    deployedAddresses.FinancingManagerV2 ||
     deployedAddresses.FinancingManager ||
     process.env.FINANCING_MANAGER_ADDRESS,
+
+  // Proxy Admin for upgrades
+  proxyAdmin:
+    deployedAddresses.ProxyAdmin ||
+    process.env.PROXY_ADMIN_ADDRESS,
 
   // Multi-Sig Wallet
   multiSigWallet:
@@ -100,7 +107,7 @@ const contractAddresses = {
   // Governance Contracts
   governanceToken:
     deployedAddresses.FinovateToken ||
-    process.env.GOVERNANCE_TOKEN_ADDRESS,
+    process.env.GOVENNANCE_TOKEN_ADDRESS,
   governanceManager:
     deployedAddresses.GovernanceManager ||
     process.env.GOVERNANCE_MANAGER_ADDRESS,
