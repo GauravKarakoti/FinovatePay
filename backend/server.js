@@ -23,7 +23,7 @@ const {
 const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
-const { logClientIP } = require("./middleware/ipWhitelist");
+const { whitelabelMiddleware } = require("./middleware/whitelabel");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
@@ -79,20 +79,10 @@ app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
 
-/* ---------------- REQUEST ID MIDDLEWARE ---------------- */
+/* ---------------- WHITELABEL MIDDLEWARE ---------------- */
 
-// Add unique request ID to each request for tracking
-app.use((req, res, next) => {
-  const requestId = crypto.randomUUID();
-  req.requestId = requestId;
-  res.locals.requestId = requestId;
-  res.setHeader('X-Request-Id', requestId);
-  next();
-});
-
-/* ---------------- CLIENT IP LOGGING ---------------- */
-
-app.use(logClientIP());
+// Apply whitelabel configuration based on domain
+app.use(whitelabelMiddleware);
 
 /* ---------------- RATE LIMITING ---------------- */
 
@@ -133,6 +123,7 @@ app.use("/api/meta-tx", require("./routes/metaTransaction"));
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/webhooks", require("./routes/webhooks"));
 app.use("/api/queue", require("./routes/queue"));
+app.use("/api/whitelabel", require("./routes/whitelabel"));
 
 /* ---------------- API KEYS ---------------- */
 
@@ -346,33 +337,6 @@ try {
     err?.message || err
   );
 }
-
-/* ---------------- GRACEFUL SHUTDOWN ---------------- */
-
-const gracefulShutdown = async () => {
-  console.log('[server] Starting graceful shutdown...');
-  
-  try {
-    await blockchainQueue.shutdown();
-    console.log('[server] Blockchain queue shutdown complete');
-  } catch (err) {
-    console.error('[server] Error during blockchain queue shutdown:', err);
-  }
-  
-  server.close(() => {
-    console.log('[server] HTTP server closed');
-    process.exit(0);
-  });
-  
-  // Force close after 10 seconds
-  setTimeout(() => {
-    console.error('[server] Forced shutdown after timeout');
-    process.exit(1);
-  }, 10000);
-};
-
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
 
 /* ---------------- GRACEFUL SHUTDOWN ---------------- */
 
