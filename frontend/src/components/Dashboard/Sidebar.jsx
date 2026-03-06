@@ -76,6 +76,8 @@ const tabs = [
 
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
+    // Add Upgrade Manager for admin
+    tabs.push({ id: 'upgrade', label: 'Upgrade Manager', icon: '🔄' });
   }
 
   const visibleTabs = user?.role === 'investor' ? tabs.filter(tab => !['quotations', 'invoices', 'payments', 'produce', 'escrow'].includes(tab.id)) : tabs;
@@ -88,6 +90,10 @@ const tabs = [
     if (tabId === 'invoices') {
       navigate('/invoices');
       onTabChange('invoices');
+    } else if (tabId === 'upgrade') {
+      // Navigate to upgrade manager page
+      navigate('/admin/upgrade');
+      onTabChange('upgrade');
     } else {
       // Determine dashboard root based on role
       let dashboardPath = '/';

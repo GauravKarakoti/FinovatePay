@@ -176,6 +176,10 @@ app.use('/api/insurance', require('./routes/insurance'));
 
 app.use('/api/governance', require('./routes/governance'));
 
+/* ---------------- PROXY / UPGRADEABLE CONTRACTS ---------------- */
+
+app.use('/api/proxy', require('./routes/proxy'));
+
 /* ---------------- FIAT ON-RAMP ---------------- */
 
 app.use("/api/fiat-ramp", require("./routes/fiatRamp"));
