@@ -22,6 +22,7 @@ const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
 const testDbConnection = require("./utils/testDbConnection");
 const { startSyncWorker } = require("./services/escrowSyncService");
+const { blockchainQueue } = require("./queues/blockchainQueue");
 
 const app = express();
 const server = http.createServer(app);
@@ -95,6 +96,7 @@ app.use("/api/shipment", shipmentRoutes);
 app.use("/api/meta-tx", require("./routes/metaTransaction"));
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/webhooks", require("./routes/webhooks"));
+app.use("/api/queue", require("./routes/queue"));
 
 /* ---------------- V2 FINANCING ---------------- */
 
@@ -204,6 +206,15 @@ server.listen(PORT, () => {
 
 /* ---------------- BACKGROUND WORKERS ---------------- */
 
+// Initialize Blockchain Transaction Queue
+try {
+  blockchainQueue.initialize(io);
+  blockchainQueue.startWorker();
+  console.log('[server] Blockchain transaction queue initialized');
+} catch (err) {
+  console.error('[server] Blockchain queue initialization failed:', err?.message || err);
+}
+
 listenForTokenization();
 startSyncWorker();
 
@@ -215,5 +226,32 @@ try {
     err?.message || err
   );
 }
+
+/* ---------------- GRACEFUL SHUTDOWN ---------------- */
+
+const gracefulShutdown = async () => {
+  console.log('[server] Starting graceful shutdown...');
+  
+  try {
+    await blockchainQueue.shutdown();
+    console.log('[server] Blockchain queue shutdown complete');
+  } catch (err) {
+    console.error('[server] Error during blockchain queue shutdown:', err);
+  }
+  
+  server.close(() => {
+    console.log('[server] HTTP server closed');
+    process.exit(0);
+  });
+  
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('[server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 module.exports = app;
