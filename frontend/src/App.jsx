@@ -16,6 +16,7 @@ import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
 import PermissionBanner from './components/Notifications/PermissionBanner';
+import UpgradeManager from './components/Admin/UpgradeManager';
 import './App.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
@@ -340,6 +341,16 @@ function App() {
                 element={
                   user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
                 } 
+              />
+
+              {/* Upgrade Manager Route - Admin Only */}
+              <Route
+                path="/admin/upgrade"
+                element={
+                  <RequireAuth allowedRoles={['admin']}>
+                    {renderDashboard(<UpgradeManager />)}
+                  </RequireAuth>
+                }
               />
             </Routes>
           </main>
