@@ -6,8 +6,8 @@ const pool = new Pool({
   host: process.env.DB_HOST,
   database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
-  ssl: { rejectUnauthorized: false }
+  port: process.env.DB_PORT
+  // ssl: { rejectUnauthorized: false } // Disabled for local dev
 });
 
 // 1. Basic Table Schema (Create this if it doesn't exist)
@@ -41,7 +41,10 @@ const alterTableQuery = `
   ADD COLUMN IF NOT EXISTS release_tx_hash VARCHAR(255),
   ADD COLUMN IF NOT EXISTS shipment_proof_hash VARCHAR(255),
   ADD COLUMN IF NOT EXISTS dispute_reason TEXT,
-  ADD COLUMN IF NOT EXISTS escrow_tx_hash VARCHAR(255);
+  ADD COLUMN IF NOT EXISTS escrow_tx_hash VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS yield_bps INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS face_value NUMERIC(78, 0) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS maturity_date BIGINT DEFAULT 0;
 `;
 
 (async () => {
