@@ -94,6 +94,7 @@ app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/shipment", shipmentRoutes);
 app.use("/api/meta-tx", require("./routes/metaTransaction"));
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/webhooks", require("./routes/webhooks"));
 
 /* ---------------- V2 FINANCING ---------------- */
 
