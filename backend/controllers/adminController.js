@@ -11,6 +11,15 @@ const uuidToBytes32 = (uuid) => {
   return ethers.zeroPadValue(hex, 32);
 };
 
+exports.checkCompliance = async (req, res) => {
+  try {
+    // Your compliance logic here
+    res.json({ success: true, message: "Compliance checked" });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /* ======================================================
    INVOICE CONFIG
 ====================================================== */

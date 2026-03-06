@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
+import { parseUnits, keccak256, toUtf8Bytes, zeroPadValue } from '../utils/formatters';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
@@ -9,12 +10,13 @@ import {
   getKYCStatus,
   createInvoice,
   updateInvoiceStatus,
+  tokenizeInvoice,
   getQuotations,
   sellerApproveQuotation,
   rejectQuotation,
   raiseDispute
 } from '../utils/api';
-import { 
+import {
   connectWallet, getEscrowContract
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
@@ -32,10 +34,11 @@ import QuotationList from '../components/Dashboard/QuotationList';
 import CreateProduceLot from '../components/Produce/CreateProduceLot';
 import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
+import TokenizeInvoiceModal from '../components/Financing/TokenizeInvoiceModal';
 import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
 import AnalyticsPage from '../pages/AnalyticsPage';
-import GovernanceDashboard from '../pages/GovernanceDashboard';
+import AuctionList from '../components/Auction/AuctionList';
 
 // ------------------ HELPER COMPONENTS ------------------
 
@@ -220,7 +223,7 @@ const InvoiceDetailsModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 };
 
 // ------------------ UTILS ------------------
-const uuidToBytes32 = (uuid) => ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
+const uuidToBytes32 = (uuid) => zeroPadValue('0x' + uuid.replace(/-/g, ''), 32);
 
 // ------------------ MAIN COMPONENT ------------------
 
@@ -243,6 +246,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [confirmingShipment, setConfirmingShipment] = useState(null);
   const [proofFile, setProofFile] = useState(null);
   const [invoiceQuotation, setInvoiceQuotation] = useState(null); 
+  const [tokenizingInvoice, setTokenizingInvoice] = useState(null); // <-- NEW STATE
   const { setStats: setGlobalStats } = useStatsActions();
 
   // ------------------ DATA LOADERS ------------------
@@ -332,11 +336,11 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       const { address: sellerAddress } = await connectWallet();
       
       const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
-      const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
+      const invoiceHash = keccak256(toUtf8Bytes(dataToHash));
       const tokenAddress = NATIVE_CURRENCY_ADDRESS;
       
       const contract = await getEscrowContract();
-      const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
+      const amountInWei = parseUnits(quotation.total_amount.toString(), 18);
 
       const discountBps = Math.floor(parseFloat(discountRate || 0) * 100);
       const discountDeadlineTs = deadline ? Math.floor(new Date(deadline).getTime() / 1000) : 0;
@@ -354,7 +358,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         amountInWei,
         tokenAddress,
         86400 * 30, // Default duration
-        ethers.constants.AddressZero, // rwaNftContract
+        ethers.ZeroAddress, // rwaNftContract
         0, // rwaTokenId
         discountBps,
         discountDeadlineTs
@@ -446,6 +450,29 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       await loadInvoices();
     } catch (error) {
       toast.error('Failed to raise dispute');
+    }
+  }, [loadInvoices]);
+
+  const handleTokenizeSubmit = useCallback(async (invoiceId, { faceValue, maturityDate, yieldBps }) => {
+    setIsSubmitting(true);
+    const toastId = toast.loading('Tokenizing invoice...');
+    
+    try {
+      await tokenizeInvoice(
+        invoiceId,
+        faceValue,
+        maturityDate,
+        yieldBps // Passed as string/number, the API handles conversion on the backend
+      );
+
+      toast.success('Invoice tokenized successfully!', { id: toastId });
+      setTokenizingInvoice(null);
+      await loadInvoices();
+    } catch (error) {
+      console.error('Tokenization failed:', error);
+      toast.error(error.response?.data?.error || error.message || "Tokenization failed", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
     }
   }, [loadInvoices]);
 
@@ -603,9 +630,13 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     </div>
   );
 
-const FinancingTabComponent = () => (
+  const FinancingTabComponent = () => (
     <div className="space-y-6">
-      <FinancingTab invoices={invoices} userRole="seller" />
+      <FinancingTab 
+        invoices={invoices} 
+        userRole="seller" 
+        onTokenizeClick={(invoice) => setTokenizingInvoice(invoice)}
+      />
     </div>
   );
 
@@ -626,7 +657,8 @@ const FinancingTabComponent = () => (
       case 'escrow': return <EscrowTab />;
       case 'financing': return <FinancingTabComponent />;
       case 'streaming': return <StreamingTabComponent />;
-      case 'governance': return <GovernanceDashboard />;
+      case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
+      case 'auctions': return <AuctionList />;
       default: return <OverviewTab />;
     }
   };
@@ -701,6 +733,15 @@ const FinancingTabComponent = () => (
         isSubmitting={isSubmitting}
       />
 
+      {tokenizingInvoice && (
+        <TokenizeInvoiceModal
+          invoice={tokenizingInvoice}
+          onClose={() => setTokenizingInvoice(null)}
+          onSubmit={(invoiceId, data) => handleTokenizeSubmit(invoiceId, data)}
+          isSubmitting={isSubmitting}
+        />
+      )}
+
       <Modal
         isOpen={!!selectedQRCode}
         onClose={() => setSelectedQRCode(null)}
@@ -732,7 +773,7 @@ const FinancingTabComponent = () => (
 };
 
 SellerDashboard.propTypes = {
-  activeTab: PropTypes.string
+  activeTab: PropTypes.string,
 };
 
 export default SellerDashboard;
