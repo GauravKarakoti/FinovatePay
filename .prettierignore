@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+out/
+coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated files
+artifacts/
+cache/
+deployed/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yaml
+
+# Config files
+hardhat.config.js
+
+# Solidity
+*.sol.bak

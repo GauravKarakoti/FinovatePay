@@ -31,6 +31,8 @@ const uuidToBytes32 = (uuid) => {
 exports.releaseEscrow = async (req, res) => {
   const client = await pool.connect();
   let correlationId = null;
+  let stepsCompleted = []; // Track actual progress for recovery
+  let txHash = null; // Track tx hash if blockchain tx succeeds
 
   try {
     const { invoiceId } = req.body;
@@ -99,6 +101,66 @@ exports.releaseEscrow = async (req, res) => {
     if (!invoice.buyer_address || !invoice.seller_address) {
       logger.error('Invoice missing address fields', { invoiceId });
       throw new Error('Invalid invoice: missing buyer or seller address');
+    /* ---------------- Blockchain interaction ---------------- */
+
+    const escrowContract = new ethers.Contract(
+      contractAddresses.escrowContract,
+      EscrowContractArtifact.abi,
+      getSigner()
+    );
+
+    const bytes32InvoiceId = uuidToBytes32(invoiceId);
+
+    const financialTx = await logFinancialTransaction({
+      transactionType: 'ESCROW_RELEASE',
+      invoiceId,
+      fromAddress: invoice.buyer_address,
+      toAddress: invoice.seller_address,
+      amount: invoice.amount,
+      status: 'PENDING',
+      initiatedBy: req.user.id,
+      metadata: { correlationId },
+    });
+
+    const tx = await escrowContract.confirmRelease(bytes32InvoiceId);
+    await tx.wait();
+
+    // Mark blockchain step as completed only after successful tx
+    stepsCompleted = ['BLOCKCHAIN_TX'];
+    txHash = tx.hash;
+
+    await updateTransactionState(correlationId, 'PROCESSING', {
+      stepsCompleted: ['BLOCKCHAIN_TX'],
+      stepsRemaining: ['DB_UPDATE', 'AUDIT_LOG'],
+      contextData: { invoiceId, txHash: tx.hash },
+    });
+
+    /* ---------------- Database update ---------------- */
+
+    await client.query(
+      `UPDATE invoices
+       SET escrow_status = $1, release_tx_hash = $2
+       WHERE invoice_id = $3`,
+      ['released', tx.hash, invoiceId]
+    );
+
+    await client.query('COMMIT');
+
+    // Mark DB update step as completed after successful commit
+    stepsCompleted = ['BLOCKCHAIN_TX', 'DB_UPDATE'];
+
+    await updateTransactionState(correlationId, 'PROCESSING', {
+      stepsCompleted: ['BLOCKCHAIN_TX', 'DB_UPDATE'],
+      stepsRemaining: ['AUDIT_LOG'],
+    });
+
+    if (financialTx) {
+      await pool.query(
+        `UPDATE financial_transactions
+         SET status = $1, blockchain_tx_hash = $2, confirmed_at = NOW()
+         WHERE transaction_id = $3`,
+        ['CONFIRMED', tx.hash, financialTx.transaction_id]
+      );
     }
 
     /* ---------------- Blockchain interaction ---------------- */
@@ -233,6 +295,19 @@ exports.releaseEscrow = async (req, res) => {
       } catch (recoveryError) {
         logger.error('Failed to add to recovery queue', { error: recoveryError.message });
       }
+      await addToRecoveryQueue(
+        correlationId,
+        {
+          operationType: 'ESCROW_RELEASE',
+          invoiceId: req.body.invoiceId,
+          txHash: txHash, // Use tracked txHash (null if tx never happened)
+          stepsCompleted: stepsCompleted, // Use actual progress, not hardcoded
+        },
+        0,
+        error.message
+      );
+
+      await updateTransactionState(correlationId, 'FAILED');
     }
 
     await logAudit({

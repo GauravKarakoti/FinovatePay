@@ -152,6 +152,20 @@ exports.createInvoice = async (req, res) => {
         }
 
         const pricePerUnit = quotation.price_per_unit / (parseFloat(process.env.EXCHANGE_RATE) || 50.75);
+        // Use env variable for exchange rate with strict validation
+        const exchangeRateEnv = process.env.EXCHANGE_RATE;
+        if (!exchangeRateEnv) {
+            console.error('[CRITICAL] EXCHANGE_RATE environment variable is not set!');
+            console.error('[CRITICAL] Using fallback rate of 50.75 - this may cause financially incorrect invoices!');
+            // In production, consider throwing an error instead:
+            // throw new Error('EXCHANGE_RATE environment variable is required for invoice creation');
+        }
+        const exchangeRate = parseFloat(exchangeRateEnv);
+        if (exchangeRateEnv && (isNaN(exchangeRate) || exchangeRate <= 0)) {
+            throw new Error('EXCHANGE_RATE environment variable must be a valid positive number');
+        }
+        const effectiveExchangeRate = exchangeRate || 50.75; // Fallback only with warning
+        const pricePerUnit = quotation.price_per_unit / effectiveExchangeRate;
 
         const values = [
             invoice_id,
