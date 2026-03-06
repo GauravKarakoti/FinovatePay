@@ -82,10 +82,17 @@ pool.on('remove', (client) => {
 // Initial Connection Test (Fail-Fast)
 // --------------------------------------------------
 
+<<<<<<< security/remove-console-logs-production-code
+pool
+  .connect()
+  .then((client) => {
+  console.log("Connected to PostgreSQL");
+=======
 async function testConnection() {
   try {
     const client = await pool.connect();
     console.log("🔌 Connected to PostgreSQL");
+>>>>>>> contrib
     client.release();
   } catch (error) {
     console.error("❌ Failed to connect to PostgreSQL:", error.message);

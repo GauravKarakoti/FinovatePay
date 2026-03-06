@@ -1,7 +1,6 @@
 require('dotenv').config();
 
 const EnvSecretsProvider = require('./EnvSecretsProvider');
-const AWSSecretsProvider = require('./AWSSecretsProvider');
 const VaultSecretsProvider = require('./VaultSecretsProvider');
 
 /**
@@ -26,24 +25,6 @@ function createSecretsProvider(options = {}) {
     case ProviderTypes.ENV:
       console.log('[Secrets] Using Environment Variables provider (development mode)');
       return new EnvSecretsProvider();
-      
-    case ProviderTypes.AWS:
-      console.log('[Secrets] Using AWS Secrets Manager provider');
-      return new AWSSecretsProvider({
-        region: options.region,
-        secretName: options.secretName,
-        cacheTTL: options.cacheTTL
-      });
-      
-    case ProviderTypes.VAULT:
-      console.log('[Secrets] Using HashiCorp Vault provider');
-      return new VaultSecretsProvider({
-        vaultAddr: options.vaultAddr,
-        vaultToken: options.vaultToken,
-        secretPath: options.secretPath,
-        mountPath: options.mountPath,
-        cacheTTL: options.cacheTTL
-      });
       
     default:
       throw new Error(`Unknown secrets provider: ${providerType}. Supported: ${Object.values(ProviderTypes).join(', ')}`);
@@ -100,6 +81,4 @@ module.exports = {
   setSecret,
   ProviderTypes,
   EnvSecretsProvider,
-  AWSSecretsProvider,
-  VaultSecretsProvider
 };

@@ -3,7 +3,7 @@
 // e.g. axios.post(KATANA_URL, { amount })
 
 async function requestLiquidity(amount) {
-    console.log(`[Katana Service] Requesting liquidity for amount: ${amount}...`);
+    logger.info(`[Katana Service] Requesting liquidity for amount: ${amount}...`);
 
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -17,7 +17,7 @@ async function requestLiquidity(amount) {
         liquidityId: `liq_${Date.now()}`
     };
 
-    console.log(`[Katana Service] Liquidity secured: ${response.fundedAmount} (ID: ${response.liquidityId})`);
+    logger.info(`[Katana Service] Liquidity secured: ${response.fundedAmount} (ID: ${response.liquidityId})`);
     return response;
 }
 
