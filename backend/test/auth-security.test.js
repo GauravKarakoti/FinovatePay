@@ -29,7 +29,7 @@ describe('Auth Security Tests - Issue #125', () => {
 
       // Verify response structure
       expect(response.body).toHaveProperty('user');
-      expect(response.body).toHaveProperty('token');
+      expect(response.body).not.toHaveProperty('token'); // Token removed for security
       
       // CRITICAL: Verify password_hash is NOT in response
       expect(response.body.user).not.toHaveProperty('password_hash');
@@ -40,8 +40,10 @@ describe('Auth Security Tests - Issue #125', () => {
       expect(response.body.user).toHaveProperty('email', testUser.email);
       expect(response.body.user).toHaveProperty('wallet_address', testUser.walletAddress);
       
-      // Store for next tests
-      authToken = response.body.token;
+      // Store cookie for next tests
+      const cookies = response.headers['set-cookie'];
+      expect(cookies).toBeDefined();
+      authToken = cookies;
       userId = response.body.user.id;
     });
   });
@@ -58,7 +60,7 @@ describe('Auth Security Tests - Issue #125', () => {
 
       // Verify response structure
       expect(response.body).toHaveProperty('user');
-      expect(response.body).toHaveProperty('token');
+      expect(response.body).not.toHaveProperty('token'); // Token removed for security
       
       // CRITICAL: Verify password_hash is NOT in response
       expect(response.body.user).not.toHaveProperty('password_hash');
@@ -89,7 +91,7 @@ describe('Auth Security Tests - Issue #125', () => {
     it('should NOT return password_hash in profile response', async () => {
       const response = await request(app)
         .get('/api/auth/profile')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authToken)
         .expect(200);
 
       // CRITICAL: Verify password_hash is NOT in response
@@ -106,7 +108,7 @@ describe('Auth Security Tests - Issue #125', () => {
     it('should NOT return password_hash when updating role', async () => {
       const response = await request(app)
         .put('/api/auth/role')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Cookie', authToken)
         .send({ role: 'seller' })
         .expect(200);
 
