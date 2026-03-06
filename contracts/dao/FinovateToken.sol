@@ -202,7 +202,7 @@ contract FinovateToken is ERC20, ERC20Votes, ERC20Permit, Ownable {
      * @notice Delegate voting power to delegatee
      * @param delegatee Address to delegate to
      */
-    function delegate(address delegatee) public override(ERC20Votes) {
+    function delegate(address delegatee) public override {
         super.delegate(delegatee);
         emit TokensDelegated(msg.sender, delegatee);
     }

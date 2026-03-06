@@ -98,16 +98,40 @@ function NavigationSetup() {
 }
 
 /* -------------------- Session Sync Setup -------------------- */
-// Breaks the infinite loop by syncing React state with localStorage
+// Syncs React state with localStorage using native storage event
+// Catches token deletions from Axios interceptors, manual storage clearing, and cross-tab logouts
 function SessionSync({ user, onLogout }) {
   const location = useLocation();
   
   useEffect(() => {
-    // If React state thinks user is logged in, but interceptor wiped localStorage
+    // Check if React state thinks user is logged in, but localStorage was wiped
     if (user && !localStorage.getItem('user')) {
-      onLogout(); // This correctly zeroes out the state and stops the loop
+      onLogout();
     }
   }, [location.pathname, user, onLogout]);
+  
+  useEffect(() => {
+    // Listen for storage events (fires when localStorage changes in ANY tab or programmatically)
+    const handleStorageChange = (e) => {
+      // Check if 'user' or 'token' was removed from localStorage
+      if ((e.key === 'user' || e.key === 'token') && e.newValue === null) {
+        // Storage was cleared, logout the user
+        if (user) {
+          onLogout();
+        }
+      }
+      // Also handle when storage is completely cleared
+      if (e.key === null && user) {
+        onLogout();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [user, onLogout]);
   
   return null;
 }

@@ -34,9 +34,6 @@ contract GovernanceManager is
     /// @notice Token used for voting
     IVotes public immutable governanceToken;
     
-    /// @notice Timelock controller
-    TimelockController public immutable timelock;
-    
     /// @notice Minimum token balance to create proposals
     uint256 public proposalThresholdAmount = 100_000 * 10 ** 18; // 100k tokens
     
@@ -100,7 +97,6 @@ contract GovernanceManager is
         Ownable(msg.sender)
     {
         governanceToken = _token;
-        timelock = _timelock;
     }
 
     /**
@@ -230,16 +226,6 @@ contract GovernanceManager is
         return super._executor();
     }
 
-    /**
-     * @notice Create a new proposal
-     * @param targets Target contracts
-     * @param values ETH values
-     * @param calldatas Call data
-     * @param description Proposal description
-     * @param category Proposal category
-     * @param title Proposal title
-     * @return Proposal ID
-     */
     function propose(
         address[] memory targets,
         uint256[] memory values,
@@ -247,7 +233,7 @@ contract GovernanceManager is
         string memory description,
         ProposalCategory category,
         string memory title
-    ) public override returns (uint256) {
+    ) public payable returns (uint256) {
         // Check proposal fee
         require(msg.value >= proposalFee, "Insufficient proposal fee");
         
@@ -388,28 +374,20 @@ contract GovernanceManager is
         return governanceToken.getPastVotes(account, blockNumber);
     }
 
-    /**
-     * @notice Update quorum fraction
-     * @param _quorumFraction New quorum fraction (in basis points)
-     */
     function updateQuorumFraction(uint256 _quorumFraction) external onlyOwner {
+        // Note: Check what your quorumDenominator is (default is usually 100).
+        // If denominator is 100, _quorumFraction of 4 means 4%.
         require(_quorumFraction <= 10000, "Invalid quorum fraction");
-        _setQuorumFraction(_quorumFraction);
+        _updateQuorumNumerator(_quorumFraction); 
     }
 
-    /**
-     * @notice Get timelock delay
-     * @return Delay in seconds
-     */
     function getTimelockDelay() external view returns (uint256) {
-        return timelock.getMinDelay();
+        return TimelockController(payable(timelock())).getMinDelay();
     }
 
-    // Required override for solidity compiler
     function supportsInterface(
         bytes4 interfaceId
-    ) public view override(Governor, TimelockControl) returns (bool) {
+    ) public view override(Governor) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 }
-
