@@ -19,7 +19,7 @@ function startComplianceListeners() {
   // Listen for KYCVerified event
   complianceManager.on('KYCVerified', async (account) => {
     try {
-      console.log('[complianceListener] KYCVerified event:', account);
+      logger.info('[complianceListener] KYCVerified event:', account);
       
       // Update wallet_kyc_mappings table
       await pool.query(
@@ -35,7 +35,7 @@ function startComplianceListeners() {
         ['verified', account.toLowerCase()]
       );
       
-      console.log('[complianceListener] Updated wallet status to verified:', account);
+      logger.info('[complianceListener] Updated wallet status to verified:', account);
     } catch (err) {
       console.error('[complianceListener] Error handling KYCVerified event:', err.message || err);
     }
@@ -44,7 +44,7 @@ function startComplianceListeners() {
   // Listen for KYCRevoked event
   complianceManager.on('KYCRevoked', async (account) => {
     try {
-      console.log('[complianceListener] KYCRevoked event:', account);
+      logger.info('[complianceListener] KYCRevoked event:', account);
       
       // Update wallet_kyc_mappings table
       await pool.query(
@@ -60,7 +60,7 @@ function startComplianceListeners() {
         ['revoked', account.toLowerCase()]
       );
       
-      console.log('[complianceListener] Updated wallet status to revoked:', account);
+      logger.info('[complianceListener] Updated wallet status to revoked:', account);
     } catch (err) {
       console.error('[complianceListener] Error handling KYCRevoked event:', err.message || err);
     }
@@ -69,7 +69,7 @@ function startComplianceListeners() {
   // Listen for AccountFrozen event
   complianceManager.on('AccountFrozen', async (account, reason) => {
     try {
-      console.log('[complianceListener] AccountFrozen event:', account, 'Reason:', reason);
+      logger.info('[complianceListener] AccountFrozen event:', account, 'Reason:', reason);
       
       // Freeze user account
       await pool.query(
@@ -77,13 +77,13 @@ function startComplianceListeners() {
         [account.toLowerCase()]
       );
       
-      console.log('[complianceListener] Froze account:', account);
+      logger.info('[complianceListener] Froze account:', account);
     } catch (err) {
       console.error('[complianceListener] Error handling AccountFrozen event:', err.message || err);
     }
   });
 
-  console.log('[complianceListener] Compliance event listeners started successfully');
+  logger.info('[complianceListener] Compliance event listeners started successfully');
 }
 
 module.exports = startComplianceListeners;

@@ -52,7 +52,7 @@ const pool = new Pool(dbConfig);
 pool
   .connect()
   .then((client) => {
-    console.log("🔌 Connected to PostgreSQL");
+  console.log("Connected to PostgreSQL");
     client.release();
   })
   .catch((error) => {

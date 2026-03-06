@@ -40,7 +40,8 @@ const socketAuthMiddleware = async (socket, next) => {
     // Attach user to socket instance
     socket.user = user;
 
-    console.log(`Socket authenticated: User ${user.id} (${user.email}) connected`);
+  logger = require('../utils/logger')('socketAuth');
+    logger.info(`Socket authenticated: User ${user.id} (${user.email}) connected`);
     next();
 
   } catch (error) {
