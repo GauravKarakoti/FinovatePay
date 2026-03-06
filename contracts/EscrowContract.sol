@@ -99,6 +99,7 @@ contract EscrowContract is
     event FeePercentageUpdated(uint256 oldFee, uint256 newFee);
     event MinimumEscrowAmountUpdated(uint256 oldMinimum, uint256 newMinimum);
     event EscrowExpired(bytes32 indexed invoiceId, address indexed buyer, uint256 amountReclaimed);
+    event NftReturnFailed(bytes32 indexed invoiceId, address indexed seller, uint256 tokenId);
     event HighValueThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
     event RequiredArbitratorApprovalsUpdated(uint256 oldCount, uint256 newCount);
     event ArbitratorApprovalAdded(bytes32 indexed invoiceId, address indexed arbitrator, uint256 approvalCount);
@@ -552,7 +553,7 @@ contract EscrowContract is
         // Update status before transfer (CEI pattern)
         escrow.status = EscrowStatus.Expired;
         
-        // Return funds to buyer
+        // Return funds to buyer (prioritized)
         if (token == address(0)) {
             // Use .call() instead of .transfer() to support smart contract wallets
             // .transfer() has a 2300 gas limit which fails for contracts with fallback logic
@@ -563,12 +564,19 @@ contract EscrowContract is
         }
         
         // Return NFT collateral to seller if exists
+        // Wrapped in try-catch to prevent seller from blocking buyer's refund
         if (escrow.rwaNftContract != address(0)) {
-            IERC721(escrow.rwaNftContract).safeTransferFrom(
+            try IERC721(escrow.rwaNftContract).safeTransferFrom(
                 address(this),
                 escrow.seller,
                 escrow.rwaTokenId
-            );
+            ) {
+                // NFT transferred successfully
+            } catch {
+                // If transfer fails, emit event for admin intervention
+                // but do NOT revert - buyer's refund is prioritized
+                emit NftReturnFailed(_invoiceId, escrow.seller, escrow.rwaTokenId);
+            }
         }
         
         emit EscrowExpired(_invoiceId, buyer, reclaimAmount);
