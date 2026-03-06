@@ -1,4 +1,4 @@
-const storageService = require('../services/storageService');
+const storageService = require('../services/storageServices');
 const errorResponse = require('../utils/errorResponse');
 
 exports.uploadDocument = async (req, res) => {
