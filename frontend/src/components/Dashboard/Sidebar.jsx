@@ -50,6 +50,11 @@ const tabs = [
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
   ];
 
+  // Add Analytics tab for admin, seller, investor roles
+  if (['admin', 'seller', 'investor'].includes(user?.role)) {
+    tabs.push({ id: 'analytics', label: 'Analytics', icon: '📈' });
+  }
+
   // Add Streaming Payments tab for seller role
   if (user?.role === 'seller') {
     tabs.push({ id: 'streaming', label: 'Streaming', icon: '📺' });
@@ -61,8 +66,18 @@ const tabs = [
     tabs.push({ id: 'financing', label: 'Financing', icon: '💸' });
   }
 
+  // Add Auctions tab for investor and seller roles
+  if (user?.role === 'investor' || user?.role === 'seller' || user?.role === 'admin') {
+    tabs.push({ id: 'auctions', label: 'Auctions', icon: '🏷️' });
+  }
+
+  // Add Governance tab for all roles (as it's important for protocol)
+  tabs.push({ id: 'governance', label: 'Governance', icon: '🏛️' });
+
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
+    // Add Upgrade Manager for admin
+    tabs.push({ id: 'upgrade', label: 'Upgrade Manager', icon: '🔄' });
   }
 
   const visibleTabs = user?.role === 'investor' ? tabs.filter(tab => !['quotations', 'invoices', 'payments', 'produce', 'escrow'].includes(tab.id)) : tabs;
@@ -75,6 +90,10 @@ const tabs = [
     if (tabId === 'invoices') {
       navigate('/invoices');
       onTabChange('invoices');
+    } else if (tabId === 'upgrade') {
+      // Navigate to upgrade manager page
+      navigate('/admin/upgrade');
+      onTabChange('upgrade');
     } else {
       // Determine dashboard root based on role
       let dashboardPath = '/';
