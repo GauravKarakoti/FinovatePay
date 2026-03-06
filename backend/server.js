@@ -136,6 +136,10 @@ app.use('/api/currencies', require('./routes/currency'));
 
 app.use('/api/credit-scores', require('./routes/creditScore'));
 
+/* ---------------- CREDIT RISK (AI-POWERED) ---------------- */
+
+app.use('/api/credit-risk', require('./routes/creditRisk'));
+
 /* ---------------- REVOLVING CREDIT LINE ---------------- */
 
 app.use('/api/credit-line', require('./routes/creditLine'));
