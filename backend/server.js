@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
+const logger = require("./utils/logger")("server");
 const crypto = require("crypto");
 require("dotenv").config();
 
@@ -194,7 +195,7 @@ app.use("/api/fiat-ramp", require("./routes/fiatRamp"));
 io.use(socketAuthMiddleware);
 
 io.on("connection", (socket) => {
-  console.log(
+  logger.info(
     `User connected: ${socket.id} | User: ${socket.user?.id} | Role: ${socket.user?.role}`
   );
 
@@ -218,11 +219,11 @@ io.on("connection", (socket) => {
       socket.join(`invoice-${invoiceId}`);
       socket.emit("joined-invoice", { invoiceId, success: true });
 
-      console.log(
+      logger.info(
         `User ${socket.user.id} joined invoice room ${invoiceId}`
       );
     } catch (err) {
-      console.error("join-invoice error:", err);
+      logger.error("join-invoice error:", err);
       socket.emit("error", {
         message: "Failed to join invoice room",
         code: "JOIN_INVOICE_ERROR",
@@ -245,9 +246,9 @@ io.on("connection", (socket) => {
       socket.join("marketplace");
       socket.emit("joined-marketplace", { success: true });
 
-      console.log(`User ${socket.user.id} joined marketplace`);
+      logger.info(`User ${socket.user.id} joined marketplace`);
     } catch (err) {
-      console.error("join-marketplace error:", err);
+      logger.error("join-marketplace error:", err);
       socket.emit("error", {
         message: "Failed to join marketplace",
         code: "JOIN_MARKETPLACE_ERROR",
@@ -288,11 +289,11 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log(`User disconnected: ${socket.id}`);
+    logger.info(`User disconnected: ${socket.id}`);
   });
 
   socket.on("error", (err) => {
-    console.error(`Socket error (${socket.user?.id}):`, err);
+    logger.error(`Socket error (${socket.user?.id}):`, err);
   });
 });
 
@@ -315,7 +316,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
 });
 
 // Set up graceful shutdown handlers
@@ -330,7 +331,7 @@ startRecoveryWorker(); // Start transaction recovery worker
 try {
   startComplianceListeners();
 } catch (err) {
-  console.error(
+  logger.error(
     "[server] Compliance listeners failed:",
     err?.message || err
   );
@@ -339,9 +340,9 @@ try {
 // Start scheduled reconciliation (every 6 hours)
 try {
   startScheduledReconciliation();
-  console.log("[Server] Reconciliation scheduler started");
+  logger.info("[Server] Reconciliation scheduler started");
 } catch (err) {
-  console.error(
+  logger.error(
     "[server] Reconciliation scheduler failed:",
     err?.message || err
   );

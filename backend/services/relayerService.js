@@ -1,4 +1,5 @@
 const { ethers } = require('ethers');
+const logger = require('../utils/logger')('relayerService');
 const { getProvider, getSigner } = require('../config/blockchain');
 const MinimalForwarderABI = require('../../deployed/MinimalForwarder.json').abi;
 const contractAddresses = require('../../deployed/contract-addresses.json');
@@ -98,7 +99,7 @@ class RelayerService {
         
         if (this.isRetryableError(error)) {
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-          console.log(`Retry attempt ${attempt} after ${delay}ms`);
+          logger.debug(`Retry attempt ${attempt} after ${delay}ms`);
           await this.sleep(delay);
           continue;
         }
@@ -239,7 +240,7 @@ class RelayerService {
         ]
       );
 
-      console.log(`Gas cost recorded: ${gasCostMatic} MATIC ($${gasCostUsd.toFixed(4)})`);
+      logger.info(`Gas cost recorded: ${gasCostMatic} MATIC ($${gasCostUsd.toFixed(4)})`);
     } catch (error) {
       console.error('Error recording gas cost:', error);
       // Don't throw - gas recording failure shouldn't fail the transaction
