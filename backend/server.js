@@ -5,7 +5,11 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
+const crypto = require("crypto");
 require("dotenv").config();
+
+// Initialize secrets provider early
+const { getSecretsProvider } = require("./services/secrets");
 
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
@@ -13,35 +17,43 @@ const {
   socketAuthMiddleware,
   verifyInvoiceAccess,
   verifyMarketplaceAccess,
+  verifyAuctionAccess,
 } = require("./middleware/socketAuth");
-const { globalLimiter } = require("./middleware/rateLimiter");
+const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
+const { logClientIP } = require("./middleware/ipWhitelist");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
 const testDbConnection = require("./utils/testDbConnection");
 const { startSyncWorker } = require("./services/escrowSyncService");
+const { startScheduledReconciliation } = require("./services/reconciliationService");
 
 const app = express();
 const server = http.createServer(app);
 
+// Import graceful shutdown utility
+const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
+
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
-const io = socketIo(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    methods: ["GET", "POST"],
-  },
-});
-
-/* ---------------- CORS CONFIG ---------------- */
-
+// Parse allowed origins for consistent CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) =>
       o.trim().replace(/\/$/, "")
     )
   : ["http://localhost:5173"];
+
+const io = socketIo(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+/* ---------------- CORS CONFIG ---------------- */
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -55,6 +67,7 @@ const corsOptions = {
 
     return callback(new Error("Not allowed by CORS"));
   },
+  // origin: "http://localhost:5173",
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   credentials: true,
   optionsSuccessStatus: 204,
@@ -65,8 +78,24 @@ app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
 
+/* ---------------- REQUEST ID MIDDLEWARE ---------------- */
+
+// Add unique request ID to each request for tracking
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  req.requestId = requestId;
+  res.locals.requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+  next();
+});
+
+/* ---------------- CLIENT IP LOGGING ---------------- */
+
+app.use(logClientIP());
+
 /* ---------------- RATE LIMITING ---------------- */
 
+// Global rate limiter for all API routes
 app.use("/api/", globalLimiter);
 
 /* ---------------- DATABASE ---------------- */
@@ -80,26 +109,73 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 /* ---------------- API ROUTES ---------------- */
 
 app.use("/api/health", require("./routes/health"));
-app.use("/api/auth", require("./routes/auth"));
+app.use("/api/auth", authLimiter, require("./routes/auth"));
 app.use("/api/invoices", require("./routes/invoice"));
-app.use("/api/payments", require("./routes/payment"));
+app.use("/api/payments", paymentLimiter, require("./routes/payment"));
+
+/* ---------------- ESCROW ---------------- */
+
+app.use("/api/escrow", require("./routes/escrow"));
+
+/* ---------------- ADMIN ---------------- */
+
 app.use("/api/admin", require("./routes/admin"));
-app.use("/api/kyc", require("./routes/kyc"));
+app.use("/api/kyc", kycLimiter, require("./routes/kyc"));
 app.use("/api/produce", require("./routes/produce"));
 app.use("/api/quotations", require("./routes/quotation"));
 app.use("/api/market", require("./routes/market"));
 app.use("/api/dispute", require("./routes/dispute"));
-app.use("/api/relayer", require("./routes/relayer"));
+app.use("/api/relayer", relayerLimiter, require("./routes/relayer"));
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/shipment", shipmentRoutes);
 app.use("/api/meta-tx", require("./routes/metaTransaction"));
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/webhooks", require("./routes/webhooks"));
 
+/* ---------------- API KEYS ---------------- */
+
+app.use("/api/api-keys", require("./routes/apiKeys"));
+
 /* ---------------- V2 FINANCING ---------------- */
 
 app.use("/api/financing", require("./routes/financing"));
 app.use("/api/investor", require("./routes/investor"));
+
+/* ---------------- CROSS-CHAIN FRACTIONALIZATION ---------------- */
+
+app.use("/api/crosschain", require("./routes/crossChain"));
+
+/* ---------------- AUCTIONS ---------------- */
+
+app.use("/api/auctions", require("./routes/auction"));
+
+/* ---------------- ANALYTICS ---------------- */
+
+app.use('/api/analytics', require('./routes/analytics'));
+
+/* ---------------- RECONCILIATION ---------------- */
+
+app.use('/api/reconciliation', require('./routes/reconciliation'));
+
+/* ---------------- CURRENCIES ---------------- */
+
+app.use('/api/currencies', require('./routes/currency'));
+
+/* ---------------- CREDIT SCORES ---------------- */
+
+app.use('/api/credit-scores', require('./routes/creditScore'));
+
+/* ---------------- REVOLVING CREDIT LINE ---------------- */
+
+app.use('/api/credit-line', require('./routes/creditLine'));
+
+/* ---------------- INSURANCE ---------------- */
+
+app.use('/api/insurance', require('./routes/insurance'));
+
+/* ---------------- GOVERNANCE ---------------- */
+
+app.use('/api/governance', require('./routes/governance'));
 
 /* ---------------- FIAT ON-RAMP ---------------- */
 
@@ -171,6 +247,38 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("join-auction", async (auctionId) => {
+    try {
+      const isAuthorized = await verifyAuctionAccess(
+        socket.user.id,
+        socket.user.role,
+        socket.user.wallet_address,
+        auctionId
+      );
+
+      if (!isAuthorized) {
+        socket.emit("error", {
+          message: "Not authorized to access this auction",
+          code: "UNAUTHORIZED_AUCTION_ACCESS",
+        });
+        return;
+      }
+
+      socket.join(`auction-${auctionId}`);
+      socket.emit("joined-auction", { auctionId, success: true });
+
+      console.log(
+        `User ${socket.user.id} joined auction room ${auctionId}`
+      );
+    } catch (err) {
+      console.error("join-auction error:", err);
+      socket.emit("error", {
+        message: "Failed to join auction room",
+        code: "JOIN_AUCTION_ERROR",
+      });
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log(`User disconnected: ${socket.id}`);
   });
@@ -202,16 +310,31 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-/* ---------------- BACKGROUND WORKERS ---------------- */
+// Set up graceful shutdown handlers
+setupGracefulShutdown(server, io);
+
+const { startRecoveryWorker } = require('./services/recoveryService');
 
 listenForTokenization();
 startSyncWorker();
+startRecoveryWorker(); // Start transaction recovery worker
 
 try {
   startComplianceListeners();
 } catch (err) {
   console.error(
     "[server] Compliance listeners failed:",
+    err?.message || err
+  );
+}
+
+// Start scheduled reconciliation (every 6 hours)
+try {
+  startScheduledReconciliation();
+  console.log("[Server] Reconciliation scheduler started");
+} catch (err) {
+  console.error(
+    "[server] Reconciliation scheduler failed:",
     err?.message || err
   );
 }

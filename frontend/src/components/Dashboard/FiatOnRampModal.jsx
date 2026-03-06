@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { Transak } from '@transak/ui-js-sdk';
 import api, { createFiatRampLink } from '../../utils/api';
+import CurrencySelector from '../Settings/CurrencySelector';
 
 const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
     const [amount, setAmount] = useState('');
@@ -14,7 +16,10 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
     const [isLoadingRate, setIsLoadingRate] = useState(false);
 
     // Fee percentages by provider
-    const FEE_PERCENT = provider === 'moonpay' ? 0.0149 : 0.015;
+    const FEE_PERCENT = 
+        provider === 'moonpay' ? 0.0149 : 
+        provider === 'transak' ? 0.035 : 
+        0.015;
 
     // --- 1. ACTUAL IMPLEMENTATION: Live Exchange Rate Fetching ---
     useEffect(() => {
@@ -70,7 +75,44 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
         try {
             let paymentUrl;
 
-            if (provider === 'moonpay') {
+            if (provider === 'transak') {
+                const transakConfig = {
+                    apiKey: import.meta.env.VITE_TRANSAK_API_KEY,
+                    environment: 'STAGING',
+                    defaultCryptoCurrency: cryptoCurrency,
+                    walletAddress: walletAddress,
+                    themeColor: '22c55e',
+                    fiatAmount: parseFloat(amount),
+                    fiatCurrency: currency,
+                    email: '', // Let user enter email in widget
+                    redirectURL: window.location.origin,
+                    hostURL: window.location.origin,
+                    widgetHeight: '625px',
+                    widgetWidth: '500px',
+                    network: 'polygon'
+                };
+
+                const transak = new Transak(transakConfig);
+
+                transak.init();
+
+                transak.on(transak.EVENTS.TRANSAK_ORDER_SUCCESSFUL, (orderData) => {
+                    if (import.meta.env.DEV) {
+                        console.log('Transak order successful:', { orderId: orderData?.id });
+                    }
+                    transak.close();
+                    toast.success("Payment successful via Transak!");
+                    if (onSuccess) onSuccess(parseFloat(amount));
+                    onClose();
+                });
+
+                transak.on(transak.EVENTS.TRANSAK_WIDGET_CLOSE, () => {
+                    transak.close();
+                    setIsProcessing(false);
+                });
+
+                return;
+            } else if (provider === 'moonpay') {
                 // Use MoonPay backend endpoint
                 const response = await createFiatRampLink({
                     amount: parseFloat(amount),
@@ -116,8 +158,11 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
             console.error('Payment initialization failed:', error);
             const errorMessage = error.response?.data?.error || "Payment connection failed. Please try again.";
             toast.error(errorMessage);
-        } finally {
             setIsProcessing(false);
+        } finally {
+            if (provider !== 'transak') {
+                setIsProcessing(false);
+            }
         }
     };
 
@@ -164,7 +209,7 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                             Payment Provider
                         </label>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                             <button
                                 type="button"
                                 onClick={() => setProvider('moonpay')}
@@ -189,6 +234,18 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                                 <span className="font-bold">Stripe</span>
                                 <span className="text-xs opacity-75">1.5% fee</span>
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setProvider('transak')}
+                                className={`py-3 px-4 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1
+                                    ${provider === 'transak' 
+                                        ? 'border-green-500 bg-green-50 text-green-700' 
+                                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
+                                    }`}
+                            >
+                                <span className="font-bold">Transak</span>
+                                <span className="text-xs opacity-75">Global / UPI</span>
+                            </button>
                         </div>
                     </div>
 
@@ -211,26 +268,24 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                             You Pay (Fiat)
                         </label>
-                        <div className="relative group">
-                            <input
-                                type="number"
-                                min="10"
-                                step="any"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="block w-full pl-4 pr-20 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium"
-                                placeholder="0.00"
-                            />
-                            <div className="absolute inset-y-0 right-0 flex items-center border-l border-gray-300">
-                                <select
+                        <div className="flex gap-3">
+                            <div className="flex-1">
+                                <input
+                                    type="number"
+                                    min="10"
+                                    step="any"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    className="block w-full pl-4 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div className="w-36">
+                                <CurrencySelector
                                     value={currency}
-                                    onChange={(e) => setCurrency(e.target.value)}
-                                    className="h-full py-0 pl-3 pr-8 bg-gray-50 text-gray-600 font-medium rounded-r-lg focus:ring-0 border-transparent cursor-pointer hover:bg-gray-100"
-                                >
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="GBP">GBP</option>
-                                </select>
+                                    onChange={setCurrency}
+                                    showFiatOnly={true}
+                                />
                             </div>
                         </div>
                     </div>
@@ -246,7 +301,7 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                             </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                            <span className="text-gray-500">Processing Fee (1.5%)</span>
+                            <span className="text-gray-500">Processing Fee ({provider === 'transak' ? '3.5%' : provider === 'moonpay' ? '1.49%' : '1.5%'})</span>
                             <span className="font-medium text-gray-700">{fees.toFixed(2)} {currency}</span>
                         </div>
                         <div className="border-t border-gray-200 my-2"></div>
@@ -278,12 +333,12 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                                 </svg>
                                 Processing...
                             </span>
-                        ) : `Pay with ${provider === 'moonpay' ? 'MoonPay' : 'Stripe'}`}
+                        ) : `Pay with ${provider === 'moonpay' ? 'MoonPay' : provider === 'transak' ? 'Transak' : 'Stripe'}`}
                     </button>
                     
                     <p className="text-xs text-center text-gray-400 mt-4 flex items-center justify-center gap-2">
                         <span>Powered by</span> 
-                        <span className="font-bold text-gray-500">{provider === 'moonpay' ? 'MoonPay' : 'Stripe'}</span>
+                        <span className="font-bold text-gray-500">{provider === 'moonpay' ? 'MoonPay' : provider === 'transak' ? 'Transak' : 'Stripe'}</span>
                     </p>
                 </form>
             </div>
