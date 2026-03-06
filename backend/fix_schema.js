@@ -12,7 +12,9 @@ const pool = new Pool({
 
 const fixDatabase = async () => {
   try {
-    console.log("🛠️ Updating Database Schema...");
+const logger = require('./utils/logger')('fix_schema');
+
+    logger.info("Updating Database Schema...");
 
     // 1. Reset the Users table to include Registration fields
     // We drop invoices first because they link to users

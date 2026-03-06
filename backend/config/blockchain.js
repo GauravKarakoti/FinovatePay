@@ -117,7 +117,6 @@ const contractAddresses = {
     process.env.INVOICE_FACTORY_ADDRESS,
 
   escrowContract:
-    deployedAddresses.EscrowContractV2 ||
     deployedAddresses.EscrowContract ||
     process.env.ESCROW_CONTRACT_ADDRESS,
 
@@ -134,7 +133,6 @@ const contractAddresses = {
     process.env.FRACTION_TOKEN_ADDRESS,
 
   financingManager:
-    deployedAddresses.FinancingManagerV2 ||
     deployedAddresses.FinancingManager ||
     process.env.FINANCING_MANAGER_ADDRESS,
 
