@@ -64,10 +64,6 @@ const io = socketIo(server, {
 
 /* ---------------- CORS CONFIG ---------------- */
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS.split(",").map((o) =>
-  o.trim().replace(/\/$/, "")
-);
-
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin && process.env.NODE_ENV !== "production") {
