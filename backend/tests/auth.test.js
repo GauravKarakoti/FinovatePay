@@ -29,15 +29,25 @@ jest.mock('jsonwebtoken', () => ({
   sign: jest.fn()
 }));
 
+jest.mock('../utils/jwt', () => ({
+  generateToken: jest.fn(() => 'mock-jwt-token'),
+  generateTokens: jest.fn(() => ({ accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' })),
+  getRefreshTokenExpiration: jest.fn(() => '1d')
+}));
+
 jest.mock('../middleware/rateLimiter', () => ({
   authLimiter: (req, res, next) => next(),
-  globalLimiter: (req, res, next) => next()
+  globalLimiter: (req, res, next) => next(),
+  forgotPasswordLimiter: (req, res, next) => next()
 }));
 
 jest.mock('../middleware/validators', () => ({
   validateRegister: (req, res, next) => next(),
   validateLogin: (req, res, next) => next(),
-  validateRoleUpdate: (req, res, next) => next()
+  validateRoleUpdate: (req, res, next) => next(),
+  validateForgotPassword: (req, res, next) => next(),
+  validateResetPassword: (req, res, next) => next(),
+  validateChangePassword: (req, res, next) => next()
 }));
 
 describe('Auth Registration Tests', () => {
@@ -66,10 +76,12 @@ describe('Auth Registration Tests', () => {
     // Import mocks after jest.clearAllMocks to ensure fresh mocks
     const bcrypt = require('bcryptjs');
     const jwt = require('jsonwebtoken');
+    const { generateToken } = require('../utils/jwt');
     
     bcrypt.hash.mockResolvedValue('hashedPassword');
     bcrypt.compare.mockResolvedValue(true);
     jwt.sign.mockReturnValue('mock-token');
+    generateToken.mockReturnValue('mock-jwt-token');
 
     // Create a fresh Express app for each test
     app = express();
@@ -196,20 +208,27 @@ describe('Auth Registration Tests', () => {
       expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
     });
 
-    it('should NOT return token in body on successful registration', async () => {
-      const jwt = require('jsonwebtoken');
+    it('should NOT return token in body but send HttpOnly cookie on successful registration', async () => {
+      const { generateToken } = require('../utils/jwt');
       
       mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser }] });
 
-      jwt.sign.mockReturnValue('mock-jwt-token');
+      generateToken.mockReturnValue('mock-jwt-token');
 
       const response = await request(app)
         .post('/auth/register')
         .send({ ...validUserData });
 
       expect(response.body.token).toBeUndefined();
+      
+      // Cookie check
+      const cookies = response.headers['set-cookie'];
+      expect(cookies).toBeDefined();
+      const tokenCookie = cookies.find(c => c.includes('token=mock-jwt-token'));
+      expect(tokenCookie).toBeDefined();
+      expect(tokenCookie).toMatch(/HttpOnly/);
     });
 
     it('should not allow arbitrator role (admin-only)', async () => {
@@ -226,12 +245,12 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should allow investor role when provided', async () => {
+      const bcrypt = require('bcryptjs');
       mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'investor' }] });
 
       bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -242,12 +261,12 @@ describe('Auth Registration Tests', () => {
     });
 
     it('should allow shipment role when provided', async () => {
+      const bcrypt = require('bcryptjs');
       mockQuery
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ ...mockUser, role: 'shipment' }] });
 
       bcrypt.hash.mockResolvedValue('hashedPassword');
-      jwt.sign.mockReturnValue('mock-token');
 
       const response = await request(app)
         .post('/auth/register')
