@@ -2,6 +2,7 @@ const { MailerSend, EmailParams } = require('mailersend');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../config/database');
 const handlebars = require('handlebars');
+const logger = require('../utils/logger')('emailService');
 
 // Initialize MailerSend client
 const mailerSend = new MailerSend({
@@ -50,7 +51,7 @@ class EmailService {
       // Update log status to sent
       await this.updateEmailLog(emailId, 'sent', { message_id: result?.message_id || emailId });
 
-      console.log(`✅ [Email Service] Email sent successfully. ID: ${result?.message_id || emailId}`);
+      logger.info(`✅ [Email Service] Email sent successfully. ID: ${result?.message_id || emailId}`);
       return {
         success: true,
         messageId: result?.message_id || emailId,
@@ -144,7 +145,7 @@ class EmailService {
         JSON.stringify(emailData.metadata || {})
       ]);
 
-      console.log(`📝 [Email Service] Email logged: ${emailData.id}`);
+      logger.info(`📝 [Email Service] Email logged: ${emailData.id}`);
     } catch (error) {
       console.error('❌ [Email Service] Error logging email:', error.message);
     }
@@ -175,7 +176,7 @@ class EmailService {
 
       await pool.query(query, params);
 
-      console.log(`📊 [Email Service] Email log updated: ${emailId} → ${status}`);
+      logger.info(`📊 [Email Service] Email log updated: ${emailId} → ${status}`);
     } catch (error) {
       console.error('❌ [Email Service] Error updating email log:', error.message);
     }
@@ -268,7 +269,7 @@ class EmailService {
       const result = await pool.query(query);
       const failedEmails = result.rows;
 
-      console.log(`🔄 [Email Service] Retrying ${failedEmails.length} failed emails...`);
+      logger.info(`🔄 [Email Service] Retrying ${failedEmails.length} failed emails...`);
 
       let successful = 0;
       let failed = 0;

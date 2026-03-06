@@ -12,10 +12,9 @@ const errorResponse = require('../utils/errorResponse');
 const { blockchainQueue, JOB_TYPES } = require('../queues/blockchainQueue');
 
 /* -------------------------------------------------------------------------- */
-/* HELPERS                                                                    */
+/* HELPERS */
 /* -------------------------------------------------------------------------- */
 
-// UUID → bytes32 (ethers v6 compatible)
 const uuidToBytes32 = (uuid) => {
   const hex = '0x' + uuid.replace(/-/g, '');
   return ethers.zeroPadValue(hex, 32);
@@ -31,6 +30,7 @@ exports.releaseEscrow = async (req, res) => {
   let stepsCompleted = []; // Track actual progress for recovery
   let txHash = null; // Track tx hash if blockchain tx succeeds
 
+exports.releaseEscrow = async (req, res) => {
   try {
     const { invoiceId } = req.body;
     const userId = req.user?.id;
@@ -46,6 +46,12 @@ exports.releaseEscrow = async (req, res) => {
     }
 
     const invoice = invoiceResult.rows[0];
+    
+    // Validate invoice state
+    if (!invoice.escrow_status) {
+      logger.error('Invoice missing escrow_status field', { invoiceId });
+      throw new Error('Invalid invoice state: missing escrow_status');
+    }
 
     // Check if escrow is in a state that allows release
     if (!['deposited', 'confirmed'].includes(invoice.escrow_status)) {
@@ -106,58 +112,41 @@ exports.releaseEscrowSync = async (req, res) => {
     const tx = await escrowContract.confirmRelease(bytes32InvoiceId);
     await tx.wait();
 
-    // Mark blockchain step as completed only after successful tx
-    stepsCompleted = ['BLOCKCHAIN_TX'];
     txHash = tx.hash;
+    stepsCompleted.push('BLOCKCHAIN_TX');
 
     await updateTransactionState(correlationId, 'PROCESSING', {
-      stepsCompleted: ['BLOCKCHAIN_TX'],
-      stepsRemaining: ['DB_UPDATE', 'AUDIT_LOG'],
-      contextData: { invoiceId, txHash: tx.hash },
+      stepsCompleted,
     });
-
-    /* ---------------- Database update ---------------- */
 
     await client.query(
       `UPDATE invoices
-       SET escrow_status = $1, release_tx_hash = $2
-       WHERE invoice_id = $3`,
+       SET escrow_status=$1, release_tx_hash=$2
+       WHERE invoice_id=$3`,
       ['released', tx.hash, invoiceId]
     );
 
     await client.query('COMMIT');
 
-    // Mark DB update step as completed after successful commit
-    stepsCompleted = ['BLOCKCHAIN_TX', 'DB_UPDATE'];
-
-    await updateTransactionState(correlationId, 'PROCESSING', {
-      stepsCompleted: ['BLOCKCHAIN_TX', 'DB_UPDATE'],
-      stepsRemaining: ['AUDIT_LOG'],
-    });
+    stepsCompleted.push('DB_UPDATE');
 
     if (financialTx) {
       await pool.query(
         `UPDATE financial_transactions
-         SET status = $1, blockchain_tx_hash = $2, confirmed_at = NOW()
-         WHERE transaction_id = $3`,
+         SET status=$1, blockchain_tx_hash=$2, confirmed_at=NOW()
+         WHERE transaction_id=$3`,
         ['CONFIRMED', tx.hash, financialTx.transaction_id]
       );
     }
-
-    /* ---------------- Audit log ---------------- */
 
     await logAudit({
       operationType: 'ESCROW_RELEASE',
       entityType: 'INVOICE',
       entityId: invoiceId,
       actorId: req.user.id,
-      actorWallet: req.user.wallet_address,
-      actorRole: req.user.role,
       action: 'RELEASE',
       status: 'SUCCESS',
-      oldValues: { escrow_status: invoice.escrow_status },
-      newValues: { escrow_status: 'released', tx_hash: tx.hash },
-      metadata: { blockchain_tx: tx.hash, correlationId },
+      metadata: { txHash, correlationId },
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });
@@ -166,13 +155,20 @@ exports.releaseEscrowSync = async (req, res) => {
       stepsCompleted: ['BLOCKCHAIN_TX', 'DB_UPDATE', 'AUDIT_LOG'],
     });
 
-    /* ---------------- Realtime event ---------------- */
+    if (io) {
+      io.to(`invoice-${invoiceId}`).emit('escrow:released', {
+        invoiceId,
+        txHash,
+      });
+    }
 
-    io.to(`invoice-${invoiceId}`).emit('escrow:released', {
-      invoiceId,
-      txHash: tx.hash,
-      status: 'released',
+    return res.json({
+      success: true,
+      txHash,
+      correlationId,
     });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
 
     return res.json({ success: true, txHash: tx.hash, correlationId });
 
@@ -250,48 +246,80 @@ exports.raiseDisputeSync = async (req, res) => {
       getSigner()
     );
 
-    const tx = await escrowContract.raiseDispute(
-      uuidToBytes32(invoiceId)
-    );
-    await tx.wait();
-
-    await client.query(
-      `UPDATE invoices
-       SET escrow_status = $1, dispute_reason = $2, dispute_tx_hash = $3
-       WHERE invoice_id = $4`,
-      ['disputed', reason, tx.hash, invoiceId]
-    );
-
-    await client.query('COMMIT');
-
-    await logAudit({
-      operationType: 'ESCROW_DISPUTE',
-      entityType: 'INVOICE',
-      entityId: invoiceId,
-      actorId: req.user.id,
-      actorWallet: req.user.wallet_address,
-      actorRole: req.user.role,
-      action: 'RAISE_DISPUTE',
-      status: 'SUCCESS',
-      oldValues: { escrow_status: invoice.escrow_status },
-      newValues: {
-        escrow_status: 'disputed',
-        dispute_reason: reason,
-        tx_hash: tx.hash,
-      },
-      metadata: { blockchain_tx: tx.hash, reason },
-      ipAddress: req.ip,
-      userAgent: req.get('user-agent'),
-    });
-
-    io.to(`invoice-${invoiceId}`).emit('escrow:dispute', {
+    return res.json({
+      success: true,
+      jobId: job.jobId,
+      message: 'Deposit queued',
       invoiceId,
-      reason,
-      txHash: tx.hash,
-      status: 'disputed',
+    });
+  } catch (error) {
+    logger.error('depositEscrow failed', { error: error.message });
+    return errorResponse(res, error.message, 500);
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* JOB STATUS */
+/* -------------------------------------------------------------------------- */
+
+exports.getJobStatus = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    const jobStatus = await blockchainQueue.getJobStatus(jobId);
+
+    if (!jobStatus) {
+      return errorResponse(res, 'Job not found', 404);
+    }
+
+    return res.json(jobStatus);
+  } catch (error) {
+    console.error("Error in raiseDisputeSync:", error);
+    return errorResponse(res, error, 500);
+  }
+};
+
+/**
+ * Deposit to escrow asynchronously via queue
+ */
+exports.depositEscrow = async (req, res) => {
+  try {
+    const { invoiceId, amount, tokenAddress } = req.body;
+    const userId = req.user?.id;
+
+    // Validate invoice exists
+    const invoiceResult = await pool.query(
+      'SELECT * FROM invoices WHERE invoice_id = $1',
+      [invoiceId]
+    );
+
+    if (invoiceResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const invoice = invoiceResult.rows[0];
+
+    // Check if escrow can accept deposit
+    if (invoice.escrow_status !== 'pending') {
+      return res.status(400).json({ 
+        error: `Cannot deposit to escrow in ${invoice.escrow_status} state` 
+      });
+    }
+
+    // Add job to queue
+    const job = await blockchainQueue.addJob(JOB_TYPES.ESCROW_DEPOSIT, {
+      invoiceId,
+      amount,
+      tokenAddress: tokenAddress || ethers.ZeroAddress,
+      userId,
     });
 
-    return res.json({ success: true, txHash: tx.hash });
+    res.json({ 
+      success: true, 
+      jobId: job.jobId,
+      message: 'Deposit queued for processing',
+      invoiceId,
+    });
 
   } catch (error) {
     console.error("Error in raiseDisputeSync:", error);
