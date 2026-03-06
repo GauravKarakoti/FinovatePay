@@ -347,18 +347,32 @@ try {
   );
 }
 
-// Start scheduled reconciliation (every 6 hours)
-const { startScheduledReconciliation } = require('./services/reconciliationService');
+/* ---------------- GRACEFUL SHUTDOWN ---------------- */
 
-try {
-  startScheduledReconciliation();
-  logger.info("[Server] Reconciliation scheduler started");
-} catch (err) {
-  logger.error(
-    "[server] Reconciliation scheduler failed:",
-    err?.message || err
-  );
-}
+const gracefulShutdown = async () => {
+  console.log('[server] Starting graceful shutdown...');
+  
+  try {
+    await blockchainQueue.shutdown();
+    console.log('[server] Blockchain queue shutdown complete');
+  } catch (err) {
+    console.error('[server] Error during blockchain queue shutdown:', err);
+  }
+  
+  server.close(() => {
+    console.log('[server] HTTP server closed');
+    process.exit(0);
+  });
+  
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('[server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 /* ---------------- GRACEFUL SHUTDOWN ---------------- */
 
