@@ -336,7 +336,10 @@ contract EscrowContract is
         
         // Return funds to buyer
         if (token == address(0)) {
-            payable(buyer).transfer(reclaimAmount);
+            // Use .call() instead of .transfer() to support smart contract wallets
+            // .transfer() has a 2300 gas limit which fails for contracts with fallback logic
+            (bool success, ) = payable(buyer).call{value: reclaimAmount}("");
+            require(success, "ETH transfer failed");
         } else {
             IERC20(token).safeTransfer(buyer, reclaimAmount);
         }
