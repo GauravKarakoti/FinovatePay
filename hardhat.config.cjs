@@ -1,9 +1,9 @@
-import "@nomicfoundation/hardhat-toolbox";
-import "@nomicfoundation/hardhat-ignition";
-import "dotenv/config";
+require("@nomicfoundation/hardhat-toolbox");
+require("@nomicfoundation/hardhat-ignition");
+require("dotenv/config");
 
 /** @type import('hardhat/config').HardhatUserConfig */
-export default {
+module.exports = {
   solidity: {
     compilers: [
       {
