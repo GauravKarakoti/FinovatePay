@@ -17,6 +17,7 @@ const {
 const { globalLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
+const { whitelabelMiddleware } = require("./middleware/whitelabel");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
@@ -66,6 +67,11 @@ app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
 
+/* ---------------- WHITELABEL MIDDLEWARE ---------------- */
+
+// Apply whitelabel configuration based on domain
+app.use(whitelabelMiddleware);
+
 /* ---------------- RATE LIMITING ---------------- */
 
 app.use("/api/", globalLimiter);
@@ -97,6 +103,7 @@ app.use("/api/meta-tx", require("./routes/metaTransaction"));
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/webhooks", require("./routes/webhooks"));
 app.use("/api/queue", require("./routes/queue"));
+app.use("/api/whitelabel", require("./routes/whitelabel"));
 
 /* ---------------- V2 FINANCING ---------------- */
 
