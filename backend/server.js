@@ -21,6 +21,10 @@ if (!process.env.ALLOWED_ORIGINS) {
 const { validateAndExit } = require("./utils/envValidator");
 validateAndExit();
 
+// Import API versioning middleware
+const { apiVersionMiddleware, deprecationMiddleware } = require("./middleware/apiVersion");
+const { versionedResponse, versionCorsMiddleware } = require("./middleware/versionedResponse");
+
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
 const {
@@ -92,83 +96,91 @@ app.use("/api/", globalLimiter);
 
 testDbConnection();
 
+/* ---------------- API VERSIONING MIDDLEWARE ---------------- */
+
+// Apply API versioning middleware for all /api routes
+app.use('/api', apiVersionMiddleware, versionCorsMiddleware, versionedResponse);
+
+// Apply deprecation middleware for all /api routes
+app.use('/api', deprecationMiddleware);
+
 /* ---------------- STATIC FILES ---------------- */
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-/* ---------------- API ROUTES ---------------- */
+/* ---------------- API ROUTES (v1) ---------------- */
 
-app.use("/api/health", require("./routes/health"));
-app.use("/api/auth", authLimiter, require("./routes/auth"));
-app.use("/api/invoices", require("./routes/invoice"));
-app.use("/api/payments", paymentLimiter, require("./routes/payment"));
+app.use("/api/v1/health", require("./routes/health"));
+app.use("/api/v1/auth", authLimiter, require("./routes/auth"));
+app.use("/api/v1/invoices", require("./routes/invoice"));
+app.use("/api/v1/payments", paymentLimiter, require("./routes/payment"));
 
 /* ---------------- ESCROW ---------------- */
 
-app.use("/api/escrow", require("./routes/escrow"));
+app.use("/api/v1/escrow", require("./routes/escrow"));
 
 /* ---------------- ADMIN ---------------- */
 
-app.use("/api/admin", require("./routes/admin"));
-app.use("/api/kyc", kycLimiter, require("./routes/kyc"));
-app.use("/api/produce", require("./routes/produce"));
-app.use("/api/quotations", require("./routes/quotation"));
-app.use("/api/market", require("./routes/market"));
-app.use("/api/dispute", require("./routes/dispute"));
-app.use("/api/relayer", relayerLimiter, require("./routes/relayer"));
-app.use("/api/chatbot", chatbotRoutes);
-app.use("/api/shipment", shipmentRoutes);
-app.use("/api/meta-tx", require("./routes/metaTransaction"));
-app.use("/api/notifications", notificationRoutes);
+app.use("/api/v1/admin", require("./routes/admin"));
+app.use("/api/v1/kyc", kycLimiter, require("./routes/kyc"));
+app.use("/api/v1/produce", require("./routes/produce"));
+app.use("/api/v1/quotations", require("./routes/quotation"));
+app.use("/api/v1/market", require("./routes/market"));
+app.use("/api/v1/dispute", require("./routes/dispute"));
+app.use("/api/v1/relayer", relayerLimiter, require("./routes/relayer"));
+app.use("/api/v1/chatbot", chatbotRoutes);
+app.use("/api/v1/shipment", shipmentRoutes);
+app.use("/api/v1/meta-tx", require("./routes/metaTransaction"));
+app.use("/api/v1/notifications", notificationRoutes);
 
 /* ---------------- V2 FINANCING ---------------- */
 
-app.use("/api/financing", require("./routes/financing"));
-app.use("/api/investor", require("./routes/investor"));
+app.use("/api/v1/financing", require("./routes/financing"));
+app.use("/api/v1/investor", require("./routes/investor"));
 
 /* ---------------- CROSS-CHAIN FRACTIONALIZATION ---------------- */
 
-app.use("/api/crosschain", require("./routes/crossChain"));
+app.use("/api/v1/crosschain", require("./routes/crossChain"));
 
 /* ---------------- AUCTIONS ---------------- */
 
-app.use("/api/auctions", require("./routes/auction"));
+app.use("/api/v1/auctions", require("./routes/auction"));
 
 /* ---------------- ANALYTICS ---------------- */
 
-app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/v1/analytics', require('./routes/analytics'));
 
 /* ---------------- RECONCILIATION ---------------- */
 
-app.use('/api/reconciliation', require('./routes/reconciliation'));
+app.use('/api/v1/reconciliation', require('./routes/reconciliation'));
 
 /* ---------------- CURRENCIES ---------------- */
 
-app.use('/api/currencies', require('./routes/currency'));
+app.use('/api/v1/currencies', require('./routes/currency'));
 
 /* ---------------- CREDIT SCORES ---------------- */
 
-app.use('/api/credit-scores', require('./routes/creditScore'));
+app.use('/api/v1/credit-scores', require('./routes/creditScore'));
 
 /* ---------------- REVOLVING CREDIT LINE ---------------- */
 
-app.use('/api/credit-line', require('./routes/creditLine'));
+app.use('/api/v1/credit-line', require('./routes/creditLine'));
 
 /* ---------------- INSURANCE ---------------- */
 
-app.use('/api/insurance', require('./routes/insurance'));
+app.use('/api/v1/insurance', require('./routes/insurance'));
 
 /* ---------------- GOVERNANCE ---------------- */
 
-app.use('/api/governance', require('./routes/governance'));
+app.use('/api/v1/governance', require('./routes/governance'));
 
 /* ---------------- PROXY / UPGRADEABLE CONTRACTS ---------------- */
 
-app.use('/api/proxy', require('./routes/proxy'));
+app.use('/api/v1/proxy', require('./routes/proxy'));
 
 /* ---------------- FIAT ON-RAMP ---------------- */
 
-app.use("/api/fiat-ramp", require("./routes/fiatRamp"));
+app.use("/api/v1/fiat-ramp", require("./routes/fiatRamp"));
 
 /* ---------------- SOCKET AUTH ---------------- */
 
