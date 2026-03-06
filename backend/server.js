@@ -47,10 +47,18 @@ const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
 
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
+// Parse allowed origins for consistent CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) =>
+      o.trim().replace(/\/$/, "")
+    )
+  : ["http://localhost:5173"];
+
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL,
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
