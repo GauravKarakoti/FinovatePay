@@ -10,7 +10,10 @@
     "test:manual": "node test/manual-event-sync-test.js",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
-    "migrate:db": "node scripts/migrate-db.js",
+    "migrate:db": "node scripts/run-migrations.js up",
+    "migrate:down": "node scripts/run-migrations.js down",
+    "migrate:status": "node scripts/migration-status.js",
+    "migrate:init": "node scripts/initialize-migrations.js",
     "seed:db": "node scripts/seed-db.js",
     "build": "docker build -t backend-prod -f Dockerfile .."
   },
@@ -47,7 +50,8 @@
     "chai": "^4.3.10",
     "jest": "^30.2.0",
     "mocha": "^10.2.0",
-    "supertest": "^7.2.2"
+    "supertest": "^7.2.2",
+    "node-pg-migrate": "^7.11.0"
   },
   "engines": {
     "node": ">=18.0.0"

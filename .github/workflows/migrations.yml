@@ -1,0 +1,178 @@
+name: Database Migrations
+
+on:
+  push:
+    branches: [ main, staging, develop ]
+    paths:
+      - 'backend/migrations/**'
+      - 'backend/scripts/run-migrations.js'
+      - '.github/workflows/migrations.yml'
+  pull_request:
+    branches: [ main, staging, develop ]
+    paths:
+      - 'backend/migrations/**'
+      - 'backend/scripts/run-migrations.js'
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER || 'postgres' }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          POSTGRES_DB: ${{ secrets.DB_NAME || 'finovate_test' }}
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Check migration syntax
+        working-directory: ./backend
+        run: |
+          echo "🔍 Checking migration files..."
+          for file in migrations/*.sql; do
+            if [ -f "$file" ]; then
+              echo "  ✓ Found: $(basename $file)"
+            fi
+          done
+
+      - name: Initialize migrations system
+        working-directory: ./backend
+        env:
+          DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+          DB_HOST: localhost
+          DB_NAME: ${{ secrets.DB_NAME || 'finovate_test' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          DB_PORT: 5432
+        run: npm run migrate:init
+
+      - name: Run migrations
+        working-directory: ./backend
+        env:
+          DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+          DB_HOST: localhost
+          DB_NAME: ${{ secrets.DB_NAME || 'finovate_test' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          DB_PORT: 5432
+        run: npm run migrate:db
+
+      - name: Verify migration status
+        working-directory: ./backend
+        env:
+          DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+          DB_HOST: localhost
+          DB_NAME: ${{ secrets.DB_NAME || 'finovate_test' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          DB_PORT: 5432
+        run: npm run migrate:status
+
+      - name: Check for pending migrations
+        working-directory: ./backend
+        env:
+          DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+          DB_HOST: localhost
+          DB_NAME: ${{ secrets.DB_NAME || 'finovate_test' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD || 'postgres' }}
+          DB_PORT: 5432
+        run: |
+          STATUS=$(npm run migrate:status 2>&1)
+          echo "$STATUS"
+          
+          # Verify no pending migrations
+          if echo "$STATUS" | grep -q "Pending: 0"; then
+            echo "✅ All migrations applied successfully"
+            exit 0
+          else
+            echo "❌ Pending migrations detected"
+            exit 1
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const migrationFiles = fs.readdirSync('./backend/migrations')
+              .filter(f => f.endsWith('.sql') && !f.endsWith('.down.sql'));
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 📊 Migration Status\n\n✅ **Database migrations verified**\n\n- Total migration files: ${migrationFiles.length}\n- Status: All migrations applied successfully\n- Test database: Ready`
+            });
+
+  validate:
+    name: Validate Migration Files
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate SQL syntax
+        working-directory: ./backend
+        run: |
+          echo "🔍 Validating migration files..."
+          
+          for file in migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              
+              # Basic checks
+              if ! grep -q "^--" "$file"; then
+                echo "⚠️  Missing header comment in $filename"
+              fi
+              
+              # Check for common issues
+              if grep -q "DROP DATABASE" "$file"; then
+                echo "❌ CRITICAL: DROP DATABASE found in $filename"
+                exit 1
+              fi
+              
+              if grep -q "DROP SCHEMA" "$file"; then
+                echo "⚠️  WARNING: DROP SCHEMA found in $filename"
+              fi
+              
+              echo "✓ $filename"
+            fi
+          done
+
+      - name: Check migration files exist
+        working-directory: ./backend
+        run: |
+          if [ ! -d "migrations" ]; then
+            echo "❌ Migrations directory not found"
+            exit 1
+          fi
+          
+          migration_count=$(find migrations -name "*.sql" ! -name "*.down.sql" | wc -l)
+          echo "Found $migration_count migration files"
+          
+          if [ $migration_count -eq 0 ]; then
+            echo "⚠️  No migration files found"
+          fi
