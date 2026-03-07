@@ -1,0 +1,88 @@
+{
+  "contractName": "TreasuryManager",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_governance",
+          "type": "address"
+        }
+      ],
+      "name": "initialize",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getCollected",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {"internalType":"address","name":"token","type":"address"},
+        {"internalType":"uint256","name":"amount","type":"uint256"}
+      ],
+      "name":"collectFee",
+      "outputs":[],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    },
+    {
+      "inputs": [
+        {"internalType":"address","name":"token","type":"address"},
+        {"internalType":"address","name":"to","type":"address"},
+        {"internalType":"uint256","name":"amount","type":"uint256"}
+      ],
+      "name":"requestWithdrawal",
+      "outputs":[],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    },
+    {
+      "inputs": [
+        {"internalType":"address","name":"token","type":"address"},
+        {"internalType":"address","name":"to","type":"address"},
+        {"internalType":"uint256","name":"amount","type":"uint256"}
+      ],
+      "name":"executeWithdrawal",
+      "outputs":[],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    },
+    {
+      "inputs":[{"internalType":"bytes32","name":"category","type":"bytes32"},{"internalType":"uint256","name":"amount","type":"uint256"}],
+      "name":"allocateBudget",
+      "outputs":[],
+      "stateMutability":"nonpayable",
+      "type":"function"
+    },
+    {
+      "anonymous":false,
+      "inputs":[{"indexed":true,"internalType":"address","name":"token","type":"address"},{"indexed":true,"internalType":"address","name":"payer","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"total","type":"uint256"}],
+      "name":"FeeCollected",
+      "type":"event"
+    },
+    {
+      "anonymous":false,
+      "inputs":[{"indexed":true,"internalType":"address","name":"token","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":true,"internalType":"address","name":"by","type":"address"}],
+      "name":"WithdrawalExecuted",
+      "type":"event"
+    }
+  ],
+  "bytecode": "0x"
+}
