@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { parseUnits } from '../utils/formatters';
+import { parseUnits } from '../../utils/formatters';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
