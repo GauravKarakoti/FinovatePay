@@ -9,6 +9,7 @@ const FractionTokenABI = require("../../deployed/FractionToken.json").abi;
 const ComplianceManagerABI = require("../../deployed/ComplianceManager.json").abi;
 const FinancingManagerABI = require("../../deployed/FinancingManager.json").abi;
 const EscrowContractABI = require("../../deployed/EscrowContract.json").abi;
+const TreasuryManagerABI = require("../../deployed/TreasuryManager.json").abi;
 const deployedAddresses = require("../../deployed/contract-addresses.json");
 
 // --------------------------------------------------
@@ -156,6 +157,10 @@ const contractAddresses = {
   timeLock:
     deployedAddresses.TimeLock ||
     process.env.TIMELOCK_ADDRESS,
+  // Treasury manager (protocol treasury)
+  treasuryManager:
+    deployedAddresses.TreasuryManager ||
+    process.env.TREASURY_MANAGER_ADDRESS,
 };
 
 // --------------------------------------------------
@@ -218,6 +223,14 @@ const getEscrowContract = (signerOrProvider) =>
     "EscrowContract"
   );
 
+const getTreasuryManagerContract = (signerOrProvider) =>
+  createContract(
+    contractAddresses.treasuryManager,
+    TreasuryManagerABI,
+    signerOrProvider,
+    "TreasuryManager"
+  );
+
 // --------------------------------------------------
 // Exports
 // --------------------------------------------------
@@ -231,7 +244,9 @@ module.exports = {
   getFractionTokenContract,
   getFinancingManagerContract,
   getEscrowContract,
+  getTreasuryManagerContract,
   getConfigError,
   FractionTokenABI,
   EscrowContractABI,
+  TreasuryManagerABI,
 };

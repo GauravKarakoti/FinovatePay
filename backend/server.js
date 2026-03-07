@@ -190,6 +190,9 @@ app.use('/api/v1/insurance', require('./routes/insurance'));
 
 app.use('/api/v1/governance', require('./routes/governance'));
 
+// Treasury endpoints
+app.use('/api/v1/treasury', require('./routes/treasury'));
+
 /* ---------------- PROXY / UPGRADEABLE CONTRACTS ---------------- */
 
 app.use('/api/v1/proxy', require('./routes/proxy'));
