@@ -13,7 +13,7 @@ const {
   validateFinancingRepay, 
   validateTokenizeInvoice 
 } = require('../middleware/validators');
-const { idempotencyMiddleware, logAudit, logFinancialTransaction } = require('../middleware/auditLogger');
+const { idempotencyMiddleware } = require('../middleware/auditLogger');
 
 // Get marketplace listings
 router.get('/marketplace', authenticateToken, async (req, res) => {

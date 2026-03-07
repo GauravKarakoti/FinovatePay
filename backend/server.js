@@ -17,6 +17,8 @@ const {
 const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
+const { requestIdMiddleware } = require("./middleware/requestId");
+const { whitelabelMiddleware } = require("./middleware/whitelabel");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
@@ -69,6 +71,12 @@ app.use(cors(corsOptions));
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
+app.use(requestIdMiddleware); // Add request ID for distributed tracing
+
+/* ---------------- WHITELABEL MIDDLEWARE ---------------- */
+
+// Apply whitelabel configuration based on domain
+app.use(whitelabelMiddleware);
 
 /* ---------------- RATE LIMITING ---------------- */
 
