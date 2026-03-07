@@ -491,6 +491,23 @@ export const resolveDispute = async (invoiceId, sellerWins) => {
   return response.data;
 };
 
+// --- Fraud Detection API ---
+export const analyzeFraudRisk = (payload) => {
+  return api.post('/fraud-detection/analyze', payload);
+};
+
+export const getFraudAlerts = (params = {}) => {
+  return api.get('/fraud-detection/alerts', { params });
+};
+
+export const getFraudSummary = () => {
+  return api.get('/fraud-detection/summary');
+};
+
+export const updateFraudAlertStatus = (alertId, status, resolutionNote) => {
+  return api.patch(`/fraud-detection/alerts/${alertId}/status`, { status, resolutionNote });
+};
+
 // --- Streaming Payments API ---
 
 // Create a new subscription stream (seller)
