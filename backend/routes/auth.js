@@ -80,7 +80,7 @@ router.post('/register', authLimiter, validateRegister, async (req, res) => {
     const token = jwt.sign(
       { id: newUser.rows[0].id }, // Changed from userId to id
       process.env.JWT_SECRET,
-      { expiresIn: '1Y' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
     res.status(201).json({
@@ -135,7 +135,7 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
     const token = jwt.sign(
       { id: user.id }, // Changed from userId to id
       process.env.JWT_SECRET,
-      { expiresIn: '1Y' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
     // Return user data (excluding password)

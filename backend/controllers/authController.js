@@ -45,7 +45,7 @@ exports.register = async (req, res) => {
     const token = jwt.sign(
       { id: newUser.rows[0].id, role: newUser.rows[0].role }, 
       process.env.JWT_SECRET, 
-      { expiresIn: '24h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
     // 6. Set HttpOnly cookie
@@ -84,7 +84,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { id: user.rows[0].id, role: user.rows[0].role }, 
       process.env.JWT_SECRET, 
-      { expiresIn: '24h' }
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
     // Set HttpOnly cookie
