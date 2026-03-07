@@ -9,6 +9,17 @@ const logger = require("./utils/logger")("server");
 const crypto = require("crypto");
 require("dotenv").config();
 
+/* ---------------- GLOBAL ERROR HANDLERS ---------------- */
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection:', reason);
+});
+
 // Initialize secrets provider early
 const { getSecretsProvider } = require("./services/secrets");
 
@@ -104,7 +115,13 @@ app.use("/api/", globalLimiter);
 /* ---------------- DATABASE ---------------- */
 
 testDbConnection()
-  .then(() => logger.info("Database connection test initiated"))
+  .then((result) => {
+    if (result) {
+      logger.info("Database connection test completed successfully");
+    } else {
+      logger.warn("Database connection test completed but reported failure");
+    }
+  })
   .catch(err => logger.error("Database connection test failed:", err));
 
 /* ---------------- STATIC FILES ---------------- */
@@ -328,16 +345,7 @@ server.listen(PORT, () => {
 // Set up graceful shutdown handlers
 setupGracefulShutdown(server, io, blockchainQueue);
 
-/* ---------------- GLOBAL ERROR HANDLERS ---------------- */
-
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error(`Unhandled Rejection at: ${promise} reason: ${reason}`);
-});
+// Global error handlers are now registered at the top of the file
 
 const { startRecoveryWorker } = require('./services/recoveryService');
 
