@@ -5,7 +5,9 @@ const { pool } = require('./config/database');
 
 async function fixRoleConstraint() {
   try {
-    console.log('🔧 Fixing database role constraint for Issue #196...\n');
+const logger = require('./utils/logger')('fix_role_constraint');
+
+    logger.info('🔧 Fixing database role constraint for Issue #196...\n');
 
     // Drop old constraint
     console.log('1. Dropping old constraint...');

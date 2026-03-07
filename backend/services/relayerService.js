@@ -1,4 +1,5 @@
 const { ethers } = require('ethers');
+const logger = require('../utils/logger')('relayerService');
 const { getProvider, getSigner } = require('../config/blockchain');
 const MinimalForwarderABI = require('../../deployed/MinimalForwarder.json').abi;
 const contractAddresses = require('../../deployed/contract-addresses.json');
@@ -12,9 +13,10 @@ class RelayerService {
       MinimalForwarderABI,
       this.signer
     );
-    this.rateLimiter = new Map(); // user -> { count, resetTime }
     this.rateLimit = parseInt(process.env.GASLESS_RATE_LIMIT || '10');
     this.rateLimitWindow = 60 * 1000; // 1 minute
+    // Use database-backed rate limiting instead of in-memory Map
+    // This ensures rate limits work across PM2 clusters, Docker replicas, etc.
   }
 
   /**
@@ -31,8 +33,8 @@ class RelayerService {
         throw new Error('Invalid signature format');
       }
 
-      // 2. Check rate limits
-      this.checkRateLimit(request.from);
+      // 2. Check rate limits (now database-backed for multi-process support)
+      await this.checkRateLimit(request.from);
 
       // 3. Verify signature matches request.from
       const isValid = await this.forwarder.verify(request, signature);
@@ -97,7 +99,7 @@ class RelayerService {
         
         if (this.isRetryableError(error)) {
           const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-          console.log(`Retry attempt ${attempt} after ${delay}ms`);
+          logger.debug(`Retry attempt ${attempt} after ${delay}ms`);
           await this.sleep(delay);
           continue;
         }
@@ -124,29 +126,83 @@ class RelayerService {
   }
 
   /**
-   * Check rate limit for user
+   * Check rate limit for user using database-backed store
+   * Works across PM2 clusters, Docker replicas, and multi-process deployments
    * @param {string} address - User address
    * @throws {Error} If rate limit exceeded
    */
-  checkRateLimit(address) {
+  async checkRateLimit(address) {
+    const { pool } = require('../config/database');
     const now = Date.now();
-    const userLimit = this.rateLimiter.get(address);
+    const windowStart = now - this.rateLimitWindow;
 
-    if (!userLimit || now > userLimit.resetTime) {
-      // Reset or initialize
-      this.rateLimiter.set(address, {
-        count: 1,
-        resetTime: now + this.rateLimitWindow
-      });
-      return;
+    try {
+      // Start a transaction for atomic read-modify-write
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // Get current rate limit state for this address
+        const result = await client.query(
+          `SELECT count, window_start FROM rate_limits 
+           WHERE address = $1 FOR UPDATE`,
+          [address.toLowerCase()]
+        );
+
+        let count;
+        let windowStartDb;
+
+        if (result.rows.length === 0) {
+          // No record exists, create new one
+          count = 1;
+          windowStartDb = now;
+          await client.query(
+            `INSERT INTO rate_limits (address, count, window_start, updated_at)
+             VALUES ($1, $2, $3, NOW())`,
+            [address.toLowerCase(), count, windowStartDb]
+          );
+        } else {
+          const record = result.rows[0];
+          windowStartDb = parseInt(record.window_start);
+
+          // Check if the window has expired
+          if (now > windowStartDb + this.rateLimitWindow) {
+            // Reset the window
+            count = 1;
+            windowStartDb = now;
+          } else {
+            // Check if limit exceeded
+            if (record.count >= this.rateLimit) {
+              const waitTime = Math.ceil((windowStartDb + this.rateLimitWindow - now) / 1000);
+              throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds`);
+            }
+            count = parseInt(record.count) + 1;
+          }
+
+          // Update the record
+          await client.query(
+            `UPDATE rate_limits 
+             SET count = $1, window_start = $2, updated_at = NOW()
+             WHERE address = $3`,
+            [count, windowStartDb, address.toLowerCase()]
+          );
+        }
+
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      if (error.message.includes('Rate limit')) {
+        throw error;
+      }
+      // If database is unavailable, log warning but allow the request
+      // This prevents blocking all meta-transactions if DB has issues
+      console.error('[WARN] Rate limit check failed, allowing request:', error.message);
     }
-
-    if (userLimit.count >= this.rateLimit) {
-      const waitTime = Math.ceil((userLimit.resetTime - now) / 1000);
-      throw new Error(`Rate limit exceeded. Try again in ${waitTime} seconds`);
-    }
-
-    userLimit.count++;
   }
 
   /**
@@ -166,7 +222,7 @@ class RelayerService {
       const maticUsdPrice = 0.50; // Placeholder
       const gasCostUsd = gasCostMatic * maticUsdPrice;
 
-      const pool = require('../config/database');
+      const { pool } = require('../config/database');
       await pool.query(
         `INSERT INTO meta_transactions 
          (user_id, tx_hash, from_address, to_address, gas_used, gas_price, gas_cost_matic, gas_cost_usd, status, confirmed_at)
@@ -184,7 +240,7 @@ class RelayerService {
         ]
       );
 
-      console.log(`Gas cost recorded: ${gasCostMatic} MATIC ($${gasCostUsd.toFixed(4)})`);
+      logger.info(`Gas cost recorded: ${gasCostMatic} MATIC ($${gasCostUsd.toFixed(4)})`);
     } catch (error) {
       console.error('Error recording gas cost:', error);
       // Don't throw - gas recording failure shouldn't fail the transaction
