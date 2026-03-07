@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+import { parseUnits } from '../utils/formatters';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -51,9 +52,9 @@ const CrossChainFractionModal = ({
             const response = await api.post('/crosschain/bridge', {
                 tokenId: tokenId,
                 invoiceId: invoice.invoice_id,
-                amount: ethers.utils.parseUnits(amount, 18).toString(),
+                amount: parseUnits(amount, 18).toString(),
                 destinationChain: selectedChain,
-                pricePerFraction: ethers.utils.parseUnits(pricePerFraction, 6).toString()
+                pricePerFraction: parseUnits(pricePerFraction, 6).toString()
             });
 
             if (response.data.success) {
@@ -90,9 +91,9 @@ const CrossChainFractionModal = ({
             const response = await api.post('/crosschain/list', {
                 tokenId: tokenId,
                 invoiceId: invoice.invoice_id,
-                amount: ethers.utils.parseUnits(amount, 18).toString(),
+                amount: parseUnits(amount, 18).toString(),
                 destinationChain: selectedChain,
-                pricePerFraction: ethers.utils.parseUnits(pricePerFraction, 6).toString()
+                pricePerFraction: parseUnits(pricePerFraction, 6).toString()
             });
 
             if (response.data.success) {
