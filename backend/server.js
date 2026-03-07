@@ -156,6 +156,10 @@ app.use("/api/v1/crosschain", require("./routes/crossChain"));
 
 app.use("/api/v1/auctions", require("./routes/auction"));
 
+/* ---------------- AMM SECONDARY MARKET ---------------- */
+
+app.use('/api/v1/amm', require('./routes/amm'));
+
 /* ---------------- ANALYTICS ---------------- */
 
 app.use('/api/v1/analytics', require('./routes/analytics'));

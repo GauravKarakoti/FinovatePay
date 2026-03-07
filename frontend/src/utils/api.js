@@ -258,6 +258,35 @@ export const getMarketplaceListings = () => {
   return api.get('/financing/marketplace');
 };
 
+// --- AMM Secondary Market API ---
+export const getAMMPairs = (params) => {
+  return api.get('/amm/pairs', { params });
+};
+
+export const getAMMPairByTokenId = (tokenId) => {
+  return api.get(`/amm/pairs/token/${tokenId}`);
+};
+
+export const addAMMLiquidity = (payload) => {
+  return api.post('/amm/liquidity/add', payload);
+};
+
+export const removeAMMLiquidity = (payload) => {
+  return api.post('/amm/liquidity/remove', payload);
+};
+
+export const executeAMMSwap = (payload) => {
+  return api.post('/amm/swap', payload);
+};
+
+export const getAMMPositions = () => {
+  return api.get('/amm/positions/me');
+};
+
+export const getAMMTrades = (params) => {
+  return api.get('/amm/trades', { params });
+};
+
 // --- Auth API ---
 export const login = (email, password) => {
   return api.post('/auth/login', { email, password });
