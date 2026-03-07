@@ -2,6 +2,7 @@ const { ethers } = require('ethers');
 const path = require('path');
 const { pool } = require('../config/database');
 const errorResponse = require('../utils/errorResponse');
+const logger = require('../utils/logger')('relayerController');
 
 // Load artifact
 // Try to load from artifacts (dev) first, then deployed (prod)
@@ -12,7 +13,7 @@ try {
     try {
         EscrowContractArtifact = require('../../deployed/EscrowContract.json');
     } catch (e2) {
-        console.error("Could not load EscrowContract artifact");
+        logger.error("Could not load EscrowContract artifact");
     }
 }
 
@@ -41,7 +42,7 @@ const verifySignature = async (user, functionData, signature, nonce) => {
         // Verify the signer matches the user
         return recoveredAddress.toLowerCase() === user.toLowerCase();
     } catch (error) {
-        console.error('Signature verification failed:', error);
+        logger.error('Signature verification failed:', error);
         return false;
     }
 };
@@ -200,20 +201,20 @@ const relayTransaction = async (req, res) => {
 
         const contract = new ethers.Contract(contractAddress, EscrowContractArtifact.abi, wallet);
 
-        console.log(`✅ Relaying transaction for user ${user} to contract ${contractAddress}`);
-        console.log(`   Nonce: ${nonceToUse}, Relayer: ${wallet.address}`);
+        logger.info(`Relaying transaction for user ${user} to contract ${contractAddress}`);
+        logger.info(`   Nonce: ${nonceToUse}, Relayer: ${wallet.address}`);
 
         // Call executeMetaTx
         const tx = await contract.executeMetaTx(user, functionData, signature);
         txHash = tx.hash;
 
-        console.log(`📤 Transaction sent: ${txHash}`);
+        logger.info(`Transaction sent: ${txHash}`);
 
         // Wait for confirmation
         const receipt = await tx.wait();
         gasUsed = receipt.gasUsed.toString();
 
-        console.log(`✅ Transaction confirmed: ${txHash}, Gas used: ${gasUsed}`);
+        logger.info(`Transaction confirmed: ${txHash}, Gas used: ${gasUsed}`);
 
         // Increment nonce after successful transaction
         await incrementNonce(user);

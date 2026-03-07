@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { ethers } = require('ethers');
+const logger = require('../utils/logger')('reconciliationService');
 const { getEscrowContract, getProvider, contractAddresses } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const Invoice = require('../models/Invoice');
@@ -300,7 +301,7 @@ const runReconciliation = async (reconciliationType = 'manual', batchSize = 50) 
   const runId = uuidv4();
   const startTime = Date.now();
   
-  console.log(`[ReconciliationService] Starting ${reconciliationType} reconciliation run: ${runId}`);
+  logger.info(`[ReconciliationService] Starting ${reconciliationType} reconciliation run: ${runId}`);
 
   const summary = {
     matchedCount: 0,
@@ -317,7 +318,7 @@ const runReconciliation = async (reconciliationType = 'manual', batchSize = 50) 
     const totalInvoices = await getInvoicesWithEscrowCount();
     await createReconciliationSummary(runId, reconciliationType, totalInvoices);
 
-    console.log(`[ReconciliationService] Total invoices to reconcile: ${totalInvoices}`);
+    logger.info(`[ReconciliationService] Total invoices to reconcile: ${totalInvoices}`);
 
     // Process in batches
     let processed = 0;
@@ -405,15 +406,15 @@ const runReconciliation = async (reconciliationType = 'manual', batchSize = 50) 
       }
 
       offset += batchSize;
-      console.log(`[ReconciliationService] Processed ${offset}/${totalInvoices} invoices`);
+      logger.info(`[ReconciliationService] Processed ${offset}/${totalInvoices} invoices`);
     }
 
     // Update summary
     await updateReconciliationSummary(runId, summary);
 
     const duration = Date.now() - startTime;
-    console.log(`[ReconciliationService] Reconciliation run ${runId} completed in ${duration}ms`);
-    console.log(`[ReconciliationService] Results: matched=${summary.matchedCount}, discrepancies=${summary.discrepancyCount}, missing_chain=${summary.missingChainCount}, missing_db=${summary.missingDbCount}`);
+    logger.info(`[ReconciliationService] Reconciliation run ${runId} completed in ${duration}ms`);
+    logger.info(`[ReconciliationService] Results: matched=${summary.matchedCount}, discrepancies=${summary.discrepancyCount}, missing_chain=${summary.missingChainCount}, missing_db=${summary.missingDbCount}`);
 
     return {
       runId,
@@ -608,7 +609,7 @@ const startScheduledReconciliation = () => {
     const SIX_HOURS = 6 * 60 * 60 * 1000;
     
     setInterval(async () => {
-      console.log('[ReconciliationService] Running scheduled reconciliation...');
+      logger.info('[ReconciliationService] Running scheduled reconciliation...');
       try {
         await runReconciliation('scheduled');
       } catch (error) {
@@ -630,7 +631,7 @@ const startScheduledReconciliation = () => {
     }
   });
 
-  console.log('[ReconciliationService] Scheduled reconciliation enabled: runs every 6 hours');
+  logger.info('[ReconciliationService] Scheduled reconciliation enabled: runs every 6 hours');
 };
 
 /**
@@ -640,7 +641,7 @@ const stopScheduledReconciliation = () => {
   if (cronJob) {
     cronJob.stop();
     cronJob = null;
-    console.log('[ReconciliationService] Scheduled reconciliation stopped');
+    logger.info('[ReconciliationService] Scheduled reconciliation stopped');
   }
 };
 

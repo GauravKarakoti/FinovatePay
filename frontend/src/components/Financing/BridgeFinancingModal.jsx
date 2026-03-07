@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import { connectWallet, getFinancingManagerContract, stablecoinAddresses } from '../../utils/web3';
 import api from '../../utils/api';
 import { toast } from 'sonner';
+import { parseUnits, formatUnits } from '../../utils/formatters';
 
 const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => {
     const [loading, setLoading] = useState(false);
@@ -37,7 +38,7 @@ const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => 
             // Request financing via backend
             const response = await api.post('/financing/request', {
                 invoiceId,
-                amount: ethers.utils.parseUnits(borrowAmount, 6), // Assuming 6 decimals for stablecoins
+                amount: parseUnits(borrowAmount, 6).toString(), // Assuming 6 decimals for stablecoins
                 asset: selectedAsset,
                 collateralTokenId: parseInt(collateralTokenId)
             });
@@ -100,7 +101,7 @@ const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => 
                     {rates && (
                         <div className="mb-4 p-3 bg-gray-100 rounded">
                             <p className="text-sm">Borrow Rate: {(rates.borrowRate * 100).toFixed(2)}% APY</p>
-                            <p className="text-sm">Available Liquidity: {ethers.utils.formatUnits(rates.availableLiquidity, 6)}</p>
+                            <p className="text-sm">Available Liquidity: {formatUnits(rates.availableLiquidity, 6)}</p>
                         </div>
                     )}
 
