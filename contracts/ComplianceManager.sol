@@ -48,21 +48,25 @@ contract ComplianceManager is ERC721, Ownable, ERC2771Context {
     }
     
     function freezeAccount(address _account, string memory reason) external onlyOwner {
+        require(_account != address(0), "Cannot freeze zero address");
         frozenAccounts[_account] = true;
         emit AccountFrozen(_account,reason);
     }
     
     function unfreezeAccount(address _account) external onlyTimelock {
+        require(_account != address(0), "Cannot unfreeze zero address");
         frozenAccounts[_account] = false;
         emit AccountUnfrozen(_account);
     }
     
     function verifyKYC(address _account) external onlyTimelock {
+        require(_account != address(0), "Cannot verify KYC for zero address");
         kycVerified[_account] = true;
         emit KYCVerified(_account);
     }
     
     function revokeKYC(address _account) external onlyTimelock {
+        require(_account != address(0), "Cannot revoke KYC for zero address");
         kycVerified[_account] = false;
         emit KYCRevoked(_account);
     }
@@ -92,6 +96,7 @@ contract ComplianceManager is ERC721, Ownable, ERC2771Context {
     }
 
     function mintIdentity(address to) external onlyTimelock {
+        require(to != address(0), "Cannot mint identity to zero address");
         require(balanceOf(to) == 0, "Identity already verified");
         
         uint256 tokenId = _nextTokenId++;
@@ -102,6 +107,7 @@ contract ComplianceManager is ERC721, Ownable, ERC2771Context {
     }
 
     function revokeIdentity(address from) external onlyTimelock {
+        require(from != address(0), "Cannot revoke identity from zero address");
         require(balanceOf(from) > 0, "No identity to revoke");
         
         uint256 tokenId = userTokenId[from];

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const { adminIpWhitelist } = require('../middleware/ipWhitelist');
 const {
     getAllUsers,
     getInvoices,
@@ -20,8 +21,8 @@ const {
 } = require('../middleware/validators');
 
 // All routes in this file are protected and require admin privileges
-// Wait, router.use already applies requireRole('admin')! 
-// No need to pass authenticateToken later in the route functions
+// Apply IP whitelist for admin routes (bypassed in development mode)
+router.use(adminIpWhitelist());
 router.use(authenticateToken, requireRole('admin'));
 
 router.get('/users', getAllUsers);

@@ -11,6 +11,7 @@ async function processTokenizedEvent(
     tokenId,
     totalSupply,
     faceValue,
+    yieldBps,
     blockNumber
 ) {
     const client = await pool.connect();
@@ -22,7 +23,7 @@ async function processTokenizedEvent(
         const checkQuery = `
             SELECT token_id 
             FROM invoices 
-            WHERE invoice_hash = $1 AND token_id IS NOT NULL
+            WHERE invoice_hash = $1 AND token_id IS NOT NULL AND is_tokenized = true
         `;
         const checkResult = await client.query(checkQuery, [invoiceHash]);
 
@@ -39,6 +40,8 @@ async function processTokenizedEvent(
                 token_id = $1,
                 financing_status = 'listed',
                 is_tokenized = true,
+                face_value = $3,
+                yield_bps = $4,
                 updated_at = CURRENT_TIMESTAMP
             WHERE invoice_hash = $2
             RETURNING *
@@ -46,7 +49,9 @@ async function processTokenizedEvent(
 
         const updateResult = await client.query(updateQuery, [
             tokenId.toString(),
-            invoiceHash
+            invoiceHash,
+            faceValue.toString(),
+            yieldBps.toString()
         ]);
 
         if (updateResult.rows.length === 0) {
@@ -94,16 +99,17 @@ async function replayMissedEvents(contract, fromBlock, toBlock) {
 
     for (const event of events) {
         // Destructure matching the Solidity event arguments
-        const { invoiceId, tokenId, seller, totalFractions, pricePerFraction } = event.args;
+        const [ invoiceId, tokenId, seller, totalFractions, pricePerFraction, totalValue, yieldBps ] = event.args;
 
         try {
-            // Note: If processTokenizedEvent requires faceValue, you might need to calculate it 
-            // or fetch it from the contract since it's not in the event payload
+            // Calculate faceValue: totalFractions * pricePerFraction
+            const faceValue = totalFractions * pricePerFraction;
+            
             const success = await processTokenizedEvent(
                 invoiceId,
                 tokenId,
-                totalFractions, // passing fractions instead of supply
-                pricePerFraction, // passing price instead of faceValue
+                totalFractions, // totalSupply = totalFractions
+                faceValue,      // faceValue = totalFractions * pricePerFraction
                 event.blockNumber
             );
 
@@ -149,16 +155,20 @@ async function listenForTokenization() {
 
         console.log("🎧 Listening for new InvoiceFractionalized events...");
 
-        // Update event name and parameter list
+
+        // Update event name and parameter list, adding TotalValue and yieldBps
         contract.on(
             "InvoiceFractionalized",
-            async (invoiceId, tokenId, seller, totalFractions, pricePerFraction, event) => {
+            async (invoiceId, tokenId, seller, totalFractions, pricePerFraction, totalValue, yieldBps, event) => {
                 try {
+                    // Calculate faceValue: totalFractions * pricePerFraction
+                    const faceValue = totalFractions * pricePerFraction;
+                    
                     await processTokenizedEvent(
                         invoiceId,
                         tokenId,
-                        totalFractions,
-                        pricePerFraction, 
+                        totalFractions, // totalSupply = totalFractions
+                        faceValue,      // faceValue = totalFractions * pricePerFraction
                         event.log.blockNumber
                     );
                 } catch (err) {

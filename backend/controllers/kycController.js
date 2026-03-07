@@ -5,6 +5,7 @@ const { getSigner, contractAddresses } = require('../config/blockchain');
 const ComplianceManagerArtifact = require('../../deployed/ComplianceManager.json');
 const errorResponse = require('../utils/errorResponse');
 const AuditService = require('../services/auditService');
+const logger = require('../utils/logger')('kycController');
 
 /**
  * Verify or upsert a wallet-level KYC mapping
@@ -59,7 +60,7 @@ exports.verifyWallet = async (req, res) => {
         signer
       );
 
-      console.log(`[kycController] Executing on-chain verifyKYC for: ${walletAddress}`);
+      logger.info(`[kycController] Executing on-chain verifyKYC for: ${walletAddress}`);
       const tx = await complianceManager.verifyKYC(walletAddress);
       await tx.wait();
       
@@ -96,7 +97,7 @@ exports.verifyWallet = async (req, res) => {
         io.to(`user-${caller}`).emit('wallet-kyc-updated', { walletAddress });
       }
     } catch (emitErr) {
-      console.warn('[kycController] emit wallet kyc update failed:', emitErr.message || emitErr);
+      logger.warn('[kycController] emit wallet kyc update failed:', emitErr.message || emitErr);
     }
 
     res.json({ 
@@ -126,6 +127,7 @@ exports.verifyWallet = async (req, res) => {
       },
     });
 
+    logger.error('[kycController] verifyWallet error:', error.message || error);
     return errorResponse(res, error, 500);
   }
 };
@@ -153,7 +155,7 @@ exports.getWalletStatus = async (req, res, walletParam) => {
       data: status 
     });
   } catch (error) {
-    console.error('[kycController] getWalletStatus error:', error.message || error);
+    logger.error('[kycController] getWalletStatus error:', error.message || error);
     return errorResponse(res, error, 500);
   }
 };
@@ -165,12 +167,12 @@ exports.initiateKYC = async (req, res) => {
   try {
     // Call Sandbox to generate OTP
     const sandboxResponse = await sandboxService.generateAadhaarOTP(idNumber);
-    console.log("Sandbox Response: ", sandboxResponse);
+    logger.debug("Sandbox Response: ", sandboxResponse);
 
     // CHANGED: Use .data.reference_id instead of .transaction_id
     const kycReferenceId = sandboxResponse.data.reference_id; 
 
-    console.log(userId, idNumber, kycReferenceId);
+    logger.debug(userId, idNumber, kycReferenceId);
     
     await pool.query(
       `INSERT INTO kyc_verifications 
@@ -218,10 +220,10 @@ exports.verifyKYCOtp = async (req, res) => {
             signer
         );
 
-        console.log(`Verifying on-chain for: ${userWalletAddress}`);
+        logger.info(`Verifying on-chain for: ${userWalletAddress}`);
         const tx = await complianceManager.verifyKYC(userWalletAddress);
         await tx.wait();
-        console.log(`On-chain KYC verified: ${tx.hash}`);
+        logger.info(`On-chain KYC verified: ${tx.hash}`);
 
         // 3. Update Database
         await pool.query(
