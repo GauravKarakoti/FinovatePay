@@ -74,12 +74,15 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
     }
 
     constructor(address _waltBridge, address _complianceManager) Ownable(msg.sender) {
+        require(_waltBridge != address(0), "Invalid WaltBridge address");
+        require(_complianceManager != address(0), "Invalid ComplianceManager address");
         waltBridge = IWaltBridge(_waltBridge);
         complianceManager = ComplianceManager(_complianceManager);
     }
 
     // Lock assets for bridging to Katana
     function lockForBridge(address token, uint256 amount, bytes32 destinationChain) external onlyCompliant(msg.sender) nonReentrant returns (bytes32) {
+        require(token != address(0), "Invalid token address");
         require(destinationChain == KATANA_CHAIN, "Invalid destination chain");
         require(amount > 0, "Amount must be positive");
 
@@ -94,6 +97,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // Bridge locked assets (called after lockForBridge)
     function bridgeAsset(bytes32 lockId, address recipient) external onlyOwner {
+        require(recipient != address(0), "Invalid recipient address");
         LockedAsset memory asset = lockedAssets[lockId];
         require(asset.owner != address(0), "Asset not locked");
 
@@ -105,6 +109,8 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // Receive assets from Katana (mint or release)
     function receiveFromBridge(address token, uint256 amount, address recipient, bytes32 sourceChain) external onlyOwner onlyCompliant(recipient) {
+        require(token != address(0), "Invalid token address");
+        require(recipient != address(0), "Invalid recipient address");
         require(sourceChain == KATANA_CHAIN, "Invalid source chain");
 
         bytes32 lockId = keccak256(abi.encodePacked(token, amount, recipient, block.timestamp));
@@ -117,6 +123,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // Lock ERC1155 assets (FractionTokens) for bridging to Katana
     function lockERC1155ForBridge(address token, uint256 tokenId, uint256 amount, bytes32 destinationChain) external onlyCompliant(msg.sender) nonReentrant returns (bytes32) {
+        require(token != address(0), "Invalid token address");
         require(destinationChain == KATANA_CHAIN, "Invalid destination chain");
         require(amount > 0, "Amount must be positive");
 
@@ -131,6 +138,7 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // Bridge locked ERC1155 assets (called after lockERC1155ForBridge)
     function bridgeERC1155Asset(bytes32 lockId, address recipient) external onlyOwner {
+        require(recipient != address(0), "Invalid recipient address");
         LockedERC1155Asset memory asset = lockedERC1155Assets[lockId];
         require(asset.owner != address(0), "Asset not locked");
 
@@ -142,6 +150,8 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // Receive ERC1155 assets from Katana (mint or release)
     function receiveERC1155FromBridge(address token, uint256 tokenId, uint256 amount, address recipient, bytes32 sourceChain) external onlyOwner onlyCompliant(recipient) {
+        require(token != address(0), "Invalid token address");
+        require(recipient != address(0), "Invalid recipient address");
         require(sourceChain == KATANA_CHAIN, "Invalid source chain");
 
         bytes32 lockId = keccak256(abi.encodePacked(token, tokenId, amount, recipient, block.timestamp));
@@ -155,26 +165,35 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // Emergency withdraw ERC20 (admin only)
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+        require(token != address(0), "Invalid token address");
+        require(amount > 0, "Amount must be positive");
         IERC20(token).safeTransfer(owner(), amount);
     }
 
     // Emergency withdraw ERC1155 (admin only)
     function emergencyWithdrawERC1155(address token, uint256 tokenId, uint256 amount) external onlyOwner {
+        require(token != address(0), "Invalid token address");
+        require(amount > 0, "Amount must be positive");
         IERC1155(token).safeTransferFrom(address(this), owner(), tokenId, amount, "");
     }
 
     // Update WaltBridge address
     function updateWaltBridge(address _waltBridge) external onlyOwner {
+        require(_waltBridge != address(0), "Invalid WaltBridge address");
         waltBridge = IWaltBridge(_waltBridge);
     }
 
     // Update AggLayer address
     function updateAggLayer(address _aggLayer) external onlyOwner {
+        require(_aggLayer != address(0), "Invalid AggLayer address");
         aggLayer = IAggLayer(_aggLayer);
     }
 
     // AggLayer-compatible cross-chain transfer for ERC20
     function aggLayerTransferERC20(address token, uint256 amount, bytes32 destinationChain, address destinationContract, address recipient) external onlyCompliant(msg.sender) nonReentrant {
+        require(token != address(0), "Invalid token address");
+        require(destinationContract != address(0), "Invalid destination contract address");
+        require(recipient != address(0), "Invalid recipient address");
         require(destinationChain != FINOVATE_CHAIN, "Cannot transfer to same chain");
         require(amount > 0, "Amount must be positive");
 
@@ -188,6 +207,9 @@ contract BridgeAdapter is Ownable, ReentrancyGuard, IERC1155Receiver {
 
     // AggLayer-compatible cross-chain transfer for ERC1155 (FractionTokens)
     function aggLayerTransferERC1155(address token, uint256 tokenId, uint256 amount, bytes32 destinationChain, address destinationContract, address recipient) external onlyCompliant(msg.sender) nonReentrant {
+        require(token != address(0), "Invalid token address");
+        require(destinationContract != address(0), "Invalid destination contract address");
+        require(recipient != address(0), "Invalid recipient address");
         require(destinationChain != FINOVATE_CHAIN, "Cannot transfer to same chain");
         require(amount > 0, "Amount must be positive");
 
