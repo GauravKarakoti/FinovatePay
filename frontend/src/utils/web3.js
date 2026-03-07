@@ -4,12 +4,12 @@ import { BrowserProvider, Contract, ethers } from 'ethers';
 import { keccak256, toUtf8Bytes } from './formatters';
 
 // Import contract ABIs and addresses
-import EscrowContractArtifact from '../../../deployed/EscrowContractV2.json';
+import EscrowContractArtifact from '../../../deployed/EscrowContract.json';
 import InvoiceFactoryArtifact from '../../../deployed/InvoiceFactory.json';
 import ProduceTrackingArtifact from '../../../deployed/ProduceTracking.json';
 import FractionTokenArtifact from '../../../deployed/FractionToken.json';
 import contractAddresses from '../../../deployed/contract-addresses.json';
-import FinancingManagerArtifact from '../../../deployed/FinancingManagerV2.json';
+import FinancingManagerArtifact from '../../../deployed/FinancingManager.json';
 import ERC20Artifact from '../../../deployed/ERC20.json';
 
 // Stablecoin addresses on Polygon Amoy

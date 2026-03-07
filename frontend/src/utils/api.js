@@ -14,15 +14,16 @@ export const setNavigateFunction = (navigate) => {
 
 // Create axios instance with default config
 // withCredentials: true ensures cookies are sent with requests
+// API v1 base URL
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/v1`,
   withCredentials: true,
 });
 
 // Raw axios instance without interceptors for logout requests
 // This prevents recursive 401 loops when logout endpoint also returns 401
 const rawAxios = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/v1`,
   withCredentials: true,
 });
 
@@ -42,7 +43,23 @@ api.interceptors.request.use(
 // Handle API errors with comprehensive error handling
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Check for API version headers
+    const apiVersion = response.headers['x-api-version'];
+    const latestVersion = response.headers['x-api-latest-version'];
+    const deprecation = response.headers['deprecation'];
+    
+    if (deprecation && process.env.NODE_ENV === 'development') {
+      console.warn(`[API] Deprecation warning: This API version is deprecated. Latest version: ${latestVersion}`);
+    }
+    
+    // Check for deprecation warning in response body
+    if (response.data?.deprecationWarning) {
+      console.warn(`[API] Deprecation Warning: ${response.data.deprecationWarning}`);
+    }
+    
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -394,6 +411,11 @@ export const getEscrowStatus = (invoiceId) => {
   return api.get(`/escrow/${invoiceId}/status`);
 };
 
+// Create a multi-party escrow for an invoice
+export const createMultiPartyEscrow = (invoiceId, durationSeconds) => {
+  return api.post('/escrow/multi-party', { invoiceId, durationSeconds });
+};
+
 // --- High-Value Transaction Multi-Sig API ---
 
 // Check if a transaction requires multi-sig
@@ -705,6 +727,23 @@ export const getGovernanceStats = () => {
 // Execute a parameter change
 export const executeParameterChange = (parameterName) => {
   return api.post('/governance/execute', { parameterName });
+};
+
+// --- Staking API ---
+export const stakeTokens = ({ tokenAddress, tokenId, amount, lockDurationSeconds, apyBP }) => {
+  return api.post('/staking/stake', { tokenAddress, tokenId, amount, lockDurationSeconds, apyBP });
+};
+
+export const unstakeTokens = (stakeId) => {
+  return api.post('/staking/unstake', { stakeId });
+};
+
+export const getStakingRewards = () => {
+  return api.get('/staking/rewards');
+};
+
+export const claimStakingRewards = (stakeId) => {
+  return api.post('/staking/rewards/claim', { stakeId });
 };
 
 export default api;
