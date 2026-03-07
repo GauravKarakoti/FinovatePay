@@ -1,6 +1,9 @@
 const { ethers } = require("ethers");
 require("dotenv").config();
 
+// Import secrets provider for secure key management
+const { getSecret } = require("../services/secrets");
+
 // 1️⃣ Import ABIs and Deployed Addresses
 const FractionTokenABI = require("../../deployed/FractionToken.json").abi;
 const ComplianceManagerABI = require("../../deployed/ComplianceManager.json").abi;
@@ -14,18 +17,28 @@ const deployedAddresses = require("../../deployed/contract-addresses.json");
 
 let configError = null;
 
-if (!process.env.BLOCKCHAIN_RPC_URL) {
-  configError =
-    "Missing BLOCKCHAIN_RPC_URL in .env file. Please provide a valid RPC URL.";
-}
+// Async validation of configuration
+const validateConfig = async () => {
+  if (!process.env.BLOCKCHAIN_RPC_URL) {
+    return "Missing BLOCKCHAIN_RPC_URL in .env file. Please provide a valid RPC URL.";
+  }
 
-if (!process.env.DEPLOYER_PRIVATE_KEY) {
-  configError =
-    configError ||
-    "Missing DEPLOYER_PRIVATE_KEY in .env file. Please provide the deployer's private key.";
-}
+  // Check for private key in secrets provider or env
+  const privateKey = await getSecret("DEPLOYER_PRIVATE_KEY");
+  if (!privateKey && !process.env.DEPLOYER_PRIVATE_KEY) {
+    return "Missing DEPLOYER_PRIVATE_KEY. Please configure via secrets provider or environment variable.";
+  }
 
-const getConfigError = () => configError;
+  return null;
+};
+
+// Initialize config validation
+let _configError = null;
+validateConfig().then(err => {
+  _configError = err;
+});
+
+const getConfigError = () => _configError;
 
 // --------------------------------------------------
 // Provider & Signer (Fail-Fast)
@@ -45,7 +58,38 @@ const getProvider = () => {
   }
 };
 
-const getSigner = () => {
+/**
+ * Gets the signer using the private key from secrets provider.
+ * Falls back to environment variable for backward compatibility.
+ */
+const getSigner = async () => {
+  // Try to get private key from secrets provider first
+  let privateKey = await getSecret("DEPLOYER_PRIVATE_KEY");
+  
+  // Fall back to environment variable
+  if (!privateKey) {
+    privateKey = process.env.DEPLOYER_PRIVATE_KEY;
+  }
+
+  if (!privateKey) {
+    throw new Error("DEPLOYER_PRIVATE_KEY not configured. Set via secrets provider or environment variable.");
+  }
+
+  const provider = getProvider();
+
+  try {
+    return new ethers.Wallet(privateKey, provider);
+  } catch (error) {
+    throw new Error(`Failed to create signer: ${error.message}`);
+  }
+};
+
+/**
+ * Synchronous version of getSigner for backward compatibility.
+ * Uses environment variable only.
+ * @deprecated Use async getSigner() instead
+ */
+const getSignerSync = () => {
   if (!process.env.DEPLOYER_PRIVATE_KEY) {
     throw new Error("DEPLOYER_PRIVATE_KEY not configured.");
   }
@@ -73,7 +117,6 @@ const contractAddresses = {
     process.env.INVOICE_FACTORY_ADDRESS,
 
   escrowContract:
-    deployedAddresses.EscrowContractV2 ||
     deployedAddresses.EscrowContract ||
     process.env.ESCROW_CONTRACT_ADDRESS,
 
@@ -90,7 +133,6 @@ const contractAddresses = {
     process.env.FRACTION_TOKEN_ADDRESS,
 
   financingManager:
-    deployedAddresses.FinancingManagerV2 ||
     deployedAddresses.FinancingManager ||
     process.env.FINANCING_MANAGER_ADDRESS,
 
@@ -183,6 +225,7 @@ const getEscrowContract = (signerOrProvider) =>
 module.exports = {
   getProvider,
   getSigner,
+  getSignerSync,
   contractAddresses,
   getComplianceManagerContract,
   getFractionTokenContract,
