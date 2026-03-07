@@ -17,6 +17,7 @@ const {
 const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
+const { auditMetadataMiddleware } = require("./middleware/auditMiddleware");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
@@ -69,6 +70,7 @@ app.use(cors(corsOptions));
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
+app.use(auditMetadataMiddleware); // Capture audit metadata for all requests
 
 /* ---------------- RATE LIMITING ---------------- */
 
@@ -98,6 +100,7 @@ app.use("/api/escrow", require("./routes/escrow"));
 
 app.use("/api/admin", require("./routes/admin"));
 app.use("/api/kyc", kycLimiter, require("./routes/kyc"));
+app.use("/api/audit", require("./routes/audit"));
 app.use("/api/produce", require("./routes/produce"));
 app.use("/api/quotations", require("./routes/quotation"));
 app.use("/api/market", require("./routes/market"));

@@ -4,6 +4,7 @@ const { ethers } = require('ethers');
 const { getSigner, contractAddresses } = require('../config/blockchain');
 const ComplianceManagerArtifact = require('../../deployed/ComplianceManager.json');
 const errorResponse = require('../utils/errorResponse');
+const AuditService = require('../services/auditService');
 
 /**
  * Verify or upsert a wallet-level KYC mapping
@@ -19,6 +20,24 @@ exports.verifyWallet = async (req, res) => {
   }
 
   try {
+    // Log KYC initiation
+    await AuditService.logKYCEvent({
+      operationType: 'KYC_INITIATE',
+      userId: caller,
+      actorId: caller,
+      actorRole: req.user?.role,
+      actorWallet: req.user?.wallet_address,
+      oldStatus: null,
+      newStatus: 'pending',
+      status: 'PENDING',
+      ipAddress: req.auditData?.ipAddress,
+      userAgent: req.auditData?.userAgent,
+      metadata: {
+        walletAddress,
+        provider,
+      },
+    });
+
     // Record wallet KYC mapping in database
     const kycService = require('../services/kycService');
     await kycService.upsertWalletMapping({
@@ -49,6 +68,27 @@ exports.verifyWallet = async (req, res) => {
       await kycService.syncWithBlockchain(walletAddress);
     }
 
+    // Log successful KYC verification
+    await AuditService.logKYCEvent({
+      operationType: 'KYC_VERIFY',
+      userId: caller,
+      actorId: caller,
+      actorRole: req.user?.role,
+      actorWallet: req.user?.wallet_address,
+      oldStatus: 'pending',
+      newStatus: status || 'verified',
+      status: 'SUCCESS',
+      ipAddress: req.auditData?.ipAddress,
+      userAgent: req.auditData?.userAgent,
+      verificationMethod: onChain ? 'on-chain' : 'manual',
+      metadata: {
+        walletAddress,
+        provider,
+        riskLevel: riskLevel || 'low',
+        transactionHash: onChain ? undefined : null,
+      },
+    });
+
     // Emit real-time update via Socket.io if available
     try {
       const io = req.app.get('io');
@@ -66,6 +106,26 @@ exports.verifyWallet = async (req, res) => {
     });
   } catch (error) {
     console.error('[kycController] verifyWallet error:', error.message || error);
+    
+    // Log KYC verification failure
+    await AuditService.logKYCEvent({
+      operationType: 'KYC_VERIFY',
+      userId: caller,
+      actorId: caller,
+      actorRole: req.user?.role,
+      actorWallet: req.user?.wallet_address,
+      oldStatus: null,
+      newStatus: 'failed',
+      status: 'FAILED',
+      ipAddress: req.auditData?.ipAddress,
+      userAgent: req.auditData?.userAgent,
+      errorMessage: error.message,
+      metadata: {
+        walletAddress,
+        provider,
+      },
+    });
+
     return errorResponse(res, error, 500);
   }
 };

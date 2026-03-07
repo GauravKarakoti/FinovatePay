@@ -2,6 +2,7 @@ const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const errorResponse = require('../utils/errorResponse');
+const AuditService = require('../services/auditService');
 
 // Utility function to sanitize user object (remove sensitive fields)
 const sanitizeUser = (user) => {
@@ -25,6 +26,15 @@ exports.register = async (req, res) => {
 
     
     if (userCheck.rows.length > 0) {
+      // Log failed registration attempt
+      await AuditService.logFailedAuth({
+        email,
+        userId: null,
+        reason: 'User already exists',
+        ipAddress: req.auditData?.ipAddress,
+        userAgent: req.auditData?.userAgent,
+        errorMessage: 'User already exists with this Email or Wallet',
+      });
       return errorResponse(res, 'User already exists with this Email or Wallet', 400);
     }
 
@@ -48,7 +58,20 @@ exports.register = async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    // 6. Set HttpOnly cookie
+    // 6. Log successful registration
+    await AuditService.logUserAuth({
+      type: 'register',
+      userId: newUser.rows[0].id,
+      email,
+      wallet: walletAddress,
+      role: 'seller',
+      action: 'user_registered',
+      status: 'SUCCESS',
+      ipAddress: req.auditData?.ipAddress,
+      userAgent: req.auditData?.userAgent,
+    });
+
+    // 7. Set HttpOnly cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -59,6 +82,15 @@ exports.register = async (req, res) => {
     res.json({ user: sanitizeUser(newUser.rows[0]), token });
   } catch (err) {
     console.error("❌ Registration Error:", err.message);
+    // Log registration error
+    await AuditService.logFailedAuth({
+      email,
+      userId: null,
+      reason: 'Server error',
+      ipAddress: req.auditData?.ipAddress,
+      userAgent: req.auditData?.userAgent,
+      errorMessage: err.message,
+    });
     return errorResponse(res, 'Server error during registration', 500);
   }
 };
@@ -71,21 +103,65 @@ exports.login = async (req, res) => {
     // 1. Find user by email
     const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (user.rows.length === 0) {
+      // Log failed login attempt
+      await AuditService.logFailedAuth({
+        email,
+        userId: null,
+        reason: 'Invalid credentials - user not found',
+        ipAddress: req.auditData?.ipAddress,
+        userAgent: req.auditData?.userAgent,
+        errorMessage: 'Invalid credentials',
+      });
       return errorResponse(res, 'Invalid credentials', 400);
     }
 
     // 2. Check password
     const isMatch = await bcrypt.compare(password, user.rows[0].password);
     if (!isMatch) {
+      // Log failed login attempt
+      await AuditService.logFailedAuth({
+        email,
+        userId: user.rows[0].id,
+        reason: 'Invalid password',
+        ipAddress: req.auditData?.ipAddress,
+        userAgent: req.auditData?.userAgent,
+        errorMessage: 'Invalid credentials',
+      });
       return errorResponse(res, 'Invalid credentials', 400);
     }
 
-    // 3. Create and set token in HttpOnly cookie
+    // 3. Check if user account is frozen/disabled
+    if (user.rows[0].is_frozen) {
+      await AuditService.logFailedAuth({
+        email,
+        userId: user.rows[0].id,
+        reason: 'Account frozen',
+        ipAddress: req.auditData?.ipAddress,
+        userAgent: req.auditData?.userAgent,
+        errorMessage: 'Account is frozen',
+      });
+      return errorResponse(res, 'Account is frozen. Please contact support.', 403);
+    }
+
+    // 4. Create and set token in HttpOnly cookie
     const token = jwt.sign(
       { id: user.rows[0].id, role: user.rows[0].role }, 
       process.env.JWT_SECRET, 
       { expiresIn: '24h' }
     );
+
+    // 5. Log successful login
+    await AuditService.logUserAuth({
+      type: 'login',
+      userId: user.rows[0].id,
+      email,
+      wallet: user.rows[0].wallet_address,
+      role: user.rows[0].role,
+      action: 'user_login',
+      status: 'SUCCESS',
+      ipAddress: req.auditData?.ipAddress,
+      userAgent: req.auditData?.userAgent,
+    });
 
     // Set HttpOnly cookie
     res.cookie('token', token, {
@@ -98,6 +174,14 @@ exports.login = async (req, res) => {
     res.json({ user: sanitizeUser(user.rows[0]), token });
   } catch (err) {
     console.error("❌ Login Error:", err.message);
+    await AuditService.logFailedAuth({
+      email,
+      userId: null,
+      reason: 'Server error',
+      ipAddress: req.auditData?.ipAddress,
+      userAgent: req.auditData?.userAgent,
+      errorMessage: err.message,
+    });
     return errorResponse(res, 'Server error', 500);
   }
 };

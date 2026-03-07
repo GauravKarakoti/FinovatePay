@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const AuditService = require('../services/auditService');
 
 /**
  * Log an audit entry for compliance tracking
@@ -6,46 +7,7 @@ const { pool } = require('../config/database');
  * @returns {Promise<Object>} - Created audit log entry
  */
 const logAudit = async (auditData) => {
-    try {
-        const {
-            operationType,
-            entityType,
-            entityId,
-            actorId,
-            actorWallet,
-            actorRole,
-            action,
-            status,
-            oldValues = null,
-            newValues = null,
-            metadata = null,
-            ipAddress = null,
-            userAgent = null,
-            errorMessage = null
-        } = auditData;
-
-        const result = await pool.query(
-            `INSERT INTO audit_logs (
-                operation_type, entity_type, entity_id, actor_id, actor_wallet, actor_role,
-                action, status, old_values, new_values, metadata, ip_address, user_agent, error_message
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-            RETURNING *`,
-            [
-                operationType, entityType, entityId, actorId, actorWallet, actorRole,
-                action, status, 
-                oldValues ? JSON.stringify(oldValues) : null,
-                newValues ? JSON.stringify(newValues) : null,
-                metadata ? JSON.stringify(metadata) : null,
-                ipAddress, userAgent, errorMessage
-            ]
-        );
-
-        return result.rows[0];
-    } catch (error) {
-        console.error('❌ Audit logging failed:', error);
-        // Don't throw - audit logging failure shouldn't break the operation
-        return null;
-    }
+    return AuditService.createAuditLog(auditData);
 };
 
 /**
