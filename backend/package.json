@@ -40,13 +40,14 @@
     "socket.io": "^4.8.1",
     "sonner": "^2.0.7",
     "stripe": "^20.0.0",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
     "chai": "^4.3.10",
     "jest": "^30.2.0",
     "mocha": "^10.2.0",
+    "nodemon": "^3.1.10",
     "supertest": "^7.2.2"
   },
   "engines": {
