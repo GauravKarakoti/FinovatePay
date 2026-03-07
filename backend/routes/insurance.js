@@ -25,13 +25,14 @@ const bytes32ToUuid = (bytes32) => {
   }).join('-').toLowerCase();
 };
 
-// All insurance routes require authentication and KYC
+// All insurance routes require authentication
+// Apply authentication middleware globally to all routes
 router.use(authenticateToken);
-router.use(requireKYC);
 
 /**
  * GET /api/insurance/config
  * Get insurance premium configuration
+ * Public endpoint - no KYC required for viewing config
  */
 router.get('/config', async (req, res) => {
   try {
@@ -74,6 +75,7 @@ router.get('/config', async (req, res) => {
 /**
  * GET /api/insurance/calculate-premium
  * Calculate premium for given coverage and duration
+ * Public endpoint - no KYC required for premium calculation
  */
 router.get('/calculate-premium', async (req, res) => {
   try {
@@ -112,8 +114,9 @@ router.get('/calculate-premium', async (req, res) => {
 /**
  * POST /api/insurance/purchase
  * Purchase insurance for an escrow
+ * Requires KYC verification
  */
-router.post('/purchase', requireRole(['buyer', 'seller', 'investor']), async (req, res) => {
+router.post('/purchase', requireKYC, requireRole(['buyer', 'seller', 'investor']), async (req, res) => {
   const client = await pool.connect();
 
   try {
@@ -248,9 +251,15 @@ router.post('/purchase', requireRole(['buyer', 'seller', 'investor']), async (re
 /**
  * GET /api/insurance/policies
  * Get user's insurance policies
+ * Requires authentication - returns only user's own policies
  */
 router.get('/policies', async (req, res) => {
   try {
+    // Verify user is authenticated (req.user should exist from authenticateToken middleware)
+    if (!req.user || !req.user.wallet_address) {
+      return errorResponse(res, 'Authentication required', 401);
+    }
+    
     const userWallet = req.user.wallet_address;
     
     const policies = await insuranceService.getPoliciesByAddress(userWallet);
@@ -268,9 +277,15 @@ router.get('/policies', async (req, res) => {
 /**
  * GET /api/insurance/policy/:policyId
  * Get specific policy details
+ * Requires authentication - users can only view their own policies
  */
 router.get('/policy/:policyId', async (req, res) => {
   try {
+    // Verify user is authenticated
+    if (!req.user || !req.user.wallet_address) {
+      return errorResponse(res, 'Authentication required', 401);
+    }
+    
     const { policyId } = req.params;
     const userWallet = req.user.wallet_address;
 
