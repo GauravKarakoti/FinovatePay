@@ -14,15 +14,16 @@ export const setNavigateFunction = (navigate) => {
 
 // Create axios instance with default config
 // withCredentials: true ensures cookies are sent with requests
+// API v1 base URL
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/v1`,
   withCredentials: true,
 });
 
 // Raw axios instance without interceptors for logout requests
 // This prevents recursive 401 loops when logout endpoint also returns 401
 const rawAxios = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/v1`,
   withCredentials: true,
 });
 
@@ -42,7 +43,23 @@ api.interceptors.request.use(
 // Handle API errors with comprehensive error handling
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Check for API version headers
+    const apiVersion = response.headers['x-api-version'];
+    const latestVersion = response.headers['x-api-latest-version'];
+    const deprecation = response.headers['deprecation'];
+    
+    if (deprecation && process.env.NODE_ENV === 'development') {
+      console.warn(`[API] Deprecation warning: This API version is deprecated. Latest version: ${latestVersion}`);
+    }
+    
+    // Check for deprecation warning in response body
+    if (response.data?.deprecationWarning) {
+      console.warn(`[API] Deprecation Warning: ${response.data.deprecationWarning}`);
+    }
+    
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
@@ -241,6 +258,35 @@ export const getMarketplaceListings = () => {
   return api.get('/financing/marketplace');
 };
 
+// --- AMM Secondary Market API ---
+export const getAMMPairs = (params) => {
+  return api.get('/amm/pairs', { params });
+};
+
+export const getAMMPairByTokenId = (tokenId) => {
+  return api.get(`/amm/pairs/token/${tokenId}`);
+};
+
+export const addAMMLiquidity = (payload) => {
+  return api.post('/amm/liquidity/add', payload);
+};
+
+export const removeAMMLiquidity = (payload) => {
+  return api.post('/amm/liquidity/remove', payload);
+};
+
+export const executeAMMSwap = (payload) => {
+  return api.post('/amm/swap', payload);
+};
+
+export const getAMMPositions = () => {
+  return api.get('/amm/positions/me');
+};
+
+export const getAMMTrades = (params) => {
+  return api.get('/amm/trades', { params });
+};
+
 // --- Auth API ---
 export const login = (email, password) => {
   return api.post('/auth/login', { email, password });
@@ -394,6 +440,11 @@ export const getEscrowStatus = (invoiceId) => {
   return api.get(`/escrow/${invoiceId}/status`);
 };
 
+// Create a multi-party escrow for an invoice
+export const createMultiPartyEscrow = (invoiceId, durationSeconds) => {
+  return api.post('/escrow/multi-party', { invoiceId, durationSeconds });
+};
+
 // --- High-Value Transaction Multi-Sig API ---
 
 // Check if a transaction requires multi-sig
@@ -467,6 +518,23 @@ export const updateInvoiceStatus = (invoiceId, status, txHash, disputeReason = '
 export const resolveDispute = async (invoiceId, sellerWins) => {
   const response = await api.post('/admin/resolve-dispute', { invoiceId, sellerWins });
   return response.data;
+};
+
+// --- Fraud Detection API ---
+export const analyzeFraudRisk = (payload) => {
+  return api.post('/fraud-detection/analyze', payload);
+};
+
+export const getFraudAlerts = (params = {}) => {
+  return api.get('/fraud-detection/alerts', { params });
+};
+
+export const getFraudSummary = () => {
+  return api.get('/fraud-detection/summary');
+};
+
+export const updateFraudAlertStatus = (alertId, status, resolutionNote) => {
+  return api.patch(`/fraud-detection/alerts/${alertId}/status`, { status, resolutionNote });
 };
 
 // --- Streaming Payments API ---
@@ -705,6 +773,40 @@ export const getGovernanceStats = () => {
 // Execute a parameter change
 export const executeParameterChange = (parameterName) => {
   return api.post('/governance/execute', { parameterName });
+};
+
+// --- Treasury API ---
+export const getTreasuryBalance = (token) => {
+  return api.get('/treasury/balance', { params: { token } });
+};
+
+export const withdrawFromTreasury = (token, to, amount) => {
+  return api.post('/treasury/withdraw', { token, to, amount });
+};
+
+export const getTreasuryTransactions = (params) => {
+  return api.get('/treasury/transactions', { params });
+};
+
+export const getTreasuryReports = (params) => {
+  return api.get('/treasury/reports', { params });
+};
+
+// --- Staking API ---
+export const stakeTokens = ({ tokenAddress, tokenId, amount, lockDurationSeconds, apyBP }) => {
+  return api.post('/staking/stake', { tokenAddress, tokenId, amount, lockDurationSeconds, apyBP });
+};
+
+export const unstakeTokens = (stakeId) => {
+  return api.post('/staking/unstake', { stakeId });
+};
+
+export const getStakingRewards = () => {
+  return api.get('/staking/rewards');
+};
+
+export const claimStakingRewards = (stakeId) => {
+  return api.post('/staking/rewards/claim', { stakeId });
 };
 
 export default api;

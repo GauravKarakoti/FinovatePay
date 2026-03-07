@@ -1,6 +1,8 @@
 const { pool } = require('../config/database');
 const CreditRiskProfile = require('../models/CreditRiskProfile');
 const creditScoreService = require('./creditScoreService');
+const axios = require('axios');
+const { fetchOnchainFeatures } = require('./onchainFetcher');
 
 /**
  * Credit Risk Assessment Service
@@ -699,7 +701,71 @@ module.exports = {
   getRiskHistory,
   getAllRiskProfiles,
   getRiskProfilesByCategory,
+  analyzeCreditRisk,
   RISK_WEIGHTS,
   BASE_RATE_CONFIG
 };
+
+/**
+ * Analyze credit risk via external ML microservice.
+ * Accepts { userId, walletAddress, force }
+ */
+async function analyzeCreditRisk({ userId, walletAddress, force = false }) {
+  const client = await pool.connect();
+  try {
+    // Gather features using existing analysis functions
+    const behavioralData = await analyzeBehavioralPatterns(client, userId);
+    const paymentVelocityData = await analyzePaymentVelocity(client, userId);
+    const marketData = await analyzeMarketAlignment(client, userId);
+    const financialHealthData = await analyzeFinancialHealth(client, userId);
+
+    const onchain = await fetchOnchainFeatures({ userId, walletAddress });
+
+    const payload = {
+      userId,
+      walletAddress,
+      features: {
+        behavioral: behavioralData,
+        payment_velocity: paymentVelocityData,
+        market: marketData,
+        financial: financialHealthData,
+        onchain
+      },
+      force
+    };
+
+    const mlUrl = process.env.ML_SERVICE_URL || 'http://localhost:5000';
+
+    const resp = await axios.post(`${mlUrl}/predict`, payload, { timeout: 15000 });
+
+    const mlResult = resp.data || {};
+
+    // Optionally upsert the returned profile into CreditRiskProfile for record
+    if (mlResult && mlResult.riskScore != null) {
+      const riskProfileData = {
+        behavioral_score: mlResult.componentScores?.behavioral || behavioralData.behavioral_score || 0,
+        payment_velocity_score: mlResult.componentScores?.paymentVelocity || paymentVelocityData.payment_consistency_score || 0,
+        market_alignment_score: mlResult.componentScores?.marketAlignment || marketData.volume_ratio || 0,
+        financial_health_score: mlResult.componentScores?.financial || financialHealthData.liquidity_indicator || 0,
+        risk_score: mlResult.riskScore,
+        risk_category: mlResult.category || null,
+        model_version: mlResult.modelVersion || 'ml-service',
+        model_confidence: mlResult.confidence || null
+      };
+
+      try {
+        await CreditRiskProfile.upsert(userId, riskProfileData);
+      } catch (err) {
+        console.warn('[CreditRiskService] Failed to upsert ML result:', err.message);
+      }
+    }
+
+    return mlResult;
+  } catch (error) {
+    console.error('[CreditRiskService] ML analysis failed:', error?.message || error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
 

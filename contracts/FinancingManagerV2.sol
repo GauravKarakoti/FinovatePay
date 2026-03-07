@@ -37,6 +37,10 @@ interface ILiquidityAdapter {
     function repayToPool(bytes32 loanId) external;
 }
 
+interface IInvoiceAMM {
+    function getPrice(uint256 tokenId) external view returns (uint256);
+}
+
 interface IEscrowContract {
     function createEscrow(
         bytes32 invoiceId,
@@ -79,6 +83,7 @@ contract FinancingManagerV2 is
     IBridgeAdapter public bridgeAdapter;
     ILiquidityAdapter public liquidityAdapter;
     IEscrowContract public escrowContract;
+    IInvoiceAMM public invoiceAMM;
 
     struct FinancingRequest {
         address borrower;
@@ -115,6 +120,7 @@ contract FinancingManagerV2 is
     event CrossChainFractionListed(uint256 indexed tokenId, address indexed seller, uint256 amount, bytes32 destinationChain, uint256 pricePerFraction);
     event CrossChainFractionSold(uint256 indexed tokenId, address indexed seller, address indexed buyer, uint256 amount, uint256 totalPrice, bytes32 destinationChain);
     event CrossChainFractionReturned(uint256 indexed tokenId, address indexed owner, uint256 amount, bytes32 sourceChain);
+    event InvoiceAMMUpdated(address indexed invoiceAMM);
     event ContractUpgraded(address indexed oldImplementation, address indexed newImplementation, uint256 newVersion);
 
     /*//////////////////////////////////////////////////////////////
@@ -415,6 +421,28 @@ contract FinancingManagerV2 is
         bridgeAdapter = IBridgeAdapter(_bridgeAdapter);
         liquidityAdapter = ILiquidityAdapter(_liquidityAdapter);
         escrowContract = IEscrowContract(_escrowContract);
+    }
+
+    /**
+     * @notice Set the secondary market AMM contract for invoice fractions.
+     */
+    function setInvoiceAMM(address _invoiceAMM) external onlyOwner {
+        require(_invoiceAMM != address(0), "Invalid AMM address");
+        invoiceAMM = IInvoiceAMM(_invoiceAMM);
+        emit InvoiceAMMUpdated(_invoiceAMM);
+    }
+
+    /**
+     * @notice Returns current AMM secondary-market spot price for a tokenized invoice.
+     * @dev Price is stablecoin units per fraction, scaled by 1e18.
+     */
+    function getSecondaryMarketPrice(uint256 _tokenId) external view returns (uint256) {
+        IFractionToken.TokenDetails memory details = fractionToken.tokenDetails(_tokenId);
+        require(details.faceValue > 0, "Token not found");
+        if (address(invoiceAMM) == address(0)) {
+            return 0;
+        }
+        return invoiceAMM.getPrice(_tokenId);
     }
 
     /*============================================================
