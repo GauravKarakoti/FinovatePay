@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { ethers } from 'ethers';
+import { ethers, zeroPadValue, formatEther, isAddress, parseUnits } from 'ethers';
 import {
   getBuyerInvoices,
   updateInvoiceStatus,
@@ -136,7 +136,7 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
         setLoading(true);
         try {
             const contract = await getEscrowContract();
-            const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+            const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
             const amount = await contract.getCurrentPayableAmount(bytes32Id);
             setPayableAmount(amount);
 
@@ -169,7 +169,7 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
 
     if (!isOpen || !invoice) return null;
 
-    const formatEth = (bn) => bn ? ethers.utils.formatEther(bn) : '0';
+    const formatEth = (bn) => bn ? formatEther(bn) : '0';
     const originalAmountEth = invoice.amount; // Assuming invoice.amount is string/number from DB
 
     return (
@@ -469,7 +469,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, []);
 
   const handleConfirmPayment = useCallback(async (invoice, payableAmount) => {
-    if (!ethers.utils.isAddress(invoice.contract_address)) {
+    if (!isAddress(invoice.contract_address)) {
       toast.error('Invalid contract address');
       return;
     }
@@ -485,7 +485,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       // Use EscrowContract
       const contract = await getEscrowContract();
       // Need bytes32 ID
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
       let tx;
 
@@ -537,7 +537,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       // Use EscrowContract
       const contract = await getEscrowContract();
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
       const tx = await contract.confirmRelease(bytes32Id);
       await tx.wait();
@@ -560,7 +560,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       // Use EscrowContract
       const contract = await getEscrowContract();
-      const bytes32Id = ethers.utils.hexZeroPad('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
       const tx = await contract.raiseDispute(bytes32Id);
       await tx.wait();

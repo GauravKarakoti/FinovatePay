@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { ethers } from 'ethers';
+import { ethers, zeroPadValue, ZeroAddress, keccak256, toUtf8Bytes, parseUnits } from 'ethers';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import ProduceQRCode from '../components/Produce/ProduceQRCode';
@@ -220,7 +220,7 @@ const InvoiceDetailsModal = ({ isOpen, onClose, onSubmit, isSubmitting }) => {
 };
 
 // ------------------ UTILS ------------------
-const uuidToBytes32 = (uuid) => ethers.utils.hexZeroPad('0x' + uuid.replace(/-/g, ''), 32);
+const uuidToBytes32 = (uuid) => zeroPadValue('0x' + uuid.replace(/-/g, ''), 32);
 
 // ------------------ MAIN COMPONENT ------------------
 
@@ -332,11 +332,11 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       const { address: sellerAddress } = await connectWallet();
       
       const dataToHash = `${sellerAddress}-${quotation.buyer_address}-${quotation.total_amount}-${Date.now()}`;
-      const invoiceHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(dataToHash));
+      const invoiceHash = keccak256(toUtf8Bytes(dataToHash));
       const tokenAddress = NATIVE_CURRENCY_ADDRESS;
       
       const contract = await getEscrowContract();
-      const amountInWei = ethers.utils.parseUnits(quotation.total_amount.toString(), 18);
+      const amountInWei = parseUnits(quotation.total_amount.toString(), 18);
 
       const discountBps = Math.floor(parseFloat(discountRate || 0) * 100);
       const discountDeadlineTs = deadline ? Math.floor(new Date(deadline).getTime() / 1000) : 0;
@@ -354,7 +354,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         amountInWei,
         tokenAddress,
         86400 * 30, // Default duration
-        ethers.constants.AddressZero, // rwaNftContract
+        ZeroAddress, // rwaNftContract
         0, // rwaTokenId
         discountBps,
         discountDeadlineTs
