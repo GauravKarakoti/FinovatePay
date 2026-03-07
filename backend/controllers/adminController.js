@@ -50,10 +50,24 @@ exports.setInvoiceSpread = async (req, res) => {
 ====================================================== */
 exports.getAllUsers = async (req, res) => {
   try {
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query('SELECT COUNT(*) as total FROM users');
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
     const result = await pool.query(
-      'SELECT id, email, wallet_address, role, kyc_status, is_frozen FROM users ORDER BY created_at DESC'
+      'SELECT id, email, wallet_address, role, kyc_status, is_frozen FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+      [limit, offset]
     );
-    res.json({ success: true, data: result.rows });
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message, 500);
@@ -249,8 +263,24 @@ exports.updateUserRole = async (req, res) => {
 ====================================================== */
 exports.getInvoices = async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM invoices ORDER BY created_at DESC');
-    res.json({ success: true, data: result.rows });
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query('SELECT COUNT(*) as total FROM invoices');
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
+    const result = await pool.query(
+      'SELECT * FROM invoices ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+      [limit, offset]
+    );
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (error) {
     console.error(error);
     return errorResponse(res, error.message, 500);
