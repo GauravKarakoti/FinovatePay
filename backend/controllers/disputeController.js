@@ -119,8 +119,27 @@ exports.uploadEvidence = async (req, res) => {
 exports.getEvidence = async (req, res) => {
   const { invoiceId } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM dispute_evidence WHERE invoice_id = $1 ORDER BY created_at DESC', [invoiceId]);
-    res.json(result.rows);
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dispute_evidence WHERE invoice_id = $1',
+      [invoiceId]
+    );
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
+    const result = await pool.query(
+      'SELECT * FROM dispute_evidence WHERE invoice_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      [invoiceId, limit, offset]
+    );
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (err) {
     console.error('Error fetching evidence:', err);
     return errorResponse(res, err, 500);
@@ -130,8 +149,27 @@ exports.getEvidence = async (req, res) => {
 exports.getLogs = async (req, res) => {
   const { invoiceId } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM dispute_logs WHERE invoice_id = $1 ORDER BY timestamp ASC', [invoiceId]);
-    res.json(result.rows);
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dispute_logs WHERE invoice_id = $1',
+      [invoiceId]
+    );
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
+    const result = await pool.query(
+      'SELECT * FROM dispute_logs WHERE invoice_id = $1 ORDER BY timestamp ASC LIMIT $2 OFFSET $3',
+      [invoiceId, limit, offset]
+    );
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (err) {
     console.error('Error fetching logs:', err);
     return errorResponse(res, err, 500);
