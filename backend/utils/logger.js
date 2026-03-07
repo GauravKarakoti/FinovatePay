@@ -1,5 +1,12 @@
 const winston = require('winston');
 const path = require('path');
+const fs = require('fs');
+
+// Ensure logs directory exists
+const logsDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 
 // Define log levels and colors
 const levels = {
@@ -31,27 +38,41 @@ const format = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss:ms' }),
   winston.format.colorize({ all: true }),
   winston.format.printf(
-    (info) => `${info.timestamp} ${info.level}: ${info.message}`,
+    (info) => `[${info.timestamp}] [${info.level}] [${info.module || 'app'}]: ${info.message}`,
   ),
 );
 
+// Configure separate log files
 const transports = [
   new winston.transports.Console(),
   new winston.transports.File({
-    filename: path.join(__dirname, '../logs/error.log'),
+    filename: path.join(logsDir, 'error.log'),
     level: 'error',
     handleExceptions: true,
     maxsize: 5242880, // 5MB
     maxFiles: 5,
   }),
-  new winston.transports.File({ filename: path.join(__dirname, '../logs/all.log') }),
+  new winston.transports.File({ filename: path.join(logsDir, 'all.log') }),
 ];
 
-const logger = winston.createLogger({
-  level: level(),
-  levels,
-  format,
-  transports,
-});
+// Factory function to create a logger for a specific module
+const createLogger = (moduleName = 'app') => {
+  return winston.createLogger({
+    level: level(),
+    levels,
+    format,
+    transports,
+    defaultMeta: { module: moduleName },
+  });
+};
 
-module.exports = logger;
+// Export factory function
+module.exports = createLogger;
+
+// Export LOG_LEVELS for compatibility
+module.exports.LOG_LEVELS = {
+  ERROR: 'error',
+  WARN: 'warn',
+  INFO: 'info',
+  DEBUG: 'debug'
+};

@@ -5,8 +5,12 @@ const cookieParser = require("cookie-parser");
 const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
-const logger = require("./utils/logger");
+const logger = require("./utils/logger")("server");
+const crypto = require("crypto");
 require("dotenv").config();
+
+// Initialize secrets provider early
+const { getSecretsProvider } = require("./services/secrets");
 
 const chatbotRoutes = require("./routes/chatbot");
 const shipmentRoutes = require("./routes/shipment");
@@ -14,16 +18,18 @@ const {
   socketAuthMiddleware,
   verifyInvoiceAccess,
   verifyMarketplaceAccess,
+  verifyAuctionAccess,
 } = require("./middleware/socketAuth");
 const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
+const { whitelabelMiddleware } = require("./middleware/whitelabel");
 
 const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
 const testDbConnection = require("./utils/testDbConnection");
 const { startSyncWorker } = require("./services/escrowSyncService");
-const { startScheduledReconciliation } = require("./services/reconciliationService");
+const { blockchainQueue } = require("./queues/blockchainQueue");
 
 const app = express();
 const server = http.createServer(app);
@@ -33,25 +39,40 @@ const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
 
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
-const io = socketIo(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    methods: ["GET", "POST"],
-  },
-});
-
-/* ---------------- CORS CONFIG ---------------- */
-
+// Parse allowed origins for consistent CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map((o) =>
       o.trim().replace(/\/$/, "")
     )
   : ["http://localhost:5173"];
 
+const io = socketIo(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+/* ---------------- CORS CONFIG ---------------- */
+
+// Validate that ALLOWED_ORIGINS is configured
+if (!process.env.ALLOWED_ORIGINS) {
+  console.error('FATAL: ALLOWED_ORIGINS environment variable is not set');
+  console.error('Please configure ALLOWED_ORIGINS in your .env file');
+  console.error('Example: ALLOWED_ORIGINS=http://localhost:5173,https://app.example.com');
+  process.exit(1);
+}
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  .split(",")
+  .map((o) => o.trim().replace(/\/$/, ""));
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin && process.env.NODE_ENV !== "production") {
-      return callback(null, true);
+    // Reject requests with no origin header (non-browser clients must specify origin)
+    if (!origin) {
+      return callback(new Error("Origin header is required"));
     }
 
     if (allowedOrigins.includes(origin)) {
@@ -60,7 +81,6 @@ const corsOptions = {
 
     return callback(new Error("Not allowed by CORS"));
   },
-  // origin: "http://localhost:5173",
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   credentials: true,
   optionsSuccessStatus: 204,
@@ -70,6 +90,11 @@ app.use(cors(corsOptions));
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
+
+/* ---------------- WHITELABEL MIDDLEWARE ---------------- */
+
+// Apply whitelabel configuration based on domain
+app.use(whitelabelMiddleware);
 
 /* ---------------- RATE LIMITING ---------------- */
 
@@ -110,11 +135,22 @@ app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/shipment", shipmentRoutes);
 app.use("/api/meta-tx", require("./routes/metaTransaction"));
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/webhooks", require("./routes/webhooks"));
+app.use("/api/queue", require("./routes/queue"));
+app.use("/api/whitelabel", require("./routes/whitelabel"));
+
+/* ---------------- API KEYS ---------------- */
+
+app.use("/api/api-keys", require("./routes/apiKeys"));
 
 /* ---------------- V2 FINANCING ---------------- */
 
 app.use("/api/financing", require("./routes/financing"));
 app.use("/api/investor", require("./routes/investor"));
+
+/* ---------------- CROSS-CHAIN FRACTIONALIZATION ---------------- */
+
+app.use("/api/crosschain", require("./routes/crossChain"));
 
 /* ---------------- AUCTIONS ---------------- */
 
@@ -136,9 +172,25 @@ app.use('/api/currencies', require('./routes/currency'));
 
 app.use('/api/credit-scores', require('./routes/creditScore'));
 
+/* ---------------- CREDIT RISK (AI-POWERED) ---------------- */
+
+app.use('/api/credit-risk', require('./routes/creditRisk'));
+
+/* ---------------- REVOLVING CREDIT LINE ---------------- */
+
+app.use('/api/credit-line', require('./routes/creditLine'));
+
 /* ---------------- INSURANCE ---------------- */
 
 app.use('/api/insurance', require('./routes/insurance'));
+
+/* ---------------- GOVERNANCE ---------------- */
+
+app.use('/api/governance', require('./routes/governance'));
+
+/* ---------------- PROXY / UPGRADEABLE CONTRACTS ---------------- */
+
+app.use('/api/proxy', require('./routes/proxy'));
 
 /* ---------------- FIAT ON-RAMP ---------------- */
 
@@ -210,6 +262,38 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("join-auction", async (auctionId) => {
+    try {
+      const isAuthorized = await verifyAuctionAccess(
+        socket.user.id,
+        socket.user.role,
+        socket.user.wallet_address,
+        auctionId
+      );
+
+      if (!isAuthorized) {
+        socket.emit("error", {
+          message: "Not authorized to access this auction",
+          code: "UNAUTHORIZED_AUCTION_ACCESS",
+        });
+        return;
+      }
+
+      socket.join(`auction-${auctionId}`);
+      socket.emit("joined-auction", { auctionId, success: true });
+
+      console.log(
+        `User ${socket.user.id} joined auction room ${auctionId}`
+      );
+    } catch (err) {
+      console.error("join-auction error:", err);
+      socket.emit("error", {
+        message: "Failed to join auction room",
+        code: "JOIN_AUCTION_ERROR",
+      });
+    }
+  });
+
   socket.on("disconnect", () => {
     logger.info(`User disconnected: ${socket.id}`);
   });
@@ -242,7 +326,7 @@ server.listen(PORT, () => {
 });
 
 // Set up graceful shutdown handlers
-setupGracefulShutdown(server, io);
+setupGracefulShutdown(server, io, blockchainQueue);
 
 /* ---------------- GLOBAL ERROR HANDLERS ---------------- */
 
@@ -256,6 +340,15 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const { startRecoveryWorker } = require('./services/recoveryService');
+
+// Initialize Blockchain Transaction Queue
+try {
+  blockchainQueue.initialize(io);
+  blockchainQueue.startWorker();
+  logger.info('[server] Blockchain transaction queue initialized');
+} catch (err) {
+  logger.error('[server] Blockchain queue initialization failed:', err?.message || err);
+}
 
 // Start background services with error handling
 listenForTokenization()
@@ -296,5 +389,9 @@ try {
     err?.message || err
   );
 }
+
+// Note: Graceful shutdown is handled by utils/gracefulShutdown.js as configured above
+// but we should ensure blockchainQueue is also shut down. 
+// For now, assuming gracefulShutdown handles IO and server.
 
 module.exports = app;

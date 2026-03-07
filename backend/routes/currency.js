@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const Currency = require('../models/Currency');
 const exchangeRateService = require('../services/exchangeRateService');
+const currencyRoutingService = require('../services/currencyRoutingService');
 
 /**
  * @swagger
@@ -290,6 +291,215 @@ router.put('/preferred', authenticateToken, async (req, res, next) => {
     res.json({
       success: true,
       data: preference
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/currencies/routes/best:
+ *   get:
+ *     summary: Get best conversion route between currencies
+ *     tags: [Currencies]
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: to
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: amount
+ *         schema:
+ *           type: number
+ *           default: 1000
+ *     responses:
+ *       200:
+ *         description: Best route for conversion
+ */
+router.get('/routes/best', async (req, res, next) => {
+  try {
+    const { from, to, amount = 1000 } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        error: 'From and to currencies are required'
+      });
+    }
+
+    const result = await currencyRoutingService.findBestRoute(
+      from.toUpperCase(),
+      to.toUpperCase(),
+      parseFloat(amount)
+    );
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/currencies/routes/quotes:
+ *   get:
+ *     summary: Get all available quotes for currency conversion
+ *     tags: [Currencies]
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: to
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: amount
+ *         schema:
+ *           type: number
+ *           default: 1000
+ *     responses:
+ *       200:
+ *         description: All available quotes
+ */
+router.get('/routes/quotes', async (req, res, next) => {
+  try {
+    const { from, to, amount = 1000 } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        error: 'From and to currencies are required'
+      });
+    }
+
+    const quotes = await currencyRoutingService.getExchangeQuotes(
+      from.toUpperCase(),
+      to.toUpperCase(),
+      parseFloat(amount)
+    );
+
+    res.json({
+      success: true,
+      data: quotes
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/currencies/routes/convert:
+ *   post:
+ *     summary: Convert amount using best route with smart routing
+ *     tags: [Currencies]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *               - from
+ *               - to
+ *             properties:
+ *               amount:
+ *                 type: number
+ *               from:
+ *                 type: string
+ *               to:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Converted amount with routing info
+ */
+router.post('/routes/convert', async (req, res, next) => {
+  try {
+    const { amount, from, to } = req.body;
+
+    if (!amount || !from || !to) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount, from, and to are required'
+      });
+    }
+
+    const result = await currencyRoutingService.convertWithRouting(
+      parseFloat(amount),
+      from.toUpperCase(),
+      to.toUpperCase()
+    );
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/currencies/stablecoins:
+ *   get:
+ *     summary: Get list of supported stablecoins
+ *     tags: [Currencies]
+ *     responses:
+ *       200:
+ *         description: List of supported stablecoins
+ */
+router.get('/stablecoins', async (req, res, next) => {
+  try {
+    const stablecoins = await currencyRoutingService.getSupportedStablecoins();
+    
+    // Get full currency details for each stablecoin
+    const currencies = await Promise.all(
+      stablecoins.map(async (code) => {
+        return await Currency.getByCode(code);
+      })
+    );
+
+    res.json({
+      success: true,
+      data: currencies.filter(c => c !== undefined)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/currencies/routes:
+ *   get:
+ *     summary: Get all currency routes
+ *     tags: [Currencies]
+ *     responses:
+ *       200:
+ *         description: List of all currency routes
+ */
+router.get('/routes', async (req, res, next) => {
+  try {
+    const routes = await currencyRoutingService.getAllRoutes();
+    res.json({
+      success: true,
+      data: routes
     });
   } catch (error) {
     next(error);
