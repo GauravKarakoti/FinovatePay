@@ -69,6 +69,54 @@ router.post('/calculate', authenticateToken, async (req, res) => {
 
 /**
  * @swagger
+ * /api/v1/credit-risk/analyze:
+ *   post:
+ *     summary: Analyze arbitrary user/wallet credit risk via ML service
+ *     tags: [Credit Risk]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               walletAddress:
+ *                 type: string
+ *               force:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: ML analysis result
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/analyze', authenticateToken, async (req, res) => {
+  try {
+    const requesterId = req.user.id;
+    const { userId, walletAddress, force } = req.body || {};
+
+    // Allow admins to analyze arbitrary users; regular users can analyze themselves only
+    if (userId && userId !== requesterId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Not authorized to analyze this user' });
+    }
+
+    const targetUserId = userId || requesterId;
+
+    const result = await creditRiskService.analyzeCreditRisk({ userId: targetUserId, walletAddress, force });
+
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('[CreditRisk] Error analyzing risk via ML service:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to analyze risk' });
+  }
+});
+
+/**
+ * @swagger
  * /api/credit-risk/{userId}:
  *   get:
  *     summary: Get credit risk profile for a specific user
