@@ -54,7 +54,17 @@ exports.createInvoice = async (req, res) => {
              throw new Error("Invalid quantity in quotation");
         }
 
-        // 5. Inventory Management (Produce Lots)
+        // 5. Amount Validation
+        if (!quotation.total_amount || parseFloat(quotation.total_amount) <= 0) {
+            throw new Error("Invalid amount: Invoice amount must be greater than zero");
+        }
+
+        // Additional validation for price_per_unit
+        if (!quotation.price_per_unit || parseFloat(quotation.price_per_unit) <= 0) {
+            throw new Error("Invalid price: Price per unit must be greater than zero");
+        }
+
+        // 6. Inventory Management (Produce Lots)
         if (quotation.lot_id) {
             const lotQuery = 'SELECT current_quantity FROM produce_lots WHERE lot_id = $1 FOR UPDATE';
             const lotResult = await client.query(lotQuery, [quotation.lot_id]);
@@ -72,7 +82,7 @@ exports.createInvoice = async (req, res) => {
             await client.query(updateLotQuery, [quotation.quantity, quotation.lot_id]);
         }
 
-        // 6. Insert Invoice
+        // 7. Insert Invoice
         // Trusting quotation data for financial fields
         const insertInvoiceQuery = `
             INSERT INTO invoices (
@@ -110,7 +120,7 @@ exports.createInvoice = async (req, res) => {
 
         const result = await client.query(insertInvoiceQuery, values);
 
-        // 7. Update Quotation Status
+        // 8. Update Quotation Status
         const updateQuotationQuery = `UPDATE quotations SET status = 'invoiced' WHERE id = $1`;
         await client.query(updateQuotationQuery, [quotation_id]);
 
@@ -133,6 +143,8 @@ exports.createInvoice = async (req, res) => {
         if (error.message === 'Quotation not fully approved') statusCode = 400;
         if (error.message.includes('Not authorized')) statusCode = 403;
         if (error.message.includes('Insufficient quantity')) statusCode = 400;
+        if (error.message.includes('Invalid amount')) statusCode = 400;
+        if (error.message.includes('Invalid price')) statusCode = 400;
         if (error.message === 'Missing quotation_id or required on-chain data.') statusCode = 400;
 
         return errorResponse(res, error, statusCode);
