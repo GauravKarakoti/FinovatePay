@@ -56,10 +56,23 @@ const io = socketIo(server, {
 
 /* ---------------- CORS CONFIG ---------------- */
 
+// Validate that ALLOWED_ORIGINS is configured
+if (!process.env.ALLOWED_ORIGINS) {
+  console.error('FATAL: ALLOWED_ORIGINS environment variable is not set');
+  console.error('Please configure ALLOWED_ORIGINS in your .env file');
+  console.error('Example: ALLOWED_ORIGINS=http://localhost:5173,https://app.example.com');
+  process.exit(1);
+}
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  .split(",")
+  .map((o) => o.trim().replace(/\/$/, ""));
+
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin && process.env.NODE_ENV !== "production") {
-      return callback(null, true);
+    // Reject requests with no origin header (non-browser clients must specify origin)
+    if (!origin) {
+      return callback(new Error("Origin header is required"));
     }
 
     if (allowedOrigins.includes(origin)) {
@@ -68,7 +81,6 @@ const corsOptions = {
 
     return callback(new Error("Not allowed by CORS"));
   },
-  // origin: "http://localhost:5173",
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   credentials: true,
   optionsSuccessStatus: 204,
