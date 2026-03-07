@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Transak } from '@transak/ui-js-sdk';
+import { Transak } from '@transak/transak-sdk';
 import api, { createFiatRampLink } from '../../utils/api';
 import CurrencySelector from '../Settings/CurrencySelector';
 

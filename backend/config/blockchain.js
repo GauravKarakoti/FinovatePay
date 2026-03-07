@@ -4,8 +4,8 @@ require("dotenv").config();
 // 1️⃣ Import ABIs and Deployed Addresses
 const FractionTokenABI = require("../../deployed/FractionToken.json").abi;
 const ComplianceManagerABI = require("../../deployed/ComplianceManager.json").abi;
-const FinancingManagerABI = require("../../deployed/FinancingManagerV2.json").abi;
-const EscrowContractABI = require("../../deployed/EscrowContractV2.json").abi;
+const FinancingManagerABI = require("../../deployed/FinancingManager.json").abi;
+const EscrowContractABI = require("../../deployed/EscrowContract.json").abi;
 const deployedAddresses = require("../../deployed/contract-addresses.json");
 
 // --------------------------------------------------
