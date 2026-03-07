@@ -145,6 +145,8 @@ app.use("/api/api-keys", require("./routes/apiKeys"));
 
 app.use("/api/v1/financing", require("./routes/financing"));
 app.use("/api/v1/investor", require("./routes/investor"));
+// Staking endpoints for invoice token staking
+app.use("/api/v1/staking", require("./routes/staking"));
 
 /* ---------------- CROSS-CHAIN FRACTIONALIZATION ---------------- */
 

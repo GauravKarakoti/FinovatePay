@@ -729,4 +729,21 @@ export const executeParameterChange = (parameterName) => {
   return api.post('/governance/execute', { parameterName });
 };
 
+// --- Staking API ---
+export const stakeTokens = ({ tokenAddress, tokenId, amount, lockDurationSeconds, apyBP }) => {
+  return api.post('/staking/stake', { tokenAddress, tokenId, amount, lockDurationSeconds, apyBP });
+};
+
+export const unstakeTokens = (stakeId) => {
+  return api.post('/staking/unstake', { stakeId });
+};
+
+export const getStakingRewards = () => {
+  return api.get('/staking/rewards');
+};
+
+export const claimStakingRewards = (stakeId) => {
+  return api.post('/staking/rewards/claim', { stakeId });
+};
+
 export default api;
