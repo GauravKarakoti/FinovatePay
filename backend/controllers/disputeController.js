@@ -2,6 +2,7 @@ const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 const { getSigner, getEscrowContract } = require('../config/blockchain');
 const errorResponse = require('../utils/errorResponse');
+const logger = require('../utils/logger')('disputeController');
 
 // Helper function to create a log entry
 const createLog = async (client, invoiceId, action, performedBy, notes) => {
@@ -74,49 +75,57 @@ exports.uploadEvidence = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Verify dispute exists - do not auto-create
-    const disputeCheck = await client.query('SELECT * FROM disputes WHERE invoice_id = $1', [invoiceId]);
-    if (disputeCheck.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        success: false,
-        error: 'No dispute exists for this invoice. Please raise a dispute first through the raiseDispute endpoint.'
-      });
-    }
-
-    // Verify user is authorized (buyer or seller of the invoice)
-    const invoiceCheck = await client.query(
-      'SELECT buyer_email, seller_email FROM invoices WHERE id = $1',
+    // 1. Verify invoice exists
+    const invoiceResult = await client.query(
+      'SELECT buyer_email, seller_email, buyer_address, seller_address FROM invoices WHERE id = $1',
       [invoiceId]
     );
 
-    if (invoiceCheck.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({
-        success: false,
-        error: 'Invoice not found'
-      });
+    if (invoiceResult.rows.length === 0) {
+      throw new Error('Invoice not found');
     }
 
-    const invoice = invoiceCheck.rows[0];
-    const isAuthorized = user.email === invoice.buyer_email || user.email === invoice.seller_email;
+    const invoice = invoiceResult.rows[0];
 
-    if (!isAuthorized) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({
-        success: false,
-        error: 'Unauthorized. Only the buyer or seller can upload evidence for this invoice.'
-      });
+    // 2. Authorization check
+    const userEmail = user.email?.toLowerCase();
+    const userWallet = user.wallet_address?.toLowerCase();
+
+    const buyerEmail = invoice.buyer_email?.toLowerCase();
+    const sellerEmail = invoice.seller_email?.toLowerCase();
+
+    const buyerWallet = invoice.buyer_address?.toLowerCase();
+    const sellerWallet = invoice.seller_address?.toLowerCase();
+
+    const authorized =
+      user.role === 'admin' ||
+      userEmail === buyerEmail ||
+      userEmail === sellerEmail ||
+      userWallet === buyerWallet ||
+      userWallet === sellerWallet;
+
+    if (!authorized) {
+      throw new Error('Not authorized: Only invoice parties can upload evidence');
     }
 
-    // Save evidence record
+    // 3. Verify dispute exists (do NOT auto-create)
+    const disputeCheck = await client.query(
+      'SELECT * FROM disputes WHERE invoice_id = $1',
+      [invoiceId]
+    );
+
+    if (disputeCheck.rows.length === 0) {
+      throw new Error('No dispute exists for this invoice. Please raise a dispute first.');
+    }
+
+    // 4. Save evidence record
     const fileUrl = `/uploads/${file.filename}`;
     await client.query(
       'INSERT INTO dispute_evidence (invoice_id, uploaded_by, file_url, file_name) VALUES ($1, $2, $3, $4)',
       [invoiceId, user.email, fileUrl, file.originalname]
     );
 
-    // Add log entry
+    // 5. Add log entry
     await createLog(client, invoiceId, 'Evidence Uploaded', user.email, `Uploaded ${file.originalname}`);
 
     await client.query('COMMIT');
@@ -130,7 +139,14 @@ exports.uploadEvidence = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error uploading evidence:', err);
-    return errorResponse(res, err, 500);
+    
+    // Determine appropriate status code
+    let statusCode = 500;
+    if (err.message === 'Invoice not found') statusCode = 404;
+    if (err.message.includes('Not authorized')) statusCode = 403;
+    if (err.message.includes('No dispute exists')) statusCode = 400;
+    
+    return errorResponse(res, err, statusCode);
   } finally {
     client.release();
   }
@@ -139,8 +155,27 @@ exports.uploadEvidence = async (req, res) => {
 exports.getEvidence = async (req, res) => {
   const { invoiceId } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM dispute_evidence WHERE invoice_id = $1 ORDER BY created_at DESC', [invoiceId]);
-    res.json(result.rows);
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dispute_evidence WHERE invoice_id = $1',
+      [invoiceId]
+    );
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
+    const result = await pool.query(
+      'SELECT * FROM dispute_evidence WHERE invoice_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      [invoiceId, limit, offset]
+    );
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (err) {
     console.error('Error fetching evidence:', err);
     return errorResponse(res, err, 500);
@@ -150,8 +185,27 @@ exports.getEvidence = async (req, res) => {
 exports.getLogs = async (req, res) => {
   const { invoiceId } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM dispute_logs WHERE invoice_id = $1 ORDER BY timestamp ASC', [invoiceId]);
-    res.json(result.rows);
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dispute_logs WHERE invoice_id = $1',
+      [invoiceId]
+    );
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
+    const result = await pool.query(
+      'SELECT * FROM dispute_logs WHERE invoice_id = $1 ORDER BY timestamp ASC LIMIT $2 OFFSET $3',
+      [invoiceId, limit, offset]
+    );
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (err) {
     console.error('Error fetching logs:', err);
     return errorResponse(res, err, 500);
@@ -189,14 +243,14 @@ exports.resolveDispute = async (req, res) => {
 
         const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
-        console.log(`Resolving on-chain: Invoice ${invoiceId} -> ${sellerWins ? 'Seller Wins' : 'Buyer Wins'}`);
+        logger.info(`Resolving on-chain: Invoice ${invoiceId} -> ${sellerWins ? 'Seller Wins' : 'Buyer Wins'}`);
         
         // Admin acts as the Arbitrator here
         const tx = await escrowContract.voteOnDispute(bytes32InvoiceId, sellerWins);
-        console.log(`Transaction sent: ${tx.hash}`);
+        logger.info(`Transaction sent: ${tx.hash}`);
         
         await tx.wait();
-        console.log('Transaction confirmed on-chain');
+        logger.info('Transaction confirmed on-chain');
 
     } catch (bcError) {
         console.error('Blockchain interaction failed:', bcError);

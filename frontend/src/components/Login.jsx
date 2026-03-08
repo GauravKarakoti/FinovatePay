@@ -128,6 +128,15 @@ const Login = ({ onLogin }) => {
                 />
               </div>
 
+              <div className="flex items-center justify-end">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm font-medium text-finovate-blue-600 hover:text-finovate-blue-700 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
               {error && (
                 <div className="rounded-xl bg-red-50 border border-red-100 p-4 flex gap-3">
                   <svg className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">

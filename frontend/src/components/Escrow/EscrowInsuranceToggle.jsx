@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
+import { ethers, parseUnits, formatUnits } from 'ethers';
 import api from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -52,7 +52,7 @@ const EscrowInsuranceToggle = ({
             const durationSeconds = durationDays * 24 * 60 * 60;
             const response = await api.get('/insurance/calculate-premium', {
                 params: {
-                    coverageAmount: ethers.utils.parseUnits(coverageAmount, 6).toString(),
+                    coverageAmount: parseUnits(coverageAmount, 6).toString(),
                     durationSeconds
                 }
             });
@@ -77,7 +77,7 @@ const EscrowInsuranceToggle = ({
             const durationSeconds = durationDays * 24 * 60 * 60;
             const response = await api.post('/insurance/purchase', {
                 invoiceId,
-                coverageAmount: ethers.utils.parseUnits(coverageAmount, 6).toString(),
+                coverageAmount: parseUnits(coverageAmount, 6).toString(),
                 durationSeconds,
                 paymentToken: '0x0000000000000000000000000000000000000000' // ETH
             });
@@ -94,7 +94,7 @@ const EscrowInsuranceToggle = ({
 
     const formatCurrency = (amount) => {
         try {
-            return ethers.utils.formatUnits(amount, 6);
+            return formatUnits(amount, 6);
         } catch {
             return amount;
         }

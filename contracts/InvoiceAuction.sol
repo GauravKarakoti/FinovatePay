@@ -120,6 +120,7 @@ contract InvoiceAuction is Ownable, ReentrancyGuard {
     ) external nonReentrant {
         require(_auctionId != bytes32(0), "Invalid auction ID");
         require(_invoiceContract != address(0), "Invalid invoice contract");
+        require(msg.sender != address(0), "Invalid seller address");
         require(_faceValue > 0, "Invalid face value");
         require(_minYieldBps > 0 && _minYieldBps <= 10000, "Invalid min yield");
         require(_duration > 0 && _duration <= 30 days, "Invalid duration");
@@ -174,6 +175,7 @@ contract InvoiceAuction is Ownable, ReentrancyGuard {
      */
     function placeBid(bytes32 _auctionId, uint256 _yieldBps) external payable nonReentrant {
         Auction storage auction = auctions[_auctionId];
+        require(msg.sender != address(0), "Invalid bidder address");
         require(auction.status == AuctionStatus.Active, "Auction not active");
         require(block.timestamp < auction.auctionEndTime, "Auction ended");
         require(msg.sender != auction.seller, "Seller cannot bid");

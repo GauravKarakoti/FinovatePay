@@ -1,4 +1,5 @@
 const Currency = require('../models/Currency');
+const logger = require('../utils/logger')('exchangeRateService');
 
 // In-memory cache for exchange rates
 let rateCache = {
@@ -104,10 +105,10 @@ const updateExchangeRatesInDb = async (rates) => {
     }));
 
     await Currency.bulkUpdateExchangeRates(updates);
-    console.log('[ExchangeRateService] Exchange rates updated in database');
+    logger.info('[ExchangeRateService] Exchange rates updated in database');
     return true;
   } catch (error) {
-    console.error('[ExchangeRateService] Failed to update rates in DB:', error.message);
+    logger.error('[ExchangeRateService] Failed to update rates in DB:', error.message);
     return false;
   }
 };
@@ -127,7 +128,7 @@ const getExchangeRates = async (forceRefresh = false) => {
   }
 
   // Fetch fresh rates
-  console.log('[ExchangeRateService] Fetching fresh exchange rates...');
+  logger.info('[ExchangeRateService] Fetching fresh exchange rates...');
   const rates = await fetchAllExchangeRates();
 
   if (rates && Object.keys(rates).length > 0) {
@@ -137,7 +138,7 @@ const getExchangeRates = async (forceRefresh = false) => {
 
     // Update database in background (don't wait)
     updateExchangeRatesInDb(rates).catch(err => 
-      console.error('[ExchangeRateService] Background DB update failed:', err)
+      logger.error('[ExchangeRateService] Background DB update failed:', err)
     );
 
     return rates;
@@ -145,12 +146,12 @@ const getExchangeRates = async (forceRefresh = false) => {
 
   // If fetch failed, return cached rates even if expired
   if (rateCache.rates) {
-    console.log('[ExchangeRateService] Using expired cache due to fetch failure');
+    logger.info('[ExchangeRateService] Using expired cache due to fetch failure');
     return rateCache.rates;
   }
 
   // Last resort: load from database
-  console.log('[ExchangeRateService] Loading rates from database as fallback');
+  logger.info('[ExchangeRateService] Loading rates from database as fallback');
   const dbRates = await Currency.getExchangeRates();
   const ratesObj = {};
   for (const row of dbRates) {
@@ -231,12 +232,12 @@ const formatCurrency = (amount, currencyCode, locale = 'en-US') => {
  */
 const initializeExchangeRates = async () => {
   try {
-    console.log('[ExchangeRateService] Initializing exchange rates...');
+    logger.info('[ExchangeRateService] Initializing exchange rates...');
     const rates = await getExchangeRates(true); // Force refresh
-    console.log('[ExchangeRateService] Exchange rates initialized:', Object.keys(rates).length, 'currencies');
+    logger.info('[ExchangeRateService] Exchange rates initialized:', Object.keys(rates).length, 'currencies');
     return rates;
   } catch (error) {
-    console.error('[ExchangeRateService] Initialization failed:', error.message);
+    logger.error('[ExchangeRateService] Initialization failed:', error.message);
     // Load from database as fallback
     const dbRates = await Currency.getExchangeRates();
     const ratesObj = {};
