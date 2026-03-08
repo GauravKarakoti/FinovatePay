@@ -253,6 +253,10 @@ app.use('/api/v1/proxy', require('./routes/proxy'));
 
 app.use("/api/v1/fiat-ramp", require("./routes/fiatRamp"));
 
+/* ---------------- SMART PAYMENT ROUTING ---------------- */
+
+app.use("/api/v1/smart-routing", require("./routes/smartRouting"));
+
 /* ---------------- SOCKET AUTH ---------------- */
 
 io.use(socketAuthMiddleware);

@@ -186,7 +186,8 @@ const createLoan = async (userId, walletAddress, data) => {
             data.collateralTokenId || 0,
             data.collateralAmount || 0,
             data.collateralValue,
-            loanDuration
+            loanDuration,
+            { from: walletAddress }
         );
         
         const receipt = await tx.wait();

@@ -547,7 +547,7 @@ contract LendingPool is
         Loan storage loan = loans[loanId];
 
         // Check if liquidatable
-        require(loan.isUndercollateralized || loan.ltv > liquidationThreshold, "Not liquidatable");
+        require(loan.isUndercollateralized || loan.ltv < liquidationThreshold, "Not liquidatable");
 
         // Calculate liquidation amounts
         uint256 debtCovered = loan.totalDebt;
