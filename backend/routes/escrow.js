@@ -28,6 +28,34 @@ const getEscrowContract = (signer) => {
 router.use(authenticateToken);
 router.use(requireKYC);
 
+const runFraudGate = async ({ req, transactionType, amount, currency, invoiceId, context }) => {
+  try {
+    const result = await fraudDetectionService.evaluateTransactionRisk({
+      userId: req.user?.id,
+      walletAddress: req.user?.wallet_address,
+      invoiceId,
+      transactionType,
+      amount,
+      currency,
+      context: {
+        ...(context || {}),
+        endpoint: req.originalUrl,
+        method: req.method,
+        actorRole: req.user?.role,
+        kycStatus: req.user?.kyc_status || 'unknown'
+      }
+    });
+    fraudDetectionService.ensureTransactionAllowed(result);
+    return result;
+  } catch (error) {
+    if (error.code === 'FRAUD_BLOCKED') {
+      throw error;
+    }
+    console.error('[EscrowRoutes] Fraud gate degraded:', error.message);
+    return null;
+  }
+};
+
 /**
  * POST /api/escrow/multi-party
  * Create a multi-party escrow on-chain for an existing invoice
@@ -61,13 +89,32 @@ router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) =
       throw new Error('Not authorized to create escrow for this invoice');
     }
 
+    const creationRisk = await runFraudGate({
+      req,
+      transactionType: 'escrow_create',
+      amount: invoice.amount,
+      currency: invoice.currency || 'USD',
+      invoiceId,
+      context: {
+        escrowStatus: invoice.escrow_status,
+        durationSeconds: Number(durationSeconds) || 7 * 24 * 60 * 60
+      }
+    });
+
+    if (creationRisk?.shouldReview) {
+      console.warn('[EscrowRoutes] Escrow creation flagged for review', {
+        invoiceId,
+        riskScore: creationRisk.riskScore
+      });
+    }
+
     const escrowContract = getEscrowContract();
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     // Defaults: 7 days if not provided
     const duration = Number(durationSeconds) || 7 * 24 * 60 * 60;
 
-    const tokenAddress = invoice.token_address || ethers.constants.AddressZero;
+    const tokenAddress = invoice.token_address || ethers.ZeroAddress;
 
     // Create on-chain escrow (onlyAdmin on contract side)
     const tx = await escrowContract.createEscrow(
@@ -77,7 +124,7 @@ router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) =
       invoice.amount,
       tokenAddress,
       duration,
-      ethers.constants.AddressZero,
+      ethers.ZeroAddress,
       0
     );
 
@@ -115,6 +162,14 @@ router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) =
     return res.json({ success: true, txHash: tx.hash });
   } catch (error) {
     await client.query('ROLLBACK');
+    if (error.code === 'FRAUD_BLOCKED') {
+      return res.status(error.statusCode || 403).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+        details: error.details
+      });
+    }
     console.error('Error creating multi-party escrow:', error);
 
     await logAudit({
@@ -173,6 +228,25 @@ router.post('/:invoiceId/approve', requireRole(['buyer', 'seller', 'admin']), as
     // Check escrow status - must be funded to approve
     if (invoice.escrow_status !== 'funded' && invoice.escrow_status !== 'deposited') {
       throw new Error('Escrow is not in funded state');
+    }
+
+    const approvalRisk = await runFraudGate({
+      req,
+      transactionType: 'escrow_approve',
+      amount: invoice.amount,
+      currency: invoice.currency || 'USD',
+      invoiceId,
+      context: {
+        escrowStatus: invoice.escrow_status,
+        approverRole: req.user.role
+      }
+    });
+
+    if (approvalRisk?.shouldReview) {
+      console.warn('[EscrowRoutes] Escrow approval flagged for review', {
+        invoiceId,
+        riskScore: approvalRisk.riskScore
+      });
     }
 
     const escrowContract = getEscrowContract();
@@ -248,6 +322,14 @@ router.post('/:invoiceId/approve', requireRole(['buyer', 'seller', 'admin']), as
     });
   } catch (error) {
     await client.query('ROLLBACK');
+    if (error.code === 'FRAUD_BLOCKED') {
+      return res.status(error.statusCode || 403).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+        details: error.details
+      });
+    }
     console.error('Error in approveMultiSig:', error);
 
     await logAudit({

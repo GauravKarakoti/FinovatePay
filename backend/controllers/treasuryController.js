@@ -37,7 +37,7 @@ exports.postWithdraw = async (req, res) => {
     const treasury = getTreasuryManagerContract(signer);
 
     // Execute withdrawal via on-chain contract
-    const tx = await treasury.executeWithdrawal(token || ethers.constants.AddressZero, to, ethers.BigInt(amount));
+    const tx = await treasury.executeWithdrawal(token || ethers.ZeroAddress, to, ethers.BigInt(amount));
     const receipt = await tx.wait();
 
     res.json({ success: true, txHash: receipt.transactionHash });
@@ -57,13 +57,10 @@ exports.getTransactions = async (req, res) => {
     const fromBlock = req.query.fromBlock ? Number(req.query.fromBlock) : 0;
     const toBlock = req.query.toBlock ? Number(req.query.toBlock) : 'latest';
 
-    // Filter for FeeCollected and WithdrawalExecuted events
-    const treasuryAbi = getTreasuryManagerContract().interface;
-    const feeFilter = treasuryAbi.getEvent('FeeCollected') ? treasuryAbi.getEvent('FeeCollected') : null;
+    // Decode events using the treasury manager contract interface
+    const iface = getTreasuryManagerContract().interface;
 
     const logs = await provider.getLogs({ address: treasuryAddress, fromBlock, toBlock });
-    // decode using contract interface
-    const iface = getTreasuryManagerContract().interface;
     const decoded = logs.map((log) => {
       try {
         const parsed = iface.parseLog(log);

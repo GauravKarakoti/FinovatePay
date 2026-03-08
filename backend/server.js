@@ -197,6 +197,11 @@ app.use('/api/credit-risk', require('./routes/creditRisk'));
 // Also expose v1 path for backwards compatibility / ML integrations
 app.use('/api/v1/credit-risk', require('./routes/creditRisk'));
 
+/* ---------------- FRAUD DETECTION (AI-POWERED) ---------------- */
+
+app.use('/api/fraud-detection', require('./routes/fraudDetection'));
+app.use('/api/v1/fraud-detection', require('./routes/fraudDetection'));
+
 /* ---------------- REVOLVING CREDIT LINE ---------------- */
 
 app.use('/api/v1/credit-line', require('./routes/creditLine'));
