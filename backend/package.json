@@ -47,7 +47,6 @@
     "groq-sdk": "^0.33.0",
     "handlebars": "^4.7.8",
     "helmet": "^8.1.0",
-    "ioredis": "^5.4.0",
     "jsonwebtoken": "^9.0.3",
     "mailersend": "^2.6.0",
     "multer": "^2.0.2",

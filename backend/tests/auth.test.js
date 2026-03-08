@@ -30,24 +30,11 @@ jest.mock('jsonwebtoken', () => ({
 }));
 
 jest.mock('../utils/jwt', () => ({
-  generateToken: jest.fn(() => 'mock-jwt-token'),
-  generateTokens: jest.fn(() => ({ accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token' })),
-  getRefreshTokenExpiration: jest.fn(() => '1d')
+  generateToken: jest.fn(() => 'mock-jwt-token')
 }));
 
 jest.mock('../middleware/rateLimiter', () => ({
-  authLimiter: (req, res, next) => next(),
-  globalLimiter: (req, res, next) => next(),
-  forgotPasswordLimiter: (req, res, next) => next()
-}));
-
-jest.mock('../middleware/validators', () => ({
-  validateRegister: (req, res, next) => next(),
-  validateLogin: (req, res, next) => next(),
-  validateRoleUpdate: (req, res, next) => next(),
-  validateForgotPassword: (req, res, next) => next(),
-  validateResetPassword: (req, res, next) => next(),
-  validateChangePassword: (req, res, next) => next()
+  authLimiter: (req, res, next) => next()
 }));
 
 describe('Auth Registration Tests', () => {
@@ -208,7 +195,7 @@ describe('Auth Registration Tests', () => {
       expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
     });
 
-    it('should NOT return token in body but send HttpOnly cookie on successful registration', async () => {
+    it('should return token on successful registration', async () => {
       const { generateToken } = require('../utils/jwt');
       
       mockQuery

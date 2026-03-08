@@ -53,45 +53,10 @@ const pool = new Pool(dbConfig);
 // Pool Event Handlers
 // --------------------------------------------------
 
-pool.on("error", (err) => {
-  console.error("❌ Unexpected error on idle database client:", err.message);
-});
-
-pool.on("connect", () => {
-  if (!isProduction) {
-    console.log("🔌 New database client connected. Total clients:", pool.totalCount);
-  }
-});
-
-pool.on("acquire", () => {
-  if (!isProduction) {
-    console.log(
-      "📊 Database client acquired. Idle:",
-      pool.idleCount,
-      "Waiting:",
-      pool.waitingCount
-    );
-  }
-});
-
-pool.on("remove", () => {
-  if (!isProduction) {
-    console.log("📤 Database client removed from pool. Total:", pool.totalCount);
-  }
-});
-
-// --------------------------------------------------
-// Initial Connection Test
-// --------------------------------------------------
-
 async function testConnection() {
   try {
     const client = await pool.connect();
-
-    if (!isProduction) {
-      console.log("🔌 Connected to PostgreSQL");
-    }
-
+    console.log("🔌 Connected to PostgreSQL");
     client.release();
   } catch (error) {
     console.error("❌ Failed to connect to PostgreSQL:", error.message);
@@ -100,43 +65,6 @@ async function testConnection() {
 }
 
 testConnection();
-
-// --------------------------------------------------
-// Pool Statistics Helper
-// --------------------------------------------------
-
-function getPoolStats() {
-  return {
-    totalCount: pool.totalCount,
-    idleCount: pool.idleCount,
-    waitingCount: pool.waitingCount,
-  };
-}
-
-// --------------------------------------------------
-// Graceful Shutdown
-// --------------------------------------------------
-
-async function closePool() {
-  try {
-    await pool.end();
-    console.log("🔌 Database pool closed gracefully");
-  } catch (err) {
-    console.error("❌ Error closing database pool:", err.message);
-  }
-}
-
-process.on("SIGINT", async () => {
-  console.log("\n🛑 Received SIGINT, closing database pool...");
-  await closePool();
-  process.exit(0);
-});
-
-process.on("SIGTERM", async () => {
-  console.log("\n🛑 Received SIGTERM, closing database pool...");
-  await closePool();
-  process.exit(0);
-});
 
 // --------------------------------------------------
 // Export
