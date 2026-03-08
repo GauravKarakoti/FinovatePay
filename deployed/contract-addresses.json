@@ -11,4 +11,5 @@
   "FinancingManager": "0xd7f4aF14b3eBB3ae4D29A4B71B308B9D058dEafd",
   "BridgeAdapter": "0xb1abc04299B723fB95d707E087bb85c7418bBaEF",
   "LiquidityAdapter": "0x8139CAe7A3b09A9E36866edFa99444cde5D25c2f"
+  ,"TreasuryManager": "0x0000000000000000000000000000000000000000"
 }

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { getMultiSigApprovals, approveMultiSig } from '../../utils/api';
+import { getMultiSigApprovals, approveMultiSig, createMultiPartyEscrow, getEscrowStatus } from '../../utils/api';
 import { toast } from 'sonner';
 
 const EscrowStatus = ({ invoice, onConfirm, onDispute }) => {
     const [multiSigData, setMultiSigData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [approving, setApproving] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [creatingEscrow, setCreatingEscrow] = useState(false);
+    const [durationSeconds, setDurationSeconds] = useState(7 * 24 * 60 * 60);
 
     const status = invoice?.escrow_status;
 
@@ -113,6 +116,65 @@ const EscrowStatus = ({ invoice, onConfirm, onDispute }) => {
                                 {approving ? 'Submitting...' : 'Approve Release'}
                             </button>
                         )}
+                    </div>
+                )}
+
+                {/* Create Multi-Party Escrow Modal trigger - visible when invoice is in 'created' state */}
+                {status === 'created' && (
+                    <div className="mt-4">
+                        <button
+                            onClick={() => setShowCreateModal(true)}
+                            className="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                            Create Multi-Party Escrow
+                        </button>
+                    </div>
+                )}
+
+                {/* Modal */}
+                {showCreateModal && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                            <h4 className="text-lg font-semibold mb-3">Create Multi-Party Escrow</h4>
+                            <label className="block text-sm text-gray-600">Duration (seconds)</label>
+                            <input
+                                type="number"
+                                value={durationSeconds}
+                                onChange={(e) => setDurationSeconds(Number(e.target.value))}
+                                className="w-full border rounded p-2 mt-1"
+                            />
+                            <div className="flex gap-2 mt-4">
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            setCreatingEscrow(true);
+                                            const resp = await createMultiPartyEscrow(invoice.invoice_id, durationSeconds);
+                                            toast.success(resp.data?.message || 'Multi-party escrow created');
+
+                                            // Refresh escrow status and multi-sig data
+                                            const statusResp = await getEscrowStatus(invoice.invoice_id);
+                                            setMultiSigData(statusResp.data?.approvals || null);
+                                            setShowCreateModal(false);
+                                        } catch (err) {
+                                            console.error('Create escrow failed', err);
+                                            toast.error(err.response?.data?.error || 'Failed to create escrow');
+                                        } finally {
+                                            setCreatingEscrow(false);
+                                        }
+                                    }}
+                                    disabled={creatingEscrow}
+                                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-300"
+                                >
+                                    {creatingEscrow ? 'Creating...' : 'Create'}
+                                </button>
+                                <button
+                                    onClick={() => setShowCreateModal(false)}
+                                    className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
 

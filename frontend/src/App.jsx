@@ -14,6 +14,7 @@ import FinovateChatbot from './components/Chatbot/Chatbot';
 import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import TreasuryDashboard from './pages/TreasuryDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
@@ -308,6 +309,14 @@ function App() {
                       {renderDashboard(<AdminDashboard activeTab={activeTab} />)}
                   </RequireAuth>
                 } 
+              />
+              <Route 
+                path="/admin/treasury"
+                element={
+                  <RequireAuth allowedRoles={['admin']}>
+                      {renderDashboard(<TreasuryDashboard />)}
+                  </RequireAuth>
+                }
               />
               
               <Route 
