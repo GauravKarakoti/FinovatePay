@@ -9,9 +9,8 @@ const EventSync = require('../models/EventSync');
 async function processTokenizedEvent(
     invoiceHash,
     tokenId,
-    totalSupply,
-    faceValue,
-    yieldBps,
+    totalFractions,
+    pricePerFraction,
     blockNumber
 ) {
     const client = await pool.connect();
@@ -67,6 +66,8 @@ async function processTokenizedEvent(
         console.log(`✅ Tokenized: ${invoiceHash} → Token ${tokenId}`);
 
         // --- TRIGGER FINANCING PIPELINE (POST-COMMIT) ---
+        // Calculate face value: totalFractions * pricePerFraction
+        const faceValue = BigInt(totalFractions) * BigInt(pricePerFraction);
         const amount = faceValue.toString();
         await financeInvoice(
             invoiceHash,
@@ -102,14 +103,11 @@ async function replayMissedEvents(contract, fromBlock, toBlock) {
         const [ invoiceId, tokenId, seller, totalFractions, pricePerFraction, totalValue, yieldBps ] = event.args;
 
         try {
-            // Calculate faceValue: totalFractions * pricePerFraction
-            const faceValue = totalFractions * pricePerFraction;
-            
             const success = await processTokenizedEvent(
                 invoiceId,
                 tokenId,
-                totalFractions, // totalSupply = totalFractions
-                faceValue,      // faceValue = totalFractions * pricePerFraction
+                totalFractions,
+                pricePerFraction,
                 event.blockNumber
             );
 
