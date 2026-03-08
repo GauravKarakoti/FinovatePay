@@ -89,7 +89,9 @@ exports.getReports = async (req, res) => {
 
     // Simple on-chain aggregation: sum FeeCollected by token over recent blocks
     const toBlock = 'latest';
-    const fromBlock = Math.max(0, (req.query.lookbackBlocks ? Number(req.query.lookbackBlocks) : 10000));
+    const latest = await provider.getBlockNumber();
+    const lookbackBlocks = req.query.lookbackBlocks ? Number(req.query.lookbackBlocks) : 10000;
+    const fromBlock = Math.max(0, latest - lookbackBlocks);
 
     const iface = getTreasuryManagerContract().interface;
     const logs = await provider.getLogs({ address: treasuryAddress, fromBlock, toBlock });
