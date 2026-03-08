@@ -5,6 +5,7 @@ import CrossChainFractionModal from './CrossChainFractionModal';
 import CrossChainMarketplace from './CrossChainMarketplace';
 import CreditLineTab from './CreditLineTab';
 import AMMMarketplace from '../Trading/AMMMarketplace';
+import LendingDashboard from './LendingDashboard';
 
 const FinancingTab = ({ invoices, onTokenizeClick, userRole }) => {
     const [isFinancingApproved, setIsFinancingApproved] = useState(false);
@@ -18,7 +19,7 @@ const FinancingTab = ({ invoices, onTokenizeClick, userRole }) => {
         tokenId: null,
         fractions: 0
     });
-    const [activeTab, setActiveTab] = useState('local'); // 'local', 'crosschain', 'creditline', or 'amm'
+    const [activeTab, setActiveTab] = useState('local'); // 'local', 'crosschain', 'creditline', 'amm', or 'lending'
 
     useEffect(() => {
         const checkApproval = async () => {
@@ -131,6 +132,16 @@ const FinancingTab = ({ invoices, onTokenizeClick, userRole }) => {
                 >
                     AMM Market 📈
                 </button>
+                <button
+                    onClick={() => setActiveTab('lending')}
+                    className={`px-4 py-2 font-medium flex items-center gap-2 ${
+                        activeTab === 'lending'
+                            ? 'text-blue-600 border-b-2 border-blue-600'
+                            : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                >
+                    Lending 🏦
+                </button>
             </div>
 
             {activeTab === 'local' && (
@@ -234,6 +245,10 @@ const FinancingTab = ({ invoices, onTokenizeClick, userRole }) => {
 
             {activeTab === 'amm' && (
                 <AMMMarketplace />
+            )}
+
+            {activeTab === 'lending' && (
+                <LendingDashboard userRole={userRole} />
             )}
 
             {/* Cross-Chain Modal */}
