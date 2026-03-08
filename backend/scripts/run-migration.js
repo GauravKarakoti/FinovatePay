@@ -14,7 +14,9 @@ async function runMigration() {
   });
 
   try {
-    console.log('🔄 Running migration...\n');
+const logger = require('../utils/logger')('migration');
+
+    logger.info('Running migration...\n');
 
     // Read migration file
     const migrationPath = path.join(__dirname, '../migrations/001_create_email_schema.sql');
@@ -23,12 +25,12 @@ async function runMigration() {
     // Execute migration
     await pool.query(sql);
 
-    console.log('✅ Migration completed successfully!\n');
-    console.log('✓ email_logs table created');
-    console.log('✓ user_notification_preferences table created');
-    console.log('✓ email_templates table created');
-    console.log('✓ Indexes created');
-    console.log('✓ Triggers created');
+    logger.info('Migration completed successfully!\n');
+    logger.info('✓ email_logs table created');
+    logger.info('✓ user_notification_preferences table created');
+    logger.info('✓ email_templates table created');
+    logger.info('✓ Indexes created');
+    logger.info('✓ Triggers created');
 
     await pool.end();
     process.exit(0);

@@ -47,18 +47,8 @@ router.get('/status', authenticateToken, async (req, res) => {
 });
 
 // Get all KYC verifications (admin only)
-router.get('/admin/verifications', authenticateToken, async (req, res) => {
+router.get('/admin/verifications', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
-    // Check if user is admin
-    const userResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [req.user.id]
-    );
-
-    if (userResult.rows[0].role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
     const verifications = await pool.query(
       `SELECT kv.*, u.email, u.wallet_address, u.company_name 
        FROM kyc_verifications kv
@@ -74,20 +64,10 @@ router.get('/admin/verifications', authenticateToken, async (req, res) => {
 });
 
 // Manual KYC override (admin only)
-router.post('/admin/override', authenticateToken, validateKYCOverride, async (req, res) => {
+router.post('/admin/override', authenticateToken, requireRole(['admin']), validateKYCOverride, async (req, res) => {
   const { user_id, status, risk_level, reason } = req.body;
 
   try {
-    // Check if user is admin
-    const userResult = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
-      [req.user.id]
-    );
-
-    if (userResult.rows[0].role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
     // Create manual verification record
     await pool.query(
       `INSERT INTO kyc_verifications 

@@ -52,7 +52,7 @@ const syncInvoiceStatus = async (invoiceId) => {
     }
 
     if (newStatus !== invoice.status) {
-      console.log(`🔄 Syncing Invoice ${invoiceId}: ${invoice.status} -> ${newStatus}`);
+      logger.info(`Syncing Invoice ${invoiceId}: ${invoice.status} -> ${newStatus}`);
       await Invoice.updateStatus(invoiceId, newStatus);
     }
 
@@ -62,7 +62,7 @@ const syncInvoiceStatus = async (invoiceId) => {
 };
 
 const startSyncWorker = () => {
-  console.log('👷 Starting Invoice Sync Worker...');
+  logger.info('Starting Invoice Sync Worker...');
   setInterval(async () => {
     try {
       // Fetch a bounded batch of pending invoices to avoid pulling a huge result set

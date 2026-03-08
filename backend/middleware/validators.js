@@ -44,6 +44,36 @@ const isOTP = (value) => {
 };
 
 /**
+ * Disposable Email Domain Blacklist
+ * Common temporary/disposable email services that should be blocked
+ * for financial platforms requiring verified user contact information
+ */
+const DISPOSABLE_EMAIL_DOMAINS = [
+  // Popular disposable email services
+  'mailinator.com', 'guerrillamail.com', 'temp-mail.org', 'throwaway.email',
+  '10minutemail.com', 'tempmail.com', 'fakeinbox.com', 'trashmail.com',
+  'yopmail.com', 'maildrop.cc', 'getnada.com', 'sharklasers.com',
+  'guerrillamailblock.com', 'pokemail.net', 'spam4.me', 'grr.la',
+  'mailnesia.com', 'mintemail.com', 'mytemp.email', 'tempinbox.com',
+  'dispostable.com', 'emailondeck.com', 'mohmal.com', 'anonbox.net',
+  'burnermail.io', 'mailsac.com', 'mailcatch.com', 'getairmail.com',
+  'guerrillamail.net', 'guerrillamail.org', 'guerrillamail.biz',
+  'spam.la', 'tmpeml.info', 'mailforspam.com', 'anonymbox.com',
+  'throwawaymail.com', 'tempmail.net', 'fakemailgenerator.com',
+  'mailtemp.info', 'emailfake.com', 'tempmailo.com', 'tempr.email',
+  'disposablemail.com', 'throwam.com', 'spambox.us', 'mailexpire.com'
+];
+
+/**
+ * Check if email domain is disposable/temporary
+ */
+const isDisposableEmail = (email) => {
+  if (!email) return false;
+  const domain = email.toLowerCase().split('@')[1];
+  return DISPOSABLE_EMAIL_DOMAINS.includes(domain);
+};
+
+/**
  * AUTH VALIDATORS
  */
 const validateRegister = [
@@ -51,7 +81,13 @@ const validateRegister = [
     .trim()
     .isEmail().withMessage('Invalid email format')
     .normalizeEmail()
-    .isLength({ max: 255 }).withMessage('Email too long'),
+    .isLength({ max: 255 }).withMessage('Email too long')
+    .custom((value) => {
+      if (isDisposableEmail(value)) {
+        throw new Error('Disposable email addresses are not allowed. Please use a permanent email address.');
+      }
+      return true;
+    }),
   
   body('password')
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
@@ -470,6 +506,49 @@ const validateWalletAddress = [
   handleValidationErrors
 ];
 
+/**
+ * PASSWORD RESET VALIDATORS
+ */
+const validateForgotPassword = [
+  body('email')
+    .trim()
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Invalid email format')
+    .normalizeEmail(),
+  handleValidationErrors
+];
+
+const validateResetPassword = [
+  body('token')
+    .trim()
+    .notEmpty().withMessage('Reset token is required')
+    .isLength({ min: 32, max: 255 }).withMessage('Invalid token format'),
+  body('newPassword')
+    .trim()
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain uppercase, lowercase, and number'),
+  handleValidationErrors
+];
+
+const validateChangePassword = [
+  body('currentPassword')
+    .trim()
+    .notEmpty().withMessage('Current password is required'),
+  body('newPassword')
+    .trim()
+    .notEmpty().withMessage('New password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain uppercase, lowercase, and number'),
+  body('newPassword').custom((value, { req }) => {
+    if (value === req.body.currentPassword) {
+      throw new Error('New password must be different from current password');
+    }
+    return true;
+  }),
+  handleValidationErrors
+];
+
 module.exports = {
   handleValidationErrors,
   // Auth
@@ -507,6 +586,10 @@ module.exports = {
   validateFinancingRepay,
   // Relayer
   validateRelayTransaction,
+  // Password Reset
+  validateForgotPassword,
+  validateResetPassword,
+  validateChangePassword,
   // Custom validators (export for reuse)
   isEthereumAddress,
   isUUID,

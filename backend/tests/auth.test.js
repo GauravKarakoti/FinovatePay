@@ -137,7 +137,7 @@ describe('Auth Registration Tests', () => {
       
       // Verify the SQL was called with 'seller' as the role (in the parameters array)
       const insertParams = mockQuery.mock.calls[1][1];
-      expect(insertParams[6]).toBe('seller');
+      expect(insertParams[7]).toBe('seller');
     });
 
     it('should default to "seller" role when invalid role is provided', async () => {
@@ -208,7 +208,14 @@ describe('Auth Registration Tests', () => {
         .post('/auth/register')
         .send({ ...validUserData });
 
-      expect(response.body.token).toBe('mock-jwt-token');
+      expect(response.body.token).toBeUndefined();
+      
+      // Cookie check
+      const cookies = response.headers['set-cookie'];
+      expect(cookies).toBeDefined();
+      const tokenCookie = cookies.find(c => c.includes('token=mock-jwt-token'));
+      expect(tokenCookie).toBeDefined();
+      expect(tokenCookie).toMatch(/HttpOnly/);
     });
 
     it('should not allow arbitrator role (admin-only)', async () => {
