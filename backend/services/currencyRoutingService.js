@@ -436,6 +436,149 @@ const getExchangeQuotes = async (fromCurrency, toCurrency, amount = 1000) => {
   })).sort((a, b) => b.amountOut - a.amountOut);
 };
 
+// ─── Smart Routing Helpers ────────────────────────────────────────────────────
+
+/**
+ * Bridge fee matrix (base + percentage fee per chain pair per bridge protocol).
+ * Fees expressed as a fraction of the transfer amount.
+ */
+const BRIDGE_FEE_MATRIX = {
+  waltbridge: {
+    'polygon-pos->katana':        { baseFee: 0.001, percentFee: 0.0005 },
+    'katana->polygon-pos':        { baseFee: 0.001, percentFee: 0.0005 },
+    'polygon-pos->polygon-zkevm': { baseFee: 0.002, percentFee: 0.001  },
+    'polygon-zkevm->polygon-pos': { baseFee: 0.002, percentFee: 0.001  },
+    'finovate-cdk->katana':       { baseFee: 0.0005, percentFee: 0.0003 },
+    'katana->finovate-cdk':       { baseFee: 0.0005, percentFee: 0.0003 },
+    'finovate-cdk->polygon-pos':  { baseFee: 0.0008, percentFee: 0.0004 },
+    'polygon-pos->finovate-cdk':  { baseFee: 0.0008, percentFee: 0.0004 },
+  },
+  agglayer: {
+    'polygon-pos->polygon-zkevm': { baseFee: 0.001,  percentFee: 0.0003 },
+    'polygon-zkevm->polygon-pos': { baseFee: 0.001,  percentFee: 0.0003 },
+    'finovate-cdk->polygon-pos':  { baseFee: 0.0008, percentFee: 0.0004 },
+    'polygon-pos->finovate-cdk':  { baseFee: 0.0008, percentFee: 0.0004 },
+  },
+};
+
+/**
+ * Estimate bridge fees for a cross-chain transfer across all known protocols.
+ * @returns {Array<{bridge, baseFee, percentageFee, totalFee, feePercent}>}
+ */
+const estimateBridgeFees = async (fromChain, toChain, _asset, amount) => {
+  const routeKey = `${fromChain}->${toChain}`;
+  const fees = [];
+
+  for (const [bridge, routes] of Object.entries(BRIDGE_FEE_MATRIX)) {
+    const spec = routes[routeKey];
+    if (!spec) continue;
+    const { baseFee, percentFee } = spec;
+    const totalFee = baseFee * amount + percentFee * amount;
+    fees.push({
+      bridge,
+      baseFee:       baseFee    * amount,
+      percentageFee: percentFee * amount,
+      totalFee,
+      feePercent:    (baseFee + percentFee) * 100,
+    });
+  }
+
+  return fees;
+};
+
+/**
+ * Find 1-hop and 2-hop conversion paths between two tokens.
+ * Intermediate tokens: USDC, USDT, DAI, ETH.
+ * @returns {Array} sorted by outputAmount DESC
+ */
+const getMultiHopPaths = async (fromToken, toToken, amount) => {
+  const INTERMEDIATES = ['USDC', 'USDT', 'DAI', 'ETH'];
+  const paths = [];
+
+  // Direct 1-hop
+  try {
+    const directRate = await fetchViaUsdRate(fromToken, toToken);
+    if (directRate) {
+      paths.push({
+        type: 'direct',
+        hops: 1,
+        path: [fromToken, toToken],
+        outputAmount: amount * directRate,
+        rate: directRate,
+        slippageBps: 10,
+      });
+    }
+  } catch (_) { /* intentionally ignored */ }
+
+  // 2-hop via intermediate
+  for (const mid of INTERMEDIATES) {
+    if (mid === fromToken || mid === toToken) continue;
+    try {
+      const [rate1, rate2] = await Promise.all([
+        fetchViaUsdRate(fromToken, mid),
+        fetchViaUsdRate(mid, toToken),
+      ]);
+      if (rate1 && rate2) {
+        const combinedRate = rate1 * rate2;
+        paths.push({
+          type: 'multi_hop',
+          hops: 2,
+          path: [fromToken, mid, toToken],
+          outputAmount: amount * combinedRate,
+          rate: combinedRate,
+          slippageBps: 25,
+        });
+      }
+    } catch (_) { /* intentionally ignored */ }
+  }
+
+  return paths.sort((a, b) => b.outputAmount - a.outputAmount);
+};
+
+/**
+ * Estimate network congestion for a given chain (0 = idle, 100 = congested).
+ * Uses time-of-day heuristics (peak = 13–21 UTC, NY/London overlap).
+ */
+const getNetworkCongestion = async (chain) => {
+  const BASE_CONGESTION = {
+    'polygon-pos':    30,
+    'polygon-zkevm':  20,
+    'katana':         25,
+    'finovate-cdk':   15,
+    'ethereum':       60,
+  };
+  const hour = new Date().getUTCHours();
+  const peakMultiplier = hour >= 13 && hour <= 21 ? 1.4 : 1.0;
+  const base = BASE_CONGESTION[chain] ?? 40;
+  return Math.min(100, Math.round(base * peakMultiplier));
+};
+
+/**
+ * Score a single route on a 0–100 scale.
+ * Weights: rate (output maximisation), fee (cost minimisation), speed (time minimisation).
+ */
+const scoreRoute = (route, weights = { rate: 0.4, fee: 0.3, speed: 0.3 }) => {
+  const inputAmount = route.inputAmount || 1;
+  const outputScore = Math.min(1, (route.outputAmount || 0) / inputAmount);
+  const feeScore    = 1 - Math.min(1, (route.totalFee || 0) / (inputAmount * 0.05 || 1));
+  const speedScore  = 1 - Math.min(1, (route.estimatedTimeSeconds || 300) / 3600);
+
+  const total = weights.rate * outputScore
+              + weights.fee  * feeScore
+              + weights.speed * speedScore;
+
+  return {
+    score: Math.round(total * 100),
+    breakdown: {
+      rateScore:  Math.round(outputScore * 100),
+      feeScore:   Math.round(feeScore    * 100),
+      speedScore: Math.round(speedScore  * 100),
+    },
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * Initialize routing service - warm up cache
  */
@@ -475,6 +618,11 @@ module.exports = {
   getPaymentByTxHash,
   getExchangeQuotes,
   initializeRouting,
-  fetchRealTimeRates
+  fetchRealTimeRates,
+  // Smart Routing Helpers
+  estimateBridgeFees,
+  getMultiHopPaths,
+  getNetworkCongestion,
+  scoreRoute,
 };
 
