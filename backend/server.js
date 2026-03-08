@@ -14,7 +14,7 @@ const {
   verifyInvoiceAccess,
   verifyMarketplaceAccess,
 } = require("./middleware/socketAuth");
-const { globalLimiter } = require("./middleware/rateLimiter");
+const { globalLimiter, authLimiter, kycLimiter, paymentLimiter, relayerLimiter } = require("./middleware/rateLimiter");
 const errorHandler = require("./middleware/errorHandler");
 const notificationRoutes = require("./routes/notifications");
 
@@ -22,9 +22,13 @@ const listenForTokenization = require("./listeners/contractListener");
 const startComplianceListeners = require("./listeners/complianceListener");
 const testDbConnection = require("./utils/testDbConnection");
 const { startSyncWorker } = require("./services/escrowSyncService");
+const { startScheduledReconciliation } = require("./services/reconciliationService");
 
 const app = express();
 const server = http.createServer(app);
+
+// Import graceful shutdown utility
+const { setupGracefulShutdown } = require('./utils/gracefulShutdown');
 
 /* ---------------- SOCKET.IO SETUP ---------------- */
 
@@ -55,6 +59,7 @@ const corsOptions = {
 
     return callback(new Error("Not allowed by CORS"));
   },
+  // origin: "http://localhost:5173",
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
   credentials: true,
   optionsSuccessStatus: 204,
@@ -67,6 +72,7 @@ app.use(express.json());
 
 /* ---------------- RATE LIMITING ---------------- */
 
+// Global rate limiter for all API routes
 app.use("/api/", globalLimiter);
 
 /* ---------------- DATABASE ---------------- */
@@ -80,16 +86,23 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 /* ---------------- API ROUTES ---------------- */
 
 app.use("/api/health", require("./routes/health"));
-app.use("/api/auth", require("./routes/auth"));
+app.use("/api/auth", authLimiter, require("./routes/auth"));
 app.use("/api/invoices", require("./routes/invoice"));
-app.use("/api/payments", require("./routes/payment"));
+app.use("/api/payments", paymentLimiter, require("./routes/payment"));
+
+/* ---------------- ESCROW ---------------- */
+
+app.use("/api/escrow", require("./routes/escrow"));
+
+/* ---------------- ADMIN ---------------- */
+
 app.use("/api/admin", require("./routes/admin"));
-app.use("/api/kyc", require("./routes/kyc"));
+app.use("/api/kyc", kycLimiter, require("./routes/kyc"));
 app.use("/api/produce", require("./routes/produce"));
 app.use("/api/quotations", require("./routes/quotation"));
 app.use("/api/market", require("./routes/market"));
 app.use("/api/dispute", require("./routes/dispute"));
-app.use("/api/relayer", require("./routes/relayer"));
+app.use("/api/relayer", relayerLimiter, require("./routes/relayer"));
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/shipment", shipmentRoutes);
 app.use("/api/meta-tx", require("./routes/metaTransaction"));
@@ -99,6 +112,30 @@ app.use("/api/notifications", notificationRoutes);
 
 app.use("/api/financing", require("./routes/financing"));
 app.use("/api/investor", require("./routes/investor"));
+
+/* ---------------- AUCTIONS ---------------- */
+
+app.use("/api/auctions", require("./routes/auction"));
+
+/* ---------------- ANALYTICS ---------------- */
+
+app.use('/api/analytics', require('./routes/analytics'));
+
+/* ---------------- RECONCILIATION ---------------- */
+
+app.use('/api/reconciliation', require('./routes/reconciliation'));
+
+/* ---------------- CURRENCIES ---------------- */
+
+app.use('/api/currencies', require('./routes/currency'));
+
+/* ---------------- CREDIT SCORES ---------------- */
+
+app.use('/api/credit-scores', require('./routes/creditScore'));
+
+/* ---------------- INSURANCE ---------------- */
+
+app.use('/api/insurance', require('./routes/insurance'));
 
 /* ---------------- FIAT ON-RAMP ---------------- */
 
@@ -201,16 +238,31 @@ server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
 
-/* ---------------- BACKGROUND WORKERS ---------------- */
+// Set up graceful shutdown handlers
+setupGracefulShutdown(server, io);
+
+const { startRecoveryWorker } = require('./services/recoveryService');
 
 listenForTokenization();
 startSyncWorker();
+startRecoveryWorker(); // Start transaction recovery worker
 
 try {
   startComplianceListeners();
 } catch (err) {
   console.error(
     "[server] Compliance listeners failed:",
+    err?.message || err
+  );
+}
+
+// Start scheduled reconciliation (every 6 hours)
+try {
+  startScheduledReconciliation();
+  console.log("[Server] Reconciliation scheduler started");
+} catch (err) {
+  console.error(
+    "[server] Reconciliation scheduler failed:",
     err?.message || err
   );
 }

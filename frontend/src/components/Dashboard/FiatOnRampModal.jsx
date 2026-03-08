@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import api, { createFiatRampLink } from '../../utils/api';
+import CurrencySelector from '../Settings/CurrencySelector';
 
 const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
     const [amount, setAmount] = useState('');
@@ -211,26 +212,24 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
                             You Pay (Fiat)
                         </label>
-                        <div className="relative group">
-                            <input
-                                type="number"
-                                min="10"
-                                step="any"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="block w-full pl-4 pr-20 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium"
-                                placeholder="0.00"
-                            />
-                            <div className="absolute inset-y-0 right-0 flex items-center border-l border-gray-300">
-                                <select
+                        <div className="flex gap-3">
+                            <div className="flex-1">
+                                <input
+                                    type="number"
+                                    min="10"
+                                    step="any"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    className="block w-full pl-4 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-finovate-blue-500 focus:border-finovate-blue-500 transition-all text-lg font-medium"
+                                    placeholder="0.00"
+                                />
+                            </div>
+                            <div className="w-36">
+                                <CurrencySelector
                                     value={currency}
-                                    onChange={(e) => setCurrency(e.target.value)}
-                                    className="h-full py-0 pl-3 pr-8 bg-gray-50 text-gray-600 font-medium rounded-r-lg focus:ring-0 border-transparent cursor-pointer hover:bg-gray-100"
-                                >
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="GBP">GBP</option>
-                                </select>
+                                    onChange={setCurrency}
+                                    showFiatOnly={true}
+                                />
                             </div>
                         </div>
                     </div>
