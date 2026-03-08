@@ -74,28 +74,45 @@ exports.uploadEvidence = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Automatically create a dispute if it doesn't exist?
-    // For now, let's assume raising a dispute is explicit, but we allow evidence upload even if not raised yet?
-    // Or we can check. Let's create it if it doesn't exist to be safe, as "evidence" implies a dispute context.
-    // However, usually you raise first. I'll check if dispute exists, if not, I'll create it with "Evidence Upload" as reason/note.
+    // 1. Verify invoice exists and get invoice details
+    const invoiceResult = await client.query(
+      'SELECT buyer_address, seller_address FROM invoices WHERE invoice_id = $1',
+      [invoiceId]
+    );
 
-    let disputeCheck = await client.query('SELECT * FROM disputes WHERE invoice_id = $1', [invoiceId]);
-    if (disputeCheck.rows.length === 0) {
-       await client.query(
-        'INSERT INTO disputes (invoice_id, status, resolution_note) VALUES ($1, $2, $3)',
-        [invoiceId, 'open', 'Auto-created by evidence upload']
-      );
-      await createLog(client, invoiceId, 'Dispute Auto-Created', user.email, 'Created by evidence upload');
+    if (invoiceResult.rows.length === 0) {
+      throw new Error('Invoice not found');
     }
 
-    // Save evidence record
+    const invoice = invoiceResult.rows[0];
+
+    // 2. Authorization check - verify user is buyer or seller
+    const userWallet = user.wallet_address?.toLowerCase();
+    const buyerWallet = invoice.buyer_address?.toLowerCase();
+    const sellerWallet = invoice.seller_address?.toLowerCase();
+
+    if (userWallet !== buyerWallet && userWallet !== sellerWallet && user.role !== 'admin') {
+      throw new Error('Not authorized: Only invoice parties can upload evidence');
+    }
+
+    // 3. Verify dispute exists - don't auto-create
+    const disputeCheck = await client.query(
+      'SELECT * FROM disputes WHERE invoice_id = $1',
+      [invoiceId]
+    );
+
+    if (disputeCheck.rows.length === 0) {
+      throw new Error('No dispute exists for this invoice. Please raise a dispute first.');
+    }
+
+    // 4. Save evidence record
     const fileUrl = `/uploads/${file.filename}`;
     await client.query(
       'INSERT INTO dispute_evidence (invoice_id, uploaded_by, file_url, file_name) VALUES ($1, $2, $3, $4)',
       [invoiceId, user.email, fileUrl, file.originalname]
     );
 
-    // Add log entry
+    // 5. Add log entry
     await createLog(client, invoiceId, 'Evidence Uploaded', user.email, `Uploaded ${file.originalname}`);
 
     await client.query('COMMIT');
@@ -109,7 +126,14 @@ exports.uploadEvidence = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Error uploading evidence:', err);
-    return errorResponse(res, err, 500);
+    
+    // Determine appropriate status code
+    let statusCode = 500;
+    if (err.message === 'Invoice not found') statusCode = 404;
+    if (err.message.includes('Not authorized')) statusCode = 403;
+    if (err.message.includes('No dispute exists')) statusCode = 400;
+    
+    return errorResponse(res, err, statusCode);
   } finally {
     client.release();
   }
