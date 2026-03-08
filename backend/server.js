@@ -230,6 +230,10 @@ app.use('/api/v1/fraud-detection', require('./routes/fraudDetection'));
 
 app.use('/api/v1/credit-line', require('./routes/creditLine'));
 
+/* ---------------- DYNAMIC COLLATERALIZED LENDING ---------------- */
+
+app.use('/api/v1/lending', require('./routes/lending'));
+
 /* ---------------- INSURANCE ---------------- */
 
 app.use('/api/v1/insurance', require('./routes/insurance'));
