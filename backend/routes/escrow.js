@@ -110,7 +110,12 @@ router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) =
       });
     }
 
-    const escrowContract = getEscrowContract();
+    const signer = await getSigner();
+    const escrowContract = new ethers.Contract(
+      contractAddresses.EscrowContract,
+      EscrowContractArtifact.abi,
+      signer
+    );
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     // Defaults: 7 days if not provided
