@@ -21,12 +21,12 @@ const API_VERSIONS = {
 
 /**
  * Extract API version from request path
- * @param {string} path - Request path (e.g., '/api/v1/auth')
+ * @param {string} path - Request path (e.g., '/v1/auth')
  * @returns {object} - Version info object
  */
 const extractVersion = (path) => {
-  // Match pattern: /api/v1 or /api/v2
-  const versionMatch = path.match(/^\/api\/(v\d+)/);
+  // Match pattern: /v1 or /v2 at the start of the path
+  const versionMatch = path.match(/^\/?(v\d+)/);
   
   if (versionMatch) {
     const versionKey = versionMatch[1]; // v1 or v2
