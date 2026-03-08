@@ -1,329 +1,209 @@
-#!/usr/bin/env node
-
-/**
- * Database Migration Runner
- * 
- * Features:
- * - Automatic discovery of migration files
- * - Tracks applied migrations in _migrations table
- * - Supports forward and backward migrations
- * - Migration locking to prevent concurrent executions
- * - Detailed logging and error handling
- * 
- * Usage:
- *   npm run migrate:db          # Run pending migrations
- *   npm run migrate:down        # Rollback last migration
- *   npm run migrate:status      # Check migration status
- */
-
-require('dotenv').config();
-const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
-
-const dbConfig = {
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT) || 5432,
-  ssl: { rejectUnauthorized: false },
-};
-
-const pool = new Pool(dbConfig);
-const migrationsDir = path.join(__dirname, '../migrations');
-
-// Color codes for console output
-const colors = {
-  reset: '\x1b[0m',
-  green: '\x1b[32m',
-  yellow: '\x1b[33m',
-  red: '\x1b[31m',
-  blue: '\x1b[34m',
-  cyan: '\x1b[36m',
-};
+const { pool } = require('../config/database');
 
 /**
- * Log with color
+ * Enhanced Migration Runner
  */
-function log(message, color = 'reset') {
-  console.log(`${colors[color]}${message}${colors.reset}`);
-}
 
-/**
- * Initialize migrations tracking table
- */
-async function initializeMigrationsTable(client) {
-  const createTableSQL = `
-    CREATE TABLE IF NOT EXISTS _migrations (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(255) UNIQUE NOT NULL,
-      executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      batch INTEGER NOT NULL,
-      execution_time_ms INTEGER,
-      status VARCHAR(20) DEFAULT 'completed'
-    );
-    
-    CREATE INDEX IF NOT EXISTS idx_migrations_name ON _migrations(name);
-    CREATE INDEX IF NOT EXISTS idx_migrations_batch ON _migrations(batch);
-  `;
-
-  try {
-    await client.query(createTableSQL);
-    log('✓ Migrations tracking table initialized', 'cyan');
-  } catch (error) {
-    log(`✗ Error initializing migrations table: ${error.message}`, 'red');
-    throw error;
+class MigrationRunner {
+  constructor() {
+    this.migrationsDir = path.join(__dirname, '../migrations');
+    this.logger = require('../utils/logger')('migration_runner');
   }
-}
 
-/**
- * Get list of migration files from migrations directory
- */
-function getMigrationFiles() {
-  try {
-    if (!fs.existsSync(migrationsDir)) {
-      fs.mkdirSync(migrationsDir, { recursive: true });
-      return [];
-    }
+  async init() {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        id SERIAL PRIMARY KEY,
+        version VARCHAR(255) NOT NULL UNIQUE,
+        filename VARCHAR(255) NOT NULL,
+        executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        execution_time_ms INTEGER,
+        checksum VARCHAR(64)
+      )
+    `);
 
-    const files = fs.readdirSync(migrationsDir)
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_schema_migrations_version 
+      ON schema_migrations(version)
+    `);
+  }
+
+  async getMigrationFiles() {
+    const files = fs.readdirSync(this.migrationsDir)
       .filter(file => file.endsWith('.sql'))
       .sort();
 
-    return files;
-  } catch (error) {
-    log(`✗ Error reading migrations directory: ${error.message}`, 'red');
-    throw error;
+    return files.map(file => {
+      const version = file.split('_')[0];
+      return {
+        version,
+        filename: file,
+        path: path.join(this.migrationsDir, file)
+      };
+    });
   }
-}
 
-/**
- * Get already applied migrations
- */
-async function getAppliedMigrations(client) {
-  try {
-    const result = await client.query(
-      'SELECT name FROM _migrations WHERE status = $1 ORDER BY executed_at ASC',
-      ['completed']
+  async getExecutedMigrations() {
+    const result = await pool.query(
+      'SELECT version, filename, executed_at FROM schema_migrations ORDER BY version'
     );
-    return result.rows.map(row => row.name);
-  } catch (error) {
-    log(`✗ Error retrieving applied migrations: ${error.message}`, 'red');
-    throw error;
+    return result.rows;
   }
-}
 
-/**
- * Get the next batch number
- */
-async function getNextBatch(client) {
-  try {
-    const result = await client.query('SELECT MAX(batch) as max_batch FROM _migrations');
-    const maxBatch = result.rows[0].max_batch;
-    return maxBatch ? maxBatch + 1 : 1;
-  } catch (error) {
-    return 1;
+  async getPendingMigrations() {
+    const allMigrations = await this.getMigrationFiles();
+    const executed = await this.getExecutedMigrations();
+    const executedVersions = new Set(executed.map(m => m.version));
+
+    return allMigrations.filter(m => !executedVersions.has(m.version));
   }
-}
 
-/**
- * Run pending migrations
- */
-async function runMigrations() {
-  const client = await pool.connect();
+  async executeMigration(migration, dryRun = false) {
+    const start = Date.now();
 
-  try {
-    log('\n🔄 Starting database migrations...\n', 'blue');
+    try {
+      const sql = fs.readFileSync(migration.path, 'utf8');
+      const checksum = require('crypto').createHash('md5').update(sql).digest('hex');
 
-    // Initialize migrations table
-    await initializeMigrationsTable(client);
+      this.logger.info(`${dryRun ? '[DRY RUN]' : ''} Running ${migration.filename}`);
 
-    const migrationFiles = getMigrationFiles();
-    const appliedMigrations = await getAppliedMigrations(client);
-    const pendingMigrations = migrationFiles.filter(file => !appliedMigrations.includes(file));
+      if (!dryRun) {
+        await pool.query(sql);
 
-    if (pendingMigrations.length === 0) {
-      log('✓ No pending migrations', 'green');
-      return { success: true, migrationCount: 0 };
-    }
-
-    const nextBatch = await getNextBatch(client);
-    let successful = 0;
-    let failed = 0;
-
-    log(`Found ${pendingMigrations.length} pending migration(s)\n`, 'yellow');
-
-    // Start transaction
-    await client.query('BEGIN');
-
-    for (const migrationFile of pendingMigrations) {
-      const migrationPath = path.join(migrationsDir, migrationFile);
-      const startTime = Date.now();
-
-      try {
-        const sql = fs.readFileSync(migrationPath, 'utf-8');
-
-        // Log migration start
-        log(`  Running: ${migrationFile}...`, 'cyan');
-
-        // Execute migration
-        await client.query(sql);
-
-        // Record migration
-        const executionTime = Date.now() - startTime;
-        await client.query(
-          `INSERT INTO _migrations (name, batch, execution_time_ms, status) 
-           VALUES ($1, $2, $3, $4)`,
-          [migrationFile, nextBatch, executionTime, 'completed']
-        );
-
-        log(`  ✓ ${migrationFile} (${executionTime}ms)`, 'green');
-        successful++;
-      } catch (error) {
-        log(`  ✗ Error in ${migrationFile}: ${error.message}`, 'red');
-        failed++;
-        throw error; // Rollback on error
+        await pool.query(`
+          INSERT INTO schema_migrations (version, filename, execution_time_ms, checksum)
+          VALUES ($1,$2,$3,$4)
+        `, [
+          migration.version,
+          migration.filename,
+          Date.now() - start,
+          checksum
+        ]);
       }
+
+      this.logger.info(`✅ ${migration.filename} finished`);
+      return true;
+
+    } catch (error) {
+      this.logger.error(`❌ ${migration.filename} failed`, error);
+      throw error;
     }
-
-    // Commit transaction
-    await client.query('COMMIT');
-
-    log(`\n✅ Migration completed successfully!`, 'green');
-    log(`Batch: ${nextBatch}`, 'cyan');
-    log(`Migrations run: ${successful}`, 'cyan');
-
-    return { success: true, migrationCount: successful };
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    log(`\n❌ Migration failed and rolled back: ${error.message}`, 'red');
-    return { success: false, error: error.message };
-  } finally {
-    client.release();
   }
-}
 
-/**
- * Rollback last migration batch
- */
-async function rollbackMigrations() {
-  const client = await pool.connect();
+  async runMigrations(options = {}) {
+    const { dryRun = false, target = null } = options;
 
-  try {
-    log('\n🔄 Starting migration rollback...\n', 'blue');
+    await this.init();
 
-    // Initialize migrations table
-    await initializeMigrationsTable(client);
+    const pending = await this.getPendingMigrations();
 
-    // Get last batch
-    const result = await client.query(
-      `SELECT batch, COUNT(*) as count FROM _migrations 
-       WHERE status = $1 
-       GROUP BY batch 
-       ORDER BY batch DESC LIMIT 1`,
-      ['completed']
-    );
-
-    if (result.rows.length === 0) {
-      log('✓ No migrations to rollback', 'green');
-      return { success: true, rolledBack: 0 };
+    if (!pending.length) {
+      this.logger.info('No pending migrations');
+      return;
     }
 
-    const lastBatch = result.rows[0].batch;
-    const migrationsInBatch = await client.query(
-      `SELECT name FROM _migrations 
-       WHERE batch = $1 AND status = $2 
-       ORDER BY executed_at DESC`,
-      [lastBatch, 'completed']
-    );
+    let migrations = pending;
 
-    if (migrationsInBatch.rows.length === 0) {
-      log('✓ No migrations to rollback', 'green');
-      return { success: true, rolledBack: 0 };
+    if (target) {
+      migrations = pending.filter(m => parseInt(m.version) <= parseInt(target));
     }
 
-    log(`Rolling back batch ${lastBatch} (${migrationsInBatch.rows.length} migration(s))\n`, 'yellow');
+    for (const migration of migrations) {
+      await this.executeMigration(migration, dryRun);
+    }
 
-    await client.query('BEGIN');
+    this.logger.info(`🎉 ${migrations.length} migrations executed`);
+  }
 
-    for (const migration of migrationsInBatch.rows) {
-      const migrationFile = migration.name;
-      const downFile = migrationFile.replace('.sql', '.down.sql');
-      const downPath = path.join(migrationsDir, downFile);
+  async rollback(steps = 1) {
+    const executed = await this.getExecutedMigrations();
 
-      try {
-        log(`  Rolling back: ${migrationFile}...`, 'cyan');
+    const toRollback = executed.slice(-steps).reverse();
 
-        if (fs.existsSync(downPath)) {
-          const downSql = fs.readFileSync(downPath, 'utf-8');
-          await client.query(downSql);
-        } else {
-          log(`  ⚠ No down migration file found: ${downFile}`, 'yellow');
-        }
+    for (const migration of toRollback) {
 
-        // Mark as rolled back
-        await client.query(
-          `UPDATE _migrations SET status = $1 WHERE name = $2`,
-          ['rolled_back', migrationFile]
-        );
+      const rollbackFile = migration.filename.replace('.sql', '_rollback.sql');
+      const rollbackPath = path.join(this.migrationsDir, rollbackFile);
 
-        log(`  ✓ ${migrationFile} rolled back`, 'green');
-      } catch (error) {
-        log(`  ✗ Error rolling back ${migrationFile}: ${error.message}`, 'red');
-        throw error;
+      if (fs.existsSync(rollbackPath)) {
+        const sql = fs.readFileSync(rollbackPath, 'utf8');
+        await pool.query(sql);
       }
+
+      await pool.query(
+        'DELETE FROM schema_migrations WHERE version=$1',
+        [migration.version]
+      );
+
+      this.logger.info(`Rolled back ${migration.filename}`);
     }
+  }
 
-    await client.query('COMMIT');
+  async status() {
+    await this.init();
 
-    log(`\n✅ Rollback completed successfully!`, 'green');
-    log(`Batch: ${lastBatch}`, 'cyan');
-    log(`Migrations rolled back: ${migrationsInBatch.rows.length}`, 'cyan');
+    const all = await this.getMigrationFiles();
+    const executed = await this.getExecutedMigrations();
+    const executedVersions = new Set(executed.map(m => m.version));
 
-    return { success: true, rolledBack: migrationsInBatch.rows.length };
-  } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
-    log(`\n❌ Rollback failed: ${error.message}`, 'red');
-    return { success: false, error: error.message };
-  } finally {
-    client.release();
+    console.log('\nMigration Status\n');
+
+    for (const migration of all) {
+      const status = executedVersions.has(migration.version)
+        ? 'Applied'
+        : 'Pending';
+
+      console.log(`${migration.version} - ${status} - ${migration.filename}`);
+    }
   }
 }
 
-/**
- * Main execution
- */
 async function main() {
-  const command = process.argv[2] || 'up';
+  const runner = new MigrationRunner();
+  const command = process.argv[2];
 
   try {
-    let result;
 
-    switch (command.toLowerCase()) {
+    switch (command) {
       case 'up':
-      case 'migrate':
-        result = await runMigrations();
+        await runner.runMigrations();
         break;
-      case 'down':
+
+      case 'dry-run':
+        await runner.runMigrations({ dryRun: true });
+        break;
+
       case 'rollback':
-        result = await rollbackMigrations();
+        const steps = parseInt(process.argv[3]) || 1;
+        await runner.rollback(steps);
         break;
+
+      case 'status':
+        await runner.status();
+        break;
+
       default:
-        log(`\n❌ Unknown command: ${command}`, 'red');
-        log(`\nUsage:\n`, 'yellow');
-        log(`  node scripts/run-migrations.js up        - Run pending migrations`, 'cyan');
-        log(`  node scripts/run-migrations.js down      - Rollback last batch`, 'cyan');
-        process.exit(1);
+        console.log(`
+Usage:
+node scripts/run-migrations.js up
+node scripts/run-migrations.js dry-run
+node scripts/run-migrations.js rollback 1
+node scripts/run-migrations.js status
+        `);
     }
 
-    await pool.end();
-    process.exit(result.success ? 0 : 1);
-  } catch (error) {
-    log(`\n❌ Fatal error: ${error.message}`, 'red');
-    await pool.end();
+  } catch (err) {
+    console.error(err);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = MigrationRunner;
