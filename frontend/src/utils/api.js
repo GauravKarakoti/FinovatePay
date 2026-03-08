@@ -729,6 +729,23 @@ export const executeParameterChange = (parameterName) => {
   return api.post('/governance/execute', { parameterName });
 };
 
+// --- Treasury API ---
+export const getTreasuryBalance = (token) => {
+  return api.get('/treasury/balance', { params: { token } });
+};
+
+export const withdrawFromTreasury = (token, to, amount) => {
+  return api.post('/treasury/withdraw', { token, to, amount });
+};
+
+export const getTreasuryTransactions = (params) => {
+  return api.get('/treasury/transactions', { params });
+};
+
+export const getTreasuryReports = (params) => {
+  return api.get('/treasury/reports', { params });
+};
+
 // --- Staking API ---
 export const stakeTokens = ({ tokenAddress, tokenId, amount, lockDurationSeconds, apyBP }) => {
   return api.post('/staking/stake', { tokenAddress, tokenId, amount, lockDurationSeconds, apyBP });
