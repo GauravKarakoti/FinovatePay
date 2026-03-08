@@ -84,7 +84,8 @@ const calculateDynamicLTV = async (userId, walletAddress, collateralValue, reque
         // Calculate base LTV from collateral
         let baseLTV = 0;
         if (requestedAmount > 0 && collateralValue > 0) {
-            baseLTV = (collateralValue * 10000) / requestedAmount;
+            // LTV = requestedAmount / collateralValue, scaled to basis points (0–10000)
+            baseLTV = (requestedAmount * 10000) / collateralValue;
         }
         
         // Cap at max
