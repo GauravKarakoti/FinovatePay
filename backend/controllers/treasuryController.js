@@ -103,7 +103,8 @@ exports.getReports = async (req, res) => {
         if (parsed.name === 'FeeCollected') {
           const token = parsed.args[0];
           const amount = parsed.args[2];
-          totals[token] = (totals[token] || ethers.BigInt(0)) + ethers.BigInt(amount.toString());
+          const amountBigInt = BigInt(amount.toString());
+          totals[token] = (totals[token] ?? 0n) + amountBigInt;
         }
       } catch (e) {
         // ignore
