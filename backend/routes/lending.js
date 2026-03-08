@@ -338,7 +338,17 @@ router.get('/ltv/:userId', authenticateToken, async (req, res) => {
     try {
         const { userId } = req.params;
         const { collateralValue, requestedAmount } = req.query;
-
+        // Authorization: only allow the same user or an admin to access this resource
+        const authenticatedUser = req.user;
+        if (!authenticatedUser) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        const hasAdminRole =
+            authenticatedUser.role === 'admin' ||
+            (Array.isArray(authenticatedUser.roles) && authenticatedUser.roles.includes('admin'));
+        if (!hasAdminRole && String(authenticatedUser.id) !== String(userId)) {
+            return res.status(403).json({ error: 'Forbidden' });
+        }
         if (!collateralValue || !requestedAmount) {
             return res.status(400).json({ error: 'Missing collateralValue or requestedAmount' });
         }

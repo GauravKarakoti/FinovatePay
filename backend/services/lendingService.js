@@ -22,8 +22,8 @@ let lendingPoolContract = null;
 const initializeContract = async () => {
     if (lendingPoolContract) return lendingPoolContract;
     
-    const { getContract } = require('../config/blockchain');
-    const contract = await getContract('LendingPool');
+    const { getLendingPoolContract } = require('../config/blockchain');
+    const contract = await getLendingPoolContract();
     lendingPoolContract = contract;
     return contract;
 };
@@ -185,8 +185,7 @@ const createLoan = async (userId, walletAddress, data) => {
             data.collateralTokenId || 0,
             data.collateralAmount || 0,
             data.collateralValue,
-            loanDuration,
-            { from: walletAddress }
+            loanDuration
         );
         
         const receipt = await tx.wait();
