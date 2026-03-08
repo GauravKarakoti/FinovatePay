@@ -213,7 +213,7 @@ const createLoan = async (userId, walletAddress, data) => {
                 loan_id, user_id, wallet_address, principal, interest_rate,
                 total_debt, collateral_value, ltv, loan_duration,
                 maturity_date, status, transaction_hash, block_number
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + INTERVAL '180 days', $10, $11, $12)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + ($9 * INTERVAL '1 day'), $10, $11, $12)`,
             [
                 loanIdStr, userId, walletAddress, data.principal.toString(),
                 interestRate, data.principal.toString(), data.collateralValue.toString(),
