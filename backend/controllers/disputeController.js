@@ -74,18 +74,39 @@ exports.uploadEvidence = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // Automatically create a dispute if it doesn't exist?
-    // For now, let's assume raising a dispute is explicit, but we allow evidence upload even if not raised yet?
-    // Or we can check. Let's create it if it doesn't exist to be safe, as "evidence" implies a dispute context.
-    // However, usually you raise first. I'll check if dispute exists, if not, I'll create it with "Evidence Upload" as reason/note.
-
-    let disputeCheck = await client.query('SELECT * FROM disputes WHERE invoice_id = $1', [invoiceId]);
+    // Verify dispute exists - do not auto-create
+    const disputeCheck = await client.query('SELECT * FROM disputes WHERE invoice_id = $1', [invoiceId]);
     if (disputeCheck.rows.length === 0) {
-       await client.query(
-        'INSERT INTO disputes (invoice_id, status, resolution_note) VALUES ($1, $2, $3)',
-        [invoiceId, 'open', 'Auto-created by evidence upload']
-      );
-      await createLog(client, invoiceId, 'Dispute Auto-Created', user.email, 'Created by evidence upload');
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'No dispute exists for this invoice. Please raise a dispute first through the raiseDispute endpoint.'
+      });
+    }
+
+    // Verify user is authorized (buyer or seller of the invoice)
+    const invoiceCheck = await client.query(
+      'SELECT buyer_email, seller_email FROM invoices WHERE id = $1',
+      [invoiceId]
+    );
+
+    if (invoiceCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({
+        success: false,
+        error: 'Invoice not found'
+      });
+    }
+
+    const invoice = invoiceCheck.rows[0];
+    const isAuthorized = user.email === invoice.buyer_email || user.email === invoice.seller_email;
+
+    if (!isAuthorized) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized. Only the buyer or seller can upload evidence for this invoice.'
+      });
     }
 
     // Save evidence record
