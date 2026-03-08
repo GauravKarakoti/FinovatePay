@@ -425,11 +425,11 @@ contract EscrowContractV2 is
         require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
         require(block.timestamp > escrow.expiresAt, "Escrow not expired yet");
 
-        // Refund buyer
-        _payout(escrow.buyer, escrow.token, escrow.amount);
-
+        // Update status before external call (CEI pattern)
         escrow.status = EscrowStatus.Expired;
 
+        // Refund buyer
+        _payout(escrow.buyer, escrow.token, escrow.amount);
         emit EscrowAutoCancelled(_invoiceId);
         emit EscrowReleased(_invoiceId, 0);
 
