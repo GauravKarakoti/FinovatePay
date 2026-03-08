@@ -89,13 +89,21 @@ export function getAppKit() {
 // Check if wallet is connected
 export function isWalletConnected() {
   if (!modal) return false;
-  return modal.getIsConnected() || false;
+  try {
+    return modal.getAccount()?.isConnected || false;
+  } catch (error) {
+    return false;
+  }
 }
 
 // Get connected wallet address
 export function getConnectedAddress() {
   if (!modal) return null;
-  return modal.getAddress() || null;
+  try {
+    return modal.getAccount()?.address || null;
+  } catch (error) {
+    return null;
+  }
 }
 
 // Ensure user is on Amoy network
@@ -124,7 +132,14 @@ export async function connectWallet() {
     }
 
     // Open modal if not connected
-    const isConnected = modal.getIsConnected() || false;
+    let isConnected = false;
+    try {
+      // getAccount() might throw if no active chain is set initially
+      isConnected = modal.getAccount()?.isConnected || false;
+    } catch (e) {
+      // silent fail, proceed to open modal
+    }
+
     if (!isConnected) {
       await modal.open();
       
@@ -135,16 +150,21 @@ export async function connectWallet() {
         }, 60000); // 60 second timeout
 
         const checkConnection = setInterval(async () => {
-          if (modal.getIsConnected?.()) {
-            clearInterval(checkConnection);
-            clearTimeout(timeout);
-            
-            try {
-              const result = await getWalletInfo();
-              resolve(result);
-            } catch (error) {
-              reject(error);
+          try {
+            const account = modal.getAccount();
+            if (account?.isConnected) {
+              clearInterval(checkConnection);
+              clearTimeout(timeout);
+              
+              try {
+                const result = await getWalletInfo();
+                resolve(result);
+              } catch (error) {
+                reject(error);
+              }
             }
+          } catch (e) {
+            // Ignore errors while polling (e.g., initial state)
           }
         }, 500);
       });

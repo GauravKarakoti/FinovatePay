@@ -50,6 +50,11 @@ const tabs = [
     { id: 'escrow', label: 'Escrow', icon: '🔒' },
   ];
 
+  // Add Analytics tab for admin, seller, investor roles
+  if (['admin', 'seller', 'investor'].includes(user?.role)) {
+    tabs.push({ id: 'analytics', label: 'Analytics', icon: '📈' });
+  }
+
   // Add Streaming Payments tab for seller role
   if (user?.role === 'seller') {
     tabs.push({ id: 'streaming', label: 'Streaming', icon: '📺' });
@@ -59,6 +64,11 @@ const tabs = [
   // Add Financing tab for relevant roles
   if (user?.role === 'seller' || user?.role === 'investor' || user?.role === 'admin') {
     tabs.push({ id: 'financing', label: 'Financing', icon: '💸' });
+  }
+
+  // Add Auctions tab for investor and seller roles
+  if (user?.role === 'investor' || user?.role === 'seller' || user?.role === 'admin') {
+    tabs.push({ id: 'auctions', label: 'Auctions', icon: '🏷️' });
   }
 
   if (user?.role === 'admin') {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import AnalyticsPage from './AnalyticsPage';
 import {
   getUsers,
   getInvoices,
@@ -468,6 +469,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
       case 'admin': return <AdminTab />;
       case 'payments':
       case 'escrow': return <PlaceholderTab />;
+      case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
       default: return <PlaceholderTab />;
     }
   };

@@ -34,6 +34,8 @@ import PaymentHistoryList from '../components/Dashboard/PaymentHistoryList';
 import FinancingTab from '../components/Financing/FinancingTab';
 import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
+import AnalyticsPage from '../pages/AnalyticsPage';
+import AuctionList from '../components/Auction/AuctionList';
 
 // ------------------ HELPER COMPONENTS ------------------
 
@@ -624,6 +626,8 @@ const FinancingTabComponent = () => (
       case 'escrow': return <EscrowTab />;
       case 'financing': return <FinancingTabComponent />;
       case 'streaming': return <StreamingTabComponent />;
+      case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
+      case 'auctions': return <AuctionList />;
       default: return <OverviewTab />;
     }
   };
