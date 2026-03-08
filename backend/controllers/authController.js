@@ -35,7 +35,7 @@ exports.register = async (req, res) => {
 
     // 4. Save to Database (Force role to 'seller')
     const newUser = await pool.query(
-      `INSERT INTO users (name, email, password, wallet_address, company_name, phone, role, kyc_status)
+      `INSERT INTO users (name, email, password_hash, wallet_address, company_name, phone, role, kyc_status)
        VALUES ($1, $2, $3, $4, $5, $6, 'seller', 'pending') 
        RETURNING *`,
       [name, email, hashedPassword, walletAddress, companyName, phone]
@@ -76,7 +76,7 @@ exports.login = async (req, res) => {
     }
 
     // 2. Check password
-    const isMatch = await bcrypt.compare(password, user.rows[0].password);
+    const isMatch = await bcrypt.compare(password, user.rows[0].password_hash);
     if (!isMatch) {
       return errorResponse(res, 'Invalid credentials', 400);
     }
