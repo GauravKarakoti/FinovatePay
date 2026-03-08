@@ -196,7 +196,8 @@ const LendingDashboard = ({ userRole }) => {
     const formatEther = (value) => {
         if (!value) return '0';
         try {
-            return ethers.formatEther(value.toString());
+            // USDC is 6-decimal; use formatUnits to avoid 18-decimal formatEther mismatch
+            return ethers.formatUnits(value.toString(), 6);
         } catch {
             return '0';
         }
