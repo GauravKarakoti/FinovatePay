@@ -46,8 +46,19 @@ async function verifyTables() {
         console.log(`      ├─ ${col.column_name}: ${col.data_type} ${nullable}`);
       });
 
-      // Get row count
-      const countResult = await pool.query(`SELECT COUNT(*) FROM ${table_name}`);
+      // Get row count - use identifier quoting to prevent SQL injection
+      // Validate table name against whitelist from information_schema
+      // This ensures table_name is a legitimate table in the database
+      const sanitizedTableName = table_name.replace(/[^a-zA-Z0-9_]/g, '');
+      if (sanitizedTableName !== table_name) {
+        console.log(`      └─ ⚠️  Skipped (invalid table name)\n`);
+        continue;
+      }
+      
+      // Use pg-format or manual identifier quoting for safety
+      const countResult = await pool.query(
+        `SELECT COUNT(*) FROM "${table_name}"`
+      );
       const rowCount = countResult.rows[0].count;
       console.log(`      └─ Rows: ${rowCount}\n`);
     }

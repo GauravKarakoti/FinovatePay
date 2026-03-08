@@ -8,7 +8,7 @@ const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 const { getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const { logAudit } = require('../middleware/auditLogger');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const fraudDetectionService = require('../services/fraudDetectionService');
 
 // Helper: UUID → bytes32 (ethers v6)
@@ -110,7 +110,12 @@ router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) =
       });
     }
 
-    const escrowContract = getEscrowContract();
+    const signer = await getSigner();
+    const escrowContract = new ethers.Contract(
+      contractAddresses.EscrowContract,
+      EscrowContractArtifact.abi,
+      signer
+    );
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     // Defaults: 7 days if not provided
