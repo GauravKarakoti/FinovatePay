@@ -21,7 +21,7 @@ const socketAuthMiddleware = async (socket, next) => {
     // Fetch user from database
     const userResult = await pool.query(
       'SELECT id, email, wallet_address, role, kyc_status, is_frozen FROM users WHERE id = $1',
-      [decoded.userId]
+      [decoded.id]
     );
 
     if (userResult.rows.length === 0) {
