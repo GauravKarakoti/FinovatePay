@@ -29,6 +29,115 @@ router.use(authenticateToken);
 router.use(requireKYC);
 
 /**
+ * POST /api/escrow/multi-party
+ * Create a multi-party escrow on-chain for an existing invoice
+ */
+router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { invoiceId, durationSeconds } = req.body;
+
+    if (!invoiceId) {
+      return errorResponse(res, 'invoiceId is required', 400);
+    }
+
+    await client.query('BEGIN');
+
+    // Lock invoice row
+    const invoiceResult = await client.query(
+      'SELECT * FROM invoices WHERE invoice_id = $1 FOR UPDATE',
+      [invoiceId]
+    );
+
+    if (!invoiceResult.rows.length) {
+      throw new Error('Invoice not found');
+    }
+
+    const invoice = invoiceResult.rows[0];
+
+    // Only seller or admin may create the on-chain escrow record
+    if (invoice.seller_address.toLowerCase() !== req.user.wallet_address.toLowerCase() && req.user.role !== 'admin') {
+      throw new Error('Not authorized to create escrow for this invoice');
+    }
+
+    const escrowContract = getEscrowContract();
+    const bytes32InvoiceId = uuidToBytes32(invoiceId);
+
+    // Defaults: 7 days if not provided
+    const duration = Number(durationSeconds) || 7 * 24 * 60 * 60;
+
+    const tokenAddress = invoice.token_address || ethers.constants.AddressZero;
+
+    // Create on-chain escrow (onlyAdmin on contract side)
+    const tx = await escrowContract.createEscrow(
+      bytes32InvoiceId,
+      invoice.seller_address,
+      invoice.buyer_address,
+      invoice.amount,
+      tokenAddress,
+      duration,
+      ethers.constants.AddressZero,
+      0
+    );
+
+    await tx.wait();
+
+    // Update DB status to reflect escrow creation
+    await client.query(
+      'UPDATE invoices SET escrow_status = $1, escrow_tx_hash = $2 WHERE invoice_id = $3',
+      ['created', tx.hash, invoiceId]
+    );
+
+    await client.query('COMMIT');
+
+    // Emit socket event
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`invoice-${invoiceId}`).emit('escrow:created', { invoiceId, txHash: tx.hash });
+    }
+
+    await logAudit({
+      operationType: 'ESCROW_CREATE',
+      entityType: 'INVOICE',
+      entityId: invoiceId,
+      actorId: req.user.id,
+      actorWallet: req.user.wallet_address,
+      actorRole: req.user.role,
+      action: 'CREATE',
+      status: 'SUCCESS',
+      newValues: { escrow_tx_hash: tx.hash },
+      metadata: { blockchain_tx: tx.hash },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
+    return res.json({ success: true, txHash: tx.hash });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating multi-party escrow:', error);
+
+    await logAudit({
+      operationType: 'ESCROW_CREATE',
+      entityType: 'INVOICE',
+      entityId: req.body?.invoiceId,
+      actorId: req.user?.id,
+      actorWallet: req.user?.wallet_address,
+      actorRole: req.user?.role,
+      action: 'CREATE',
+      status: 'FAILED',
+      errorMessage: error.message,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
+    return errorResponse(res, error.message, 500);
+  } finally {
+    client.release();
+  }
+});
+
+/**
  * POST /api/escrow/:invoiceId/approve
  * Add multi-signature approval for an escrow
  */

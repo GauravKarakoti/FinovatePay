@@ -69,6 +69,13 @@ contract EscrowContractV2 is
         uint256 discountDeadline;
     }
 
+    struct ApprovalStage {
+        address[] approvers; // addresses allowed to approve this stage
+        uint256 required; // number of approvals required for this stage
+        uint256 approvalCount; // current approvals
+        bool completed;
+    }
+
     struct DisputeVoting {
         uint256 snapshotArbitratorCount;
         uint256 votesForBuyer;
@@ -95,6 +102,9 @@ contract EscrowContractV2 is
     mapping(bytes32 => mapping(address => bool)) public hasMultiSigApproved;
     mapping(bytes32 => bool) public requiresMultiSig;
     mapping(bytes32 => bool) public highValueTxReleased;
+    // Role-based approval stages per escrow
+    mapping(bytes32 => ApprovalStage[]) public approvalStages;
+    mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public hasStageApproved;
 
     address public governanceManager;
     bool public governanceEnabled = false;
@@ -137,6 +147,9 @@ contract EscrowContractV2 is
     event HighValueTransactionCreated(bytes32 indexed invoiceId, uint256 amount);
     event HighValueTransactionApproved(bytes32 indexed invoiceId, address indexed approver);
     event HighValueTransactionReleased(bytes32 indexed invoiceId);
+    event ApprovalStagesSet(bytes32 indexed invoiceId);
+    event StageApproved(bytes32 indexed invoiceId, uint256 indexed stageIndex, address approver);
+    event EscrowAutoCancelled(bytes32 indexed invoiceId);
 
     event YieldPoolUpdated(address indexed oldPool, address indexed newPool);
     event YieldPoolEnabled(bool enabled);
@@ -333,6 +346,95 @@ contract EscrowContractV2 is
     function checkMultiSigRequired(bytes32 _invoiceId) external view returns (bool) {
         Escrow storage escrow = escrows[_invoiceId];
         return escrow.amount >= multiSigThreshold;
+    }
+
+    /**
+     * @notice Set approval stages for a specific escrow. Only admin.
+     * @dev Each stage has a list of approver addresses and required approvals
+     */
+    function setApprovalStages(
+        bytes32 _invoiceId,
+        address[][] calldata _approversPerStage,
+        uint256[] calldata _requiredPerStage
+    ) external onlyAdmin {
+        require(_approversPerStage.length == _requiredPerStage.length, "Mismatched stages");
+        // clear existing stages
+        delete approvalStages[_invoiceId];
+
+        for (uint256 i = 0; i < _approversPerStage.length; i++) {
+            ApprovalStage memory s;
+            s.approvers = _approversPerStage[i];
+            s.required = _requiredPerStage[i];
+            s.approvalCount = 0;
+            s.completed = false;
+            approvalStages[_invoiceId].push(s);
+        }
+
+        emit ApprovalStagesSet(_invoiceId);
+    }
+
+    /**
+     * @notice Approve a specific stage for an escrow
+     */
+    function approveStage(bytes32 _invoiceId, uint256 _stageIndex) external {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
+        require(_stageIndex < approvalStages[_invoiceId].length, "Invalid stage");
+
+        ApprovalStage storage stage = approvalStages[_invoiceId][_stageIndex];
+
+        // Check caller is listed as an approver for the stage
+        bool allowed = false;
+        for (uint256 i = 0; i < stage.approvers.length; i++) {
+            if (stage.approvers[i] == _msgSender()) {
+                allowed = true;
+                break;
+            }
+        }
+        require(allowed, "Not authorized for this stage");
+        require(!hasStageApproved[_invoiceId][_stageIndex][_msgSender()], "Already approved");
+
+        hasStageApproved[_invoiceId][_stageIndex][_msgSender()] = true;
+        stage.approvalCount += 1;
+
+        emit StageApproved(_invoiceId, _stageIndex, _msgSender());
+
+        if (stage.approvalCount >= stage.required) {
+            stage.completed = true;
+        }
+
+        // If all stages completed, release funds
+        bool allDone = true;
+        for (uint256 j = 0; j < approvalStages[_invoiceId].length; j++) {
+            if (!approvalStages[_invoiceId][j].completed) {
+                allDone = false;
+                break;
+            }
+        }
+
+        if (allDone && escrow.status == EscrowStatus.Funded) {
+            _releaseFunds(_invoiceId);
+        }
+    }
+
+    /**
+     * @notice Auto-cancel escrow after expiry and refund buyer. Anyone may call.
+     */
+    function autoCancelEscrow(bytes32 _invoiceId) external nonReentrant {
+        Escrow storage escrow = escrows[_invoiceId];
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
+        require(block.timestamp > escrow.expiresAt, "Escrow not expired yet");
+
+        // Refund buyer
+        _payout(escrow.buyer, escrow.token, escrow.amount);
+
+        escrow.status = EscrowStatus.Expired;
+
+        emit EscrowAutoCancelled(_invoiceId);
+        emit EscrowReleased(_invoiceId, 0);
+
+        // Cleanup
+        delete approvalStages[_invoiceId];
     }
 
     function getMultiSigApprovals(bytes32 _invoiceId) external view returns (

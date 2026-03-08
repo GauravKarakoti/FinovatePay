@@ -411,6 +411,11 @@ export const getEscrowStatus = (invoiceId) => {
   return api.get(`/escrow/${invoiceId}/status`);
 };
 
+// Create a multi-party escrow for an invoice
+export const createMultiPartyEscrow = (invoiceId, durationSeconds) => {
+  return api.post('/escrow/multi-party', { invoiceId, durationSeconds });
+};
+
 // --- High-Value Transaction Multi-Sig API ---
 
 // Check if a transaction requires multi-sig
