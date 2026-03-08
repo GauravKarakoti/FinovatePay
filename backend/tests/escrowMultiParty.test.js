@@ -17,15 +17,25 @@ const mockContract = {
 
 const mockEthers = {
   zeroPadValue: jest.fn((hex, bytes) => hex),
-  constants: { AddressZero: '0x0000000000000000000000000000000000000000' }
+  ZeroAddress: '0x0000000000000000000000000000000000000000',
+  Contract: jest.fn(() => mockContract)
 };
 
 // Mock modules used by the route
 jest.mock('../config/database', () => ({ pool: mockPool }));
-jest.mock('ethers', () => mockEthers);
+jest.mock('ethers', () => ({ ethers: mockEthers }));
 jest.mock('../config/blockchain', () => ({ getSigner: jest.fn(), contractAddresses: { escrowContract: '0x123' }, getEscrowContract: jest.fn(() => mockContract) }));
 jest.mock('../../deployed/EscrowContract.json', () => ({ abi: [] }), { virtual: true });
 jest.mock('../middleware/auditLogger', () => ({ logAudit: jest.fn() }));
+jest.mock('../services/fraudDetectionService', () => ({
+  evaluateTransactionRisk: jest.fn().mockResolvedValue({
+    shouldBlock: false,
+    shouldAlert: false,
+    shouldReview: false,
+    riskScore: 0
+  }),
+  ensureTransactionAllowed: jest.fn()
+}));
 
 // Bypass auth and kyc middleware used by the router
 jest.mock('../middleware/auth', () => ({
@@ -51,7 +61,11 @@ describe('Escrow multi-party route', () => {
     // Setup DB mock to return an invoice
     const client = { query: jest.fn(), release: jest.fn() };
     mockPool.connect.mockResolvedValue(client);
-    client.query.mockResolvedValueOnce({ rows: [{ invoice_id: 'inv-1', seller_address: '0xSeller', buyer_address: '0xBuyer', token_address: '0xToken', amount: 100, escrow_status: 'created' }] });
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ invoice_id: 'inv-1', seller_address: '0xSeller', buyer_address: '0xBuyer', token_address: '0xToken', amount: 100, escrow_status: 'created' }] })
+      .mockResolvedValueOnce({}) // UPDATE
+      .mockResolvedValueOnce({}); // COMMIT
 
     const res = await request(app)
       .post('/api/v1/escrow/multi-party')
@@ -74,7 +88,9 @@ describe('Escrow multi-party route', () => {
   it('returns error when invoice not found', async () => {
     const client = { query: jest.fn(), release: jest.fn() };
     mockPool.connect.mockResolvedValue(client);
-    client.query.mockResolvedValueOnce({ rows: [] });
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [] });
 
     const res = await request(app)
       .post('/api/v1/escrow/multi-party')

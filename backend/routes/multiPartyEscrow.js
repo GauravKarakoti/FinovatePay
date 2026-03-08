@@ -244,14 +244,17 @@ router.post(
                 blockNumber,
             });
 
-            const io = req.app.get('io');
+            const invoiceId = updated.invoice_id || updated.invoiceId;
+            const io        = req.app.get('io');
             if (io) {
-                emitToInvoice(io, escrowId, 'escrow:milestone:approved', {
-                    escrowId,
-                    milestoneId,
-                    milestoneStatus: updated.status,
-                    approvalCount:   updated.approval_count,
-                });
+                if (invoiceId) {
+                    emitToInvoice(io, invoiceId, 'escrow:milestone:approved', {
+                        escrowId,
+                        milestoneId,
+                        milestoneStatus: updated.status,
+                        approvalCount:   updated.approval_count,
+                    });
+                }
 
                 // Notify via user room so all stakeholder tabs refresh
                 emitToUser(io, req.user.id, 'escrow:milestone:approved', {

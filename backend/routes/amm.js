@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const ammService = require('../services/ammService');
 
 const parsePagination = (query) => {

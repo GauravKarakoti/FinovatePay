@@ -22,7 +22,7 @@ exports.getBalance = async (req, res) => {
     res.json({ address: treasuryAddress, native: native.toString(), tokenBalance: tokenBalance ? tokenBalance.toString() : null });
   } catch (err) {
     console.error('treasury.getBalance error', err);
-    return res.status(500).json(errorResponse(err));
+    return errorResponse(res, err, 500);
   }
 };
 
@@ -37,13 +37,13 @@ exports.postWithdraw = async (req, res) => {
     const treasury = getTreasuryManagerContract(signer);
 
     // Execute withdrawal via on-chain contract
-    const tx = await treasury.executeWithdrawal(token || ethers.constants.AddressZero, to, ethers.BigInt(amount));
+    const tx = await treasury.executeWithdrawal(token || ethers.ZeroAddress, to, ethers.BigInt(amount));
     const receipt = await tx.wait();
 
     res.json({ success: true, txHash: receipt.transactionHash });
   } catch (err) {
     console.error('treasury.postWithdraw error', err);
-    return res.status(500).json(errorResponse(err));
+    return errorResponse(res, err, 500);
   }
 };
 
@@ -57,13 +57,10 @@ exports.getTransactions = async (req, res) => {
     const fromBlock = req.query.fromBlock ? Number(req.query.fromBlock) : 0;
     const toBlock = req.query.toBlock ? Number(req.query.toBlock) : 'latest';
 
-    // Filter for FeeCollected and WithdrawalExecuted events
-    const treasuryAbi = getTreasuryManagerContract().interface;
-    const feeFilter = treasuryAbi.getEvent('FeeCollected') ? treasuryAbi.getEvent('FeeCollected') : null;
+    // Decode events using the treasury manager contract interface
+    const iface = getTreasuryManagerContract().interface;
 
     const logs = await provider.getLogs({ address: treasuryAddress, fromBlock, toBlock });
-    // decode using contract interface
-    const iface = getTreasuryManagerContract().interface;
     const decoded = logs.map((log) => {
       try {
         const parsed = iface.parseLog(log);
@@ -76,7 +73,7 @@ exports.getTransactions = async (req, res) => {
     res.json({ address: treasuryAddress, events: decoded });
   } catch (err) {
     console.error('treasury.getTransactions error', err);
-    return res.status(500).json(errorResponse(err));
+    return errorResponse(res, err, 500);
   }
 };
 
@@ -89,7 +86,9 @@ exports.getReports = async (req, res) => {
 
     // Simple on-chain aggregation: sum FeeCollected by token over recent blocks
     const toBlock = 'latest';
-    const fromBlock = Math.max(0, (req.query.lookbackBlocks ? Number(req.query.lookbackBlocks) : 10000));
+    const latest = await provider.getBlockNumber();
+    const lookbackBlocks = req.query.lookbackBlocks ? Number(req.query.lookbackBlocks) : 10000;
+    const fromBlock = Math.max(0, latest - lookbackBlocks);
 
     const iface = getTreasuryManagerContract().interface;
     const logs = await provider.getLogs({ address: treasuryAddress, fromBlock, toBlock });
@@ -101,7 +100,8 @@ exports.getReports = async (req, res) => {
         if (parsed.name === 'FeeCollected') {
           const token = parsed.args[0];
           const amount = parsed.args[2];
-          totals[token] = (totals[token] || ethers.BigInt(0)) + ethers.BigInt(amount.toString());
+          const amountBigInt = BigInt(amount.toString());
+          totals[token] = (totals[token] ?? 0n) + amountBigInt;
         }
       } catch (e) {
         // ignore
@@ -115,6 +115,6 @@ exports.getReports = async (req, res) => {
     res.json({ address: treasuryAddress, totals: result });
   } catch (err) {
     console.error('treasury.getReports error', err);
-    return res.status(500).json(errorResponse(err));
+    return errorResponse(res, err, 500);
   }
 };
