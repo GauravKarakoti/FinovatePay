@@ -118,8 +118,8 @@ app.use("/api/v1/payments", paymentLimiter, require("./routes/payment"));
 
 /* ---------------- ESCROW ---------------- */
 
-app.use("/api/v1/escrow", require("./routes/escrow"));
 app.use("/api/v1/escrow/milestones", require("./routes/multiPartyEscrow"));
+app.use("/api/v1/escrow", require("./routes/escrow"));
 
 /* ---------------- ADMIN ---------------- */
 
