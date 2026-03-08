@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -40,16 +40,28 @@ contract InvoiceTokenStaking is Ownable, ReentrancyGuard {
     // total staked per token (by token contract + id)
     mapping(address => mapping(uint256 => uint256)) public totalStaked;
 
+    // APY is protocol-controlled per ERC-1155 pool and capped to prevent reward drain.
+    mapping(address => mapping(uint256 => uint256)) public poolApyBP;
+    uint256 public constant MAX_APY_BP = 5000; // 50%
+
     // user stakes
     mapping(address => Stake[]) public stakes;
 
     event Staked(address indexed user, address tokenAddress, uint256 tokenId, uint256 amount, uint256 lockUntil, uint256 apy);
     event Unstaked(address indexed user, uint256 stakeIndex, uint256 amount, uint256 penalty);
     event RewardsClaimed(address indexed user, uint256 amount);
+    event PoolApyUpdated(address indexed tokenAddress, uint256 indexed tokenId, uint256 apyBP);
 
     constructor(address _governanceToken) Ownable(msg.sender) {
         require(_governanceToken != address(0), "Invalid governance token");
         governanceToken = IERC20(_governanceToken);
+    }
+
+    function setPoolApyBP(address tokenAddress, uint256 tokenId, uint256 apyBP) external onlyOwner {
+        require(tokenAddress != address(0), "Invalid token");
+        require(apyBP <= MAX_APY_BP, "APY too high");
+        poolApyBP[tokenAddress][tokenId] = apyBP;
+        emit PoolApyUpdated(tokenAddress, tokenId, apyBP);
     }
 
     function setProtocolFeeShareBP(uint256 bp) external onlyOwner {
