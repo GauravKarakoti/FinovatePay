@@ -2,6 +2,7 @@ const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 const { getSigner, getEscrowContract } = require('../config/blockchain');
 const errorResponse = require('../utils/errorResponse');
+const logger = require('../utils/logger')('disputeController');
 
 // Helper function to create a log entry
 const createLog = async (client, invoiceId, action, performedBy, notes) => {
@@ -118,8 +119,27 @@ exports.uploadEvidence = async (req, res) => {
 exports.getEvidence = async (req, res) => {
   const { invoiceId } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM dispute_evidence WHERE invoice_id = $1 ORDER BY created_at DESC', [invoiceId]);
-    res.json(result.rows);
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dispute_evidence WHERE invoice_id = $1',
+      [invoiceId]
+    );
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
+    const result = await pool.query(
+      'SELECT * FROM dispute_evidence WHERE invoice_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+      [invoiceId, limit, offset]
+    );
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (err) {
     console.error('Error fetching evidence:', err);
     return errorResponse(res, err, 500);
@@ -129,8 +149,27 @@ exports.getEvidence = async (req, res) => {
 exports.getLogs = async (req, res) => {
   const { invoiceId } = req.params;
   try {
-    const result = await pool.query('SELECT * FROM dispute_logs WHERE invoice_id = $1 ORDER BY timestamp ASC', [invoiceId]);
-    res.json(result.rows);
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Get total count
+    const countResult = await pool.query(
+      'SELECT COUNT(*) as total FROM dispute_logs WHERE invoice_id = $1',
+      [invoiceId]
+    );
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated data
+    const result = await pool.query(
+      'SELECT * FROM dispute_logs WHERE invoice_id = $1 ORDER BY timestamp ASC LIMIT $2 OFFSET $3',
+      [invoiceId, limit, offset]
+    );
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (err) {
     console.error('Error fetching logs:', err);
     return errorResponse(res, err, 500);
@@ -168,14 +207,14 @@ exports.resolveDispute = async (req, res) => {
 
         const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
-        console.log(`Resolving on-chain: Invoice ${invoiceId} -> ${sellerWins ? 'Seller Wins' : 'Buyer Wins'}`);
+        logger.info(`Resolving on-chain: Invoice ${invoiceId} -> ${sellerWins ? 'Seller Wins' : 'Buyer Wins'}`);
         
         // Admin acts as the Arbitrator here
         const tx = await escrowContract.voteOnDispute(bytes32InvoiceId, sellerWins);
-        console.log(`Transaction sent: ${tx.hash}`);
+        logger.info(`Transaction sent: ${tx.hash}`);
         
         await tx.wait();
-        console.log('Transaction confirmed on-chain');
+        logger.info('Transaction confirmed on-chain');
 
     } catch (bcError) {
         console.error('Blockchain interaction failed:', bcError);

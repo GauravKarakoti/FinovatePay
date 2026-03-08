@@ -5,6 +5,8 @@ import Header from './components/Dashboard/Header';
 import Sidebar from './components/Dashboard/Sidebar';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Invoices from './pages/Invoices';
 import InvoiceDetails from './pages/InvoiceDetails';
 import DisputeDashboard from './pages/DisputeDashboard';
@@ -12,13 +14,16 @@ import FinovateChatbot from './components/Chatbot/Chatbot';
 import SellerDashboard from './pages/SellerDashboard';
 import BuyerDashboard from './pages/BuyerDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import TreasuryDashboard from './pages/TreasuryDashboard';
 import InvestorDashboard from './pages/InvestorDashboard';
 import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
+import ContributorsPage from './pages/ContributorsPage';
 import './App.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
 import { setNavigateFunction } from './utils/api';
+import PermissionBanner from './components/Notifications/PermissionBanner';
 
 /* -------------------- Error Boundary Component -------------------- */
 class ErrorBoundary extends React.Component {
@@ -94,16 +99,40 @@ function NavigationSetup() {
 }
 
 /* -------------------- Session Sync Setup -------------------- */
-// Breaks the infinite loop by syncing React state with localStorage
+// Syncs React state with localStorage using native storage event
+// Catches token deletions from Axios interceptors, manual storage clearing, and cross-tab logouts
 function SessionSync({ user, onLogout }) {
   const location = useLocation();
   
   useEffect(() => {
-    // If React state thinks user is logged in, but interceptor wiped localStorage
+    // Check if React state thinks user is logged in, but localStorage was wiped
     if (user && !localStorage.getItem('user')) {
-      onLogout(); // This correctly zeroes out the state and stops the loop
+      onLogout();
     }
   }, [location.pathname, user, onLogout]);
+  
+  useEffect(() => {
+    // Listen for storage events (fires when localStorage changes in ANY tab or programmatically)
+    const handleStorageChange = (e) => {
+      // Check if 'user' or 'token' was removed from localStorage
+      if ((e.key === 'user' || e.key === 'token') && e.newValue === null) {
+        // Storage was cleared, logout the user
+        if (user) {
+          onLogout();
+        }
+      }
+      // Also handle when storage is completely cleared
+      if (e.key === null && user) {
+        onLogout();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [user, onLogout]);
   
   return null;
 }
@@ -281,6 +310,14 @@ function App() {
                   </RequireAuth>
                 } 
               />
+              <Route 
+                path="/admin/treasury"
+                element={
+                  <RequireAuth allowedRoles={['admin']}>
+                      {renderDashboard(<TreasuryDashboard />)}
+                  </RequireAuth>
+                }
+              />
               
               <Route 
                 path="/shipment" 
@@ -328,6 +365,11 @@ function App() {
                 element={<ProduceHistory />}
               />
               
+              <Route
+                path="/contributors"
+                element={<ContributorsPage />}
+              />
+
               <Route 
                 path="/login" 
                 element={
@@ -338,6 +380,18 @@ function App() {
                 path="/register" 
                 element={
                   user ? <Navigate to="/" /> : <Register onLogin={handleLogin} />
+                } 
+              />
+              <Route 
+                path="/forgot-password" 
+                element={
+                  user ? <Navigate to="/" /> : <ForgotPassword />
+                } 
+              />
+              <Route 
+                path="/reset-password/:token" 
+                element={
+                  user ? <Navigate to="/" /> : <ResetPassword />
                 } 
               />
             </Routes>
@@ -361,6 +415,7 @@ function App() {
                   </svg>
                 ) : '💬'}
               </button>
+              <PermissionBanner />
             </>
           )}
         </div>

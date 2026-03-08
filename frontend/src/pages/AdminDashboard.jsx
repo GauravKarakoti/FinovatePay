@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
+import AnalyticsPage from './AnalyticsPage';
 import {
   getUsers,
   getInvoices,
@@ -11,6 +12,7 @@ import {
 } from '../utils/api';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
+import FraudAlerts from '../components/Admin/FraudAlerts';
 import { toast } from 'sonner';
 import { useStatsActions } from '../context/StatsContext';
 
@@ -442,6 +444,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
   const AdminTab = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-800">Administration</h2>
+      <FraudAlerts compact />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <UserManagementSection />
         <ComplianceSection />
@@ -468,6 +471,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
       case 'admin': return <AdminTab />;
       case 'payments':
       case 'escrow': return <PlaceholderTab />;
+      case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
       default: return <PlaceholderTab />;
     }
   };

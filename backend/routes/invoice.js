@@ -5,6 +5,7 @@ const { requireKYC } = require('../middleware/kycValidation');
 const Invoice = require('../models/Invoice');
 const { pool } = require("../config/database");
 const { syncInvoiceStatus } = require('../services/escrowSyncService');
+const fraudDetectionService = require('../services/fraudDetectionService');
 const { 
   validateCreateInvoice, 
   validateInvoiceId, 
@@ -22,10 +23,93 @@ const {
 // All invoice routes require authentication
 router.use(authenticateToken);
 
+const runFraudGate = async ({ req, transactionType, amount, currency, invoiceId, context }) => {
+  try {
+    const result = await fraudDetectionService.evaluateTransactionRisk({
+      userId: req.user?.id,
+      walletAddress: req.user?.wallet_address,
+      invoiceId,
+      transactionType,
+      amount,
+      currency,
+      context: {
+        ...(context || {}),
+        endpoint: req.originalUrl,
+        method: req.method,
+        actorRole: req.user?.role,
+        kycStatus: req.user?.kyc_status || 'unknown'
+      }
+    });
+
+    fraudDetectionService.ensureTransactionAllowed(result);
+    return result;
+  } catch (error) {
+    if (error.code === 'FRAUD_BLOCKED') {
+      throw error;
+    }
+
+    // Fail-open for service errors so invoice operations are not fully blocked by telemetry failures.
+    console.error('[InvoiceRoutes] Fraud gate degraded:', error.message);
+    return null;
+  }
+};
+
 // Create a new invoice - Only sellers can create invoices
 router.post('/', requireKYC, requireRole(['seller', 'admin']), validateCreateInvoice, async (req, res) => {
-  console.log("Creating invoice with data:", req.body);
-  await createInvoice(req, res);
+  try {
+    const quotationId = req.body?.quotation_id;
+    let amount = 0;
+    let currency = 'USD';
+
+    if (quotationId) {
+      const quoteResult = await pool.query(
+        'SELECT total_amount, currency FROM quotations WHERE id = $1',
+        [quotationId]
+      );
+      if (quoteResult.rows[0]) {
+        amount = quoteResult.rows[0].total_amount;
+        currency = quoteResult.rows[0].currency || currency;
+      }
+    }
+
+    const risk = await runFraudGate({
+      req,
+      transactionType: 'invoice_create',
+      amount,
+      currency,
+      invoiceId: req.body?.invoice_id,
+      context: {
+        quotationId,
+        contractAddress: req.body?.contract_address
+      }
+    });
+
+    if (risk?.shouldReview) {
+      console.warn('[InvoiceRoutes] Invoice flagged for review', {
+        invoiceId: req.body?.invoice_id,
+        riskScore: risk.riskScore,
+        reasons: risk.reasons
+      });
+    }
+
+    console.log("Creating invoice with data:", req.body);
+    await createInvoice(req, res);
+  } catch (error) {
+    if (error.code === 'FRAUD_BLOCKED') {
+      return res.status(error.statusCode || 403).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+        details: error.details
+      });
+    }
+
+    console.error('[InvoiceRoutes] Error creating invoice with fraud gate:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to run invoice fraud detection checks'
+    });
+  }
 });
 
 // Get seller's invoices - Only accessible by sellers and admins
