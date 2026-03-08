@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
-const { getProvider } = require('../config/blockchain');
+const { getProvider, getSigner } = require('../config/blockchain');
+const { ethers } = require('ethers');
 
 /**
  * Check database health
@@ -27,16 +28,42 @@ const checkDatabase = async () => {
 const checkBlockchain = async () => {
     try {
         const provider = getProvider();
+        
+        // Check 1: Provider connectivity
+        const network = await provider.getNetwork();
         const blockNumber = await provider.getBlockNumber();
         
+        // Check 2: Get signer and relayer balance
+        const signer = getSigner();
+        const signerAddress = await signer.getAddress();
+        const balance = await provider.getBalance(signerAddress);
+        const balanceInEther = ethers.formatEther(balance);
+        
+        // Check 3: Verify minimum balance (warn if below 0.1 ETH)
+        const minBalanceThreshold = ethers.parseEther('0.1');
+        const isLowBalance = balance < minBalanceThreshold;
+        
         return {
-            status: 'healthy',
+            status: isLowBalance ? 'degraded' : 'healthy',
+            connected: true,
+            network: {
+                chainId: network.chainId,
+                name: network.name
+            },
             blockNumber,
+            relayerAddress: signerAddress,
+            relayerBalance: {
+                wei: balance.toString(),
+                ether: balanceInEther
+            },
+            isLowBalance,
+            warning: isLowBalance ? 'Relayer balance is below 0.1 ETH' : null,
             timestamp: new Date().toISOString()
         };
     } catch (error) {
         return {
             status: 'unhealthy',
+            connected: false,
             error: error.message,
             timestamp: new Date().toISOString()
         };

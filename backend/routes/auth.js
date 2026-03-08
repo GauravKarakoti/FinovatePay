@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/sanitize');
+const { generateToken } = require('../utils/jwt');
 const { 
   generateToken, 
   generateTokens, 

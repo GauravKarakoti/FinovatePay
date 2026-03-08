@@ -96,9 +96,16 @@ async function main() {
 
   console.log("\n10. Deploying FractionToken...");
   const FractionToken = await ethers.getContractFactory("FractionToken");
-  const fractionToken = await FractionToken.deploy(stablecoinAddress);
+  const fractionToken = await FractionToken.deploy(USDC_ADDRESS);
   await fractionToken.waitForDeployment();
   console.log("FractionToken deployed to:", fractionToken.target);
+
+  console.log("🔗 Setting up EscrowContract authorization...");
+  const tx = await fractionToken.setEscrowContract(escrowContractV2Implementation.target);
+  await tx.wait();
+  console.log("✅ EscrowContract authorized:", escrowContractV2Implementation.target);
+  console.log("- Payment Token:", await fractionToken.paymentToken());
+  console.log("- Owner:", await fractionToken.owner());
 
   // 11. Deploy FinancingManagerV2
   console.log("\n11. Deploying FinancingManagerV2 Implementation...");
@@ -178,8 +185,8 @@ async function main() {
     }
   }
 
-  fs.writeFileSync(contractsDir + "/EscrowContract.json", JSON.stringify(escrowContractV2Artifact, null, 2));
-  fs.writeFileSync(contractsDir + "/FinancingManager.json", JSON.stringify(financingManagerV2Artifact, null, 2));
+  fs.writeFileSync(contractsDir + "/EscrowContract.json", JSON.stringify(EscrowContractV2, null, 2));
+  fs.writeFileSync(contractsDir + "/FinancingManager.json", JSON.stringify(FinancingManagerV2, null, 2));
 
   console.log("\n✅ Deployment completed successfully!");
   console.log("- FinovateToken:", governanceTokenAddress);

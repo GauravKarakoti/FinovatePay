@@ -110,18 +110,13 @@ router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) =
       });
     }
 
-    const signer = await getSigner();
-    const escrowContract = new ethers.Contract(
-      contractAddresses.EscrowContract,
-      EscrowContractArtifact.abi,
-      signer
-    );
+    const escrowContract = getEscrowContract();
     const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
     // Defaults: 7 days if not provided
     const duration = Number(durationSeconds) || 7 * 24 * 60 * 60;
 
-    const tokenAddress = invoice.token_address || ethers.constants.AddressZero;
+    const tokenAddress = invoice.token_address || ethers.ZeroAddress;
 
     // Create on-chain escrow (onlyAdmin on contract side)
     const tx = await escrowContract.createEscrow(
@@ -131,7 +126,7 @@ router.post('/multi-party', requireRole(['seller', 'admin']), async (req, res) =
       invoice.amount,
       tokenAddress,
       duration,
-      ethers.constants.AddressZero,
+      ethers.ZeroAddress,
       0
     );
 
