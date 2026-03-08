@@ -11,7 +11,9 @@ const runMigration = async () => {
     await client.query('BEGIN');
     await client.query(sql);
     await client.query('COMMIT');
-    console.log('✅ Dispute tables migration completed successfully.');
+const logger = require('../utils/logger')('dispute-migration');
+
+    logger.info('Dispute tables migration completed successfully.');
     client.release();
     process.exit(0);
   } catch (err) {

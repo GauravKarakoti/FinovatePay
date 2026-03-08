@@ -1,4 +1,5 @@
 const { ethers } = require('ethers');
+const logger = require('../utils/logger')('bridgeService');
 
 // Import ABIs (assuming they are compiled and available)
 const BridgeAdapterABI = require('../../deployed/BridgeAdapter.json').abi;
@@ -131,7 +132,7 @@ async function bridgeToKatana(collateralTokenId, amount, userId) {
         
         const katanaChain = ethers.keccak256(ethers.toUtf8Bytes("katana"));
         
-        console.log(`[BridgeService] Locking ERC1155 for bridge: tokenId=${collateralTokenId}, amount=${amount}`);
+        logger.info(`[BridgeService] Locking ERC1155 for bridge: tokenId=${collateralTokenId}, amount=${amount}`);
         
         const lockTx = await getBridgeAdapter().lockERC1155ForBridge(
             fractionTokenAddress, 
@@ -140,20 +141,20 @@ async function bridgeToKatana(collateralTokenId, amount, userId) {
             katanaChain
         );
         
-        console.log(`[BridgeService] Lock transaction sent: ${lockTx.hash}`);
+        logger.info(`[BridgeService] Lock transaction sent: ${lockTx.hash}`);
         const lockReceipt = await lockTx.wait();
         
-        console.log(`[BridgeService] Lock confirmed, bridging asset...`);
+        logger.info(`[BridgeService] Lock confirmed, bridging asset...`);
         
         const bridgeTx = await getBridgeAdapter().bridgeERC1155Asset(
             lockTx.hash, 
             LIQUIDITY_ADAPTER_ADDRESS
         );
         
-        console.log(`[BridgeService] Bridge transaction sent: ${bridgeTx.hash}`);
+        logger.info(`[BridgeService] Bridge transaction sent: ${bridgeTx.hash}`);
         const bridgeReceipt = await bridgeTx.wait();
         
-        console.log(`[BridgeService] Bridge completed successfully`);
+        logger.info(`[BridgeService] Bridge completed successfully`);
         
         return { 
             lockId: lockTx.hash,
@@ -167,6 +168,7 @@ async function bridgeToKatana(collateralTokenId, amount, userId) {
             throw error;
         }
         console.error('[BridgeService] Error bridging to Katana:', error);
+        logger.error('[BridgeService] Error bridging to Katana:', error);
         handleBlockchainError(error, 'bridge collateral to Katana');
     }
 }
@@ -199,12 +201,12 @@ async function borrowFromKatana(asset, amount, collateralTokenId) {
             );
         }
         
-        console.log(`[BridgeService] Borrowing from Katana: asset=${asset}, amount=${amount}, collateral=${collateralTokenId}`);
+        logger.info(`[BridgeService] Borrowing from Katana: asset=${asset}, amount=${amount}, collateral=${collateralTokenId}`);
         
         // First, bridge collateral if not already done
         const bridgeResult = await bridgeToKatana(collateralTokenId, amount, 'user');
         
-        console.log(`[BridgeService] Borrowing from pool: assetAddress=${assetAddress}, amount=${amount}`);
+        logger.info(`[BridgeService] Borrowing from pool: assetAddress=${assetAddress}, amount=${amount}`);
         
         // Borrow from pool
         const borrowTx = await getLiquidityAdapter().borrowFromPool(
@@ -213,10 +215,10 @@ async function borrowFromKatana(asset, amount, collateralTokenId) {
             signer.address
         );
         
-        console.log(`[BridgeService] Borrow transaction sent: ${borrowTx.hash}`);
+        logger.info(`[BridgeService] Borrow transaction sent: ${borrowTx.hash}`);
         const receipt = await borrowTx.wait();
         
-        console.log(`[BridgeService] Borrow completed successfully`);
+        logger.info(`[BridgeService] Borrow completed successfully`);
         
         return { 
             loanId: borrowTx.hash,
@@ -229,7 +231,7 @@ async function borrowFromKatana(asset, amount, collateralTokenId) {
         if (error instanceof BridgeServiceError) {
             throw error;
         }
-        console.error('[BridgeService] Error borrowing from Katana:', error);
+        logger.error('[BridgeService] Error borrowing from Katana:', error);
         handleBlockchainError(error, 'borrow from Katana');
     }
 }
@@ -248,7 +250,7 @@ async function getLiquidityRates(asset) {
             );
         }
         
-        console.log(`[BridgeService] Getting liquidity rates for: ${asset}`);
+        logger.info(`[BridgeService] Getting liquidity rates for: ${asset}`);
         
         const borrowRate = await getLiquidityAdapter().getBorrowRate(assetAddress);
         const availableLiquidity = await getLiquidityAdapter().getAvailableLiquidity(assetAddress);
@@ -264,7 +266,7 @@ async function getLiquidityRates(asset) {
         if (error instanceof BridgeServiceError) {
             throw error;
         }
-        console.error('[BridgeService] Error getting liquidity rates:', error);
+        logger.error('[BridgeService] Error getting liquidity rates:', error);
         handleBlockchainError(error, 'get liquidity rates');
     }
 }
@@ -297,15 +299,15 @@ async function repayToKatana(asset, amount, loanId) {
             );
         }
         
-        console.log(`[BridgeService] Repaying to Katana: asset=${asset}, amount=${amount}, loanId=${loanId}`);
+        logger.info(`[BridgeService] Repaying to Katana: asset=${asset}, amount=${amount}, loanId=${loanId}`);
         
         // Repay the loan
         const repayTx = await getLiquidityAdapter().repayToPool(loanId);
         
-        console.log(`[BridgeService] Repay transaction sent: ${repayTx.hash}`);
+        logger.info(`[BridgeService] Repay transaction sent: ${repayTx.hash}`);
         const receipt = await repayTx.wait();
         
-        console.log(`[BridgeService] Repay completed successfully`);
+        logger.info(`[BridgeService] Repay completed successfully`);
         
         return { 
             success: true,
@@ -319,7 +321,7 @@ async function repayToKatana(asset, amount, loanId) {
         if (error instanceof BridgeServiceError) {
             throw error;
         }
-        console.error('[BridgeService] Error repaying to Katana:', error);
+        logger.error('[BridgeService] Error repaying to Katana:', error);
         handleBlockchainError(error, 'repay to Katana');
     }
 }
