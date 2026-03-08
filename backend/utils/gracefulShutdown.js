@@ -23,8 +23,9 @@ function wait(ms) {
  * Set up graceful shutdown handlers for the server
  * @param {http.Server} server - The HTTP server instance
  * @param {socketIo.Server} io - Socket.io instance (optional)
+ * @param {Object} blockchainQueue - Blockchain queue instance (optional)
  */
-function setupGracefulShutdown(server, io) {
+function setupGracefulShutdown(server, io, blockchainQueue) {
   serverRef = server;
   ioRef = io;
 
@@ -51,12 +52,34 @@ function setupGracefulShutdown(server, io) {
         await wait(2000);
         
         // Forcefully disconnect all socket connections after grace period
-        ioRef.disconnectSockets(true);
+        if (ioRef && ioRef.disconnectSockets) {
+             ioRef.disconnectSockets(true);
+        }
       }
 
-      // Step 3: Wait briefly for any pending operations
-      await wait(1000);
+      // Step 3: Shutdown blockchain queue if provided
+      if (blockchainQueue) {
+        console.log('⛓️ Shutting down blockchain queue...');
+        try {
+          await blockchainQueue.shutdown();
+          console.log('✅ Blockchain queue shutdown complete');
+        } catch (queueErr) {
+          console.error('❌ Error shutting down blockchain queue:', queueErr.message);
+        }
+      }
 
+      // Step 4: Wait briefly for any pending operations
+      await wait(1000);
+      // Step 3.1: Shutdown blockchain queue
+      if (blockchainQueue) {
+        console.log('⛓️ Shutting down blockchain queue...');
+        try {
+          await blockchainQueue.shutdown();
+          console.log('✅ Blockchain queue shut down');
+        } catch (err) {
+          console.error('❌ Error shutting down blockchain queue:', err.message);
+        }
+      }
       // Step 4: Close database connection pool
       console.log('🔌 Closing database connection pool...');
       try {

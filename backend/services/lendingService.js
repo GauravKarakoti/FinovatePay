@@ -22,8 +22,8 @@ let lendingPoolContract = null;
 const initializeContract = async () => {
     if (lendingPoolContract) return lendingPoolContract;
     
-    const { getContract } = require('../config/blockchain');
-    const contract = await getContract('LendingPool');
+    const { getLendingPoolContract } = require('../config/blockchain');
+    const contract = await getLendingPoolContract();
     lendingPoolContract = contract;
     return contract;
 };
@@ -84,7 +84,8 @@ const calculateDynamicLTV = async (userId, walletAddress, collateralValue, reque
         // Calculate base LTV from collateral
         let baseLTV = 0;
         if (requestedAmount > 0 && collateralValue > 0) {
-            baseLTV = (collateralValue * 10000) / requestedAmount;
+            // LTV = requestedAmount / collateralValue, scaled to basis points (0–10000)
+            baseLTV = (requestedAmount * 10000) / collateralValue;
         }
         
         // Cap at max
@@ -213,7 +214,7 @@ const createLoan = async (userId, walletAddress, data) => {
                 loan_id, user_id, wallet_address, principal, interest_rate,
                 total_debt, collateral_value, ltv, loan_duration,
                 maturity_date, status, transaction_hash, block_number
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + INTERVAL '180 days', $10, $11, $12)`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + ($9 * INTERVAL '1 day'), $10, $11, $12)`,
             [
                 loanIdStr, userId, walletAddress, data.principal.toString(),
                 interestRate, data.principal.toString(), data.collateralValue.toString(),

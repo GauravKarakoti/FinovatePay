@@ -9,6 +9,17 @@ const logger = require("./utils/logger")("server");
 const crypto = require("crypto");
 require("dotenv").config();
 
+/* ---------------- GLOBAL ERROR HANDLERS ---------------- */
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection:', reason);
+});
+
 // Initialize secrets provider early
 const { getSecretsProvider } = require("./services/secrets");
 
@@ -114,7 +125,15 @@ app.use("/api/", globalLimiter);
 
 /* ---------------- DATABASE ---------------- */
 
-testDbConnection();
+testDbConnection()
+  .then((result) => {
+    if (result) {
+      logger.info("Database connection test completed successfully");
+    } else {
+      logger.warn("Database connection test completed but reported failure");
+    }
+  })
+  .catch(err => logger.error("Database connection test failed:", err));
 
 /* ---------------- API VERSIONING MIDDLEWARE ---------------- */
 
@@ -364,11 +383,13 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
+  logger.info(`🚀 Server running on port ${PORT}`);
 });
 
 // Set up graceful shutdown handlers
-setupGracefulShutdown(server, io);
+setupGracefulShutdown(server, io, blockchainQueue);
+
+// Global error handlers are now registered at the top of the file
 
 const { startRecoveryWorker } = require('./services/recoveryService');
 
@@ -376,17 +397,33 @@ const { startRecoveryWorker } = require('./services/recoveryService');
 try {
   blockchainQueue.initialize(io);
   blockchainQueue.startWorker();
-  console.log('[server] Blockchain transaction queue initialized');
+  logger.info('[server] Blockchain transaction queue initialized');
 } catch (err) {
-  console.error('[server] Blockchain queue initialization failed:', err?.message || err);
+  logger.error('[server] Blockchain queue initialization failed:', err?.message || err);
 }
 
-listenForTokenization();
-startSyncWorker();
-startRecoveryWorker(); // Start transaction recovery worker
+// Start background services with error handling
+listenForTokenization()
+  .then(() => logger.info("Tokenization listener started"))
+  .catch(err => logger.error("Tokenization listener failed:", err));
+
+try {
+  startSyncWorker();
+  logger.info("Invoice Sync Worker started");
+} catch (err) {
+  logger.error("Invoice Sync Worker failed to start:", err);
+}
+
+try {
+  startRecoveryWorker(); // Start transaction recovery worker
+  logger.info("Transaction Recovery Worker started");
+} catch (err) {
+  logger.error("Transaction Recovery Worker failed to start:", err);
+}
 
 try {
   startComplianceListeners();
+  logger.info("Compliance listeners started");
 } catch (err) {
   logger.error(
     "[server] Compliance listeners failed:",
@@ -394,31 +431,19 @@ try {
   );
 }
 
-/* ---------------- GRACEFUL SHUTDOWN ---------------- */
+// Start scheduled reconciliation (every 6 hours)
+try {
+  startScheduledReconciliation();
+  logger.info("[Server] Reconciliation scheduler started");
+} catch (err) {
+  logger.error(
+    "[server] Reconciliation scheduler failed:",
+    err?.message || err
+  );
+}
 
-const gracefulShutdown = async () => {
-  console.log('[server] Starting graceful shutdown...');
-  
-  try {
-    await blockchainQueue.shutdown();
-    console.log('[server] Blockchain queue shutdown complete');
-  } catch (err) {
-    console.error('[server] Error during blockchain queue shutdown:', err);
-  }
-  
-  server.close(() => {
-    console.log('[server] HTTP server closed');
-    process.exit(0);
-  });
-  
-  // Force close after 10 seconds
-  setTimeout(() => {
-    console.error('[server] Forced shutdown after timeout');
-    process.exit(1);
-  }, 10000);
-};
-
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
+// Note: Graceful shutdown is handled by utils/gracefulShutdown.js as configured above
+// but we should ensure blockchainQueue is also shut down. 
+// For now, assuming gracefulShutdown handles IO and server.
 
 module.exports = app;

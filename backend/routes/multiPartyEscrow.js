@@ -244,8 +244,6 @@ router.post(
                 blockNumber,
             });
 
-            const io = req.app.get('io');
-            // Derive the linked invoice ID for socket broadcasting, if available
             const invoiceId = updated.invoice_id || updated.invoiceId;
             const io = req.app.get('io');
             if (io) {

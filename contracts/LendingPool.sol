@@ -133,6 +133,7 @@ contract LendingPool is
     ) external initializer {
         __Ownable_init(_owner);
         __Pausable_init();
+        __ReentrancyGuard_init();
 
         require(_stablecoin != address(0), "Invalid stablecoin");
         require(_fractionToken != address(0), "Invalid fraction token");
