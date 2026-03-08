@@ -37,7 +37,7 @@ exports.postWithdraw = async (req, res) => {
     const treasury = getTreasuryManagerContract(signer);
 
     // Execute withdrawal via on-chain contract
-    const tx = await treasury.executeWithdrawal(token || ethers.constants.AddressZero, to, ethers.BigInt(amount));
+    const tx = await treasury.executeWithdrawal(token || ethers.ZeroAddress, to, ethers.BigInt(amount));
     const receipt = await tx.wait();
 
     res.json({ success: true, txHash: receipt.transactionHash });
