@@ -1,6 +1,12 @@
+const { ethers } = require('ethers');
 const { getProvider, getEscrowContract } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const Invoice = require('../models/Invoice');
+
+const uuidToBytes32 = (uuid) => {
+  const hex = '0x' + uuid.replace(/-/g, '');
+  return ethers.zeroPadValue(hex, 32);
+};
 
 /**
  * Fetch on-chain features related to a user using DB invoice linkage and RPC queries.
@@ -41,8 +47,8 @@ const fetchOnchainFeatures = async ({ userId, walletAddress }) => {
     for (const inv of invoices) {
       try {
         // invoice id is UUID string; contract.escrows expects bytes32
-        const idHex = '0x' + inv.invoice_id.replace(/-/g, '');
-        const esc = await escrowContract.escrows(idHex);
+        const bytes32InvoiceId = uuidToBytes32(inv.invoice_id);
+        const esc = await escrowContract.escrows(bytes32InvoiceId);
         // seller address zero indicates not created
         if (esc && esc.seller && esc.seller !== '0x0000000000000000000000000000000000000000') {
           escrowOnchainCount += 1;

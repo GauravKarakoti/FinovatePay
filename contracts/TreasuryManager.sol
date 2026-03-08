@@ -39,9 +39,9 @@ contract TreasuryManager is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function initialize(address _owner, address _governance) public initializer {
-        __Ownable_init();
+        require(_owner != address(0), "Owner cannot be the zero address");
+        __Ownable_init(_owner);
         __UUPSUpgradeable_init();
-        transferOwnership(_owner);
         governance = _governance;
     }
 
