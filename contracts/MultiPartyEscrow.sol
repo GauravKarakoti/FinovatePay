@@ -47,6 +47,7 @@ contract MultiPartyEscrow is Ownable, ReentrancyGuard {
         uint256 createdAt;
         uint256 expiresAt;       // 0 = no expiry
         EscrowStatus status;
+        bool isFunded;
     }
 
     // ─────────────────────────────── STATE ───────────────────────────────────
@@ -150,12 +151,16 @@ contract MultiPartyEscrow is Ownable, ReentrancyGuard {
         onlyParticipant(escrowId)
     {
         Escrow storage e = escrows[escrowId];
+        require(!e.isFunded, "MultiPartyEscrow: escrow already funded");
+
         if (e.token == address(0)) {
             require(msg.value == e.totalAmount, "MultiPartyEscrow: incorrect ETH amount");
         } else {
             require(msg.value == 0, "MultiPartyEscrow: ETH sent for token escrow");
             IERC20(e.token).safeTransferFrom(msg.sender, address(this), e.totalAmount);
         }
+
+        e.isFunded = true;
         emit FundsDeposited(escrowId, msg.sender, e.totalAmount);
     }
 
@@ -177,6 +182,8 @@ contract MultiPartyEscrow is Ownable, ReentrancyGuard {
 
     function _addParticipant(bytes32 escrowId, address wallet, string memory role) internal {
         require(wallet != address(0), "MultiPartyEscrow: zero address");
+        require(!isParticipant[escrowId][wallet], "MultiPartyEscrow: duplicate participant");
+
         Escrow storage e = escrows[escrowId];
         uint256 idx = e.participantCount;
         participants[escrowId][idx] = Participant({ wallet: wallet, role: role, isActive: true });

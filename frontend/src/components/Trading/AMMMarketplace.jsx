@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   addAMMLiquidity,
@@ -22,6 +22,7 @@ const AMMMarketplace = () => {
   const [trades, setTrades] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const latestRequestIdRef = useRef(0);
 
   const [addForm, setAddForm] = useState({
     tokenId: '',
@@ -48,49 +49,51 @@ const AMMMarketplace = () => {
     [pairs, selectedPairId]
   );
 
-  const refreshData = async () => {
+  const refreshData = useCallback(async (pairIdOverride) => {
+    const requestId = ++latestRequestIdRef.current;
+
     try {
       setIsLoading(true);
-      const [pairsRes, positionsRes, tradesRes] = await Promise.all([
+      const [pairsRes, positionsRes] = await Promise.all([
         getAMMPairs({ limit: 50 }),
-        getAMMPositions(),
-        getAMMTrades({ limit: 50, pairId: selectedPairId || undefined })
+        getAMMPositions()
       ]);
 
       const nextPairs = pairsRes?.data?.pairs || [];
+      const resolvedPairId = pairIdOverride || nextPairs[0]?.pair_id || '';
+      const tradesRes = await getAMMTrades({ limit: 50, pairId: resolvedPairId || undefined });
+
+      // Ignore stale responses from older in-flight refresh calls.
+      if (requestId !== latestRequestIdRef.current) {
+        return;
+      }
+
       setPairs(nextPairs);
       setPositions(positionsRes?.data?.positions || []);
       setTrades(tradesRes?.data?.trades || []);
 
-      if (!selectedPairId && nextPairs.length > 0) {
+      if (!pairIdOverride && nextPairs.length > 0) {
         setSelectedPairId(nextPairs[0].pair_id);
       }
     } catch (error) {
       console.error('Failed loading AMM data:', error);
       toast.error(error?.response?.data?.error?.message || 'Failed to load AMM marketplace data');
     } finally {
-      setIsLoading(false);
+      if (requestId === latestRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshData();
-  }, []);
+  }, [refreshData]);
 
   useEffect(() => {
     if (!selectedPairId) return;
 
-    const loadTradesForPair = async () => {
-      try {
-        const response = await getAMMTrades({ limit: 50, pairId: selectedPairId });
-        setTrades(response?.data?.trades || []);
-      } catch (error) {
-        console.error('Failed loading trades for pair:', error);
-      }
-    };
-
-    loadTradesForPair();
-  }, [selectedPairId]);
+    refreshData(selectedPairId);
+  }, [refreshData, selectedPairId]);
 
   const handleAddLiquidity = async (e) => {
     e.preventDefault();

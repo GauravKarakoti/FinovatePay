@@ -423,12 +423,15 @@ contract EscrowContractV2 is
     function autoCancelEscrow(bytes32 _invoiceId) external nonReentrant {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
+        require(escrow.amount > 0, "Escrow already finalized");
         require(block.timestamp > escrow.expiresAt, "Escrow not expired yet");
 
-        // Refund buyer
-        _payout(escrow.buyer, escrow.token, escrow.amount);
-
+        uint256 refundAmount = escrow.amount;
+        escrow.amount = 0;
         escrow.status = EscrowStatus.Expired;
+
+        // Refund buyer
+        _payout(escrow.buyer, escrow.token, refundAmount);
 
         emit EscrowAutoCancelled(_invoiceId);
         emit EscrowReleased(_invoiceId, 0);
@@ -470,10 +473,16 @@ contract EscrowContractV2 is
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
         require(!highValueTxReleased[_invoiceId], "Already released");
+
+        uint256 releaseAmount = escrow.amount;
+        require(releaseAmount > 0, "No funds to release");
+
+        escrow.status = EscrowStatus.Released;
+        escrow.amount = 0;
         
         highValueTxReleased[_invoiceId] = true;
         
-        IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
+        _payout(escrow.seller, escrow.token, releaseAmount);
         
         if (escrow.rwaNftContract != address(0)) {
             IERC721(escrow.rwaNftContract).safeTransferFrom(
@@ -483,10 +492,8 @@ contract EscrowContractV2 is
             );
         }
         
-        escrow.status = EscrowStatus.Released;
-        
         emit HighValueTransactionReleased(_invoiceId);
-        emit EscrowReleased(_invoiceId, escrow.amount);
+        emit EscrowReleased(_invoiceId, releaseAmount);
     }
 
     function cancelHighValueTransaction(bytes32 _invoiceId) external onlyAdmin {
@@ -591,6 +598,7 @@ contract EscrowContractV2 is
             _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
             "Not party"
         );
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
 
         if (_msgSender() == escrow.seller) {
             escrow.sellerConfirmed = true;
@@ -639,14 +647,23 @@ contract EscrowContractV2 is
 
     function _releaseFunds(bytes32 _invoiceId) internal {
         Escrow storage escrow = escrows[_invoiceId];
+
+        require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
+        uint256 releaseAmount = escrow.amount;
+        require(releaseAmount > 0, "No funds to release");
+
+        escrow.status = EscrowStatus.Released;
+        escrow.amount = 0;
         
-        IERC20(escrow.token).safeTransfer(escrow.seller, escrow.amount);
+        _payout(escrow.seller, escrow.token, releaseAmount);
         
         if (escrow.rwaNftContract != address(0)) {
             IERC721(escrow.rwaNftContract).safeTransferFrom(address(this), escrow.buyer, escrow.rwaTokenId);
         }
         
-        emit EscrowReleased(_invoiceId, escrow.amount);
+        emit EscrowReleased(_invoiceId, releaseAmount);
+
+        delete approvalStages[_invoiceId];
     }
 
     function _getPayableAmount(Escrow storage escrow)

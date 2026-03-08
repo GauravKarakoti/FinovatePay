@@ -325,21 +325,42 @@ const createMilestone = async (escrowId, {
  * Auto-advances the milestone to 'approved' and credits released_amount on the
  * parent escrow when the threshold is reached.
  *
+ * @param {string} escrowId        UUID of multi_party_escrows
  * @param {number} milestoneId     Primary key of escrow_milestones
  * @param {{userId?:string, walletAddress:string, txHash?:string, blockNumber?:number}} opts
  * @returns {object} Updated escrow_milestones row
  */
-const approveMilestone = async (milestoneId, { userId = null, walletAddress, txHash = null, blockNumber = null }) => {
+const approveMilestone = async (
+    escrowId,
+    milestoneId,
+    { userId = null, walletAddress, txHash = null, blockNumber = null }
+) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
+        // Caller must be an active participant of the requested escrow.
+        const participantRes = await client.query(
+            `SELECT 1
+             FROM escrow_participants
+             WHERE escrow_id = $1
+               AND LOWER(wallet_address) = LOWER($2)
+               AND is_active = TRUE
+             LIMIT 1`,
+            [escrowId, walletAddress]
+        );
+        if (!participantRes.rows.length) {
+            throw new Error(`Wallet ${walletAddress} is not a participant of escrow ${escrowId}`);
+        }
+
         // Lock the milestone row
         const milestoneRes = await client.query(
-            'SELECT * FROM escrow_milestones WHERE id = $1 FOR UPDATE',
-            [milestoneId]
+            'SELECT * FROM escrow_milestones WHERE id = $1 AND escrow_id = $2 FOR UPDATE',
+            [milestoneId, escrowId]
         );
-        if (!milestoneRes.rows.length) throw new Error(`Milestone not found: ${milestoneId}`);
+        if (!milestoneRes.rows.length) {
+            throw new Error(`Milestone ${milestoneId} not found for escrow ${escrowId}`);
+        }
         const milestone = milestoneRes.rows[0];
 
         if (!['pending', 'in_progress'].includes(milestone.status)) {

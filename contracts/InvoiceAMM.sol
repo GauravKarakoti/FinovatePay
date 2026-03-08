@@ -149,13 +149,13 @@ contract InvoiceAMM is Ownable, ERC1155Holder, ReentrancyGuard {
         require(pair.totalLpShares > 0, "Pair not initialized");
 
         if (stableToFraction) {
-            stablecoin.safeTransferFrom(msg.sender, address(this), amountIn);
-
             uint256 amountInWithFee = (amountIn * (BPS_DENOMINATOR - FEE_BPS)) / BPS_DENOMINATOR;
             amountOut = (amountInWithFee * pair.reserveFractions) / (pair.reserveStable + amountInWithFee);
 
             require(amountOut >= minAmountOut, "Slippage exceeded");
             require(amountOut > 0 && amountOut < pair.reserveFractions, "Insufficient output liquidity");
+
+            stablecoin.safeTransferFrom(msg.sender, address(this), amountIn);
 
             pair.reserveStable += amountIn;
             pair.reserveFractions -= amountOut;
@@ -164,13 +164,13 @@ contract InvoiceAMM is Ownable, ERC1155Holder, ReentrancyGuard {
 
             emit SwapExecuted(tokenId, msg.sender, true, amountIn, amountOut, amountIn - amountInWithFee);
         } else {
-            fractionToken.safeTransferFrom(msg.sender, address(this), tokenId, amountIn, "");
-
             uint256 amountInWithFee = (amountIn * (BPS_DENOMINATOR - FEE_BPS)) / BPS_DENOMINATOR;
             amountOut = (amountInWithFee * pair.reserveStable) / (pair.reserveFractions + amountInWithFee);
 
             require(amountOut >= minAmountOut, "Slippage exceeded");
             require(amountOut > 0 && amountOut < pair.reserveStable, "Insufficient output liquidity");
+
+            fractionToken.safeTransferFrom(msg.sender, address(this), tokenId, amountIn, "");
 
             pair.reserveFractions += amountIn;
             pair.reserveStable -= amountOut;

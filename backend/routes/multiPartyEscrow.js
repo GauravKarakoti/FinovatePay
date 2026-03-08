@@ -237,7 +237,7 @@ router.post(
         const { txHash, blockNumber }     = req.body;
 
         try {
-            const updated = await svc.approveMilestone(Number(milestoneId), {
+            const updated = await svc.approveMilestone(req.params.escrowId, Number(milestoneId), {
                 userId:        req.user.id,
                 walletAddress: req.user.wallet_address,
                 txHash,
