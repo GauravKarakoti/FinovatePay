@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
 
 // Token expiration configuration
-const ACCESS_TOKEN_EXPIRES = process.env.JWT_ACCESS_EXPIRES || '15m';
-const REFRESH_TOKEN_EXPIRES = process.env.JWT_REFRESH_EXPIRES || '7d';
+const ACCESS_TOKEN_EXPIRES = process.env.JWT_ACCESS_EXPIRES;
+const REFRESH_TOKEN_EXPIRES = process.env.JWT_REFRESH_EXPIRES;
 
 /**
  * Generates an access token for authentication.

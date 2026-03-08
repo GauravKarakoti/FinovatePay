@@ -7,9 +7,7 @@ const { contractAddresses } = require('../config/blockchain');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 const { getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
-const { logAudit } = require('../middleware/auditLogger');
-const { errorResponse } = require('../utils/errorResponse');
-const fraudDetectionService = require('../services/fraudDetectionService');
+const errorResponse = require('../utils/errorResponse');
 
 // Helper: UUID → bytes32 (ethers v6)
 const uuidToBytes32 = (uuid) => {
