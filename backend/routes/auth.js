@@ -7,13 +7,6 @@ const { authenticateToken } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/sanitize');
 const { generateToken } = require('../utils/jwt');
 const { 
-  generateToken, 
-  generateTokens, 
-  generateRefreshToken,
-  verifyToken,
-  getRefreshTokenExpiration 
-} = require('../utils/jwt');
-const { 
   validateRegister, 
   validateLogin, 
   validateRoleUpdate,
@@ -209,14 +202,6 @@ router.post('/register', authLimiter, validateRegister, async (req, res) => {
 
     const token = generateToken(newUser.rows[0]);
 
-    // Set HttpOnly cookie for additional security (defense-in-depth)
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    });
-
     res.status(201).json({
       message: 'User created successfully',
       user: sanitizeUser(newUser.rows[0])
@@ -283,26 +268,7 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // Generate tokens
-    const tokens = generateTokens(user);
-    const clientInfo = getClientInfo(req);
-    
-    // Store refresh token in database
-    const expiresAt = new Date(Date.now() + getRefreshTokenExpirationMs());
-    await RefreshToken.create({
-      userId: user.id,
-      token: tokens.refreshToken,
-      expiresAt,
-      ...clientInfo
-    });
-
-    // Set HttpOnly cookies for tokens
-    res.cookie('token', tokens.accessToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    });
+    const token = generateToken(user);
 
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,

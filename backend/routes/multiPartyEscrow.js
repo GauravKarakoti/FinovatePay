@@ -245,7 +245,7 @@ router.post(
             });
 
             const invoiceId = updated.invoice_id || updated.invoiceId;
-            const io        = req.app.get('io');
+            const io = req.app.get('io');
             if (io) {
                 if (invoiceId) {
                     emitToInvoice(io, invoiceId, 'escrow:milestone:approved', {
