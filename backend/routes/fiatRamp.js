@@ -122,31 +122,53 @@ router.post('/create-link', requireRole(['buyer', 'seller', 'investor', 'admin']
 /**
  * POST /api/fiat-ramp/webhook
  * Handle MoonPay webhook callbacks for payment confirmation
+ * SECURITY: Requires mandatory signature verification
  */
 router.post('/webhook', async (req, res) => {
     try {
         const webhookData = req.body;
         const signature = req.headers['x-moonpay-signature'];
-
-        // Verify webhook signature (in production)
         const moonpayWebhookKey = process.env.MOONPAY_WEBHOOK_KEY;
-        
-        if (moonpayWebhookKey && signature) {
-            const crypto = require('crypto');
-            const expectedSignature = crypto
-                .createHmac('sha256', moonpayWebhookKey)
-                .update(JSON.stringify(webhookData))
-                .digest('hex');
 
-            if (signature !== expectedSignature) {
-                console.warn('Invalid MoonPay webhook signature');
-                return res.status(401).json({ error: 'Invalid signature' });
-            }
+        // MANDATORY signature verification - reject if not configured
+        if (!moonpayWebhookKey) {
+            console.error('SECURITY: MOONPAY_WEBHOOK_KEY not configured - rejecting webhook');
+            return res.status(500).json({ 
+                error: 'Webhook verification not configured',
+                message: 'Server configuration error - contact administrator'
+            });
         }
 
+        // Reject webhooks without signature
+        if (!signature) {
+            console.warn('SECURITY: Webhook received without signature header');
+            return res.status(401).json({ 
+                error: 'Missing signature',
+                message: 'x-moonpay-signature header is required'
+            });
+        }
+
+        // Verify webhook signature
+        const crypto = require('crypto');
+        const expectedSignature = crypto
+            .createHmac('sha256', moonpayWebhookKey)
+            .update(JSON.stringify(webhookData))
+            .digest('hex');
+
+        if (signature !== expectedSignature) {
+            console.warn('SECURITY: Invalid MoonPay webhook signature detected');
+            console.warn(`Expected: ${expectedSignature.substring(0, 10)}...`);
+            console.warn(`Received: ${signature.substring(0, 10)}...`);
+            return res.status(401).json({ 
+                error: 'Invalid signature',
+                message: 'Webhook signature verification failed'
+            });
+        }
+
+        // Signature verified - process webhook
         const { type, data } = webhookData;
 
-        console.log(`MoonPay webhook received: ${type}`, data);
+        console.log(`MoonPay webhook received (verified): ${type}`, data);
 
         switch (type) {
             case 'payment.created':

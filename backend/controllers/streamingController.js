@@ -325,8 +325,20 @@ exports.getStream = async (req, res) => {
  */
 exports.getSellerStreams = async (req, res) => {
   try {
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
     const streams = await StreamingPayment.findBySeller(req.user.wallet_address);
-    res.json(streams);
+    const total = streams.length;
+    
+    // Apply pagination
+    const paginatedStreams = streams.slice(offset, offset + limit);
+    
+    res.json({
+      success: true,
+      data: paginatedStreams,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (error) {
     console.error('Error getting seller streams:', error);
     return errorResponse(res, error, 500);
@@ -338,8 +350,20 @@ exports.getSellerStreams = async (req, res) => {
  */
 exports.getBuyerStreams = async (req, res) => {
   try {
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
+    
     const streams = await StreamingPayment.findByBuyer(req.user.wallet_address);
-    res.json(streams);
+    const total = streams.length;
+    
+    // Apply pagination
+    const paginatedStreams = streams.slice(offset, offset + limit);
+    
+    res.json({
+      success: true,
+      data: paginatedStreams,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (error) {
     console.error('Error getting buyer streams:', error);
     return errorResponse(res, error, 500);
@@ -351,6 +375,8 @@ exports.getBuyerStreams = async (req, res) => {
  */
 exports.getMyStreams = async (req, res) => {
   try {
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
+    const { limit, offset } = getPaginationParams(req.query);
     const address = req.user.wallet_address;
     
     const [asSeller, asBuyer] = await Promise.all([
@@ -368,7 +394,16 @@ exports.getMyStreams = async (req, res) => {
       new Map(allStreams.map(s => [s.stream_id, s])).values()
     );
     
-    res.json(uniqueStreams);
+    const total = uniqueStreams.length;
+    
+    // Apply pagination
+    const paginatedStreams = uniqueStreams.slice(offset, offset + limit);
+    
+    res.json({
+      success: true,
+      data: paginatedStreams,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (error) {
     console.error('Error getting my streams:', error);
     return errorResponse(res, error, 500);

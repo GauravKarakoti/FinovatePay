@@ -133,7 +133,6 @@ contract LendingPool is
     ) external initializer {
         __Ownable_init(_owner);
         __Pausable_init();
-        __ReentrancyGuard_init();
 
         require(_stablecoin != address(0), "Invalid stablecoin");
         require(_fractionToken != address(0), "Invalid fraction token");
@@ -547,7 +546,7 @@ contract LendingPool is
         Loan storage loan = loans[loanId];
 
         // Check if liquidatable
-        require(loan.isUndercollateralized || loan.ltv > liquidationThreshold, "Not liquidatable");
+        require(loan.isUndercollateralized || loan.ltv < liquidationThreshold, "Not liquidatable");
 
         // Calculate liquidation amounts
         uint256 debtCovered = loan.totalDebt;

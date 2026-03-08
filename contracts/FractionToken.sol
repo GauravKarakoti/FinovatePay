@@ -19,6 +19,10 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     using Strings for uint256;
 
     IERC20 public paymentToken; // USDC
+    
+    // Access control for authorized contracts
+    mapping(address => bool) public authorizedContracts;
+    address public escrowContract;
 
     // Chain identifiers for cross-chain operations
     bytes32 public constant FINOVATE_CHAIN = keccak256("finovate-cdk");
@@ -99,6 +103,11 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     );
     event InvoiceClosed(uint256 indexed tokenId);
     
+    // Access control events
+    event EscrowContractUpdated(address indexed oldEscrow, address indexed newEscrow);
+    event AuthorizedContractAdded(address indexed contractAddress);
+    event AuthorizedContractRemoved(address indexed contractAddress);
+    
     // Cross-chain events
     event FractionsBridged(
         uint256 indexed tokenId,
@@ -122,12 +131,74 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         bytes32 destinationChain
     );
 
+    // Access control modifiers
+    modifier onlyAuthorized() {
+        require(
+            msg.sender == escrowContract || 
+            authorizedContracts[msg.sender] || 
+            msg.sender == owner(),
+            "FractionToken: Unauthorized access"
+        );
+        _;
+    }
+
+    modifier onlyEscrowOrOwner() {
+        require(
+            msg.sender == escrowContract || msg.sender == owner(),
+            "FractionToken: Only escrow contract or owner"
+        );
+        _;
+    }
+
     constructor(address _paymentToken)
         ERC1155("https://api.finovatepay.com/token/{id}.json") 
         Ownable(msg.sender)
     {
         require(_paymentToken != address(0), "Invalid payment token");
         paymentToken = IERC20(_paymentToken);
+    }
+
+    /**
+     * @notice Set the escrow contract address (only owner).
+     * @param _escrowContract The address of the escrow contract.
+     */
+    function setEscrowContract(address _escrowContract) external onlyOwner {
+        require(_escrowContract != address(0), "Invalid escrow contract address");
+        address oldEscrow = escrowContract;
+        escrowContract = _escrowContract;
+        emit EscrowContractUpdated(oldEscrow, _escrowContract);
+    }
+
+    /**
+     * @notice Add an authorized contract (only owner).
+     * @param _contract The address to authorize.
+     */
+    function addAuthorizedContract(address _contract) external onlyOwner {
+        require(_contract != address(0), "Invalid contract address");
+        require(!authorizedContracts[_contract], "Contract already authorized");
+        authorizedContracts[_contract] = true;
+        emit AuthorizedContractAdded(_contract);
+    }
+
+    /**
+     * @notice Remove an authorized contract (only owner).
+     * @param _contract The address to remove authorization from.
+     */
+    function removeAuthorizedContract(address _contract) external onlyOwner {
+        require(authorizedContracts[_contract], "Contract not authorized");
+        authorizedContracts[_contract] = false;
+        emit AuthorizedContractRemoved(_contract);
+    }
+
+    /**
+     * @notice Check if an address is authorized to call restricted functions.
+     * @param _address The address to check.
+     * @return True if authorized.
+     */
+    function isAuthorized(address _address) external view returns (bool) {
+        return _address == escrowContract || 
+               authorizedContracts[_address] || 
+               _address == owner();
     }
 
     /**
@@ -239,13 +310,16 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Deposit repayment for an invoice (called by EscrowContract).
+     * @notice Deposit repayment for an invoice (only callable by authorized contracts).
+     * @dev This function should only be called by the EscrowContract or other authorized contracts.
      * @param _tokenId The token ID.
      * @param _amount The amount of USDC being repaid.
      */
-    function depositRepayment(uint256 _tokenId, uint256 _amount) external nonReentrant {
+    function depositRepayment(uint256 _tokenId, uint256 _amount) external onlyAuthorized nonReentrant {
         InvoiceMeta storage meta = invoiceMetadata[_tokenId];
         require(meta.totalFractions > 0, "Invoice not found");
+        require(_amount > 0, "Amount must be positive");
+        require(!meta.repaymentFunded, "Repayment already funded");
         
         // Transfer USDC from Payer (Escrow/Relayer) to THIS contract to pool for redemption.
         paymentToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -303,7 +377,7 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         bytes32 _destinationChain,
         address _owner,
         bytes32 _lockId
-    ) external onlyOwner nonReentrant {
+    ) external onlyAuthorized nonReentrant {
         require(isActive[_tokenId], "Invoice not active");
         require(_amount > 0, "Amount must be positive");
         require(_destinationChain != FINOVATE_CHAIN, "Cannot bridge to same chain");
@@ -352,7 +426,7 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 _amount,
         address _owner,
         bytes32 _sourceChain
-    ) external onlyOwner nonReentrant {
+    ) external onlyAuthorized nonReentrant {
         require(_amount > 0, "Amount must be positive");
         require(
             _sourceChain == KATANA_CHAIN || 
@@ -396,7 +470,7 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
         uint256 _amount,
         uint256 _price,
         bytes32 _destinationChain
-    ) external onlyOwner nonReentrant {
+    ) external onlyAuthorized nonReentrant {
         require(isActive[_tokenId], "Invoice not active");
         require(_amount > 0 && _price > 0, "Invalid amount or price");
         require(_destinationChain != FINOVATE_CHAIN, "Cannot trade on same chain");
