@@ -15,8 +15,26 @@ class RelayerService {
     );
     this.rateLimit = parseInt(process.env.GASLESS_RATE_LIMIT || '10');
     this.rateLimitWindow = 60 * 1000; // 1 minute
-    // Use database-backed rate limiting instead of in-memory Map
-    // This ensures rate limits work across PM2 clusters, Docker replicas, etc.
+    
+    // Start periodic cleanup of expired rate limit entries (every 5 minutes)
+    this.cleanupInterval = setInterval(() => this.cleanupRateLimiter(), 5 * 60 * 1000);
+  }
+
+  /**
+   * Cleanup expired rate limit entries to prevent memory leak
+   */
+  cleanupRateLimiter() {
+    const now = Date.now();
+    let cleaned = 0;
+    for (const [address, limit] of this.rateLimiter.entries()) {
+      if (now > limit.resetTime) {
+        this.rateLimiter.delete(address);
+        cleaned++;
+      }
+    }
+    if (cleaned > 0) {
+      console.log(`Rate limiter cleanup: removed ${cleaned} expired entries`);
+    }
   }
 
   /**

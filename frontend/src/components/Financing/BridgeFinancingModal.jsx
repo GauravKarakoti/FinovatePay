@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
 import { connectWallet, getFinancingManagerContract, stablecoinAddresses } from '../../utils/web3';
 import api from '../../utils/api';
 import { toast } from 'sonner';
@@ -35,7 +34,6 @@ const BridgeFinancingModal = ({ isOpen, onClose, invoiceId, invoiceAmount }) => 
             // Connect wallet
             const { signer, address } = await connectWallet();
 
-            // Request financing via backend
             const response = await api.post('/financing/request', {
                 invoiceId,
                 amount: parseUnits(borrowAmount, 6).toString(), // Assuming 6 decimals for stablecoins

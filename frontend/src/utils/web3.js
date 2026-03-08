@@ -229,15 +229,13 @@ export async function disconnectWallet() {
 // Contract helper functions
 export async function getEscrowContract() {
   const { signer } = await connectWallet();
-  // Support both V2 and legacy V1 addresses
-  const escrowAddress = contractAddresses.EscrowContractV2 || contractAddresses.EscrowContract;
+  const escrowAddress = contractAddresses.EscrowContract;
   return new Contract(escrowAddress, EscrowContractArtifact.abi, signer);
 }
 
 export async function getFinancingManagerContract() {
   const { signer } = await connectWallet();
-  // Support both V2 and legacy V1 addresses
-  const financingAddress = contractAddresses.FinancingManagerV2 || contractAddresses.FinancingManager;
+  const financingAddress = contractAddresses.FinancingManager;
   return new Contract(financingAddress, FinancingManagerArtifact.abi, signer);
 }
 
