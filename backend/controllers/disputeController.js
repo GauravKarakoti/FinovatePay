@@ -2,6 +2,7 @@ const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 const { getSigner, getEscrowContract } = require('../config/blockchain');
 const errorResponse = require('../utils/errorResponse');
+const logger = require('../utils/logger')('disputeController');
 
 // Helper function to create a log entry
 const createLog = async (client, invoiceId, action, performedBy, notes) => {
@@ -168,14 +169,14 @@ exports.resolveDispute = async (req, res) => {
 
         const bytes32InvoiceId = uuidToBytes32(invoiceId);
 
-        console.log(`Resolving on-chain: Invoice ${invoiceId} -> ${sellerWins ? 'Seller Wins' : 'Buyer Wins'}`);
+        logger.info(`Resolving on-chain: Invoice ${invoiceId} -> ${sellerWins ? 'Seller Wins' : 'Buyer Wins'}`);
         
         // Admin acts as the Arbitrator here
         const tx = await escrowContract.voteOnDispute(bytes32InvoiceId, sellerWins);
-        console.log(`Transaction sent: ${tx.hash}`);
+        logger.info(`Transaction sent: ${tx.hash}`);
         
         await tx.wait();
-        console.log('Transaction confirmed on-chain');
+        logger.info('Transaction confirmed on-chain');
 
     } catch (bcError) {
         console.error('Blockchain interaction failed:', bcError);

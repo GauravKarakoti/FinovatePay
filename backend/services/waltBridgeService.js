@@ -2,8 +2,10 @@
 // In production, this would sign a transaction or call a relay API
 // e.g. bridge.send({ toChain: KATANA_CHAIN, amount, receiver })
 
+const logger = require('../utils/logger')('waltBridgeService');
+
 async function bridgeFunds(amount, receiver) {
-    console.log(`[WaltBridge Service] Initiating bridge transfer of ${amount} to ${receiver}...`);
+    logger.info(`[WaltBridge Service] Initiating bridge transfer of ${amount} to ${receiver}...`);
 
     if (!receiver || !amount) {
         throw new Error("Invalid parameters: receiver and amount are required");
@@ -24,7 +26,7 @@ async function bridgeFunds(amount, receiver) {
         timestamp: new Date().toISOString()
     };
 
-    console.log(`[WaltBridge Service] Bridge successful! Tx Hash: ${receipt.txHash}`);
+    logger.info(`[WaltBridge Service] Bridge successful! Tx Hash: ${receipt.txHash}`);
     return receipt;
 }
 

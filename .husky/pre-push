@@ -1,0 +1,6 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Pre-push linting is handled via pre-commit hook with lint-staged
+# This ensures faster pushes while maintaining code quality standards
+exit 0

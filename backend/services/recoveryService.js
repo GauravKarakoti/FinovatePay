@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const logger = require('../utils/logger')('recoveryService');
 
 /**
  * Create a new transaction state
@@ -26,7 +27,7 @@ const createTransactionState = async (data) => {
         [correlationId, operationType, entityType, entityId, JSON.stringify(stepsRemaining), JSON.stringify(contextData), initiatedBy]
     );
 
-    console.log(`✅ Created transaction state: ${correlationId} (${operationType})`);
+    logger.info(`Created transaction state: ${correlationId} (${operationType})`);
     return correlationId;
 };
 
@@ -66,7 +67,7 @@ const updateTransactionState = async (correlationId, newState, updates = {}) => 
     const query = `UPDATE transaction_states SET ${setClauses.join(', ')} WHERE correlation_id = $1`;
     await pool.query(query, values);
 
-    console.log(`📝 Updated transaction state: ${correlationId} → ${newState}`);
+    logger.info(`Updated transaction state: ${correlationId} -> ${newState}`);
 };
 
 /**
@@ -103,7 +104,7 @@ const addToRecoveryQueue = async (correlationId, operationData, retryCount = 0, 
         ]
     );
 
-    console.log(`🔄 Added to recovery queue: ${correlationId} (retry ${retryCount}, next: ${backoffMinutes}min)`);
+    logger.info(`Added to recovery queue: ${correlationId} (retry ${retryCount}, next: ${backoffMinutes}min)`);
     return result.rows[0].id;
 };
 
@@ -142,7 +143,7 @@ const moveToDLQ = async (correlationId, operationData, failureReason, retryCount
         [correlationId]
     );
 
-    console.log(`💀 Moved to DLQ: ${correlationId} (${failureReason})`);
+    logger.warn(`Moved to DLQ: ${correlationId} (${failureReason})`);
 };
 
 /**
@@ -163,7 +164,7 @@ const processRecoveryQueue = async () => {
         );
 
         const operations = result.rows;
-        console.log(`🔄 Processing ${operations.length} operations from recovery queue`);
+        logger.info(`Processing ${operations.length} operations from recovery queue`);
 
         for (const op of operations) {
             try {
@@ -194,7 +195,7 @@ const processRecoveryQueue = async () => {
                         [op.id]
                     );
 
-                    console.log(`✅ Recovered: ${op.correlation_id}`);
+                    logger.info(`Recovered: ${op.correlation_id}`);
                 } else {
                     throw new Error('Operation execution failed');
                 }

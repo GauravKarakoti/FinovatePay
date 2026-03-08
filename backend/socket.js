@@ -11,5 +11,10 @@ module.exports = {
   // Emit to the general marketplace
   emitToMarketplace: (io, event, data) => {
     io.to('marketplace').emit(event, data);
+  },
+
+  // Emit to a specific auction room
+  emitToAuction: (io, auctionId, event, data) => {
+    io.to(`auction-${auctionId}`).emit(event, data);
   }
 };

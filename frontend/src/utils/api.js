@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { checkOnlineStatus } from './network';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL;
-console.log("API Base URL:", API_BASE_URL);
+console.log('API Base URL:', API_BASE_URL);
 
 // Navigation utility for programmatic navigation outside React components
 let navigateFunction = null;
@@ -14,15 +14,16 @@ export const setNavigateFunction = (navigate) => {
 
 // Create axios instance with default config
 // withCredentials: true ensures cookies are sent with requests
+// API v1 base URL
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/v1`,
   withCredentials: true,
 });
 
 // Raw axios instance without interceptors for logout requests
 // This prevents recursive 401 loops when logout endpoint also returns 401
 const rawAxios = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/v1`,
   withCredentials: true,
 });
 
@@ -42,14 +43,30 @@ api.interceptors.request.use(
 // Handle API errors with comprehensive error handling
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Check for API version headers
+    const apiVersion = response.headers['x-api-version'];
+    const latestVersion = response.headers['x-api-latest-version'];
+    const deprecation = response.headers['deprecation'];
+    
+    if (deprecation && process.env.NODE_ENV === 'development') {
+      console.warn(`[API] Deprecation warning: This API version is deprecated. Latest version: ${latestVersion}`);
+    }
+    
+    // Check for deprecation warning in response body
+    if (response.data?.deprecationWarning) {
+      console.warn(`[API] Deprecation Warning: ${response.data.deprecationWarning}`);
+    }
+    
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
-    
+
     // Handle network errors (no response from server)
     if (!error.response) {
       console.error('Network error: No response from server', error);
-      
+
       // Check if it's a timeout error
       if (error.code === 'ECONNABORTED') {
         console.error('Request timeout');
@@ -58,10 +75,10 @@ api.interceptors.response.use(
         return Promise.reject({
           ...error,
           message,
-          isTimeout: true
+          isTimeout: true,
         });
       }
-      
+
       // Check if user is offline using robust connectivity detection
       const isOnline = await checkOnlineStatus();
       if (!isOnline) {
@@ -71,35 +88,36 @@ api.interceptors.response.use(
         return Promise.reject({
           ...error,
           message,
-          isOffline: true
+          isOffline: true,
         });
       }
-      
+
       const message = 'Network error. Please check your connection and try again.';
       toast.error(message);
       return Promise.reject({
         ...error,
         message,
-        isNetworkError: true
+        isNetworkError: true,
       });
     }
-    
+
     const status = error.response.status;
     const errorData = error.response.data;
     let message = '';
-    
+
     // Handle specific HTTP status codes
     switch (status) {
       case 400:
         console.error('Bad request:', errorData);
-        message = errorData?.message || errorData?.error || 'Invalid request. Please check your input.';
+        message =
+          errorData?.message || errorData?.error || 'Invalid request. Please check your input.';
         toast.error(message);
         return Promise.reject({
           ...error,
           message,
-          isValidationError: true
+          isValidationError: true,
         });
-        
+
       case 401:
         // Call backend logout to clear HttpOnly cookie using raw axios (without interceptor)
         // to prevent recursive 401 loops if logout endpoint also returns 401
@@ -109,9 +127,12 @@ api.interceptors.response.use(
           console.error('Logout request failed:', logoutError);
         }
         
+        // Clear all authentication tokens and user data from localStorage
+        localStorage.removeItem('token');
+
         // Clear user data from localStorage
         localStorage.removeItem('user');
-        
+
         // Use React Router navigation if available, fallback to hard redirect
         if (navigateFunction) {
           navigateFunction('/login', { replace: true });
@@ -123,20 +144,22 @@ api.interceptors.response.use(
         return Promise.reject({
           ...error,
           message,
-          isAuthError: true
+          isAuthError: true,
         });
 
-        
       case 403:
         console.error('Forbidden:', errorData);
-        message = errorData?.message || errorData?.error || 'You do not have permission to perform this action.';
+        message =
+          errorData?.message ||
+          errorData?.error ||
+          'You do not have permission to perform this action.';
         toast.error(message);
         return Promise.reject({
           ...error,
           message,
-          isForbidden: true
+          isForbidden: true,
         });
-        
+
       case 404:
         console.error('Not found:', errorData);
         message = errorData?.message || errorData?.error || 'The requested resource was not found.';
@@ -144,80 +167,85 @@ api.interceptors.response.use(
         return Promise.reject({
           ...error,
           message,
-          isNotFound: true
+          isNotFound: true,
         });
-        
+
       case 409:
         console.error('Conflict:', errorData);
-        message = errorData?.message || errorData?.error || 'A conflict occurred. The resource may already exist.';
+        message =
+          errorData?.message ||
+          errorData?.error ||
+          'A conflict occurred. The resource may already exist.';
         toast.error(message);
         return Promise.reject({
           ...error,
           message,
-          isConflict: true
+          isConflict: true,
         });
-        
+
       case 422:
         console.error('Validation error:', errorData);
-        message = errorData?.message || errorData?.error || 'Validation failed. Please check your input.';
+        message =
+          errorData?.message || errorData?.error || 'Validation failed. Please check your input.';
         toast.error(message);
         return Promise.reject({
           ...error,
           message,
           isValidationError: true,
-          validationErrors: errorData?.errors
+          validationErrors: errorData?.errors,
         });
-        
+
       case 429:
         console.error('Rate limited:', errorData);
-        message = errorData?.message || errorData?.error || 'Too many requests. Please try again later.';
+        message =
+          errorData?.message || errorData?.error || 'Too many requests. Please try again later.';
         toast.error(message);
         return Promise.reject({
           ...error,
           message,
-          isRateLimited: true
+          isRateLimited: true,
         });
-        
+
       case 500:
       case 502:
       case 503:
       case 504:
         console.error('Server error:', status, errorData);
-        
+
         // Retry logic for transient server errors (only for GET requests and not already retried)
         if (originalRequest.method === 'get' && !originalRequest._retry) {
           originalRequest._retry = true;
           console.log(`Retrying request after ${status} error...`);
-          
+
           // Wait 1 second before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
           return api(originalRequest);
         }
-        
+
         message = errorData?.message || errorData?.error || 'Server error. Please try again later.';
         toast.error(message);
         return Promise.reject({
           ...error,
           message,
-          isServerError: true
+          isServerError: true,
         });
-        
+
       default:
         console.error(`HTTP ${status} error:`, errorData);
-        message = errorData?.message || errorData?.error || `An error occurred (HTTP ${status}). Please try again.`;
+        message =
+          errorData?.message ||
+          errorData?.error ||
+          `An error occurred (HTTP ${status}). Please try again.`;
         toast.error(message);
         return Promise.reject({
           ...error,
           message,
-          status
+          status,
         });
     }
   }
 );
-
-
-
 
 // --- Fixed Functions (Now using 'api' instance) ---
 
@@ -239,13 +267,36 @@ export const register = (userData) => {
   return api.post('/auth/register', userData);
 };
 
-export const logout = () => {
-  return api.post('/auth/logout');
+export const logout = async () => {
+  try {
+    // Call logout endpoint to clear server-side sessions/cookies
+    await api.post('/auth/logout');
+  } catch (error) {
+    // Continue with local cleanup even if server logout fails
+    console.error('Server logout failed:', error);
+  } finally {
+    // Always clear ALL authentication data from localStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    
+    console.log('[AUTH] User logged out - all tokens cleared from localStorage');
+  }
 };
 
 export const updateCurrentUserRole = (role) => {
-
   return api.put('/auth/role', { role });
+};
+
+export const forgotPassword = (email) => {
+  return api.post('/auth/forgot-password', { email });
+};
+
+export const resetPassword = (token, newPassword) => {
+  return api.post('/auth/reset-password', { token, newPassword });
+};
+
+export const changePassword = (currentPassword, newPassword) => {
+  return api.put('/auth/change-password', { currentPassword, newPassword });
 };
 
 // --- Invoice API ---
@@ -275,7 +326,7 @@ export const getProduceLot = (lotId) => {
 };
 
 export const createFiatRampLink = (data) => {
-  return api.post('/fiat-ramp/create-link', data); 
+  return api.post('/fiat-ramp/create-link', data);
 };
 
 export const transferProduce = (transferData) => {
@@ -298,28 +349,28 @@ export const createQuotation = (quotationData) => {
 };
 
 export const getQuotations = () => {
-    return api.get('/quotations');
+  return api.get('/quotations');
 };
 
 export const getPendingBuyerApprovals = () => {
-    return api.get('/quotations/pending-for-buyer');
+  return api.get('/quotations/pending-for-buyer');
 };
 
 export const sellerApproveQuotation = (quotationId) => {
-    return api.post(`/quotations/${quotationId}/seller-approve`);
+  return api.post(`/quotations/${quotationId}/seller-approve`);
 };
 
 export const buyerApproveQuotation = (quotationId) => {
-    return api.post(`/quotations/${quotationId}/buyer-approve`);
+  return api.post(`/quotations/${quotationId}/buyer-approve`);
 };
 
 export const rejectQuotation = (quotationId) => {
-    return api.post(`/quotations/${quotationId}/reject`);
+  return api.post(`/quotations/${quotationId}/reject`);
 };
 
 // --- Market API ---
 export const getMarketPrices = (crop, state) => {
-    return api.get('/market/prices', { params: { crop, state } });
+  return api.get('/market/prices', { params: { crop, state } });
 };
 
 export const getSellerLots = () => {
@@ -334,7 +385,6 @@ export const getProduceTransactions = (lotId) => {
 export const depositToEscrow = (invoiceId, amount, sellerAddress) => {
   return api.post('/payments/escrow/deposit', { invoiceId, amount, sellerAddress });
 };
-
 
 export const confirmRelease = (invoiceId) => {
   return api.post('/payments/escrow/release', { invoiceId });
@@ -359,6 +409,43 @@ export const getMultiSigApprovals = (invoiceId) => {
 // Get full escrow status including multi-sig details
 export const getEscrowStatus = (invoiceId) => {
   return api.get(`/escrow/${invoiceId}/status`);
+};
+
+// Create a multi-party escrow for an invoice
+export const createMultiPartyEscrow = (invoiceId, durationSeconds) => {
+  return api.post('/escrow/multi-party', { invoiceId, durationSeconds });
+};
+
+// --- High-Value Transaction Multi-Sig API ---
+
+// Check if a transaction requires multi-sig
+export const checkHighValueRequired = (invoiceId) => {
+  return api.get(`/multi-sig/check-require/${invoiceId}`);
+};
+
+// Get high-value transaction status
+export const getHighValueStatus = (invoiceId) => {
+  return api.get(`/multi-sig/status/${invoiceId}`);
+};
+
+// Add approval for high-value transaction
+export const approveHighValue = (invoiceId) => {
+  return api.post(`/multi-sig/approve/${invoiceId}`);
+};
+
+// Get all high-value transactions
+export const getHighValueTransactions = (status) => {
+  return api.get('/multi-sig/transactions', { params: { status } });
+};
+
+// Get multi-sig configuration
+export const getMultiSigConfig = () => {
+  return api.get('/multi-sig/config');
+};
+
+// Update multi-sig configuration (admin)
+export const updateMultiSigConfig = (key, value) => {
+  return api.put('/multi-sig/config', { key, value });
 };
 
 // --- KYC API ---
@@ -396,9 +483,8 @@ export const updateUserRole = (userId, role) => {
 };
 
 export const updateInvoiceStatus = (invoiceId, status, txHash, disputeReason = '') => {
-    return api.post(`/invoices/${invoiceId}/status`, { status, txHash, disputeReason });
+  return api.post(`/invoices/${invoiceId}/status`, { status, txHash, disputeReason });
 };
-
 
 export const resolveDispute = async (invoiceId, sellerWins) => {
   const response = await api.post('/admin/resolve-dispute', { invoiceId, sellerWins });
@@ -589,6 +675,92 @@ export const getInsuranceStats = () => {
 // Get all pending claims (admin only)
 export const getPendingClaims = () => {
   return api.get('/insurance/claims');
+};
+
+// --- Governance API ---
+
+// Get all proposals
+export const getProposals = (params) => {
+  return api.get('/governance/proposals', { params });
+};
+
+// Get a specific proposal
+export const getProposal = (proposalId) => {
+  return api.get(`/governance/proposals/${proposalId}`);
+};
+
+// Create a new proposal
+export const createProposal = (proposalData) => {
+  return api.post('/governance/proposals', proposalData);
+};
+
+// Cast a vote on a proposal
+export const castVote = (voteData) => {
+  return api.post('/governance/vote', voteData);
+};
+
+// Get governance parameters
+export const getGovernanceParameters = () => {
+  return api.get('/governance/parameters');
+};
+
+// Update a governance parameter (admin)
+export const updateGovernanceParameter = (name, value) => {
+  return api.put(`/governance/parameters/${name}`, { value });
+};
+
+// Get voting power for a wallet
+export const getVotingPower = (wallet) => {
+  return api.get(`/governance/voting-power/${wallet}`);
+};
+
+// Get delegation info
+export const getDelegation = (wallet) => {
+  return api.get(`/governance/delegation/${wallet}`);
+};
+
+// Get governance statistics
+export const getGovernanceStats = () => {
+  return api.get('/governance/stats');
+};
+
+// Execute a parameter change
+export const executeParameterChange = (parameterName) => {
+  return api.post('/governance/execute', { parameterName });
+};
+
+// --- Treasury API ---
+export const getTreasuryBalance = (token) => {
+  return api.get('/treasury/balance', { params: { token } });
+};
+
+export const withdrawFromTreasury = (token, to, amount) => {
+  return api.post('/treasury/withdraw', { token, to, amount });
+};
+
+export const getTreasuryTransactions = (params) => {
+  return api.get('/treasury/transactions', { params });
+};
+
+export const getTreasuryReports = (params) => {
+  return api.get('/treasury/reports', { params });
+};
+
+// --- Staking API ---
+export const stakeTokens = ({ tokenAddress, tokenId, amount, lockDurationSeconds, apyBP }) => {
+  return api.post('/staking/stake', { tokenAddress, tokenId, amount, lockDurationSeconds, apyBP });
+};
+
+export const unstakeTokens = (stakeId) => {
+  return api.post('/staking/unstake', { stakeId });
+};
+
+export const getStakingRewards = () => {
+  return api.get('/staking/rewards');
+};
+
+export const claimStakingRewards = (stakeId) => {
+  return api.post('/staking/rewards/claim', { stakeId });
 };
 
 export default api;
