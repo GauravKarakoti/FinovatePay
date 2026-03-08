@@ -495,7 +495,7 @@ async function _executeAsync(executionId, route, userAddress) {
     // Amount in smallest unit (USDC = 6 decimals)
     const amountBn = BigInt(Math.floor(route.inputAmount * 1e6));
     const result = await bridgeService.bridgeToKatana(
-      userAddress,   // used as a placeholder tokenId reference for ERC1155 bridge
+      route.fromToken,   // collateral tokenId for ERC1155 bridge   // used as a placeholder tokenId reference for ERC1155 bridge
       amountBn,
       userAddress,
     );
@@ -510,7 +510,7 @@ async function _executeAsync(executionId, route, userAddress) {
     const result = await bridgeService.borrowFromKatana(
       route.fromToken,
       amountBn,
-      userAddress,
+      route.collateralTokenId,
     );
     completeStep(stepIdx, result.txHash);
   }

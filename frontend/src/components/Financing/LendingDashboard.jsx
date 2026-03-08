@@ -58,8 +58,8 @@ const LendingDashboard = ({ userRole }) => {
 
         try {
             setSubmitting(true);
-            const amountWei = ethers.parseEther(borrowAmount).toString();
-            const collateralWei = ethers.parseEther(collateralValue).toString();
+            const amountWei = ethers.parseUnits(borrowAmount, 6).toString();
+            const collateralWei = ethers.parseUnits(collateralValue, 6).toString();
             
             const res = await fetch('/api/v1/lending/loans', {
                 method: 'POST',

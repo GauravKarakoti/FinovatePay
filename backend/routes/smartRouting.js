@@ -24,7 +24,7 @@ function validate(req, res) {
  * GET /api/v1/smart-routing/protocols
  *
  * Returns the list of supported protocols, chains, and bridge route metadata.
- * No authentication required — used during page load.
+ Authentication: Protected by authenticateToken middleware (requires a valid token).
  */
 router.get('/protocols', authenticateToken, (_req, res) => {
   const data = smartRoutingService.getSupportedProtocols();
