@@ -809,4 +809,67 @@ export const claimStakingRewards = (stakeId) => {
   return api.post('/staking/rewards/claim', { stakeId });
 };
 
+// --- Multi-Party Conditional Escrow (milestone-based) ---
+
+/**
+ * Create a new multi-party conditional escrow with milestones.
+ * @param {object} payload - { invoiceId, title, totalAmount, currency, durationSeconds, participants, milestones }
+ */
+export const createMultiPartyConditionalEscrow = (payload) =>
+  api.post('/escrow/milestones', payload);
+
+/**
+ * Publish a draft escrow to the blockchain (status: draft → active).
+ * @param {string} escrowId UUID of multi_party_escrows record
+ * @param {object} [opts] - { tokenAddress, durationSeconds }
+ */
+export const activateMultiPartyEscrow = (escrowId, opts = {}) =>
+  api.post(`/escrow/milestones/${escrowId}/activate`, opts);
+
+/**
+ * Add a participant to an existing multi-party escrow.
+ * @param {string} escrowId
+ * @param {{ walletAddress: string, role: string, userId?: string, onChain?: boolean }} participant
+ */
+export const addEscrowParticipant = (escrowId, participant) =>
+  api.post(`/escrow/milestones/${escrowId}/participants`, participant);
+
+/**
+ * Add a milestone to an existing multi-party escrow.
+ * @param {string} escrowId
+ * @param {{ title: string, description?: string, amount: number, requiredApprovals?: number, onChain?: boolean }} milestone
+ */
+export const addEscrowMilestone = (escrowId, milestone) =>
+  api.post(`/escrow/milestones/${escrowId}/milestones`, milestone);
+
+/**
+ * Approve a specific milestone.
+ * @param {string} escrowId
+ * @param {number|string} milestoneId  Primary key of escrow_milestones
+ * @param {{ txHash?: string, blockNumber?: number }} [opts]
+ */
+export const approveMilestoneOnEscrow = (escrowId, milestoneId, opts = {}) =>
+  api.post(`/escrow/milestones/${escrowId}/milestones/${milestoneId}/approve`, opts);
+
+/**
+ * Fetch full escrow details (header + participants + milestones with approvals).
+ * @param {string} escrowId
+ */
+export const getMultiPartyEscrow = (escrowId) =>
+  api.get(`/escrow/milestones/${escrowId}`);
+
+/**
+ * Fetch only the milestones and participants for an escrow.
+ * @param {string} escrowId
+ */
+export const getEscrowMilestones = (escrowId) =>
+  api.get(`/escrow/milestones/${escrowId}/milestones`);
+
+/**
+ * List all multi-party escrows created by the current user.
+ * @param {string} [status] Optional status filter
+ */
+export const listMultiPartyEscrows = (status) =>
+  api.get('/escrow/milestones', status ? { params: { status } } : undefined);
+
 export default api;
