@@ -79,23 +79,26 @@ contract InvoiceTokenStaking is Ownable {
         Stake storage s = stakes[msg.sender][stakeIndex];
         require(s.amount > 0, "Already withdrawn");
 
-        uint256 amount = s.amount;
+        uint256 stakeAmount = s.amount;
+        uint256 amount = stakeAmount;
         uint256 penalty = 0;
 
         if (block.timestamp < s.lockUntil) {
             penalty = (amount * earlyWithdrawalPenaltyBP) / 10000;
+            amount = amount - penalty;
+        }
+
+        // effects: update staking state before external calls to prevent reentrancy issues
+        totalStaked[s.tokenAddress][s.tokenId] -= stakeAmount;
+        s.amount = 0;
+
+        if (penalty > 0) {
             // send penalty to owner (treasury)
             IERC1155(s.tokenAddress).safeTransferFrom(address(this), owner(), s.tokenId, penalty, "");
-            amount = amount - penalty;
         }
 
         // transfer remaining back to user
         IERC1155(s.tokenAddress).safeTransferFrom(address(this), msg.sender, s.tokenId, amount, "");
-
-        totalStaked[s.tokenAddress][s.tokenId] -= s.amount;
-
-        s.amount = 0;
-
         emit Unstaked(msg.sender, stakeIndex, amount, penalty);
     }
 
