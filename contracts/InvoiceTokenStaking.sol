@@ -37,7 +37,7 @@ contract InvoiceTokenStaking is Ownable {
     event Unstaked(address indexed user, uint256 stakeIndex, uint256 amount, uint256 penalty);
     event RewardsClaimed(address indexed user, uint256 amount);
 
-    constructor(address _governanceToken) {
+    constructor(address _governanceToken) Ownable(msg.sender) {
         require(_governanceToken != address(0), "Invalid governance token");
         governanceToken = IERC20(_governanceToken);
     }
