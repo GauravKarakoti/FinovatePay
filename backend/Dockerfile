@@ -19,5 +19,11 @@ WORKDIR /app
 # Copy everything from the builder stage
 COPY --from=builder /app ./
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))" || exit 1
+
 EXPOSE 3000
-CMD ["npm", "start"]
+
+# Run database migrations before starting the application
+CMD ["sh", "-c", "npm run migrate:db && npm start"]

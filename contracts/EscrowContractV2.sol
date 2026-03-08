@@ -102,9 +102,6 @@ contract EscrowContractV2 is
     mapping(bytes32 => mapping(address => bool)) public hasMultiSigApproved;
     mapping(bytes32 => bool) public requiresMultiSig;
     mapping(bytes32 => bool) public highValueTxReleased;
-    // Role-based approval stages per escrow
-    mapping(bytes32 => ApprovalStage[]) public approvalStages;
-    mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public hasStageApproved;
 
     address public governanceManager;
     bool public governanceEnabled = false;
@@ -139,6 +136,10 @@ contract EscrowContractV2 is
     // Version tracking for upgrades
     uint256 public version;
     string public constant VERSION_NAME = "EscrowContractV2";
+
+    // Appended storage: role-based staged approvals per escrow (keep append-only for proxy safety)
+    mapping(bytes32 => ApprovalStage[]) public approvalStages;
+    mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public hasStageApproved;
 
     // Events
     event MultiSigThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
@@ -426,13 +427,11 @@ contract EscrowContractV2 is
         require(escrow.amount > 0, "Escrow already finalized");
         require(block.timestamp > escrow.expiresAt, "Escrow not expired yet");
 
-        uint256 refundAmount = escrow.amount;
-        escrow.amount = 0;
+        // Update status before external call (CEI pattern)
         escrow.status = EscrowStatus.Expired;
 
         // Refund buyer
-        _payout(escrow.buyer, escrow.token, refundAmount);
-
+        _payout(escrow.buyer, escrow.token, escrow.amount);
         emit EscrowAutoCancelled(_invoiceId);
         emit EscrowReleased(_invoiceId, 0);
 

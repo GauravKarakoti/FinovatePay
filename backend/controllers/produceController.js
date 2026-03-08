@@ -124,14 +124,32 @@ exports.getProduceLot = async (req, res) => {
 
 exports.getSellerLots = async (req, res) => {
   try {
+    const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
     const seller_address = req.user.wallet_address;
+    const { limit, offset } = getPaginationParams(req.query);
+    
+    // Count total seller lots
+    const countQuery = `
+      SELECT COUNT(*) as total FROM produce_lots 
+      WHERE farmer_address = $1 AND current_quantity > 0
+    `;
+    const countResult = await pool.query(countQuery, [seller_address]);
+    const total = parseInt(countResult.rows[0]?.total || 0);
+    
+    // Get paginated lots
     const query = `
       SELECT * FROM produce_lots 
       WHERE farmer_address = $1 AND current_quantity > 0
       ORDER BY created_at DESC
+      LIMIT $2 OFFSET $3
     `;
-    const result = await pool.query(query, [seller_address]);
-    res.json(result.rows);
+    const result = await pool.query(query, [seller_address, limit, offset]);
+    
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: getPaginationMetadata(limit, offset, total)
+    });
   } catch (error) {
     console.error('Error fetching seller lots:', error);
     return errorResponse(res, 'Failed to fetch seller lots.', 500);

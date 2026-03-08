@@ -1,5 +1,6 @@
 const { ethers, artifacts } = require("hardhat");
 const fs = require("fs");
+const path = require("path");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -7,7 +8,16 @@ async function main() {
   console.log("Deploying contracts with gasless transaction support and UUPS Upgradeable Proxies...");
   console.log("Deploying with account:", deployer.address);
 
-  // 1. Deploy MinimalForwarder first
+  // 0. Deploy FinovateToken (Governance Token)
+  console.log("\n0. Deploying FinovateToken (Governance Token)...");
+  const treasuryAddress = deployer.address; // Using deployer as initial treasury
+  const FinovateToken = await ethers.getContractFactory("FinovateToken");
+  const finovateToken = await FinovateToken.deploy(treasuryAddress);
+  await finovateToken.waitForDeployment();
+  const governanceTokenAddress = finovateToken.target;
+  console.log("FinovateToken deployed to:", governanceTokenAddress);
+
+  // 1. Deploy MinimalForwarder
   console.log("\n1. Deploying MinimalForwarder...");
   const MinimalForwarder = await ethers.getContractFactory("MinimalForwarder");
   const minimalForwarder = await MinimalForwarder.deploy();
@@ -23,9 +33,9 @@ async function main() {
 
   // 3. Verify the deployer's address immediately after deployment
   console.log(`\n3. Verifying KYC for deployer account: ${deployer.address}...`);
-  const tx = await complianceManager.verifyKYC(deployer.address);
-  await tx.wait();
-  console.log(`Deployer account KYC verified. Transaction hash: ${tx.hash}`);
+  const kycTx = await complianceManager.verifyKYC(deployer.address);
+  await kycTx.wait();
+  console.log(`Deployer account KYC verified. Transaction hash: ${kycTx.hash}`);
 
   // 4. Mint Identity SBT
   console.log(`\n4. Minting Identity SBT for deployer: ${deployer.address}...`);
@@ -51,21 +61,16 @@ async function main() {
   await escrowContractV2Implementation.waitForDeployment();
   console.log("EscrowContractV2 Implementation deployed to:", escrowContractV2Implementation.target);
 
+  // 7. Deploy EscrowContractV2 Proxy
   console.log("\n7. Deploying EscrowContractV2 Proxy...");
   const ERC1967Proxy = await ethers.getContractFactory("@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy");
-  
-  // Encode the initialize function call for EscrowContractV2
   const escrowV2InitData = EscrowContractV2.interface.encodeFunctionData("initialize", [
-    minimalForwarder.target,  // trustedForwarder
-    complianceManager.target, // complianceManager
-    arbitratorsRegistry.target, // arbitratorsRegistry
-    deployer.address // initialAdmin
+    minimalForwarder.target,
+    complianceManager.target,
+    arbitratorsRegistry.target,
+    deployer.address
   ]);
-
-  const escrowProxy = await ERC1967Proxy.deploy(
-    escrowContractV2Implementation.target,
-    escrowV2InitData
-  );
+  const escrowProxy = await ERC1967Proxy.deploy(escrowContractV2Implementation.target, escrowV2InitData);
   await escrowProxy.waitForDeployment();
   console.log("EscrowContractV2 Proxy deployed to:", escrowProxy.target);
 
@@ -76,145 +81,120 @@ async function main() {
   await invoiceFactory.waitForDeployment();
   console.log("InvoiceFactory deployed to:", invoiceFactory.target);
 
+  // 9. Deploy Staking (Using the newly deployed FinovateToken)
+  console.log("\n9. Deploying InvoiceTokenStaking...");
+  const Staking = await ethers.getContractFactory("InvoiceTokenStaking");
+  const staking = await Staking.deploy(governanceTokenAddress);
+  await staking.waitForDeployment();
+  const stakingAddress = staking.target;
+  console.log("InvoiceTokenStaking deployed to:", stakingAddress);
+
+  // 10. Deploy FractionToken
   const stablecoinAddress = "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"; // Polygon USDC
   const feeWalletAddress = "0xeb4f0cb1644fa1f6dd01aa2f7c49099d2267f3a8";
   const stablecoinDecimals = 6;
 
-  // 9. Deploy FractionToken
-  console.log("\n9. Deploying FractionToken...");
+  console.log("\n10. Deploying FractionToken...");
   const FractionToken = await ethers.getContractFactory("FractionToken");
-  const fractionToken = await FractionToken.deploy(stablecoinAddress);
+  const fractionToken = await FractionToken.deploy(USDC_ADDRESS);
   await fractionToken.waitForDeployment();
   console.log("FractionToken deployed to:", fractionToken.target);
 
-  const fractionTokenAddress = fractionToken.target;
+  console.log("🔗 Setting up EscrowContract authorization...");
+  const tx = await fractionToken.setEscrowContract(escrowContractV2Implementation.target);
+  await tx.wait();
+  console.log("✅ EscrowContract authorized:", escrowContractV2Implementation.target);
+  console.log("- Payment Token:", await fractionToken.paymentToken());
+  console.log("- Owner:", await fractionToken.owner());
 
-  // 10. Deploy FinancingManagerV2 Implementation
-  console.log("\n10. Deploying FinancingManagerV2 Implementation...");
+  // 11. Deploy FinancingManagerV2
+  console.log("\n11. Deploying FinancingManagerV2 Implementation...");
   const FinancingManagerV2 = await ethers.getContractFactory("FinancingManagerV2");
   const financingManagerV2Implementation = await FinancingManagerV2.deploy();
   await financingManagerV2Implementation.waitForDeployment();
-  console.log("FinancingManagerV2 Implementation deployed to:", financingManagerV2Implementation.target);
 
-  console.log("\n11. Deploying FinancingManagerV2 Proxy...");
-  
-  // Encode the initialize function call for FinancingManagerV2
+  console.log("12. Deploying FinancingManagerV2 Proxy...");
   const financingV2InitData = FinancingManagerV2.interface.encodeFunctionData("initialize", [
-    fractionTokenAddress, // fractionToken
-    stablecoinAddress, // stablecoin
-    feeWalletAddress, // feeWallet
-    stablecoinDecimals, // stablecoinDecimals
-    deployer.address // initialOwner
+    fractionToken.target,
+    stablecoinAddress,
+    feeWalletAddress,
+    stablecoinDecimals,
+    deployer.address
   ]);
-
-  const financingProxy = await ERC1967Proxy.deploy(
-    financingManagerV2Implementation.target,
-    financingV2InitData
-  );
+  const financingProxy = await ERC1967Proxy.deploy(financingManagerV2Implementation.target, financingV2InitData);
   await financingProxy.waitForDeployment();
   console.log("FinancingManagerV2 Proxy deployed to:", financingProxy.target);
 
-  console.log(`\n12. Approving FractionToken to manage deployer's tokens...`);
+  // 13. Logic: Approve FractionToken
   const approvalTx = await fractionToken.setApprovalForAll(financingProxy.target, true);
   await approvalTx.wait();
-  console.log(`FractionToken approval set. Transaction hash: ${approvalTx.hash}`);
+  console.log(`\n13. FractionToken approval set for FinancingManager.`);
 
-  // 13. Deploy ProduceTracking
-  console.log("\n13. Deploying ProduceTracking...");
+  // 14. Deploy Supplementary Adapters
+  console.log("\n14. Deploying ProduceTracking...");
   const ProduceTracking = await ethers.getContractFactory("ProduceTracking");
   const produceTracking = await ProduceTracking.deploy();
   await produceTracking.waitForDeployment();
-  console.log("ProduceTracking deployed to:", produceTracking.target);
 
-  // 14. Deploy BridgeAdapter
-  console.log("\n14. Deploying BridgeAdapter...");
-  const waltBridgePlaceholder = "0x0000000000000000000000000000000000000000"; // Replace with real or mock address
+  const waltBridgePlaceholder = "0x0000000000000000000000000000000000000000";
+  console.log("15. Deploying Bridge/Liquidity Adapters...");
   const BridgeAdapter = await ethers.getContractFactory("BridgeAdapter");
   const bridgeAdapter = await BridgeAdapter.deploy(waltBridgePlaceholder, complianceManager.target);
   await bridgeAdapter.waitForDeployment();
-  console.log("BridgeAdapter deployed to:", bridgeAdapter.target);
 
-  // 15. Deploy LiquidityAdapter
-  console.log("\n15. Deploying LiquidityAdapter...");
   const LiquidityAdapter = await ethers.getContractFactory("LiquidityAdapter");
   const liquidityAdapter = await LiquidityAdapter.deploy(waltBridgePlaceholder, complianceManager.target);
   await liquidityAdapter.waitForDeployment();
-  console.log("LiquidityAdapter deployed to:", liquidityAdapter.target);
 
-  // Save deployed addresses
-  const contractsDir = __dirname + "/../deployed";
+  // 16. Save Addresses and Artifacts
+  const contractsDir = path.join(__dirname, "..", "deployed");
+  if (!fs.existsSync(contractsDir)) fs.mkdirSync(contractsDir);
 
-  if (!fs.existsSync(contractsDir)) {
-    fs.mkdirSync(contractsDir);
+  const addressMap = {
+    FinovateToken: governanceTokenAddress,
+    MinimalForwarder: minimalForwarder.target,
+    ComplianceManager: complianceManager.target,
+    ArbitratorsRegistry: arbitratorsRegistry.target,
+    EscrowContractProxy: escrowProxy.target,
+    EscrowContract: escrowContractV2Implementation.target,
+    InvoiceFactory: invoiceFactory.target,
+    InvoiceTokenStaking: stakingAddress,
+    FractionToken: fractionToken.target,
+    ProduceTracking: produceTracking.target,
+    FinancingManagerProxy: financingProxy.target,
+    FinancingManager: financingManagerV2Implementation.target,
+    BridgeAdapter: bridgeAdapter.target,
+    LiquidityAdapter: liquidityAdapter.target
+  };
+
+  fs.writeFileSync(path.join(contractsDir, "contract-addresses.json"), JSON.stringify(addressMap, null, 2));
+
+  // Save ABIs
+  const contractNames = [
+    "FinovateToken", "MinimalForwarder", "ComplianceManager", 
+    "InvoiceFactory", "FractionToken", "Invoice", "ProduceTracking", 
+    "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking"
+  ];
+
+  for (const name of contractNames) {
+    try {
+      const artifact = await artifacts.readArtifact(name);
+      fs.writeFileSync(path.join(contractsDir, `${name}.json`), JSON.stringify(artifact, null, 2));
+    } catch (e) {
+      console.warn(`Could not find artifact for ${name}`);
+    }
   }
 
-  fs.writeFileSync(
-    contractsDir + "/contract-addresses.json",
-    JSON.stringify({
-      MinimalForwarder: minimalForwarder.target,
-      ComplianceManager: complianceManager.target,
-      ArbitratorsRegistry: arbitratorsRegistry.target,
-      EscrowContractProxy: escrowProxy.target,
-      EscrowContract: escrowContractV2Implementation.target,
-      InvoiceFactory: invoiceFactory.target,
-      FractionToken: fractionToken.target,
-      ProduceTracking: produceTracking.target,
-      FinancingManagerProxy: financingProxy.target,
-      FinancingManager: financingManagerV2Implementation.target,
-      BridgeAdapter: bridgeAdapter.target,
-      LiquidityAdapter: liquidityAdapter.target
-    }, undefined, 2)
-  );
+  fs.writeFileSync(contractsDir + "/EscrowContract.json", JSON.stringify(EscrowContractV2, null, 2));
+  fs.writeFileSync(contractsDir + "/FinancingManager.json", JSON.stringify(FinancingManagerV2, null, 2));
 
-  // Save contract ABIs
-  const minimalForwarderArtifact = await artifacts.readArtifact("MinimalForwarder");
-  const complianceManagerArtifact = await artifacts.readArtifact("ComplianceManager");
-  const arbitratorsRegistryArtifact = await artifacts.readArtifact("contracts/ArbitratorsRegistry.sol:ArbitratorsRegistry");
-  const escrowContractV2Artifact = await artifacts.readArtifact("EscrowContractV2");
-  const invoiceFactoryArtifact = await artifacts.readArtifact("InvoiceFactory");
-  const fractionTokenArtifact = await artifacts.readArtifact("FractionToken");
-  const invoiceArtifact = await artifacts.readArtifact("Invoice");
-  const produceTrackingArtifact = await artifacts.readArtifact("ProduceTracking");
-  const financingManagerV2Artifact = await artifacts.readArtifact("FinancingManagerV2");
-  const bridgeAdapterArtifact = await artifacts.readArtifact("BridgeAdapter");
-  const liquidityAdapterArtifact = await artifacts.readArtifact("LiquidityAdapter");
-  const erc1967ProxyArtifact = await artifacts.readArtifact("@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy");
-
-  fs.writeFileSync(contractsDir + "/MinimalForwarder.json", JSON.stringify(minimalForwarderArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/ComplianceManager.json", JSON.stringify(complianceManagerArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/ArbitratorsRegistry.json", JSON.stringify(arbitratorsRegistryArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/EscrowContract.json", JSON.stringify(escrowContractV2Artifact, null, 2));
-  fs.writeFileSync(contractsDir + "/InvoiceFactory.json", JSON.stringify(invoiceFactoryArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/FractionToken.json", JSON.stringify(fractionTokenArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/Invoice.json", JSON.stringify(invoiceArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/ProduceTracking.json", JSON.stringify(produceTrackingArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/FinancingManager.json", JSON.stringify(financingManagerV2Artifact, null, 2));
-  fs.writeFileSync(contractsDir + "/BridgeAdapter.json", JSON.stringify(bridgeAdapterArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/LiquidityAdapter.json", JSON.stringify(liquidityAdapterArtifact, null, 2));
-  fs.writeFileSync(contractsDir + "/ERC1967Proxy.json", JSON.stringify(erc1967ProxyArtifact, null, 2));
-
-  console.log("\n✅ Deployment completed with UUPS upgradeable proxies!");
-  console.log("\n📋 Summary:");
-  console.log("- MinimalForwarder:", minimalForwarder.target);
-  console.log("- ComplianceManager:", complianceManager.target);
-  console.log("- ArbitratorsRegistry:", arbitratorsRegistry.target);
-  console.log("- EscrowContractV2 Implementation:", escrowContractV2Implementation.target);
-  console.log("- EscrowContractV2 Proxy:", escrowProxy.target);
-  console.log("- InvoiceFactory:", invoiceFactory.target);
-  console.log("- FractionToken:", fractionToken.target);
-  console.log("- FinancingManagerV2 Implementation:", financingManagerV2Implementation.target);
-  console.log("- FinancingManagerV2 Proxy:", financingProxy.target);
-  console.log("- ProduceTracking:", produceTracking.target);
-  console.log("- BridgeAdapter:", bridgeAdapter.target);
-  console.log("- LiquidityAdapter:", liquidityAdapter.target);
-  console.log("\nAll artifacts saved to deployed/ directory");
-  console.log("\n⚠️  IMPORTANT: Update backend/config/blockchain.js to use the new V2 contract addresses!");
+  console.log("\n✅ Deployment completed successfully!");
+  console.log("- FinovateToken:", governanceTokenAddress);
+  console.log("- InvoiceTokenStaking:", stakingAddress);
+  console.log("\n⚠️ IMPORTANT: Update backend/config/blockchain.js to use the new V2 contract addresses!");
 }
 
-main()
-  .then(() => process.exit(0))
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
-
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
