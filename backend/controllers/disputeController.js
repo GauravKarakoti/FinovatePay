@@ -75,9 +75,9 @@ exports.uploadEvidence = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Verify invoice exists and get invoice details
+    // 1. Verify invoice exists
     const invoiceResult = await client.query(
-      'SELECT buyer_address, seller_address FROM invoices WHERE invoice_id = $1',
+      'SELECT buyer_email, seller_email, buyer_address, seller_address FROM invoices WHERE id = $1',
       [invoiceId]
     );
 
@@ -87,16 +87,28 @@ exports.uploadEvidence = async (req, res) => {
 
     const invoice = invoiceResult.rows[0];
 
-    // 2. Authorization check - verify user is buyer or seller
+    // 2. Authorization check
+    const userEmail = user.email?.toLowerCase();
     const userWallet = user.wallet_address?.toLowerCase();
+
+    const buyerEmail = invoice.buyer_email?.toLowerCase();
+    const sellerEmail = invoice.seller_email?.toLowerCase();
+
     const buyerWallet = invoice.buyer_address?.toLowerCase();
     const sellerWallet = invoice.seller_address?.toLowerCase();
 
-    if (userWallet !== buyerWallet && userWallet !== sellerWallet && user.role !== 'admin') {
+    const authorized =
+      user.role === 'admin' ||
+      userEmail === buyerEmail ||
+      userEmail === sellerEmail ||
+      userWallet === buyerWallet ||
+      userWallet === sellerWallet;
+
+    if (!authorized) {
       throw new Error('Not authorized: Only invoice parties can upload evidence');
     }
 
-    // 3. Verify dispute exists - don't auto-create
+    // 3. Verify dispute exists (do NOT auto-create)
     const disputeCheck = await client.query(
       'SELECT * FROM disputes WHERE invoice_id = $1',
       [invoiceId]
