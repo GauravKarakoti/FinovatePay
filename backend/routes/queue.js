@@ -8,7 +8,7 @@ const express = require('express');
 const router = express.Router();
 const { blockchainQueue, JOB_TYPES } = require('../queues/blockchainQueue');
 const { pool } = require('../config/database');
-const authMiddleware = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 const errorResponse = require('../utils/errorResponse');
 
 /**
@@ -16,7 +16,7 @@ const errorResponse = require('../utils/errorResponse');
  * @desc    Get queue statistics
  * @access  Private (Admin only)
  */
-router.get('/stats', authMiddleware, async (req, res) => {
+router.get('/stats', authenticateToken, async (req, res) => {
   try {
     // Check admin role
     if (req.user.role !== 'admin') {
@@ -44,7 +44,7 @@ router.get('/stats', authMiddleware, async (req, res) => {
  * @desc    Get job status by ID
  * @access  Private
  */
-router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
+router.get('/jobs/:jobId', authenticateToken, async (req, res) => {
   try {
     const { jobId } = req.params;
     const jobStatus = await blockchainQueue.getJobStatus(jobId);
@@ -65,7 +65,7 @@ router.get('/jobs/:jobId', authMiddleware, async (req, res) => {
  * @desc    List jobs with filters
  * @access  Private (Admin only)
  */
-router.get('/jobs', authMiddleware, async (req, res) => {
+router.get('/jobs', authenticateToken, async (req, res) => {
   try {
     // Check admin role
     if (req.user.role !== 'admin') {
@@ -112,7 +112,7 @@ router.get('/jobs', authMiddleware, async (req, res) => {
  * @desc    Get all active jobs
  * @access  Private (Admin only)
  */
-router.get('/active', authMiddleware, async (req, res) => {
+router.get('/active', authenticateToken, async (req, res) => {
   try {
     // Check admin role
     if (req.user.role !== 'admin') {
@@ -132,7 +132,7 @@ router.get('/active', authMiddleware, async (req, res) => {
  * @desc    Get failed jobs
  * @access  Private (Admin only)
  */
-router.get('/failed', authMiddleware, async (req, res) => {
+router.get('/failed', authenticateToken, async (req, res) => {
   try {
     // Check admin role
     if (req.user.role !== 'admin') {
@@ -152,7 +152,7 @@ router.get('/failed', authMiddleware, async (req, res) => {
  * @desc    Retry a failed job
  * @access  Private (Admin only)
  */
-router.post('/retry/:jobId', authMiddleware, async (req, res) => {
+router.post('/retry/:jobId', authenticateToken, async (req, res) => {
   try {
     // Check admin role
     if (req.user.role !== 'admin') {
@@ -196,7 +196,7 @@ router.post('/retry/:jobId', authMiddleware, async (req, res) => {
  * @desc    Create a new blockchain job manually
  * @access  Private (Admin only)
  */
-router.post('/jobs', authMiddleware, async (req, res) => {
+router.post('/jobs', authenticateToken, async (req, res) => {
   try {
     // Check admin role
     if (req.user.role !== 'admin') {
@@ -233,7 +233,7 @@ router.post('/jobs', authMiddleware, async (req, res) => {
  * @desc    Cancel a pending job
  * @access  Private (Admin only)
  */
-router.delete('/jobs/:jobId', authMiddleware, async (req, res) => {
+router.delete('/jobs/:jobId', authenticateToken, async (req, res) => {
   try {
     // Check admin role
     if (req.user.role !== 'admin') {
@@ -278,7 +278,7 @@ router.delete('/jobs/:jobId', authMiddleware, async (req, res) => {
  * @desc    Get available job types
  * @access  Private
  */
-router.get('/job-types', authMiddleware, (req, res) => {
+router.get('/job-types', authenticateToken, (req, res) => {
   res.json({
     jobTypes: Object.entries(JOB_TYPES).map(([key, value]) => ({
       key,

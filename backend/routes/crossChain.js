@@ -4,7 +4,7 @@ const crossChainService = require('../services/crossChainService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const { pool } = require('../config/database');
-const { idempotencyMiddleware, logAudit } = require('../middleware/auditLogger');
+const { logAudit } = require('../middleware/auditLogger');
 
 /**
  * GET /api/crosschain/chains

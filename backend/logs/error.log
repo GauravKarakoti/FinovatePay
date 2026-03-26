@@ -1,0 +1,16 @@
+[2026-03-26 18:17:14:820] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:17:14:828] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:17:14:829] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:22:14:441] [error] [server]: uncaughtException: Cannot read properties of undefined (reading 'entries')
+TypeError: Cannot read properties of undefined (reading 'entries')
+    at RelayerService.cleanupRateLimiter (C:\Users\Asus\Desktop\Projects\FinovatePay\backend\services\relayerService.js:29:53)
+    at Timeout._onTimeout (C:\Users\Asus\Desktop\Projects\FinovatePay\backend\services\relayerService.js:20:51)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7)
+[2026-03-26 18:23:50:152] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:23:50:160] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:23:50:161] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:25:42:086] [error] [server]: Tokenization listener failed: exceeded maximum retry limit (request={  }, response={  }, error=null, info={ "requestUrl": "https://polygon-amoy.g.alchemy.com/v2/o1lr0Pt07dct7AF2TUNsd", "responseBody": "[{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":429,\"message\":\"Monthly capacity limit exceeded. Visit https://dashboard.alchemy.com/settings/billing to upgrade your scaling policy for continued service.\"}},{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":429,\"message\":\"Monthly capacity limit exceeded. Visit https://dashboard.alchemy.com/settings/billing to upgrade your scaling policy for continued service.\"}}]", "responseStatus": "599 CLIENT ESCALATED SERVER ERROR (429 Too Many Requests; exceeded maximum retry limit)" }, code=SERVER_ERROR, version=6.15.0)
+[2026-03-26 18:30:20:031] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:30:20:039] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:30:20:040] [error] [server]: [server] Reconciliation scheduler failed:
