@@ -80,10 +80,6 @@ if (!process.env.ALLOWED_ORIGINS) {
   process.exit(1);
 }
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  .split(",")
-  .map((o) => o.trim().replace(/\/$/, ""));
-
 const corsOptions = {
   origin: (origin, callback) => {
     // Reject requests with no origin header (non-browser clients must specify origin)

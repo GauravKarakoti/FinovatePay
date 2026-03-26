@@ -17,13 +17,12 @@
     "start": "node server.js",
     "lint": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . --ext .js,.ts --fix",
-    "migrate:db": "node scripts/run-migrations.js up",
+    "migrate:db": "node scripts/migrate-db.js",
     "migrate:down": "node scripts/run-migrations.js down",
     "migrate:status": "node scripts/migration-status.js",
     "migrate:init": "node scripts/initialize-migrations.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "migrate:db": "node scripts/migrate-db.js",
     "seed:db": "node scripts/seed-db.js",
     "build": "docker build -t backend-prod -f Dockerfile .."
   },
@@ -61,14 +60,13 @@
     "winston": "^3.19.0"
   },
   "devDependencies": {
+    "node-pg-migrate": "^8.0.4",
     "@eslint/js": "^9.39.3",
     "chai": "^4.3.10",
     "eslint": "^9.39.3",
     "globals": "^17.4.0",
     "jest": "^30.2.0",
     "mocha": "^10.2.0",
-    "supertest": "^7.2.2",
-    "node-pg-migrate": "^7.11.0"
     "nodemon": "^3.1.10",
     "nyc": "^15.1.0",
     "prettier": "^3.2.5",

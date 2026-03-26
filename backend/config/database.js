@@ -71,7 +71,5 @@ testConnection();
 // --------------------------------------------------
 
 module.exports = {
-  pool,
-  getPoolStats,
-  closePool,
+  pool
 };

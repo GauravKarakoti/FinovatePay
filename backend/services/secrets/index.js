@@ -1,7 +1,6 @@
 require('dotenv').config();
 
 const EnvSecretsProvider = require('./EnvSecretsProvider');
-const VaultSecretsProvider = require('./VaultSecretsProvider');
 
 /**
  * Supported secrets provider types
