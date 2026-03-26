@@ -1,6 +1,52 @@
 const notificationService = require('../services/notificationService');
 const { pool } = require('../config/database');
 
+const getEmailStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Assuming you have this method in your notificationService
+    // Alternatively, you could use a direct pool.query here like in getHistory
+    const stats = await notificationService.getEmailStats(userId);
+
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('[NotificationController] Get email stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get email statistics'
+    });
+  }
+};
+
+/**
+ * Retry failed email notifications
+ * POST /api/notifications/retry-emails
+ */
+const retryFailedEmails = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Call the service to retry failed emails for this user
+    const result = await notificationService.retryFailedEmails(userId);
+
+    res.json({
+      success: true,
+      message: 'Successfully triggered retry for failed emails',
+      retriedCount: result.count || 0
+    });
+  } catch (error) {
+    console.error('[NotificationController] Retry failed emails error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retry failed emails'
+    });
+  }
+};
+
 /**
  * Subscribe to push notifications
  * POST /api/notifications/subscribe
@@ -279,5 +325,7 @@ module.exports = {
   updatePreferences,
   getHistory,
   unsubscribeAll,
-  sendTestNotification
+  sendTestNotification,
+  getEmailStats,
+  retryFailedEmails
 };

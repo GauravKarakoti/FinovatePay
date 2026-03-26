@@ -162,7 +162,6 @@ exports.createInvoice = async (req, res) => {
             throw new Error('Quotation has invalid buyer_address');
         }
 
-        const pricePerUnit = quotation.price_per_unit / (parseFloat(process.env.EXCHANGE_RATE) || 50.75);
         // Use env variable for exchange rate with strict validation
         const exchangeRateEnv = process.env.EXCHANGE_RATE;
         if (!exchangeRateEnv) {
