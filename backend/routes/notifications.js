@@ -1,26 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
-const { emailTestLimiter, pushTestLimiter } = require('../middleware/rateLimiter');
+const { emailTestLimiter } = require('../middleware/rateLimiter');
 const {
-  sendTestEmail,
-  getNotificationPreferences,
-  updateNotificationPreferences,
-  getEmailHistory,
-  getEmailStats,
-  unsubscribe: unsubscribeEmail,
-  retryFailedEmails
-} = require('../controllers/notificationController');
-const {
-  subscribe,
-  unsubscribe,
-  getSubscriptions,
-  getVapidKey,
+  sendTestNotification,
   getPreferences,
   updatePreferences,
   getHistory,
-  unsubscribeAll,
-  sendTestNotification
+  getEmailStats,
+  unsubscribe,
+  retryFailedEmails,
+  subscribe,
+  getSubscriptions,
+  getVapidKey,
+  unsubscribeAll
 } = require('../controllers/notificationController');
 
 // ============================================
@@ -59,16 +52,16 @@ router.post('/push-test', authenticateToken, sendTestNotification);
 // ============================================
 
 // Send test email - WITH RATE LIMITING to prevent email bombing
-router.post('/send-test', authenticateToken, emailTestLimiter, sendTestEmail);
+router.post('/send-test', authenticateToken, emailTestLimiter, sendTestNotification);
 
 // Get user's notification preferences
-router.get('/preferences', authenticateToken, getNotificationPreferences);
+router.get('/preferences', authenticateToken, getPreferences);
 
 // Update notification preferences
-router.put('/preferences', authenticateToken, updateNotificationPreferences);
+router.put('/preferences', authenticateToken, updatePreferences);
 
 // Get email sending history
-router.get('/history', authenticateToken, getEmailHistory);
+router.get('/history', authenticateToken, getHistory);
 
 // Get email statistics
 router.get('/stats', authenticateToken, getEmailStats);
@@ -81,6 +74,6 @@ router.post('/retry-failed', authenticateToken, emailTestLimiter, retryFailedEma
 // ============================================
 
 // Unsubscribe from emails
-router.post('/unsubscribe/:token', unsubscribeEmail);
+router.post('/unsubscribe/:token', unsubscribe);
 
 module.exports = router;

@@ -6,7 +6,6 @@ const http = require("http");
 const path = require("path");
 const socketIo = require("socket.io");
 const logger = require("./utils/logger")("server");
-const crypto = require("crypto");
 require("dotenv").config();
 
 /* ---------------- GLOBAL ERROR HANDLERS ---------------- */
@@ -19,9 +18,6 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection:', reason);
 });
-
-// Initialize secrets provider early
-const { getSecretsProvider } = require("./services/secrets");
 
 // Import API versioning middleware
 const { apiVersionMiddleware, deprecationMiddleware } = require("./middleware/apiVersion");
@@ -143,11 +139,16 @@ app.use('/api', deprecationMiddleware);
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-/* ---------------- API ROUTES (v1) ---------------- */
-
+console.log("Loading health routes...");
 app.use("/api/v1/health", require("./routes/health"));
+
+console.log("Loading auth routes...");
 app.use("/api/v1/auth", authLimiter, require("./routes/auth"));
+
+console.log("Loading invoice routes...");
 app.use("/api/v1/invoices", require("./routes/invoice"));
+
+console.log("Loading payment routes...");
 app.use("/api/v1/payments", paymentLimiter, require("./routes/payment"));
 
 /* ---------------- ESCROW ---------------- */
@@ -253,8 +254,7 @@ app.use("/api/v1/fiat-ramp", require("./routes/fiatRamp"));
 
 app.use("/api/v1/smart-routing", require("./routes/smartRouting"));
 
-/* ---------------- SOCKET AUTH ---------------- */
-
+console.log("Is socketAuthMiddleware defined?:", typeof socketAuthMiddleware);
 io.use(socketAuthMiddleware);
 
 io.on("connection", (socket) => {
