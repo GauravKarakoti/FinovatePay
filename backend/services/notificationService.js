@@ -4,9 +4,9 @@ const { pool } = require('../config/database');
 // VAPID keys - should be generated once and stored in environment variables
 // Generate using: webpush.generateVAPIDKeys()
 const vapidKeys = {
-  publicKey: process.env.VAPID_PUBLIC_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U',
-  privateKey: process.env.VAPID_PRIVATE_KEY || 'UUxI4O8-FbRouAf7-7OTt9GH4o-5VnPVLXtZdCKJws',
-  subject: process.env.VAPID_SUBJECT || 'mailto:admin@finovatepay.com'
+  publicKey: process.env.VAPID_PUBLIC_KEY,
+  privateKey: process.env.VAPID_PRIVATE_KEY,
+  subject: process.env.VAPID_SUBJECT
 };
 
 // Configure web-push

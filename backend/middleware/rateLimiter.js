@@ -1,28 +1,13 @@
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 
-/**
- * Key generator for authenticated endpoints
- * Combines IP + User ID for authenticated users
- * Falls back to IP only for unauthenticated users
- */
 const getAuthenticatedKey = (req) => {
-  // If user is authenticated, use IP + User ID
   if (req.user && req.user.id) {
-    return `${req.ip}:${req.user.id}`;
+    // 2. Wrap req.ip with the helper
+    return `${ipKeyGenerator(req.ip)}:${req.user.id}`; 
   }
-  // Fall back to IP only for unauthenticated requests
-  return req.ip;
-};
-
-/**
- * Key generator with role-based logic
- * Returns IP:user_id for authenticated, IP only for unauthenticated
- */
-const getRoleBasedKey = (req, roleMultiplier = 1) => {
-  if (req.user && req.user.id) {
-    return `${req.ip}:${req.user.id}`;
-  }
-  return req.ip;
+  // 3. Fall back to the grouped IP
+  return ipKeyGenerator(req.ip);
 };
 
 /**
@@ -39,7 +24,7 @@ const globalLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  keyGenerator: (req) => req.ip, // IP only for global limiter
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
   handler: (req, res) => {
     res.status(429).json({
       error: 'Too many requests from this IP, please try again later.',
