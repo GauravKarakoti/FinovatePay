@@ -34,3 +34,20 @@
 [2026-03-26 18:30:20:040] [error] [server]: [server] Reconciliation scheduler failed:
 [2026-03-26 18:30:20:046] [info] [server]: 🚀 Server running on port 3000
 [2026-03-26 18:30:21:943] [info] [server]: Database connection test completed successfully
+[2026-03-26 18:31:05:606] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-26 18:31:05:612] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:31:05:613] [info] [server]: Transaction Recovery Worker started
+[2026-03-26 18:31:05:620] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:31:05:621] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:31:05:627] [info] [server]: 🚀 Server running on port 3000
+[2026-03-26 18:31:07:276] [info] [server]: Database connection test completed successfully
+[2026-03-26 18:31:35:840] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:40:18:023] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-26 18:40:18:028] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-03-26 18:40:18:028] [info] [server]: Invoice Sync Worker started
+[2026-03-26 18:40:18:029] [info] [server]: Transaction Recovery Worker started
+[2026-03-26 18:40:18:035] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-03-26 18:40:18:036] [info] [server]: Compliance listeners started
+[2026-03-26 18:40:18:037] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:40:18:042] [info] [server]: 🚀 Server running on port 3000
+[2026-03-26 18:40:22:285] [info] [server]: Database connection test completed successfully

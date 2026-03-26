@@ -2,6 +2,7 @@ const { getSigner, contractAddresses } = require('../config/blockchain');
 const ComplianceManagerArtifact = require('../../deployed/ComplianceManager.json');
 const { ethers } = require('ethers');
 const { pool } = require('../config/database');
+const logger = require('../utils/logger')('complianceListener');
 
 /**
  * Start listening to ComplianceManager contract events

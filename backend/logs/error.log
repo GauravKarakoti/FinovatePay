@@ -14,3 +14,7 @@ TypeError: Cannot read properties of undefined (reading 'entries')
 [2026-03-26 18:30:20:031] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
 [2026-03-26 18:30:20:039] [error] [server]: [server] Compliance listeners failed:
 [2026-03-26 18:30:20:040] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:31:05:612] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:31:05:620] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:31:05:621] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:40:18:037] [error] [server]: [server] Reconciliation scheduler failed:

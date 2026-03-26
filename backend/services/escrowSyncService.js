@@ -2,6 +2,7 @@ const { getEscrowContract } = require('../config/blockchain');
 const Invoice = require('../models/Invoice');
 const { ethers } = require('ethers');
 const { pool } = require('../config/database');
+const logger = require('../utils/logger')('escrowSyncService');
 
 const uuidToBytes32 = (uuid) => {
   return ethers.zeroPadValue('0x' + uuid.replace(/-/g, ''), 32);
