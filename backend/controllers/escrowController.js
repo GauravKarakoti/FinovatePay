@@ -3,9 +3,7 @@ const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 const {
-  createTransactionState,
-  updateTransactionState,
-  addToRecoveryQueue,
+  updateTransactionState
 } = require('../services/recoveryService');
 const errorResponse = require('../utils/errorResponse');
 const { blockchainQueue, JOB_TYPES } = require('../queues/blockchainQueue');
@@ -18,16 +16,6 @@ const uuidToBytes32 = (uuid) => {
   const hex = '0x' + uuid.replace(/-/g, '');
   return ethers.zeroPadValue(hex, 32);
 };
-
-/**
- * Release escrow funds asynchronously via queue
- * This immediately returns a job ID and processes the transaction in background
- */
-exports.releaseEscrow = async (req, res) => {
-  const client = await pool.connect();
-  let correlationId = null;
-  let stepsCompleted = []; // Track actual progress for recovery
-  let txHash = null; // Track tx hash if blockchain tx succeeds
 
 exports.releaseEscrow = async (req, res) => {
   try {
@@ -168,10 +156,6 @@ exports.releaseEscrowSync = async (req, res) => {
     });
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
-
-    return res.json({ success: true, txHash: tx.hash, correlationId });
-
-  } catch (error) {
     console.error("Error in releaseEscrowSync:", error);
     return errorResponse(res, error, 500);
   }
@@ -272,54 +256,6 @@ exports.getJobStatus = async (req, res) => {
     }
 
     return res.json(jobStatus);
-  } catch (error) {
-    console.error("Error in raiseDisputeSync:", error);
-    return errorResponse(res, error, 500);
-  }
-};
-
-/**
- * Deposit to escrow asynchronously via queue
- */
-exports.depositEscrow = async (req, res) => {
-  try {
-    const { invoiceId, amount, tokenAddress } = req.body;
-    const userId = req.user?.id;
-
-    // Validate invoice exists
-    const invoiceResult = await pool.query(
-      'SELECT * FROM invoices WHERE invoice_id = $1',
-      [invoiceId]
-    );
-
-    if (invoiceResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Invoice not found' });
-    }
-
-    const invoice = invoiceResult.rows[0];
-
-    // Check if escrow can accept deposit
-    if (invoice.escrow_status !== 'pending') {
-      return res.status(400).json({ 
-        error: `Cannot deposit to escrow in ${invoice.escrow_status} state` 
-      });
-    }
-
-    // Add job to queue
-    const job = await blockchainQueue.addJob(JOB_TYPES.ESCROW_DEPOSIT, {
-      invoiceId,
-      amount,
-      tokenAddress: tokenAddress || ethers.ZeroAddress,
-      userId,
-    });
-
-    res.json({ 
-      success: true, 
-      jobId: job.jobId,
-      message: 'Deposit queued for processing',
-      invoiceId,
-    });
-
   } catch (error) {
     console.error("Error in raiseDisputeSync:", error);
     return errorResponse(res, error, 500);
