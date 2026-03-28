@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
-import { Transak } from '@transak/ui-js-sdk';
+import { Transak } from '@transak/transak-sdk';
 import { stablecoinAddresses, erc20ABI, connectWallet } from '../utils/web3';
 import { toast } from 'sonner';
 
