@@ -504,7 +504,6 @@ contract LendingPool is
         }
 
         // Update loan
-        uint256 oldTotalDebt = loan.totalDebt;
         loan.totalDebt -= principalPaid;
         totalInterestAccrued += interestPaid;
 
@@ -553,7 +552,6 @@ contract LendingPool is
         
         // Calculate bonus for liquidator
         uint256 bonus = (debtCovered * liquidationBonus) / BASIS_POINTS;
-        uint256 totalLiquidationAmount = debtCovered + bonus;
 
         // Transfer debt from liquidator
         stablecoin.safeTransferFrom(_msgSender(), address(this), debtCovered);

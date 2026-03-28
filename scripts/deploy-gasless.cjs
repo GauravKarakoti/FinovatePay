@@ -96,11 +96,11 @@ async function main() {
 
   console.log("\n10. Deploying FractionToken...");
   const FractionToken = await ethers.getContractFactory("FractionToken");
-  const fractionToken = await FractionToken.deploy(USDC_ADDRESS);
+  const fractionToken = await FractionToken.deploy(stablecoinAddress);
   await fractionToken.waitForDeployment();
   console.log("FractionToken deployed to:", fractionToken.target);
 
-  console.log("🔗 Setting up EscrowContract authorization...");
+  console.log("\n🔗 Setting up EscrowContract authorization...");
   const tx = await fractionToken.setEscrowContract(escrowContractV2Implementation.target);
   await tx.wait();
   console.log("✅ EscrowContract authorized:", escrowContractV2Implementation.target);
@@ -112,8 +112,9 @@ async function main() {
   const FinancingManagerV2 = await ethers.getContractFactory("FinancingManagerV2");
   const financingManagerV2Implementation = await FinancingManagerV2.deploy();
   await financingManagerV2Implementation.waitForDeployment();
+  console.log("FinancingManagerV2Implementation deployed to:", financingManagerV2Implementation.target);
 
-  console.log("12. Deploying FinancingManagerV2 Proxy...");
+  console.log("\n12. Deploying FinancingManagerV2 Proxy...");
   const financingV2InitData = FinancingManagerV2.interface.encodeFunctionData("initialize", [
     fractionToken.target,
     stablecoinAddress,
@@ -135,16 +136,26 @@ async function main() {
   const ProduceTracking = await ethers.getContractFactory("ProduceTracking");
   const produceTracking = await ProduceTracking.deploy();
   await produceTracking.waitForDeployment();
+  console.log("ProduceTracking deployed to:", produceTracking.target);
 
-  const waltBridgePlaceholder = "0x0000000000000000000000000000000000000000";
-  console.log("15. Deploying Bridge/Liquidity Adapters...");
+  // 14.5 Deploy Mock WaltBridge
+  console.log("\n14.5 Deploying MockWaltBridge...");
+  const MockWaltBridge = await ethers.getContractFactory("MockWaltBridge");
+  const waltBridge = await MockWaltBridge.deploy();
+  await waltBridge.waitForDeployment();
+  const actualWaltBridgeAddress = waltBridge.target;
+  console.log("MockWaltBridge deployed to:", actualWaltBridgeAddress);
+
+  console.log("\n15. Deploying Bridge/Liquidity Adapters...");
   const BridgeAdapter = await ethers.getContractFactory("BridgeAdapter");
-  const bridgeAdapter = await BridgeAdapter.deploy(waltBridgePlaceholder, complianceManager.target);
+  const bridgeAdapter = await BridgeAdapter.deploy(actualWaltBridgeAddress, complianceManager.target);
   await bridgeAdapter.waitForDeployment();
+  console.log("BridgeAdapter Proxy deployed to:", bridgeAdapter.target);
 
   const LiquidityAdapter = await ethers.getContractFactory("LiquidityAdapter");
-  const liquidityAdapter = await LiquidityAdapter.deploy(waltBridgePlaceholder, complianceManager.target);
+  const liquidityAdapter = await LiquidityAdapter.deploy(actualWaltBridgeAddress, complianceManager.target);
   await liquidityAdapter.waitForDeployment();
+  console.log("LiquidityAdapter Proxy deployed to:", bridgeAdapter.target);
 
   // 16. Save Addresses and Artifacts
   const contractsDir = path.join(__dirname, "..", "deployed");
@@ -164,7 +175,8 @@ async function main() {
     FinancingManagerProxy: financingProxy.target,
     FinancingManager: financingManagerV2Implementation.target,
     BridgeAdapter: bridgeAdapter.target,
-    LiquidityAdapter: liquidityAdapter.target
+    LiquidityAdapter: liquidityAdapter.target,
+    MockWaltBridge: actualWaltBridgeAddress
   };
 
   fs.writeFileSync(path.join(contractsDir, "contract-addresses.json"), JSON.stringify(addressMap, null, 2));
@@ -173,7 +185,7 @@ async function main() {
   const contractNames = [
     "FinovateToken", "MinimalForwarder", "ComplianceManager", 
     "InvoiceFactory", "FractionToken", "Invoice", "ProduceTracking", 
-    "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking"
+    "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking", "MockWaltBridge"
   ];
 
   for (const name of contractNames) {
@@ -186,6 +198,8 @@ async function main() {
   }
 
   fs.writeFileSync(contractsDir + "/EscrowContract.json", JSON.stringify(EscrowContractV2, null, 2));
+  fs.writeFileSync(contractsDir + "/ERC1967Proxy.json", JSON.stringify(ERC1967Proxy, null, 2));
+  fs.writeFileSync(contractsDir + "/ArbitratorsRegistry.json", JSON.stringify(ArbitratorsRegistry, null, 2));
   fs.writeFileSync(contractsDir + "/FinancingManager.json", JSON.stringify(FinancingManagerV2, null, 2));
 
   console.log("\n✅ Deployment completed successfully!");

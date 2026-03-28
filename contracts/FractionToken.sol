@@ -388,7 +388,6 @@ contract FractionToken is ERC1155, Ownable, ReentrancyGuard {
             "Unsupported destination chain"
         );
 
-        InvoiceMeta storage meta = invoiceMetadata[_tokenId];
         CrossChainMeta storage crossMeta = crossChainMetadata[_tokenId];
 
         // Check if owner has enough tokens

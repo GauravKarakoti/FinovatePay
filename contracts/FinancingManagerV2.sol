@@ -530,7 +530,7 @@ contract FinancingManagerV2 is
     /**
      * @notice Get cross-chain listing details.
      */
-    function getCrossChainListing(uint256 _tokenId) external view returns (
+    function getCrossChainListing(uint256 _tokenId) external pure returns (
         uint256 totalListed,
         uint256 totalSold,
         uint256 totalReturned,
