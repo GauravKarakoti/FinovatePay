@@ -41,10 +41,7 @@ def predict():
                 'traditional': data.get('traditionalScore', 50)
             },
             'modelVersion': 'heuristic-0.1',
-            'confidence': 0.65,
-            'explanation': {
-                'notes': 'This is a heuristic placeholder ML model. Replace with trained model for production.'
-            }
+            'confidence': 0.65
         }
 
         return jsonify(response)
