@@ -1,0 +1,287 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "MockWaltBridge",
+  "sourceName": "contracts/mocks/MockWaltBridge.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "destinationChain",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "TokensLocked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "destinationChain",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "TokensLocked1155",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "sourceChain",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "TokensMinted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "sourceChain",
+          "type": "bytes32"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "TokensMinted1155",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "sourceChain",
+          "type": "bytes32"
+        }
+      ],
+      "name": "burnAndRelease",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "sourceChain",
+          "type": "bytes32"
+        }
+      ],
+      "name": "burnAndRelease1155",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "destinationChain",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "lockAndSend",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "destinationChain",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "lockAndSend1155",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "sourceChain",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "mintAndSend",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608080604052346015576102d2908161001a8239f35b5f80fdfe6080806040526004361015610012575f80fd5b5f3560e01c9081632756bf90146101df575080637de32590146101ad5780639fd0018c14610143578063b1ad46a0146100bc5763c2e4aacb14610053575f80fd5b346100b8576100b37fd9f6936bd4db5ca2823de4c9c29c12449392a55ad5da84f36311e7152346ba0b6100853661025e565b6040805193845260208401929092526001600160a01b03908116918301919091529091169281906060820190565b0390a2005b5f80fd5b346100b85760a03660031901126100b8576100d5610248565b608435906001600160a01b03821682036100b8576040805160243581526044356020820152606435918101919091526001600160a01b0392831660608201529116907fa2af97d639d4baec982161f7a17dae0af172f19b9d3cfe1427aa672511b911539080608081016100b3565b346100b85760603660031901126100b85761015c610248565b604080516024358152604435602082015233918101919091526001600160a01b03909116907f1a3438ba5d336cf001dfd95e92b3275de413cb92537f30dd1ae0a7e2e55533f39080606081016100b3565b346100b8576100b37f1a3438ba5d336cf001dfd95e92b3275de413cb92537f30dd1ae0a7e2e55533f36100853661025e565b346100b85760803660031901126100b8577f8aa8922ff6c9279f9a5aa5ecb9663dd2204c36791cb09cb61f4dcdf804aa57606001600160a01b03610221610248565b602435845260443560208501526064356040850152336060850152169180608081016100b3565b600435906001600160a01b03821682036100b857565b60809060031901126100b8576004356001600160a01b03811681036100b8579060243590604435906064356001600160a01b03811681036100b8579056fea264697066735822122022af1988021bbb73f1597f735f73dfba792e636bb96303c0481fbf566458b67f64736f6c634300081c0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c9081632756bf90146101df575080637de32590146101ad5780639fd0018c14610143578063b1ad46a0146100bc5763c2e4aacb14610053575f80fd5b346100b8576100b37fd9f6936bd4db5ca2823de4c9c29c12449392a55ad5da84f36311e7152346ba0b6100853661025e565b6040805193845260208401929092526001600160a01b03908116918301919091529091169281906060820190565b0390a2005b5f80fd5b346100b85760a03660031901126100b8576100d5610248565b608435906001600160a01b03821682036100b8576040805160243581526044356020820152606435918101919091526001600160a01b0392831660608201529116907fa2af97d639d4baec982161f7a17dae0af172f19b9d3cfe1427aa672511b911539080608081016100b3565b346100b85760603660031901126100b85761015c610248565b604080516024358152604435602082015233918101919091526001600160a01b03909116907f1a3438ba5d336cf001dfd95e92b3275de413cb92537f30dd1ae0a7e2e55533f39080606081016100b3565b346100b8576100b37f1a3438ba5d336cf001dfd95e92b3275de413cb92537f30dd1ae0a7e2e55533f36100853661025e565b346100b85760803660031901126100b8577f8aa8922ff6c9279f9a5aa5ecb9663dd2204c36791cb09cb61f4dcdf804aa57606001600160a01b03610221610248565b602435845260443560208501526064356040850152336060850152169180608081016100b3565b600435906001600160a01b03821682036100b857565b60809060031901126100b8576004356001600160a01b03811681036100b8579060243590604435906064356001600160a01b03811681036100b8579056fea264697066735822122022af1988021bbb73f1597f735f73dfba792e636bb96303c0481fbf566458b67f64736f6c634300081c0033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

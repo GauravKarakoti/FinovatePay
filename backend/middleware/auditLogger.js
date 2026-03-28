@@ -1,13 +1,60 @@
 const { pool } = require('../config/database');
+const logger = require('../utils/logger')('audit');
 
 /**
- * Log an audit entry for compliance tracking
- * @param {Object} auditData - Audit log data
- * @returns {Promise<Object>} - Created audit log entry
+ * Logs an audit event to the database for compliance and tracking purposes.
+ * * @param {Object} params
+ * @param {string} params.operationType - E.g., 'MULTI_PARTY_ESCROW_CREATE'
+ * @param {string} params.entityType - E.g., 'ESCROW', 'MILESTONE'
+ * @param {string} params.entityId - The ID of the entity being modified
+ * @param {string} params.actorId - User ID performing the action
+ * @param {string} params.actorWallet - Wallet address of the user
+ * @param {string} params.actorRole - Role of the user (buyer, seller, admin, etc.)
+ * @param {string} params.action - 'CREATE', 'UPDATE', 'DELETE', etc.
+ * @param {string} params.status - 'SUCCESS', 'FAILED'
+ * @param {Object} [params.oldValues] - Previous state (optional)
+ * @param {Object} [params.newValues] - New state (optional)
+ * @param {string} [params.errorMessage] - Error message if status is FAILED
+ * @param {string} [params.ipAddress] - IP address of the requestor
+ * @param {string} [params.userAgent] - User agent of the requestor
  */
-const logAudit = async (auditData) => {
+const logAudit = async ({
+    operationType,
+    entityType,
+    entityId,
+    actorId,
+    actorWallet,
+    actorRole,
+    action,
+    status,
+    oldValues = null,
+    newValues = null,
+    errorMessage = null,
+    ipAddress = null,
+    userAgent = null
+}) => {
     try {
-        const {
+        const query = `
+            INSERT INTO audit_logs (
+                operation_type, 
+                entity_type, 
+                entity_id, 
+                actor_id, 
+                actor_wallet, 
+                actor_role, 
+                action, 
+                status, 
+                old_values, 
+                new_values, 
+                error_message, 
+                ip_address, 
+                user_agent,
+                created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+            RETURNING id;
+        `;
+
+        const values = [
             operationType,
             entityType,
             entityId,
@@ -16,275 +63,112 @@ const logAudit = async (auditData) => {
             actorRole,
             action,
             status,
-            oldValues = null,
-            newValues = null,
-            metadata = null,
-            ipAddress = null,
-            userAgent = null,
-            errorMessage = null
-        } = auditData;
+            oldValues ? JSON.stringify(oldValues) : null,
+            newValues ? JSON.stringify(newValues) : null,
+            errorMessage,
+            ipAddress,
+            userAgent
+        ];
 
-        const result = await pool.query(
-            `INSERT INTO audit_logs (
-                operation_type, entity_type, entity_id, actor_id, actor_wallet, actor_role,
-                action, status, old_values, new_values, metadata, ip_address, user_agent, error_message
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-            RETURNING *`,
-            [
-                operationType, entityType, entityId, actorId, actorWallet, actorRole,
-                action, status, 
-                oldValues ? JSON.stringify(oldValues) : null,
-                newValues ? JSON.stringify(newValues) : null,
-                metadata ? JSON.stringify(metadata) : null,
-                ipAddress, userAgent, errorMessage
-            ]
-        );
+        await pool.query(query, values);
 
-        return result.rows[0];
     } catch (error) {
-        console.error('❌ Audit logging failed:', error);
-        // Don't throw - audit logging failure shouldn't break the operation
-        return null;
+        // We log the error but don't throw it because audit logging 
+        // shouldn't typically break the main application flow if it fails
+        logger.error('Failed to write audit log to database:', error);
     }
 };
 
-/**
- * Log a financial transaction
- * @param {Object} txData - Transaction data
- * @returns {Promise<Object>} - Created transaction entry
- */
-const logFinancialTransaction = async (txData) => {
-    try {
-        const {
-            transactionType,
-            invoiceId = null,
-            fromAddress,
-            toAddress,
-            amount,
-            currency = 'USDC',
-            blockchainTxHash = null,
-            status,
-            initiatedBy,
-            metadata = null
-        } = txData;
-
-        const result = await pool.query(
-            `INSERT INTO financial_transactions (
-                transaction_type, invoice_id, from_address, to_address, amount, currency,
-                blockchain_tx_hash, status, initiated_by, metadata
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING *`,
-            [
-                transactionType, invoiceId, fromAddress, toAddress, amount, currency,
-                blockchainTxHash, status, initiatedBy,
-                metadata ? JSON.stringify(metadata) : null
-            ]
-        );
-
-        return result.rows[0];
-    } catch (error) {
-        console.error('❌ Financial transaction logging failed:', error);
-        return null;
-    }
-};
-
-/**
- * Update financial transaction status
- * @param {string} transactionId - Transaction UUID
- * @param {string} status - New status
- * @param {string} blockchainTxHash - Blockchain transaction hash
- */
-const updateFinancialTransaction = async (transactionId, status, blockchainTxHash = null) => {
-    try {
-        await pool.query(
-            `UPDATE financial_transactions 
-             SET status = $1, blockchain_tx_hash = $2, confirmed_at = NOW()
-             WHERE transaction_id = $3`,
-            [status, blockchainTxHash, transactionId]
-        );
-    } catch (error) {
-        console.error('❌ Financial transaction update failed:', error);
-    }
-};
-
-/**
- * Check and store idempotency key
- * @param {string} idempotencyKey - Unique key for the operation
- * @param {string} operationType - Type of operation
- * @param {number} userId - User ID
- * @param {Object} requestBody - Request body
- * @returns {Promise<Object|null>} - Existing response if duplicate, null if new
- */
-const checkIdempotency = async (idempotencyKey, operationType, userId, requestBody) => {
-    try {
-        // Check if key exists
-        const existing = await pool.query(
-            'SELECT * FROM idempotency_keys WHERE idempotency_key = $1 AND user_id = $2',
-            [idempotencyKey, userId]
-        );
-
-        if (existing.rows.length > 0) {
-            const record = existing.rows[0];
-            
-            // If still processing, return conflict
-            if (record.status === 'PROCESSING') {
-                return { 
-                    duplicate: true, 
-                    status: 'PROCESSING',
-                    message: 'Request is already being processed'
-                };
-            }
-
-            // If completed, return cached response
-            if (record.status === 'COMPLETED') {
-                return {
-                    duplicate: true,
-                    status: 'COMPLETED',
-                    response: record.response_body
-                };
-            }
-
-            // If failed, allow retry
-            if (record.status === 'FAILED') {
-                await pool.query(
-                    'DELETE FROM idempotency_keys WHERE idempotency_key = $1',
-                    [idempotencyKey]
-                );
-            }
-        }
-
-        // Create new idempotency record
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-        await pool.query(
-            `INSERT INTO idempotency_keys (
-                idempotency_key, operation_type, user_id, request_body, status, expires_at
-            ) VALUES ($1, $2, $3, $4, 'PROCESSING', $5)`,
-            [idempotencyKey, operationType, userId, JSON.stringify(requestBody), expiresAt]
-        );
-
-        return { duplicate: false };
-    } catch (error) {
-        console.error('❌ Idempotency check failed:', error);
-        // If idempotency check fails, allow the operation to proceed
-        return { duplicate: false };
-    }
-};
-
-/**
- * Complete idempotency key with response
- * @param {string} idempotencyKey - Unique key for the operation
- * @param {string} status - COMPLETED or FAILED
- * @param {Object} responseBody - Response to cache
- */
-const completeIdempotency = async (idempotencyKey, status, responseBody) => {
-    try {
-        await pool.query(
-            `UPDATE idempotency_keys 
-             SET status = $1, response_body = $2, completed_at = NOW()
-             WHERE idempotency_key = $3`,
-            [status, JSON.stringify(responseBody), idempotencyKey]
-        );
-    } catch (error) {
-        console.error('❌ Idempotency completion failed:', error);
-    }
-};
-
-/**
- * Middleware to automatically log audit entries
- * @param {string} operationType - Type of operation
- * @param {string} entityType - Type of entity
- */
-const auditMiddleware = (operationType, entityType) => {
+const idempotencyMiddleware = (action) => {
     return async (req, res, next) => {
-        // Store original json method
-        const originalJson = res.json.bind(res);
+        const idempotencyKey = req.headers['x-idempotency-key'];
 
-        // Override json method to capture response
-        res.json = function(data) {
-            // Log audit entry
-            logAudit({
-                operationType,
-                entityType,
-                entityId: req.params.id || req.params.userId || req.params.invoiceId || req.body.invoiceId || 'unknown',
-                actorId: req.user?.id,
-                actorWallet: req.user?.wallet_address,
-                actorRole: req.user?.role,
-                action: req.method,
-                status: res.statusCode >= 200 && res.statusCode < 300 ? 'SUCCESS' : 'FAILED',
-                newValues: data,
-                metadata: {
-                    endpoint: req.originalUrl,
-                    method: req.method,
-                    statusCode: res.statusCode
-                },
-                ipAddress: req.ip || req.connection.remoteAddress,
-                userAgent: req.get('user-agent'),
-                errorMessage: data.error || null
-            });
-
-            // Call original json method
-            return originalJson(data);
-        };
-
-        next();
-    };
-};
-
-/**
- * Middleware to handle idempotency
- * @param {string} operationType - Type of operation
- */
-const idempotencyMiddleware = (operationType) => {
-    return async (req, res, next) => {
-        const idempotencyKey = req.headers['idempotency-key'];
-
+        // 1. Ensure the header exists (optional: remove this check if you want it to be optional)
         if (!idempotencyKey) {
             return res.status(400).json({ 
-                error: 'Idempotency-Key header is required for this operation' 
+                error: 'Idempotency key is required. Please provide the x-idempotency-key header.' 
             });
         }
 
-        const result = await checkIdempotency(
-            idempotencyKey,
-            operationType,
-            req.user.id,
-            req.body
-        );
+        // Use the authenticated user's ID to prevent cross-user key collisions
+        const userId = req.user?.id || 'anonymous';
 
-        if (result.duplicate) {
-            if (result.status === 'PROCESSING') {
-                return res.status(409).json({ 
-                    error: 'Request is already being processed',
-                    idempotencyKey 
-                });
+        try {
+            // 2. Check if this request has already been processed or is processing
+            const checkQuery = `
+                SELECT status, response_code, response_body 
+                FROM idempotency_keys 
+                WHERE idempotency_key = $1 AND user_id = $2 AND action = $3
+            `;
+            const { rows } = await pool.query(checkQuery, [idempotencyKey, userId, action]);
+
+            if (rows.length > 0) {
+                const record = rows[0];
+                
+                // If another request with this key is currently hitting the route
+                if (record.status === 'IN_PROGRESS') {
+                    return res.status(409).json({ 
+                        error: 'A request with this idempotency key is already in progress.' 
+                    });
+                }
+                
+                // If it already finished, return the exact same response as last time
+                if (record.status === 'COMPLETED') {
+                    return res.status(record.response_code).json(record.response_body);
+                }
             }
 
-            if (result.status === 'COMPLETED') {
-                return res.status(200).json(result.response);
+            // 3. Mark the key as IN_PROGRESS in the database
+            const insertQuery = `
+                INSERT INTO idempotency_keys (idempotency_key, user_id, action, request_path, status)
+                VALUES ($1, $2, $3, $4, 'IN_PROGRESS')
+            `;
+            await pool.query(insertQuery, [idempotencyKey, userId, action, req.originalUrl]);
+
+            // 4. Intercept the standard res.json to capture the final output
+            const originalJson = res.json;
+            res.json = function (body) {
+                const statusCode = res.statusCode;
+
+                // Only cache successful or acceptable error responses (e.g., don't cache 500 server crashes)
+                if (statusCode >= 200 && statusCode < 500) {
+                    pool.query(`
+                        UPDATE idempotency_keys 
+                        SET status = 'COMPLETED', 
+                            response_code = $1, 
+                            response_body = $2, 
+                            completed_at = NOW()
+                        WHERE idempotency_key = $3 AND user_id = $4
+                    `, [statusCode, JSON.stringify(body), idempotencyKey, userId])
+                    .catch(err => {
+                        logger.error('Failed to update idempotency key cache:', err);
+                    });
+                } else {
+                    // If it was a 500 error, delete the key so the user can try again safely
+                    pool.query(`DELETE FROM idempotency_keys WHERE idempotency_key = $1`, [idempotencyKey])
+                    .catch(e => logger.error('Failed to clear failed idempotency key:', e));
+                }
+
+                // Call the original Express res.json method to actually send the data to the user
+                return originalJson.call(this, body);
+            };
+
+            next(); // Proceed to your actual route logic
+            
+        } catch (error) {
+            // Handle race condition: If two requests hit this exact block simultaneously, 
+            // the DB's unique constraint on (idempotency_key, user_id) will throw a 23505 duplicate error.
+            if (error.code === '23505') {
+                return res.status(409).json({ error: 'A request with this idempotency key is already in progress.' });
             }
+
+            logger.error('Idempotency middleware error:', error);
+            return res.status(500).json({ error: 'Internal server error while verifying request uniqueness.' });
         }
-
-        // Store idempotency key in request for later use
-        req.idempotencyKey = idempotencyKey;
-
-        // Override res.json to complete idempotency
-        const originalJson = res.json.bind(res);
-        res.json = function(data) {
-            const status = res.statusCode >= 200 && res.statusCode < 300 ? 'COMPLETED' : 'FAILED';
-            completeIdempotency(idempotencyKey, status, data);
-            return originalJson(data);
-        };
-
-        next();
     };
 };
 
 module.exports = {
     logAudit,
-    logFinancialTransaction,
-    updateFinancialTransaction,
-    checkIdempotency,
-    completeIdempotency,
-    auditMiddleware,
     idempotencyMiddleware
 };

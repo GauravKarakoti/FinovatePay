@@ -2,6 +2,7 @@ const { getEscrowContract } = require('../config/blockchain');
 const Invoice = require('../models/Invoice');
 const { ethers } = require('ethers');
 const { pool } = require('../config/database');
+const logger = require('../utils/logger')('escrowSyncService');
 
 const uuidToBytes32 = (uuid) => {
   return ethers.zeroPadValue('0x' + uuid.replace(/-/g, ''), 32);
@@ -52,7 +53,7 @@ const syncInvoiceStatus = async (invoiceId) => {
     }
 
     if (newStatus !== invoice.status) {
-      console.log(`🔄 Syncing Invoice ${invoiceId}: ${invoice.status} -> ${newStatus}`);
+      logger.info(`Syncing Invoice ${invoiceId}: ${invoice.status} -> ${newStatus}`);
       await Invoice.updateStatus(invoiceId, newStatus);
     }
 
@@ -62,7 +63,7 @@ const syncInvoiceStatus = async (invoiceId) => {
 };
 
 const startSyncWorker = () => {
-  console.log('👷 Starting Invoice Sync Worker...');
+  logger.info('Starting Invoice Sync Worker...');
   setInterval(async () => {
     try {
       // Fetch a bounded batch of pending invoices to avoid pulling a huge result set

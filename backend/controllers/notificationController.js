@@ -1,43 +1,165 @@
-const EmailService = require('../services/emailService');
-const NotificationPreference = require('../models/NotificationPreference');
-const EmailLog = require('../models/EmailLog');
-const errorResponse = require('../utils/errorResponse');
+const notificationService = require('../services/notificationService');
+const { pool } = require('../config/database');
 
-/**
- * Send test email
- * POST /api/notifications/send-test
- */
-exports.sendTestEmail = async (req, res) => {
+const getEmailStats = async (req, res) => {
   try {
-    const { recipientEmail, templateName } = req.body;
-
-    if (!recipientEmail || !templateName) {
-      return errorResponse(res, 'recipientEmail and templateName are required', 400);
-    }
-
-    const result = await EmailService.sendFromTemplate(
-      recipientEmail,
-      templateName,
-      {
-        userName: req.user?.email || 'User',
-        companyName: 'FinovatePay',
-        invoiceId: 'INV-001',
-        amount: '1000',
-        currency: 'USD',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        dashboardUrl: `${process.env.FRONTEND_URL}/dashboard`
-      },
-      req.user?.id || null
-    );
+    const userId = req.user.id;
+    
+    // Assuming you have this method in your notificationService
+    // Alternatively, you could use a direct pool.query here like in getHistory
+    const stats = await notificationService.getEmailStats(userId);
 
     res.json({
       success: true,
-      message: 'Test email sent successfully',
-      data: result
+      stats
     });
   } catch (error) {
-    console.error('❌ Error sending test email:', error.message);
-    return errorResponse(res, error, 500);
+    console.error('[NotificationController] Get email stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get email statistics'
+    });
+  }
+};
+
+/**
+ * Retry failed email notifications
+ * POST /api/notifications/retry-emails
+ */
+const retryFailedEmails = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Call the service to retry failed emails for this user
+    const result = await notificationService.retryFailedEmails(userId);
+
+    res.json({
+      success: true,
+      message: 'Successfully triggered retry for failed emails',
+      retriedCount: result.count || 0
+    });
+  } catch (error) {
+    console.error('[NotificationController] Retry failed emails error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retry failed emails'
+    });
+  }
+};
+
+/**
+ * Subscribe to push notifications
+ * POST /api/notifications/subscribe
+ */
+const subscribe = async (req, res) => {
+  try {
+    const { subscription } = req.body;
+    const userAgent = req.get('user-agent');
+    
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid subscription object'
+      });
+    }
+
+    const userId = req.user.id;
+    const result = await notificationService.subscribeUser(userId, subscription, userAgent);
+
+    res.json({
+      success: true,
+      message: 'Successfully subscribed to push notifications',
+      subscriptionId: result.subscriptionId
+    });
+  } catch (error) {
+    console.error('[NotificationController] Subscribe error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to subscribe to push notifications'
+    });
+  }
+};
+
+/**
+ * Unsubscribe from push notifications
+ * DELETE /api/notifications/subscribe
+ */
+const unsubscribe = async (req, res) => {
+  try {
+    const { endpoint } = req.body;
+    
+    if (!endpoint) {
+      return res.status(400).json({
+        success: false,
+        message: 'Endpoint is required'
+      });
+    }
+
+    const userId = req.user.id;
+    await notificationService.unsubscribeUser(userId, endpoint);
+
+    res.json({
+      success: true,
+      message: 'Successfully unsubscribed from push notifications'
+    });
+  } catch (error) {
+    console.error('[NotificationController] Unsubscribe error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unsubscribe from push notifications'
+    });
+  }
+};
+
+/**
+ * Get user's push notification subscriptions
+ * GET /api/notifications/subscriptions
+ */
+const getSubscriptions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const subscriptions = await notificationService.getUserSubscriptions(userId);
+
+    // Return sanitized subscription data
+    const sanitized = subscriptions.map(sub => ({
+      id: sub.id,
+      endpoint: sub.endpoint,
+      browser: sub.browser,
+      isActive: sub.is_active,
+      createdAt: sub.created_at
+    }));
+
+    res.json({
+      success: true,
+      subscriptions: sanitized
+    });
+  } catch (error) {
+    console.error('[NotificationController] Get subscriptions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get subscriptions'
+    });
+  }
+};
+
+/**
+ * Get push notification VAPID public key
+ * GET /api/notifications/vapid-key
+ */
+const getVapidKey = async (req, res) => {
+  try {
+    const publicKey = notificationService.getVapidPublicKey();
+    
+    res.json({
+      success: true,
+      publicKey
+    });
+  } catch (error) {
+    console.error('[NotificationController] Get VAPID key error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get VAPID key'
+    });
   }
 };
 
@@ -45,24 +167,21 @@ exports.sendTestEmail = async (req, res) => {
  * Get notification preferences
  * GET /api/notifications/preferences
  */
-exports.getNotificationPreferences = async (req, res) => {
+const getPreferences = async (req, res) => {
   try {
     const userId = req.user.id;
-
-    let preferences = await NotificationPreference.findByUserId(userId);
-
-    // Create default preferences if not exists
-    if (!preferences) {
-      preferences = await NotificationPreference.create(userId);
-    }
+    const preferences = await notificationService.getUserPreferences(userId);
 
     res.json({
       success: true,
-      data: preferences
+      preferences
     });
   } catch (error) {
-    console.error('❌ Error fetching preferences:', error.message);
-    return errorResponse(res, error, 500);
+    console.error('[NotificationController] Get preferences error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get notification preferences'
+    });
   }
 };
 
@@ -70,113 +189,143 @@ exports.getNotificationPreferences = async (req, res) => {
  * Update notification preferences
  * PUT /api/notifications/preferences
  */
-exports.updateNotificationPreferences = async (req, res) => {
+const updatePreferences = async (req, res) => {
   try {
     const userId = req.user.id;
     const preferences = req.body;
-
-    const updated = await NotificationPreference.updatePreferences(
-      userId,
-      preferences
-    );
+    
+    const updated = await notificationService.updateUserPreferences(userId, preferences);
 
     res.json({
       success: true,
       message: 'Preferences updated successfully',
-      data: updated
+      preferences: updated
     });
   } catch (error) {
-    console.error('❌ Error updating preferences:', error.message);
-    return errorResponse(res, error, 500);
+    console.error('[NotificationController] Update preferences error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update notification preferences'
+    });
   }
 };
 
 /**
- * Get email history
+ * Get notification history
  * GET /api/notifications/history
  */
-exports.getEmailHistory = async (req, res) => {
+const getHistory = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { limit = 50, offset = 0 } = req.query;
+    const { limit = 50, offset = 0, type, status } = req.query;
 
-    const history = await EmailService.getEmailHistory(
-      userId,
-      parseInt(limit),
-      parseInt(offset)
-    );
+    let query = `
+      SELECT * FROM push_notification_history 
+      WHERE user_id = $1
+    `;
+    const params = [userId];
+    let paramCount = 1;
 
-    res.json({
-      success: true,
-      data: history
-    });
-  } catch (error) {
-    console.error('❌ Error fetching email history:', error.message);
-    return errorResponse(res, error, 500);
-  }
-};
-
-/**
- * Get email statistics
- * GET /api/notifications/stats
- */
-exports.getEmailStats = async (req, res) => {
-  try {
-    const stats = await EmailLog.getStats();
-    const totalCount = await EmailLog.getTotalCount();
-
-    res.json({
-      success: true,
-      data: {
-        total: totalCount,
-        byStatus: stats
-      }
-    });
-  } catch (error) {
-    console.error('❌ Error fetching email stats:', error.message);
-    return errorResponse(res, error, 500);
-  }
-};
-
-/**
- * Unsubscribe from emails
- * POST /api/notifications/unsubscribe/:token
- */
-exports.unsubscribe = async (req, res) => {
-  try {
-    const { token } = req.params;
-
-    if (!token) {
-      return errorResponse(res, 'Unsubscribe token is required', 400);
+    if (type) {
+      paramCount++;
+      query += ` AND notification_type = $${paramCount}`;
+      params.push(type);
     }
 
-    await NotificationPreference.unsubscribe(token);
+    if (status) {
+      paramCount++;
+      query += ` AND status = $${paramCount}`;
+      params.push(status);
+    }
+
+    query += ` ORDER BY sent_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    params.push(parseInt(limit), parseInt(offset));
+
+    const result = await pool.query(query, params);
 
     res.json({
       success: true,
-      message: 'Unsubscribed successfully'
+      history: result.rows
     });
   } catch (error) {
-    console.error('❌ Error unsubscribing:', error.message);
-    return errorResponse(res, error, 500);
+    console.error('[NotificationController] Get history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get notification history'
+    });
   }
 };
 
 /**
- * Retry failed emails (Admin only)
- * POST /api/notifications/retry-failed
+ * Unsubscribe all devices
+ * POST /api/notifications/unsubscribe-all
  */
-exports.retryFailedEmails = async (req, res) => {
+const unsubscribeAll = async (req, res) => {
   try {
-    const result = await EmailService.retryFailedEmails();
+    const userId = req.user.id;
+    await notificationService.unsubscribeAllUser(userId);
 
     res.json({
       success: true,
-      message: 'Retry process completed',
-      data: result
+      message: 'Successfully unsubscribed from all push notifications'
     });
   } catch (error) {
-    console.error('❌ Error retrying emails:', error.message);
-    return errorResponse(res, error, 500);
+    console.error('[NotificationController] Unsubscribe all error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to unsubscribe from all push notifications'
+    });
   }
+};
+
+/**
+ * Send test notification
+ * POST /api/notifications/test
+ */
+const sendTestNotification = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    const result = await notificationService.sendNotification(userId, 'test', {
+      title: 'Test Notification',
+      body: 'This is a test notification from FinovatePay!'
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Test notification sent successfully'
+      });
+    } else if (result.reason === 'no_subscriptions') {
+      res.status(400).json({
+        success: false,
+        message: 'No active push subscriptions found. Please subscribe first.'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send test notification'
+      });
+    }
+  } catch (error) {
+    console.error('[NotificationController] Send test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send test notification'
+    });
+  }
+};
+
+module.exports = {
+  subscribe,
+  unsubscribe,
+  getSubscriptions,
+  getVapidKey,
+  getPreferences,
+  updatePreferences,
+  getHistory,
+  unsubscribeAll,
+  sendTestNotification,
+  getEmailStats,
+  retryFailedEmails
 };

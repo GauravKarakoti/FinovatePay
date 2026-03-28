@@ -1,0 +1,94 @@
+[2026-03-26 18:17:14:814] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-26 18:17:14:820] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:17:14:821] [info] [server]: Transaction Recovery Worker started
+[2026-03-26 18:17:14:828] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:17:14:829] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:17:14:834] [info] [server]: 🚀 Server running on port 3000
+[2026-03-26 18:17:17:260] [info] [server]: Database connection test completed successfully
+[2026-03-26 18:17:45:123] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:18:15:076] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:18:45:072] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:19:15:087] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:19:45:089] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:20:15:102] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:20:45:105] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:21:15:111] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:21:45:115] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:22:14:442] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-03-26 18:23:50:146] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-26 18:23:50:152] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:23:50:153] [info] [server]: Transaction Recovery Worker started
+[2026-03-26 18:23:50:160] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:23:50:161] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:23:50:167] [info] [server]: 🚀 Server running on port 3000
+[2026-03-26 18:23:51:976] [info] [server]: Database connection test completed successfully
+[2026-03-26 18:24:20:456] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:24:50:435] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:25:20:597] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:25:42:086] [error] [server]: Tokenization listener failed: exceeded maximum retry limit (request={  }, response={  }, error=null, info={ "requestUrl": "https://polygon-amoy.g.alchemy.com/v2/o1lr0Pt07dct7AF2TUNsd", "responseBody": "[{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":429,\"message\":\"Monthly capacity limit exceeded. Visit https://dashboard.alchemy.com/settings/billing to upgrade your scaling policy for continued service.\"}},{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":429,\"message\":\"Monthly capacity limit exceeded. Visit https://dashboard.alchemy.com/settings/billing to upgrade your scaling policy for continued service.\"}}]", "responseStatus": "599 CLIENT ESCALATED SERVER ERROR (429 Too Many Requests; exceeded maximum retry limit)" }, code=SERVER_ERROR, version=6.15.0)
+[2026-03-26 18:25:50:439] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:30:20:025] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-26 18:30:20:031] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:30:20:032] [info] [server]: Transaction Recovery Worker started
+[2026-03-26 18:30:20:039] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:30:20:040] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:30:20:046] [info] [server]: 🚀 Server running on port 3000
+[2026-03-26 18:30:21:943] [info] [server]: Database connection test completed successfully
+[2026-03-26 18:31:05:606] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-26 18:31:05:612] [error] [server]: Invoice Sync Worker failed to start: logger is not defined
+[2026-03-26 18:31:05:613] [info] [server]: Transaction Recovery Worker started
+[2026-03-26 18:31:05:620] [error] [server]: [server] Compliance listeners failed:
+[2026-03-26 18:31:05:621] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:31:05:627] [info] [server]: 🚀 Server running on port 3000
+[2026-03-26 18:31:07:276] [info] [server]: Database connection test completed successfully
+[2026-03-26 18:31:35:840] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-26 18:40:18:023] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-26 18:40:18:028] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-03-26 18:40:18:028] [info] [server]: Invoice Sync Worker started
+[2026-03-26 18:40:18:029] [info] [server]: Transaction Recovery Worker started
+[2026-03-26 18:40:18:035] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-03-26 18:40:18:036] [info] [server]: Compliance listeners started
+[2026-03-26 18:40:18:037] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-26 18:40:18:042] [info] [server]: 🚀 Server running on port 3000
+[2026-03-26 18:40:22:285] [info] [server]: Database connection test completed successfully
+[2026-03-28 11:05:47:143] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-28 11:05:47:209] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-03-28 11:05:47:164] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-03-28 11:05:47:171] [info] [server]: Invoice Sync Worker started
+[2026-03-28 11:05:47:185] [info] [server]: Transaction Recovery Worker started
+[2026-03-28 11:05:47:211] [info] [server]: Compliance listeners started
+[2026-03-28 11:05:47:222] [info] [server]: [Server] Reconciliation scheduler started
+[2026-03-28 11:05:47:233] [info] [server]: 🚀 Server running on port 3000
+[2026-03-28 11:05:54:393] [info] [server]: Database connection test completed successfully
+[2026-03-28 11:06:17:513] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:06:47:451] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:07:17:474] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:07:47:470] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:08:17:505] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:08:47:469] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:09:17:481] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:09:44:806] [error] [server]: Tokenization listener failed: exceeded maximum retry limit (request={  }, response={  }, error=null, info={ "requestUrl": "https://polygon-amoy.g.alchemy.com/v2/o1lr0Pt07dct7AF2TUNsd", "responseBody": null, "responseStatus": "599 CLIENT ESCALATED SERVER ERROR (429 Too Many Requests; exceeded maximum retry limit)" }, code=SERVER_ERROR, version=6.15.0)
+[2026-03-28 11:09:47:488] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:10:17:491] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:10:29:026] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-28 11:10:29:041] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-03-28 11:10:29:032] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-03-28 11:10:29:032] [info] [server]: Invoice Sync Worker started
+[2026-03-28 11:10:29:033] [info] [server]: Transaction Recovery Worker started
+[2026-03-28 11:10:29:042] [info] [server]: Compliance listeners started
+[2026-03-28 11:10:29:046] [info] [server]: [Server] Reconciliation scheduler started
+[2026-03-28 11:10:29:049] [info] [server]: 🚀 Server running on port 3000
+[2026-03-28 11:10:30:829] [info] [server]: Database connection test completed successfully
+[2026-03-28 11:10:59:277] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:11:29:312] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:11:35:274] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-03-28 11:11:35:287] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-03-28 11:11:35:279] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-03-28 11:11:35:280] [info] [server]: Invoice Sync Worker started
+[2026-03-28 11:11:35:281] [info] [server]: Transaction Recovery Worker started
+[2026-03-28 11:11:35:288] [info] [server]: Compliance listeners started
+[2026-03-28 11:11:35:290] [info] [server]: [Server] Reconciliation scheduler started
+[2026-03-28 11:11:35:293] [info] [server]: 🚀 Server running on port 3000
+[2026-03-28 11:11:37:349] [info] [server]: Database connection test completed successfully
+[2026-03-28 11:12:05:578] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-03-28 11:12:35:586] [info] [recoveryService]: Processing 0 operations from recovery queue

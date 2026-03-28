@@ -188,22 +188,35 @@ exports.buyerApproveQuotation = asyncHandler(async (req, res) => {
 
 // ---------------- GET USER QUOTATIONS ----------------
 exports.getQuotations = asyncHandler(async (req, res) => {
+  const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
   const userAddress = req.user.wallet_address;
+  const { limit, offset } = getPaginationParams(req.query);
 
+  // Count total quotations
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM quotations q
+    WHERE q.seller_address = $1 OR q.buyer_address = $1
+  `;
+  const countResult = await pool.query(countQuery, [userAddress]);
+  const total = parseInt(countResult.rows[0]?.total || 0);
+
+  // Get paginated quotations
   const query = `
     SELECT q.*, p.produce_type
     FROM quotations q
     LEFT JOIN produce_lots p ON q.lot_id = p.lot_id
     WHERE q.seller_address = $1 OR q.buyer_address = $1
     ORDER BY q.created_at DESC
+    LIMIT $2 OFFSET $3
   `;
 
-  const result = await pool.query(query, [userAddress]);
-
+  const result = await pool.query(query, [userAddress, limit, offset]);
 
   res.json({
     success: true,
     data: result.rows,
+    pagination: getPaginationMetadata(limit, offset, total)
   });
 });
 
@@ -239,8 +252,21 @@ exports.rejectQuotation = asyncHandler(async (req, res) => {
 
 // ---------------- PENDING BUYER APPROVALS ----------------
 exports.getPendingBuyerApprovals = asyncHandler(async (req, res) => {
+  const { getPaginationParams, getPaginationMetadata } = require('../utils/pagination');
   const buyerAddress = req.user.wallet_address;
+  const { limit, offset } = getPaginationParams(req.query);
 
+  // Count total pending approvals
+  const countQuery = `
+    SELECT COUNT(*) as total
+    FROM quotations q
+    WHERE q.buyer_address = $1
+      AND q.status = 'pending_buyer_approval'
+  `;
+  const countResult = await pool.query(countQuery, [buyerAddress]);
+  const total = parseInt(countResult.rows[0]?.total || 0);
+
+  // Get paginated pending approvals
   const query = `
     SELECT 
       q.*,
@@ -252,13 +278,14 @@ exports.getPendingBuyerApprovals = asyncHandler(async (req, res) => {
     WHERE q.buyer_address = $1
       AND q.status = 'pending_buyer_approval'
     ORDER BY q.created_at DESC
+    LIMIT $2 OFFSET $3
   `;
 
-  const result = await pool.query(query, [buyerAddress]);
-
+  const result = await pool.query(query, [buyerAddress, limit, offset]);
 
   res.json({
     success: true,
     data: result.rows,
+    pagination: getPaginationMetadata(limit, offset, total)
   });
 });

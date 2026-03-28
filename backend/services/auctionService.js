@@ -88,8 +88,8 @@ const statusToString = (status) => {
 const generateAuctionId = (invoiceId, sellerAddress) => {
   return ethers.keccak256(
     ethers.solidityPacked(
-      ['bytes32', 'address', 'uint256'],
-      [invoiceId, sellerAddress, Date.now()]
+      ['bytes32', 'address', 'bytes32'],
+      [invoiceId, sellerAddress, ethers.randomBytes(32)]
     )
   );
 };
@@ -354,11 +354,11 @@ const getAuctionBids = async (auctionId) => {
 const placeBid = async (bidData) => {
   const { auctionId, bidderAddress, yieldBps, bidAmount, txHash } = bidData;
 
-  // Generate bid ID
+  // Generate bid ID with random salt to prevent race condition collisions
   const bidId = ethers.keccak256(
     ethers.solidityPacked(
-      ['bytes32', 'address', 'uint256'],
-      [auctionId, bidderAddress, Date.now()]
+      ['bytes32', 'address', 'bytes32'],
+      [auctionId, bidderAddress, ethers.randomBytes(32)]
     )
   );
 

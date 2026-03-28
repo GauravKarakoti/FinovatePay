@@ -41,21 +41,14 @@ export const signMetaTx = async (signer, contractAddress, functionData) => {
 
     // 4. Define Value
     const value = {
-        nonce: nonce.toString(), // Convert BigNumber to string/number if needed, but ethers handles BigNumber
+        nonce: nonce, // ethers v6 handles BigInt natively
         from: userAddress,
         functionSignature: functionData
     };
 
-    // 5. Sign Data (Ethers v5 syntax)
-    // Note: _signTypedData is used in ethers v5. In v6 it's signTypedData.
-    // Ensure we handle both if possible, but project uses v5.
-    let signature;
-    if (typeof signer._signTypedData === 'function') {
-        signature = await signer._signTypedData(domain, types, value);
-    } else {
-        // Fallback for v6 or other signers
-        signature = await signer.signTypedData(domain, types, value);
-    }
+    // 5. Sign Data (Ethers v6 syntax)
+    // Ethers v6 uses signTypedData(domain, types, value)
+    const signature = await signer.signTypedData(domain, types, value);
 
     return {
         user: userAddress,

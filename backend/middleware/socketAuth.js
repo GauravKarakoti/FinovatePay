@@ -21,7 +21,7 @@ const socketAuthMiddleware = async (socket, next) => {
     // Fetch user from database
     const userResult = await pool.query(
       'SELECT id, email, wallet_address, role, kyc_status, is_frozen FROM users WHERE id = $1',
-      [decoded.userId]
+      [decoded.id]
     );
 
     if (userResult.rows.length === 0) {
@@ -40,7 +40,8 @@ const socketAuthMiddleware = async (socket, next) => {
     // Attach user to socket instance
     socket.user = user;
 
-    console.log(`Socket authenticated: User ${user.id} (${user.email}) connected`);
+  logger = require('../utils/logger')('socketAuth');
+    logger.info(`Socket authenticated: User ${user.id} (${user.email}) connected`);
     next();
 
   } catch (error) {
@@ -100,8 +101,56 @@ const verifyMarketplaceAccess = (user) => {
   return user.role === 'investor' || user.role === 'admin';
 };
 
+/**
+ * Verify user has permission to access a specific auction
+ * Sellers, bidders, investors, and admins can access auction rooms
+ */
+const verifyAuctionAccess = async (userId, userRole, userWalletAddress, auctionId) => {
+  try {
+    // Admin can access all auctions
+    if (userRole === 'admin') {
+      return true;
+    }
+
+    // Investors can access all auctions (they may want to bid)
+    if (userRole === 'investor') {
+      return true;
+    }
+
+    // Fetch auction from database
+    const auctionResult = await pool.query(
+      'SELECT seller_address FROM auctions WHERE auction_id = $1',
+      [auctionId]
+    );
+
+    if (auctionResult.rows.length === 0) {
+      return false;
+    }
+
+    const auction = auctionResult.rows[0];
+
+    // Check if user is the seller
+    if (auction.seller_address === userWalletAddress) {
+      return true;
+    }
+
+    // Check if user has bid on this auction
+    const bidResult = await pool.query(
+      'SELECT 1 FROM auction_bids WHERE auction_id = $1 AND bidder_address = $2 LIMIT 1',
+      [auctionId, userWalletAddress]
+    );
+
+    return bidResult.rows.length > 0;
+
+  } catch (error) {
+    console.error('Error verifying auction access:', error);
+    return false;
+  }
+};
+
 module.exports = {
   socketAuthMiddleware,
   verifyInvoiceAccess,
-  verifyMarketplaceAccess
+  verifyMarketplaceAccess,
+  verifyAuctionAccess
 };
