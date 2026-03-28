@@ -18,3 +18,4 @@ TypeError: Cannot read properties of undefined (reading 'entries')
 [2026-03-26 18:31:05:620] [error] [server]: [server] Compliance listeners failed:
 [2026-03-26 18:31:05:621] [error] [server]: [server] Reconciliation scheduler failed:
 [2026-03-26 18:40:18:037] [error] [server]: [server] Reconciliation scheduler failed:
+[2026-03-28 11:09:44:806] [error] [server]: Tokenization listener failed: exceeded maximum retry limit (request={  }, response={  }, error=null, info={ "requestUrl": "https://polygon-amoy.g.alchemy.com/v2/o1lr0Pt07dct7AF2TUNsd", "responseBody": null, "responseStatus": "599 CLIENT ESCALATED SERVER ERROR (429 Too Many Requests; exceeded maximum retry limit)" }, code=SERVER_ERROR, version=6.15.0)

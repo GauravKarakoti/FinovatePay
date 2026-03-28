@@ -7,6 +7,7 @@ const path = require("path");
 const socketIo = require("socket.io");
 const logger = require("./utils/logger")("server");
 require("dotenv").config();
+const { startScheduledReconciliation } = require("./services/reconciliationService");
 
 /* ---------------- GLOBAL ERROR HANDLERS ---------------- */
 
