@@ -518,7 +518,7 @@ contract MultiCurrencyEscrow is ReentrancyGuard, Pausable, Ownable {
      * @param fromAmount Amount in source currency
      * @param fromCurrency Source currency
      * @param toCurrency Destination currency
-     * @param maxSlippageBps Maximum acceptable slippage
+     * @param _maxSlippageBps Maximum acceptable slippage
      * @return expectedAmount Expected amount after conversion
      * @return actualAmount Minimum amount acceptable
      */
@@ -526,12 +526,12 @@ contract MultiCurrencyEscrow is ReentrancyGuard, Pausable, Ownable {
         uint256 fromAmount,
         string memory fromCurrency,
         string memory toCurrency,
-        uint256 maxSlippageBps
+        uint256 _maxSlippageBps
     ) external view returns (uint256 expectedAmount, uint256 actualAmount) {
         bytes32 fromBytes = keccak256(abi.encodePacked(fromCurrency));
         bytes32 toBytes = keccak256(abi.encodePacked(toCurrency));
         
-        require(maxSlippageBps <= maxSlippageBps, "Slippage too high");
+        require(maxSlippageBps <= _maxSlippageBps, "Slippage too high");
         
         uint256 rate = exchangeRates[fromBytes][toBytes];
         require(rate > 0, "No exchange rate available");
@@ -540,7 +540,7 @@ contract MultiCurrencyEscrow is ReentrancyGuard, Pausable, Ownable {
         expectedAmount = (fromAmount * rate) / 1e8;
         
         // Apply slippage
-        uint256 slippageFactor = 10000 - maxSlippageBps;
+        uint256 slippageFactor = 10000 - _maxSlippageBps;
         actualAmount = (expectedAmount * slippageFactor) / 10000;
         
         return (expectedAmount, actualAmount);

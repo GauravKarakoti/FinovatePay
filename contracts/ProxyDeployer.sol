@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/proxyERC1967/ERC1967Proxy.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -44,6 +44,9 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
     
     // Mapping of contract names to deployment order
     mapping(string => address) public latestProxyAddresses;
+
+    // NEW: Mapping for O(1) lookups from proxy address to contract name
+    mapping(address => string) public proxyToContractName;
     
     // Array to track all deployed proxy addresses
     address[] public deployedProxies;
@@ -88,12 +91,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Deploy a new UUPS proxy contract
-     * @param _implementation Address of the implementation contract
-     * @param _contractName Name of the contract (e.g., "EscrowContract", "FinancingManager")
-     * @param _admin Address that will have admin rights over the proxy
-     * @param _version Initial version number
-     * @param _data Initialization data to call on the proxy
-     * @return Address of the deployed proxy
      */
     function deployProxy(
         address _implementation,
@@ -124,8 +121,9 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
             deployedAt: block.timestamp
         });
         
-        // Update latest proxy address
+        // Update mapping references
         latestProxyAddresses[_contractName] = proxyAddress;
+        proxyToContractName[proxyAddress] = _contractName; // <-- NEW
         
         // Track deployed proxies
         deployedProxies.push(proxyAddress);
@@ -155,10 +153,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Upgrade a proxy to a new implementation
-     * @param _proxyAddress Address of the proxy to upgrade
-     * @param _newImplementation Address of the new implementation contract
-     * @param _newVersion New version number
-     * @param _reason Reason for the upgrade
      */
     function upgradeProxy(
         address _proxyAddress,
@@ -169,25 +163,22 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
         require(_proxyAddress != address(0), "Proxy address cannot be zero");
         require(_newImplementation != address(0), "New implementation cannot be zero");
         
-        // Get current implementation
-        address oldImplementation = UUPSUpgradeable(_proxyAddress).implementation();
+        // 1. Get the current contract name using the new O(1) mapping
+        string memory contractName = proxyToContractName[_proxyAddress];
+        require(bytes(contractName).length > 0, "Proxy not found");
+
+        // 2. Fetch the current implementation from our own storage
+        address oldImplementation = proxyInfos[contractName].implementationAddress;
         
-        // Perform the upgrade
+        // 3. Perform the upgrade via UUPS
         UUPSUpgradeable(_proxyAddress).upgradeToAndCall(
             _newImplementation,
             ""
         );
         
-        // Find and update the contract name if tracked
-        string memory contractName = "";
-        for (uint256 i = 0; i < contractNames.length; i++) {
-            if (proxyInfos[contractNames[i]].proxyAddress == _proxyAddress) {
-                contractName = contractNames[i];
-                proxyInfos[contractName].implementationAddress = _newImplementation;
-                proxyInfos[contractName].version = _newVersion;
-                break;
-            }
-        }
+        // 4. Update the storage efficiently (No loop required anymore!)
+        proxyInfos[contractName].implementationAddress = _newImplementation;
+        proxyInfos[contractName].version = _newVersion;
         
         // Record upgrade in history
         upgradeHistory[_proxyAddress].push(UpgradeRecord({
@@ -215,13 +206,14 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
      * @return Address of the current implementation
      */
     function getImplementation(address _proxyAddress) external view returns (address) {
-        return UUPSUpgradeable(_proxyAddress).implementation();
+        // Read directly from state instead of calling the proxy
+        string memory contractName = proxyToContractName[_proxyAddress];
+        require(bytes(contractName).length > 0, "Proxy not found");
+        return proxyInfos[contractName].implementationAddress;
     }
 
     /**
      * @notice Get proxy information by contract name
-     * @param _contractName Name of the contract
-     * @return ProxyInfo struct containing proxy details
      */
     function getProxyInfo(string memory _contractName) external view returns (ProxyInfo memory) {
         return proxyInfos[_contractName];
@@ -229,8 +221,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Get the latest proxy address for a contract name
-     * @param _contractName Name of the contract
-     * @return Address of the latest proxy
      */
     function getLatestProxy(string memory _contractName) external view returns (address) {
         return latestProxyAddresses[_contractName];
@@ -238,8 +228,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Get upgrade history for a proxy
-     * @param _proxyAddress Address of the proxy
-     * @return Array of UpgradeRecord structs
      */
     function getUpgradeHistory(address _proxyAddress) external view returns (UpgradeRecord[] memory) {
         return upgradeHistory[_proxyAddress];
@@ -247,7 +235,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Get the number of deployed proxies
-     * @return Number of deployed proxies
      */
     function getDeployedProxiesCount() external view returns (uint256) {
         return deployedProxies.length;
@@ -255,9 +242,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Get all deployed proxies (paginated)
-     * @param _offset Start index
-     * @param _limit Number of proxies to return
-     * @return Array of proxy addresses
      */
     function getDeployedProxies(uint256 _offset, uint256 _limit) external view returns (address[] memory) {
         uint256 length = _limit;
@@ -275,7 +259,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Get all contract names
-     * @return Array of contract names
      */
     function getAllContractNames() external view returns (string[] memory) {
         return contractNames;
@@ -283,8 +266,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Check if a proxy is active
-     * @param _contractName Name of the contract
-     * @return Whether the proxy is active
      */
     function isProxyActive(string memory _contractName) external view returns (bool) {
         return proxyInfos[_contractName].isActive;
@@ -292,7 +273,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Deactivate a proxy (pause functionality)
-     * @param _contractName Name of the contract
      */
     function deactivateProxy(string memory _contractName) external onlyOwner {
         require(proxyInfos[_contractName].proxyAddress != address(0), "Proxy not found");
@@ -302,7 +282,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Reactivate a proxy
-     * @param _contractName Name of the contract
      */
     function activateProxy(string memory _contractName) external onlyOwner {
         require(proxyInfos[_contractName].proxyAddress != address(0), "Proxy not found");
@@ -312,8 +291,6 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Transfer proxy admin rights
-     * @param _contractName Name of the contract
-     * @param _newAdmin New admin address
      */
     function transferProxyAdmin(string memory _contractName, address _newAdmin) external onlyOwner {
         require(_newAdmin != address(0), "New admin cannot be zero address");
@@ -328,11 +305,8 @@ contract ProxyDeployer is Initializable, OwnableUpgradeable {
 
     /**
      * @notice Get proxy admin for a contract
-     * @param _contractName Name of the contract
-     * @return Address of the admin
      */
     function getProxyAdmin(string memory _contractName) external view returns (address) {
         return proxyInfos[_contractName].admin;
     }
 }
-

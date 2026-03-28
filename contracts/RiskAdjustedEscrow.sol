@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
@@ -16,7 +16,6 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
  * - Penalty system for late payments proportional to risk level
  */
 contract RiskAdjustedEscrow is ReentrancyGuard, Ownable {
-    
     // Enums
     enum EscrowState { 
         Created, 
@@ -112,8 +111,7 @@ contract RiskAdjustedEscrow is ReentrancyGuard, Ownable {
         _;
     }
 
-    // Constructor
-    constructor() {
+    constructor() Ownable(msg.sender) {
         // Initialize risk-based configurations
         // Excellent risk (0-20): Low rates, low collateral
         riskBasedInterestRates[RiskLevel.Excellent] = 300;    // 3% APR
@@ -215,7 +213,7 @@ contract RiskAdjustedEscrow is ReentrancyGuard, Ownable {
     function fundEscrow(bytes32 _escrowId)
         external
         payable
-        onlyInState, EscrowState(_escrowId.Created)
+        onlyInState(_escrowId, EscrowState.Created)
         nonReentrant
     {
         EscrowTerms memory terms = escrowTerms[_escrowId];
