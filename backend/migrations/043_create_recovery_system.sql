@@ -150,13 +150,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_update_transaction_state_timestamp
+CREATE OR REPLACE TRIGGER trigger_update_transaction_state_timestamp
 BEFORE UPDATE ON transaction_states
 FOR EACH ROW
 EXECUTE FUNCTION update_transaction_state_timestamp();
 
 -- Update updated_at timestamp for recovery queue
-CREATE TRIGGER trigger_update_recovery_queue_timestamp
+CREATE OR REPLACE TRIGGER trigger_update_recovery_queue_timestamp
 BEFORE UPDATE ON transaction_recovery_queue
 FOR EACH ROW
 EXECUTE FUNCTION update_transaction_state_timestamp();

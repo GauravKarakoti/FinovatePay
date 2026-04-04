@@ -1,18 +1,17 @@
 -- Multi-Currency Stablecoin Support
 -- Adds support for additional stablecoins (DAI, EUROC, PYUSD) with smart routing
 
--- Add new stablecoins to currencies table
 INSERT INTO currencies (code, name, symbol, decimal_places, is_crypto, is_active, is_default) VALUES
     ('DAI', 'Dai Stablecoin', 'DAI', 18, TRUE, TRUE, FALSE),
-    ('EUROC', 'Euro Coin', 'EUROC', 6, TRUE, TRUE, FALSE),
-    ('PYUSD', 'PayPal USD', 'PYUSD', 6, TRUE, TRUE, FALSE)
-ON CONFLICT (code) DO NOTHING;
+    ('EUR', 'Euro Coin', 'EUROC', 6, TRUE, TRUE, FALSE),
+    ('PYU', 'PayPal USD', 'PYUSD', 6, TRUE, TRUE, FALSE)
+ON CONFLICT (code) DO NOTHING
 
 -- Add initial exchange rates for new stablecoins (pegged to USD)
 INSERT INTO exchange_rates (currency_code, rate) VALUES
     ('DAI', 1.0),
-    ('EUROC', 0.92),
-    ('PYUSD', 1.0)
+    ('EUR', 0.92),
+    ('PYU', 1.0)
 ON CONFLICT (currency_code) DO NOTHING;
 
 -- Create currency routes table for smart routing
@@ -86,42 +85,47 @@ CREATE INDEX IF NOT EXISTS idx_payments_user ON multi_currency_payments(user_id)
 CREATE INDEX IF NOT EXISTS idx_payments_invoice ON multi_currency_payments(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_pairs_tokens ON stablecoin_pairs(token_a, token_b);
 
--- Insert default currency routes for stablecoins
+INSERT INTO currencies (code, name, symbol, decimal_places, is_crypto, is_active, is_default) VALUES
+    ('USC', 'USD Coin', 'USDC', 6, true, true, false),
+    ('UST', 'Tether USD', 'USDT', 6, true, true, false),
+    ('DAI', 'Dai Stablecoin', 'DAI', 18, true, true, false),
+    ('PYU', 'PayPal USD', 'PYUSD', 6, true, true, false),
+    ('EUR', 'Euro Coin', 'EUROC', 6, true, true, false),
+    ('ERO', 'Euro', '€', 2, false, true, false),
+    ('USD', 'US Dollar', '$', 2, false, true, true)
+ON CONFLICT (code) DO NOTHING;
+
 INSERT INTO currency_routes (from_currency, to_currency, route_type, provider, route_path, rate, slippage_bps, priority) VALUES
-    -- Direct routes (pegged 1:1)
-    ('USDC', 'USDT', 'direct', 'coingecko', '["USDC","USDT"]', 1.0, 10, 10),
-    ('USDT', 'USDC', 'direct', 'coingecko', '["USDT","USDC"]', 1.0, 10, 10),
-    ('DAI', 'USDC', 'direct', 'coingecko', '["DAI","USDC"]', 1.0, 20, 8),
-    ('USDC', 'DAI', 'direct', 'coingecko', '["USDC","DAI"]', 1.0, 20, 8),
-    ('DAI', 'USDT', 'direct', 'coingecko', '["DAI","USDT"]', 1.0, 20, 8),
-    ('USDT', 'DAI', 'direct', 'coingecko', '["USDT","DAI"]', 1.0, 20, 8),
-    ('PYUSD', 'USDC', 'direct', 'coingecko', '["PYUSD","USDC"]', 1.0, 15, 7),
-    ('USDC', 'PYUSD', 'direct', 'coingecko', '["USDC","PYUSD"]', 1.0, 15, 7),
-    ('PYUSD', 'USDT', 'direct', 'coingecko', '["PYUSD","USDT"]', 1.0, 15, 7),
-    ('USDT', 'PYUSD', 'direct', 'coingecko', '["USDT","PYUSD"]', 1.0, 15, 7),
-    -- EUR stablecoin routes
-    ('EUROC', 'EUR', 'direct', 'coingecko', '["EUROC","EUR"]', 1.0, 30, 5),
-    ('EUR', 'EUROC', 'direct', 'coingecko', '["EUR","EUROC"]', 1.0, 30, 5),
-    ('EUROC', 'USDC', 'via_usd', 'coingecko', '["EUROC","EUR","USD","USDC"]', 0.92, 50, 3),
-    ('USDC', 'EUROC', 'via_usd', 'coingecko', '["USDC","USD","EUR","EUROC"]', 1.087, 50, 3),
-    -- USD via routes (for fallback)
-    ('USDC', 'USD', 'via_usd', 'coingecko', '["USDC"]', 1.0, 5, 20),
-    ('USDT', 'USD', 'via_usd', 'coingecko', '["USDT"]', 1.0, 5, 20),
+    ('USC', 'UST', 'direct', 'coingecko', '["USDC","USDT"]', 1.0, 10, 10),
+    ('UST', 'USC', 'direct', 'coingecko', '["USDT","USDC"]', 1.0, 10, 10),
+    ('DAI', 'USC', 'direct', 'coingecko', '["DAI","USDC"]', 1.0, 20, 8),
+    ('USC', 'DAI', 'direct', 'coingecko', '["USDC","DAI"]', 1.0, 20, 8),
+    ('DAI', 'UST', 'direct', 'coingecko', '["DAI","USDT"]', 1.0, 20, 8),
+    ('UST', 'DAI', 'direct', 'coingecko', '["USDT","DAI"]', 1.0, 20, 8),
+    ('PYU', 'USC', 'direct', 'coingecko', '["PYUSD","USDC"]', 1.0, 15, 7),
+    ('USC', 'PYU', 'direct', 'coingecko', '["USDC","PYUSD"]', 1.0, 15, 7),
+    ('PYU', 'UST', 'direct', 'coingecko', '["PYUSD","USDT"]', 1.0, 15, 7),
+    ('UST', 'PYU', 'direct', 'coingecko', '["USDT","PYUSD"]', 1.0, 15, 7),
+    ('EUR', 'ERO', 'direct', 'coingecko', '["EUROC","EUR"]', 1.0, 30, 5),
+    ('ERO', 'EUR', 'direct', 'coingecko', '["EUR","EUROC"]', 1.0, 30, 5),
+    ('EUR', 'USC', 'via_usd', 'coingecko', '["EUROC","EUR","USD","USDC"]', 0.92, 50, 3),
+    ('USC', 'EUR', 'via_usd', 'coingecko', '["USDC","USD","EUR","EUROC"]', 1.087, 50, 3),
+    ('USC', 'USD', 'via_usd', 'coingecko', '["USDC"]', 1.0, 5, 20),
+    ('UST', 'USD', 'via_usd', 'coingecko', '["USDT"]', 1.0, 5, 20),
     ('DAI', 'USD', 'via_usd', 'coingecko', '["DAI"]', 1.0, 10, 15),
-    ('PYUSD', 'USD', 'via_usd', 'coingecko', '["PYUSD"]', 1.0, 10, 12),
-    ('USD', 'USDC', 'via_usd', 'coingecko', '["USDC"]', 1.0, 5, 20),
-    ('USD', 'USDT', 'via_usd', 'coingecko', '["USDT"]', 1.0, 5, 20),
+    ('PYU', 'USD', 'via_usd', 'coingecko', '["PYUSD"]', 1.0, 10, 12),
+    ('USD', 'USC', 'via_usd', 'coingecko', '["USDC"]', 1.0, 5, 20),
+    ('USD', 'UST', 'via_usd', 'coingecko', '["USDT"]', 1.0, 5, 20),
     ('USD', 'DAI', 'via_usd', 'coingecko', '["DAI"]', 1.0, 10, 15),
-    ('USD', 'PYUSD', 'via_usd', 'coingecko', '["PYUSD"]', 1.0, 10, 12)
+    ('USD', 'PYU', 'via_usd', 'coingecko', '["PYUSD"]', 1.0, 10, 12)
 ON CONFLICT (from_currency, to_currency, provider) DO NOTHING;
 
--- Insert some popular stablecoin pairs for DEX tracking
 INSERT INTO stablecoin_pairs (token_a, token_b, dex_name, pool_address, liquidity_usd, volume_24h, is_active) VALUES
-    ('USDC', 'USDT', 'uniswap', '0x3041cbd36888becc7bbcbc0045e3b1f144466f5f', 50000000, 25000000, TRUE),
-    ('DAI', 'USDC', 'uniswap', '0xae461ca67b15dc8dc81ce7615e0320da1a9ab8ed', 25000000, 15000000, TRUE),
-    ('DAI', 'USDT', 'uniswap', '0x3e8468f66d30fc99f9e8aa87002d42cffc17f3a3', 20000000, 12000000, TRUE),
-    ('USDC', 'USDT', 'curve', '0x42b7a526b3176ade2bcf6a0b3d6b4ee3d9f3a0b6', 100000000, 50000000, TRUE),
-    ('DAI', 'USDC', 'curve', '0x3b6831c0077a1e50011a92b73eed2a76e5e7a0c7', 30000000, 18000000, TRUE)
+    ('USC', 'UST', 'uniswap', '0x3041cbd36888becc7bbcbc0045e3b1f144466f5f', 50000000, 25000000, TRUE),
+    ('DAI', 'USC', 'uniswap', '0xae461ca67b15dc8dc81ce7615e0320da1a9ab8ed', 25000000, 15000000, TRUE),
+    ('DAI', 'UST', 'uniswap', '0x3e8468f66d30fc99f9e8aa87002d42cffc17f3a3', 20000000, 12000000, TRUE),
+    ('USC', 'UST', 'curve', '0x42b7a526b3176ade2bcf6a0b3d6b4ee3d9f3a0b6', 100000000, 50000000, TRUE),
+    ('DAI', 'USC', 'curve', '0x3b6831c0077a1e50011a92b73eed2a76e5e7a0c7', 30000000, 18000000, TRUE)
 ON CONFLICT (token_a, token_b, dex_name) DO NOTHING;
 
 -- Add trigger function for updating timestamps

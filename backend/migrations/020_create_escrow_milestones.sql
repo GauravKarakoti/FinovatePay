@@ -1,16 +1,14 @@
 -- =============================================================================
--- Migration 020: Multi-Party Conditional Escrow
--- Tables: multi_party_escrows, escrow_milestones, escrow_participants,
---         milestone_approvals
+-- Migration 020: Multi-Party Conditional Escrow (FK STANDARDIZED TO INTEGER)
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. Top-level escrow records
+-- 1. MAIN ESCROW TABLE (UNCHANGED - SOURCE OF TRUTH)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS multi_party_escrows (
     id               BIGSERIAL    PRIMARY KEY,
     escrow_id        UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    invoice_id       UUID         REFERENCES invoices(invoice_id) ON DELETE SET NULL,
+    invoice_id       VARCHAR(100) REFERENCES invoices(invoice_id) ON DELETE SET NULL,
     title            VARCHAR(255) NOT NULL,
     description      TEXT,
     total_amount     NUMERIC(20, 6) NOT NULL CHECK (total_amount > 0),
@@ -21,7 +19,10 @@ CREATE TABLE IF NOT EXISTS multi_party_escrows (
                          CHECK (status IN ('draft', 'active', 'released', 'cancelled', 'disputed')),
     on_chain_tx_hash VARCHAR(66),
     expires_at       TIMESTAMP,
-    created_by       UUID         REFERENCES users(id) ON DELETE SET NULL,
+    
+    -- ✅ BASE STANDARD (INTEGER)
+    created_by       INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    
     metadata         JSONB        NOT NULL DEFAULT '{}'::jsonb,
     created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -33,16 +34,19 @@ CREATE INDEX IF NOT EXISTS idx_mpe_invoice_id  ON multi_party_escrows(invoice_id
 CREATE INDEX IF NOT EXISTS idx_mpe_status      ON multi_party_escrows(status);
 CREATE INDEX IF NOT EXISTS idx_mpe_created_by  ON multi_party_escrows(created_by);
 CREATE INDEX IF NOT EXISTS idx_mpe_expires_at  ON multi_party_escrows(expires_at)
-    WHERE expires_at IS NOT NULL;
+WHERE expires_at IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
--- 2. Participants within an escrow
+-- 2. ESCROW PARTICIPANTS (FIXED)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS escrow_participants (
     id             BIGSERIAL    PRIMARY KEY,
     escrow_id      UUID         NOT NULL
                        REFERENCES multi_party_escrows(escrow_id) ON DELETE CASCADE,
-    user_id        UUID         REFERENCES users(id) ON DELETE SET NULL,
+
+    -- ✅ FIX: UUID → INTEGER
+    user_id        INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+
     wallet_address VARCHAR(42)  NOT NULL,
     role           VARCHAR(50)  NOT NULL
                        CHECK (role IN ('buyer', 'seller', 'supplier', 'logistics', 'arbiter')),
@@ -58,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_ep_user_id       ON escrow_participants(user_id);
 CREATE INDEX IF NOT EXISTS idx_ep_wallet        ON escrow_participants(wallet_address);
 
 -- ---------------------------------------------------------------------------
--- 3. Milestones within an escrow
+-- 3. ESCROW MILESTONES (NO USER FK HERE)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS escrow_milestones (
     id                       BIGSERIAL     PRIMARY KEY,
@@ -87,13 +91,16 @@ CREATE INDEX IF NOT EXISTS idx_em_status      ON escrow_milestones(status);
 CREATE INDEX IF NOT EXISTS idx_em_order       ON escrow_milestones(escrow_id, order_index);
 
 -- ---------------------------------------------------------------------------
--- 4. Approval audit trail (one row per approver per milestone)
+-- 4. MILESTONE APPROVALS (FIXED)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS milestone_approvals (
     id             BIGSERIAL    PRIMARY KEY,
     milestone_id   BIGINT       NOT NULL
                        REFERENCES escrow_milestones(id) ON DELETE CASCADE,
-    user_id        UUID         REFERENCES users(id) ON DELETE SET NULL,
+
+    -- ✅ FIX: UUID → INTEGER
+    user_id        INTEGER      REFERENCES users(id) ON DELETE SET NULL,
+
     wallet_address VARCHAR(42)  NOT NULL,
     tx_hash        VARCHAR(66),
     block_number   BIGINT,
@@ -109,7 +116,6 @@ CREATE INDEX IF NOT EXISTS idx_ma_user_id       ON milestone_approvals(user_id);
 -- ---------------------------------------------------------------------------
 -- 5. updated_at triggers
 -- ---------------------------------------------------------------------------
--- Reuse the function if it already exists from a previous migration.
 CREATE OR REPLACE FUNCTION fn_update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

@@ -52,7 +52,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_update_meta_tx_nonce_timestamp
+CREATE OR REPLACE TRIGGER trigger_update_meta_tx_nonce_timestamp
 BEFORE UPDATE ON meta_transaction_nonces
 FOR EACH ROW
 EXECUTE FUNCTION update_meta_tx_nonce_timestamp();

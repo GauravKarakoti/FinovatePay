@@ -27,9 +27,7 @@ ALTER TABLE users ALTER COLUMN kyc_status SET DEFAULT 'pending';
 -- Drop old constraint if it exists
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
 
--- Add new constraint with all supported roles
-ALTER TABLE users ADD CONSTRAINT users_role_check 
-CHECK (role IN ('buyer', 'seller', 'investor', 'shipment'));
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('buyer', 'seller', 'investor', 'shipment', 'admin'))
 
 -- ============================================
 -- ADD MISSING INDEXES

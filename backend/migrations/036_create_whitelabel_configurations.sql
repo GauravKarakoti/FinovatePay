@@ -32,63 +32,51 @@ CREATE TABLE IF NOT EXISTS organizations (
     CONSTRAINT valid_plan CHECK (plan IN ('starter', 'professional', 'enterprise', 'white_label'))
 );
 
--- Create whitelabel_configurations table
 CREATE TABLE IF NOT EXISTS whitelabel_configurations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
     
-    -- Branding
     brand_name VARCHAR(255) NOT NULL,
     tagline VARCHAR(500),
     logo_url VARCHAR(1000),
     logo_dark_url VARCHAR(1000),
     favicon_url VARCHAR(1000),
     
-    -- Theme Colors
     primary_color VARCHAR(7) DEFAULT '#3B82F6',
     secondary_color VARCHAR(7) DEFAULT '#1E40AF',
     accent_color VARCHAR(7) DEFAULT '#10B981',
     background_color VARCHAR(7) DEFAULT '#FFFFFF',
     text_color VARCHAR(7) DEFAULT '#1F2937',
     
-    -- Typography
     font_family VARCHAR(100) DEFAULT 'Inter',
     heading_font VARCHAR(100) DEFAULT 'Inter',
     
-    -- UI Customization
     border_radius VARCHAR(20) DEFAULT '8px',
     button_style VARCHAR(50) DEFAULT 'rounded',
     card_style VARCHAR(50) DEFAULT 'shadow',
     
-    -- Layout
     sidebar_style VARCHAR(50) DEFAULT 'fixed',
     header_style VARCHAR(50) DEFAULT 'standard',
     footer_enabled BOOLEAN DEFAULT true,
     
-    -- Custom Content
     custom_css TEXT,
     custom_js TEXT,
     
-    -- Logo and Footer
     show_powered_by BOOLEAN DEFAULT true,
     footer_links JSONB DEFAULT '[]',
     social_links JSONB DEFAULT '{}',
     
-    -- Email Configuration
     email_sender_name VARCHAR(255),
     email_sender_address VARCHAR(255),
     email_template_header TEXT,
     email_template_footer TEXT,
     
-    -- Feature Flags
     features JSONB DEFAULT '{}',
     
-    -- Meta Information
     meta_title VARCHAR(255),
     meta_description TEXT,
     og_image_url VARCHAR(1000),
     
-    -- Timestamps
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     
@@ -98,7 +86,7 @@ CREATE TABLE IF NOT EXISTS whitelabel_configurations (
 -- Create domain verifications table
 CREATE TABLE IF NOT EXISTS domain_verifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
     domain VARCHAR(255) NOT NULL,
     verification_token VARCHAR(255) NOT NULL,
     verification_method VARCHAR(50) DEFAULT 'dns',
@@ -112,10 +100,9 @@ CREATE TABLE IF NOT EXISTS domain_verifications (
     CONSTRAINT valid_verification_method CHECK (verification_method IN ('dns', 'file'))
 );
 
--- Create indexes
-CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);
-CREATE INDEX IF NOT EXISTS idx_organizations_domain ON organizations(domain);
-CREATE INDEX IF NOT EXISTS idx_organizations_status ON organizations(status);
+CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(name);
+CREATE INDEX IF NOT EXISTS idx_organizations_name ON organizations(name);
+CREATE INDEX IF NOT EXISTS idx_organizations_kyc_status ON organizations(kyc_status);
 CREATE INDEX IF NOT EXISTS idx_whitelabel_config_org ON whitelabel_configurations(organization_id);
 CREATE INDEX IF NOT EXISTS idx_domain_verifications_org ON domain_verifications(organization_id);
 CREATE INDEX IF NOT EXISTS idx_domain_verifications_domain ON domain_verifications(domain);
@@ -141,10 +128,8 @@ CREATE TRIGGER trigger_domain_verifications_updated_at
     BEFORE UPDATE ON domain_verifications
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
--- Insert default organization for platform itself
-INSERT INTO organizations (name, slug, domain, status, plan, max_users, max_invoices)
-VALUES ('FinovatePay', 'finovatepay', 'finovatepay.com', 'active', 'enterprise', 10000, 1000000)
-ON CONFLICT (slug) DO NOTHING;
+INSERT INTO organizations (name, kyc_status)
+VALUES ('FinovatePay', 'verified')
 
 -- Add comments for documentation
 COMMENT ON TABLE organizations IS 'Multi-tenant organizations/partners';
@@ -154,7 +139,7 @@ COMMENT ON TABLE domain_verifications IS 'Custom domain verification tracking fo
 -- Create function to get whitelabel config by domain
 CREATE OR REPLACE FUNCTION get_whitelabel_config_by_domain(domain_name VARCHAR)
 RETURNS TABLE (
-    organization_id UUID,
+    organization_id INTEGER,
     org_name VARCHAR,
     org_slug VARCHAR,
     brand_name VARCHAR,

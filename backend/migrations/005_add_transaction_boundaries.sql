@@ -1,8 +1,9 @@
 -- Migration: Add Transaction Boundaries and ACID Property Support
 -- Date: 2026-03-08
--- Purpose: Create tables to support transaction tracking, recovery, and audit trails
 
--- Transaction States Table
+-- =========================
+-- 1. TRANSACTION STATES
+-- =========================
 CREATE TABLE IF NOT EXISTS transaction_states (
   id SERIAL PRIMARY KEY,
   correlation_id UUID UNIQUE NOT NULL,
@@ -16,16 +17,12 @@ CREATE TABLE IF NOT EXISTS transaction_states (
   initiated_by VARCHAR(255),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  completed_at TIMESTAMP,
-  
-  INDEX idx_correlation_id (correlation_id),
-  INDEX idx_operation_type (operation_type),
-  INDEX idx_entity_ref (entity_type, entity_id),
-  INDEX idx_current_state (current_state),
-  INDEX idx_created_at (created_at)
+  completed_at TIMESTAMP
 );
 
--- Transaction Recovery Queue Table
+-- =========================
+-- 2. RECOVERY QUEUE
+-- =========================
 CREATE TABLE IF NOT EXISTS transaction_recovery_queue (
   id SERIAL PRIMARY KEY,
   correlation_id UUID NOT NULL UNIQUE,
@@ -38,14 +35,15 @@ CREATE TABLE IF NOT EXISTS transaction_recovery_queue (
   status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  
-  FOREIGN KEY (correlation_id) REFERENCES transaction_states(correlation_id) ON DELETE CASCADE,
-  INDEX idx_status_retry (status, next_retry_at),
-  INDEX idx_correlation_id (correlation_id),
-  INDEX idx_created_at (created_at)
+
+  FOREIGN KEY (correlation_id) 
+    REFERENCES transaction_states(correlation_id) 
+    ON DELETE CASCADE
 );
 
--- Dead Letter Queue Table
+-- =========================
+-- 3. DEAD LETTER QUEUE
+-- =========================
 CREATE TABLE IF NOT EXISTS dead_letter_queue (
   id SERIAL PRIMARY KEY,
   correlation_id UUID NOT NULL UNIQUE,
@@ -58,26 +56,26 @@ CREATE TABLE IF NOT EXISTS dead_letter_queue (
   compensation_status VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  
-  FOREIGN KEY (correlation_id) REFERENCES transaction_states(correlation_id) ON DELETE CASCADE,
-  INDEX idx_requires_compensation (requires_compensation, compensation_status),
-  INDEX idx_correlation_id (correlation_id),
-  INDEX idx_created_at (created_at)
+
+  FOREIGN KEY (correlation_id) 
+    REFERENCES transaction_states(correlation_id) 
+    ON DELETE CASCADE
 );
 
--- Idempotency Keys Table
+-- =========================
+-- 4. IDEMPOTENCY KEYS
+-- =========================
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   idempotency_key VARCHAR(255) PRIMARY KEY,
   operation_type VARCHAR(100) NOT NULL,
   operation_data JSONB NOT NULL,
   result JSONB,
-  created_at TIMESTAMP DEFAULT NOW(),
-  
-  INDEX idx_operation_type (operation_type),
-  INDEX idx_created_at (created_at)
+  created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Blockchain Operation Snapshots Table
+-- =========================
+-- 5. BLOCKCHAIN SNAPSHOTS
+-- =========================
 CREATE TABLE IF NOT EXISTS blockchain_operation_snapshots (
   id SERIAL PRIMARY KEY,
   snapshot_id UUID UNIQUE NOT NULL,
@@ -88,16 +86,15 @@ CREATE TABLE IF NOT EXISTS blockchain_operation_snapshots (
   state_data JSONB NOT NULL,
   related_snapshot_id UUID,
   created_at TIMESTAMP DEFAULT NOW(),
-  
-  FOREIGN KEY (related_snapshot_id) REFERENCES blockchain_operation_snapshots(snapshot_id) ON DELETE SET NULL,
-  INDEX idx_snapshot_id (snapshot_id),
-  INDEX idx_operation_entity (operation_type, entity_type, entity_id),
-  INDEX idx_snapshot_type (snapshot_type),
-  INDEX idx_related_snapshot (related_snapshot_id),
-  INDEX idx_created_at (created_at)
+
+  FOREIGN KEY (related_snapshot_id) 
+    REFERENCES blockchain_operation_snapshots(snapshot_id) 
+    ON DELETE SET NULL
 );
 
--- Transaction Audit Trail Table
+-- =========================
+-- 6. AUDIT TRAIL
+-- =========================
 CREATE TABLE IF NOT EXISTS transaction_audit_trail (
   id SERIAL PRIMARY KEY,
   audit_id UUID UNIQUE NOT NULL,
@@ -113,19 +110,15 @@ CREATE TABLE IF NOT EXISTS transaction_audit_trail (
   user_agent TEXT,
   transaction_hash VARCHAR(255),
   created_at TIMESTAMP DEFAULT NOW(),
-  
-  FOREIGN KEY (correlation_id) REFERENCES transaction_states(correlation_id) ON DELETE SET NULL,
-  INDEX idx_audit_id (audit_id),
-  INDEX idx_correlation_id (correlation_id),
-  INDEX idx_operation_type (operation_type),
-  INDEX idx_entity_ref (entity_type, entity_id),
-  INDEX idx_actor_id (actor_id),
-  INDEX idx_status (status),
-  INDEX idx_created_at (created_at),
-  INDEX idx_tx_hash (transaction_hash)
+
+  FOREIGN KEY (correlation_id) 
+    REFERENCES transaction_states(correlation_id) 
+    ON DELETE SET NULL
 );
 
--- Financial Transactions Table (enhanced for audit)
+-- =========================
+-- 7. FINANCIAL TRANSACTIONS
+-- =========================
 CREATE TABLE IF NOT EXISTS financial_transactions (
   id SERIAL PRIMARY KEY,
   transaction_id UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
@@ -137,31 +130,96 @@ CREATE TABLE IF NOT EXISTS financial_transactions (
   initiated_by VARCHAR(255),
   confirmed_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  
-  INDEX idx_transaction_id (transaction_id),
-  INDEX idx_invoice_id (invoice_id),
-  INDEX idx_tx_hash (blockchain_tx_hash),
-  INDEX idx_status (status),
-  INDEX idx_created_at (created_at)
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_transaction_states_search 
-ON transaction_states(operation_type, entity_type, entity_id, current_state)
-WHERE current_state != 'COMPLETED';
+-- =========================
+-- INDEXES
+-- =========================
 
-CREATE INDEX IF NOT EXISTS idx_recovery_queue_ready 
-ON transaction_recovery_queue(next_retry_at, status)
-WHERE status = 'PENDING';
+-- transaction_states
+CREATE INDEX IF NOT EXISTS idx_ts_correlation_id 
+ON transaction_states(correlation_id);
 
-CREATE INDEX IF NOT EXISTS idx_snapshots_pair 
-ON blockchain_operation_snapshots(snapshot_id, related_snapshot_id, snapshot_type);
+CREATE INDEX IF NOT EXISTS idx_ts_operation_type 
+ON transaction_states(operation_type);
 
+CREATE INDEX IF NOT EXISTS idx_ts_entity_ref 
+ON transaction_states(entity_type, entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_ts_current_state 
+ON transaction_states(current_state);
+
+CREATE INDEX IF NOT EXISTS idx_ts_created_at 
+ON transaction_states(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_ts_context_gin 
+ON transaction_states USING GIN (context_data);
+
+-- transaction_recovery_queue
+CREATE INDEX IF NOT EXISTS idx_trq_status_retry 
+ON transaction_recovery_queue(status, next_retry_at);
+
+CREATE INDEX IF NOT EXISTS idx_trq_created_at 
+ON transaction_recovery_queue(created_at);
+
+-- dead_letter_queue
+CREATE INDEX IF NOT EXISTS idx_dlq_compensation 
+ON dead_letter_queue(requires_compensation, compensation_status);
+
+CREATE INDEX IF NOT EXISTS idx_dlq_created_at 
+ON dead_letter_queue(created_at);
+
+-- idempotency_keys
+CREATE INDEX IF NOT EXISTS idx_idem_operation_type 
+ON idempotency_keys(operation_type);
+
+CREATE INDEX IF NOT EXISTS idx_idem_created_at 
+ON idempotency_keys(created_at);
+
+-- blockchain_operation_snapshots
+CREATE INDEX IF NOT EXISTS idx_bos_snapshot_id 
+ON blockchain_operation_snapshots(snapshot_id);
+
+CREATE INDEX IF NOT EXISTS idx_bos_entity 
+ON blockchain_operation_snapshots(operation_type, entity_type, entity_id);
+
+CREATE INDEX IF NOT EXISTS idx_bos_snapshot_type 
+ON blockchain_operation_snapshots(snapshot_type);
+
+CREATE INDEX IF NOT EXISTS idx_bos_related 
+ON blockchain_operation_snapshots(related_snapshot_id);
+
+-- audit trail
 CREATE INDEX IF NOT EXISTS idx_audit_entity_timeline 
 ON transaction_audit_trail(entity_type, entity_id, created_at DESC);
 
--- Add audit trigger for transaction_states table
+CREATE INDEX IF NOT EXISTS idx_audit_status 
+ON transaction_audit_trail(status);
+
+-- financial transactions
+CREATE INDEX IF NOT EXISTS idx_ft_status 
+ON financial_transactions(status);
+
+CREATE INDEX IF NOT EXISTS idx_ft_created_at 
+ON financial_transactions(created_at);
+
+-- =========================
+-- PARTIAL INDEXES (PERF)
+-- =========================
+
+CREATE INDEX IF NOT EXISTS idx_ts_active 
+ON transaction_states(operation_type, entity_type, entity_id, current_state)
+WHERE current_state != 'COMPLETED';
+
+CREATE INDEX IF NOT EXISTS idx_trq_ready 
+ON transaction_recovery_queue(next_retry_at, status)
+WHERE status = 'PENDING';
+
+-- =========================
+-- TRIGGER: AUTO UPDATE TIMESTAMP
+-- =========================
+
 CREATE OR REPLACE FUNCTION update_transaction_states_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -170,8 +228,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_update_transaction_states_timestamp ON transaction_states;
+DROP TRIGGER IF EXISTS trigger_update_transaction_states_timestamp 
+ON transaction_states;
+
 CREATE TRIGGER trigger_update_transaction_states_timestamp
-  BEFORE UPDATE ON transaction_states
-  FOR EACH ROW
-  EXECUTE FUNCTION update_transaction_states_timestamp();
+BEFORE UPDATE ON transaction_states
+FOR EACH ROW
+EXECUTE FUNCTION update_transaction_states_timestamp();

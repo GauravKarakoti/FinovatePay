@@ -1,4 +1,4 @@
-CREATE TABLE idempotency_keys (
+CREATE TABLE IF NOT EXISTS idempotency_keys (
     idempotency_key VARCHAR(255) NOT NULL,
     user_id UUID NOT NULL, -- Change UUID to INT if your user IDs are integers
     action VARCHAR(100) NOT NULL,

@@ -85,4 +85,4 @@ COMMENT ON TABLE push_notification_preferences IS 'Stores user preferences for p
 COMMENT ON TABLE push_notification_history IS 'Stores history of sent notifications for debugging';
 COMMENT ON COLUMN push_subscriptions.endpoint IS 'The push subscription endpoint URL';
 COMMENT ON COLUMN push_subscriptions.p256dh IS 'The P-256 ECDH public key of the push subscription';
-COMMENT ON COLUMN push_subscriptions.auth The auth secret of the push subscription';
+COMMENT ON COLUMN push_subscriptions.auth IS 'The auth secret of the push subscription';

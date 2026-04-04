@@ -7,4 +7,4 @@ DROP TABLE IF EXISTS email_logs CASCADE;
 DROP TABLE IF EXISTS user_notification_preferences CASCADE;
 DROP TABLE IF EXISTS email_templates CASCADE;
 
-DROP FUNCTION IF EXISTS update_updated_at_column();
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;

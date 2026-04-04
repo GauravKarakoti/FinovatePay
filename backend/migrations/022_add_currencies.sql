@@ -50,17 +50,17 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
-CREATE TRIGGER update_currencies_updated_at
+CREATE OR REPLACE TRIGGER update_currencies_updated_at
     BEFORE UPDATE ON currencies
     FOR EACH ROW
     EXECUTE FUNCTION update_currency_updated_at_column();
 
-CREATE TRIGGER update_exchange_rates_updated_at
+CREATE OR REPLACE TRIGGER update_exchange_rates_updated_at
     BEFORE UPDATE ON exchange_rates
     FOR EACH ROW
     EXECUTE FUNCTION update_currency_updated_at_column();
 
-CREATE TRIGGER update_user_prefs_updated_at
+CREATE OR REPLACE TRIGGER update_user_prefs_updated_at
     BEFORE UPDATE ON user_currency_preferences
     FOR EACH ROW
     EXECUTE FUNCTION update_currency_updated_at_column();

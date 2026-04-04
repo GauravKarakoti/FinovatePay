@@ -3,17 +3,17 @@
 
 CREATE TABLE IF NOT EXISTS revolving_credit_lines (
     id SERIAL PRIMARY KEY,
-    credit_line_id VARCHAR(66) NOT NULL UNIQUE, -- bytes32 as hex string
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    credit_line_id VARCHAR(66) NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     wallet_address VARCHAR(42) NOT NULL,
     credit_limit VARCHAR(78) NOT NULL DEFAULT '0',
     drawn_amount VARCHAR(78) NOT NULL DEFAULT '0',
-    interest_rate INTEGER NOT NULL DEFAULT 0, -- Annual rate in BPS
+    interest_rate INTEGER NOT NULL DEFAULT 0,
     collateral_token_id BIGINT,
     collateral_amount VARCHAR(78) NOT NULL DEFAULT '0',
     collateral_value VARCHAR(78) NOT NULL DEFAULT '0',
     is_active BOOLEAN NOT NULL DEFAULT true,
-    status VARCHAR(50) NOT NULL DEFAULT 'active', -- active, suspended, closed
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_transaction_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -95,16 +95,13 @@ CREATE TABLE IF NOT EXISTS credit_line_collateral_history (
 -- Index for collateral history queries
 CREATE INDEX IF NOT EXISTS idx_credit_line_collateral_history ON credit_line_collateral_history(credit_line_id, created_at DESC);
 
--- Credit Line Configuration Table
--- Stores global and user-specific credit line parameters
-
 CREATE TABLE IF NOT EXISTS credit_line_config (
     id SERIAL PRIMARY KEY,
     parameter_key VARCHAR(100) NOT NULL UNIQUE,
     parameter_value VARCHAR(255) NOT NULL,
     description TEXT,
     is_global BOOLEAN NOT NULL DEFAULT true,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

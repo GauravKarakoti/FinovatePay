@@ -17,10 +17,10 @@ CREATE TABLE IF NOT EXISTS meta_transactions (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_meta_tx_user ON meta_transactions(user_id);
-CREATE INDEX idx_meta_tx_hash ON meta_transactions(tx_hash);
-CREATE INDEX idx_meta_tx_status ON meta_transactions(status);
-CREATE INDEX idx_meta_tx_created_at ON meta_transactions(created_at);
+CREATE INDEX IF NOT EXISTS idx_meta_tx_user ON meta_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_meta_tx_hash ON meta_transactions(tx_hash);
+CREATE INDEX IF NOT EXISTS idx_meta_tx_status ON meta_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_meta_tx_created_at ON meta_transactions(created_at);
 
 -- Create user_gas_usage table for daily gas limit tracking
 CREATE TABLE IF NOT EXISTS user_gas_usage (
@@ -31,8 +31,8 @@ CREATE TABLE IF NOT EXISTS user_gas_usage (
     last_reset TIMESTAMP DEFAULT NOW()
 );
 
--- Create index on user_id
-CREATE INDEX idx_user_gas_usage_user ON user_gas_usage(user_id);
+-- Create index IF NOT EXISTS on user_id
+CREATE INDEX IF NOT EXISTS idx_user_gas_usage_user ON user_gas_usage(user_id);
 
 -- Add comments for documentation
 COMMENT ON TABLE meta_transactions IS 'Tracks gasless meta-transactions submitted through the relayer service';

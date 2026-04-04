@@ -1,43 +1,136 @@
--- Lending Pool Tables
--- Dynamic Collateralized Lending Protocol
--- Allows borrowing against invoice fractions and escrow deposits with dynamic LTV
-
--- Loans Table
--- Stores loan information with dynamic LTV ratios
-CREATE TABLE IF NOT EXISTS loans (
+-- =========================
+-- COLLATERAL POSITIONS (FIXED)
+-- =========================
+CREATE TABLE IF NOT EXISTS collateral_positions (
     id SERIAL PRIMARY KEY,
-    loan_id VARCHAR(66) NOT NULL UNIQUE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    position_id VARCHAR(66) NOT NULL UNIQUE,
+    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
+
+    -- ✅ FIX: UUID → INTEGER
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
     wallet_address VARCHAR(42) NOT NULL,
     
-    -- Loan Details
-    principal NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    interest_rate INTEGER NOT NULL DEFAULT 500, -- bps (5%)
-    total_debt NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    collateral_value NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    ltv INTEGER NOT NULL DEFAULT 0, -- Loan-to-value in bps
+    collateral_type VARCHAR(20) NOT NULL 
+        CHECK (collateral_type IN ('fraction_token', 'escrow_deposit')),
     
-    -- Loan Terms
-    loan_duration INTEGER NOT NULL DEFAULT 0, -- seconds
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    maturity_date TIMESTAMP NOT NULL,
+    token_contract VARCHAR(42) NOT NULL,
+    token_id NUMERIC(78, 0) NOT NULL DEFAULT 0,
+    amount NUMERIC(78, 0) NOT NULL DEFAULT 0,
     
-    -- Status
-    status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'repaid', 'liquidated', 'defaulted')),
-    is_undercollateralized BOOLEAN NOT NULL DEFAULT FALSE,
+    value NUMERIC(78, 0) NOT NULL DEFAULT 0,
     
-    -- On-chain Reference
-    transaction_hash VARCHAR(66),
-    block_number BIGINT,
+    is_locked BOOLEAN NOT NULL DEFAULT TRUE,
+    deposited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    -- Timestamps
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    -- Indexes
-    CONSTRAINT loans_principal_positive CHECK (principal > 0)
+    CONSTRAINT collateral_amount_positive CHECK (amount > 0),
+    CONSTRAINT collateral_value_positive CHECK (value >= 0)
 );
 
--- Indexes for faster queries
+-- =========================
+-- LIQUIDATION EVENTS (FIXED)
+-- =========================
+CREATE TABLE IF NOT EXISTS liquidation_events (
+    id SERIAL PRIMARY KEY,
+    liquidation_id VARCHAR(66) NOT NULL UNIQUE,
+    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
+
+    -- ✅ FIX: UUID → INTEGER
+    liquidator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+
+    liquidator_address VARCHAR(42) NOT NULL,
+    
+    collateral_seized_value NUMERIC(78, 0) NOT NULL DEFAULT 0,
+    debt_covered NUMERIC(78, 0) NOT NULL DEFAULT 0,
+    liquidation_bonus NUMERIC(78, 0) NOT NULL DEFAULT 0,
+    
+    collateral_type VARCHAR(20),
+    token_contract VARCHAR(42),
+    token_id NUMERIC(78, 0),
+    amount_seized NUMERIC(78, 0),
+    
+    status VARCHAR(20) NOT NULL DEFAULT 'completed' 
+        CHECK (status IN ('pending', 'completed', 'reverted')),
+    
+    liquidated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at TIMESTAMP,
+    
+    transaction_hash VARCHAR(66),
+    block_number BIGINT
+);
+
+-- =========================
+-- LOAN REPAYMENTS (FIXED)
+-- =========================
+CREATE TABLE IF NOT EXISTS loan_repayments (
+    id SERIAL PRIMARY KEY,
+    repayment_id VARCHAR(66) NOT NULL UNIQUE,
+    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
+
+    -- ✅ FIX: UUID → INTEGER
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    amount NUMERIC(78, 0) NOT NULL,
+    interest_paid NUMERIC(78, 0) NOT NULL DEFAULT 0,
+    principal_paid NUMERIC(78, 0) NOT NULL DEFAULT 0,
+    remaining_debt NUMERIC(78, 0) NOT NULL DEFAULT 0,
+    
+    status VARCHAR(20) NOT NULL DEFAULT 'completed' 
+        CHECK (status IN ('pending', 'completed', 'failed')),
+    
+    repaid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    transaction_hash VARCHAR(66),
+    block_number BIGINT
+);
+
+-- =========================
+-- LOAN COLLATERAL HISTORY (FIXED)
+-- =========================
+CREATE TABLE IF NOT EXISTS loan_collateral_history (
+    id SERIAL PRIMARY KEY,
+    history_id VARCHAR(66) NOT NULL UNIQUE,
+    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
+    position_id VARCHAR(66) REFERENCES collateral_positions(position_id) ON DELETE SET NULL,
+
+    -- ✅ FIX: UUID → INTEGER
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    action VARCHAR(20) NOT NULL 
+        CHECK (action IN ('deposit', 'withdraw', 'seized')),
+    
+    collateral_type VARCHAR(20) NOT NULL,
+    token_contract VARCHAR(42),
+    token_id NUMERIC(78, 0),
+    amount NUMERIC(78, 0) NOT NULL,
+    value NUMERIC(78, 0) NOT NULL,
+    
+    collateral_value_before NUMERIC(78, 0),
+    collateral_value_after NUMERIC(78, 0),
+    
+    action_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    transaction_hash VARCHAR(66),
+    block_number BIGINT
+);
+
+-- =========================
+-- LENDING POOL CONFIG (FIXED)
+-- =========================
+CREATE TABLE IF NOT EXISTS lending_pool_config (
+    id SERIAL PRIMARY KEY,
+    parameter_key VARCHAR(50) NOT NULL UNIQUE,
+    parameter_value TEXT NOT NULL,
+    description TEXT,
+    is_global BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- ✅ FIX: UUID → INTEGER
+    updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_loans_user_id ON loans(user_id);
 CREATE INDEX IF NOT EXISTS idx_loans_wallet_address ON loans(wallet_address);
 CREATE INDEX IF NOT EXISTS idx_loans_loan_id ON loans(loan_id);
@@ -46,39 +139,6 @@ CREATE INDEX IF NOT EXISTS idx_loans_maturity_date ON loans(maturity_date);
 CREATE INDEX IF NOT EXISTS idx_loans_is_undercollateralized ON loans(is_undercollateralized);
 CREATE INDEX IF NOT EXISTS idx_loans_ltv ON loans(ltv);
 
--- Collateral Positions Table
--- Tracks collateral deposits (ERC1155 fractions and escrow deposits)
-CREATE TABLE IF NOT EXISTS collateral_positions (
-    id SERIAL PRIMARY KEY,
-    position_id VARCHAR(66) NOT NULL UNIQUE,
-    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    wallet_address VARCHAR(42) NOT NULL,
-    
-    -- Collateral Type
-    collateral_type VARCHAR(20) NOT NULL CHECK (collateral_type IN ('fraction_token', 'escrow_deposit')),
-    
-    -- Token Details
-    token_contract VARCHAR(42) NOT NULL,
-    token_id NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    amount NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    
-    -- Value
-    value NUMERIC(78, 0) NOT NULL DEFAULT 0, -- USD value
-    
-    -- Status
-    is_locked BOOLEAN NOT NULL DEFAULT TRUE,
-    deposited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Timestamps
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- Constraints
-    CONSTRAINT collateral_amount_positive CHECK (amount > 0),
-    CONSTRAINT collateral_value_positive CHECK (value >= 0)
-);
-
--- Indexes for collateral positions
 CREATE INDEX IF NOT EXISTS idx_collateral_loan_id ON collateral_positions(loan_id);
 CREATE INDEX IF NOT EXISTS idx_collateral_user_id ON collateral_positions(user_id);
 CREATE INDEX IF NOT EXISTS idx_collateral_position_id ON collateral_positions(position_id);
@@ -86,125 +146,21 @@ CREATE INDEX IF NOT EXISTS idx_collateral_type ON collateral_positions(collatera
 CREATE INDEX IF NOT EXISTS idx_collateral_token ON collateral_positions(token_contract, token_id);
 CREATE INDEX IF NOT EXISTS idx_collateral_is_locked ON collateral_positions(is_locked);
 
--- Liquidation Events Table
--- Records all liquidation events for auditing
-CREATE TABLE IF NOT EXISTS liquidation_events (
-    id SERIAL PRIMARY KEY,
-    liquidation_id VARCHAR(66) NOT NULL UNIQUE,
-    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
-    liquidator_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    liquidator_address VARCHAR(42) NOT NULL,
-    
-    -- Liquidation Details
-    collateral_seized_value NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    debt_covered NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    liquidation_bonus NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    
-    -- Collateral Details
-    collateral_type VARCHAR(20),
-    token_contract VARCHAR(42),
-    token_id NUMERIC(78, 0),
-    amount_seized NUMERIC(78, 0),
-    
-    -- Status
-    status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'reverted')),
-    
-    -- Timestamps
-    liquidated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    confirmed_at TIMESTAMP,
-    
-    -- On-chain Reference
-    transaction_hash VARCHAR(66),
-    block_number BIGINT
-);
-
--- Indexes for liquidation events
 CREATE INDEX IF NOT EXISTS idx_liquidation_loan_id ON liquidation_events(loan_id);
 CREATE INDEX IF NOT EXISTS idx_liquidation_liquidator ON liquidation_events(liquidator_address);
 CREATE INDEX IF NOT EXISTS idx_liquidation_liquidator_id ON liquidation_events(liquidator_id);
 CREATE INDEX IF NOT EXISTS idx_liquidation_status ON liquidation_events(status);
 CREATE INDEX IF NOT EXISTS idx_liquidation_date ON liquidation_events(liquidated_at);
 
--- Loan Repayment History Table
--- Tracks all repayment transactions
-CREATE TABLE IF NOT EXISTS loan_repayments (
-    id SERIAL PRIMARY KEY,
-    repayment_id VARCHAR(66) NOT NULL UNIQUE,
-    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Payment Details
-    amount NUMERIC(78, 0) NOT NULL,
-    interest_paid NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    principal_paid NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    remaining_debt NUMERIC(78, 0) NOT NULL DEFAULT 0,
-    
-    -- Status
-    status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed')),
-    
-    -- Timestamps
-    repaid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- On-chain Reference
-    transaction_hash VARCHAR(66),
-    block_number BIGINT
-);
-
--- Indexes for loan repayments
 CREATE INDEX IF NOT EXISTS idx_loan_repayments_loan_id ON loan_repayments(loan_id);
 CREATE INDEX IF NOT EXISTS idx_loan_repayments_user_id ON loan_repayments(user_id);
 CREATE INDEX IF NOT EXISTS idx_loan_repayments_date ON loan_repayments(repaid_at);
 
--- Loan Collateral History Table
--- Tracks all collateral deposits and withdrawals
-CREATE TABLE IF NOT EXISTS loan_collateral_history (
-    id SERIAL PRIMARY KEY,
-    history_id VARCHAR(66) NOT NULL UNIQUE,
-    loan_id VARCHAR(66) NOT NULL REFERENCES loans(loan_id) ON DELETE CASCADE,
-    position_id VARCHAR(66) REFERENCES collateral_positions(position_id) ON DELETE SET NULL,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    -- Action Type
-    action VARCHAR(20) NOT NULL CHECK (action IN ('deposit', 'withdraw', 'seized')),
-    
-    -- Collateral Details
-    collateral_type VARCHAR(20) NOT NULL,
-    token_contract VARCHAR(42),
-    token_id NUMERIC(78, 0),
-    amount NUMERIC(78, 0) NOT NULL,
-    value NUMERIC(78, 0) NOT NULL,
-    
-    -- Before/After Values
-    collateral_value_before NUMERIC(78, 0),
-    collateral_value_after NUMERIC(78, 0),
-    
-    -- Timestamps
-    action_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    -- On-chain Reference
-    transaction_hash VARCHAR(66),
-    block_number BIGINT
-);
-
--- Indexes for collateral history
 CREATE INDEX IF NOT EXISTS idx_loan_collateral_history_loan_id ON loan_collateral_history(loan_id);
 CREATE INDEX IF NOT EXISTS idx_loan_collateral_history_user_id ON loan_collateral_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_loan_collateral_history_action ON loan_collateral_history(action);
 CREATE INDEX IF NOT EXISTS idx_loan_collateral_history_date ON loan_collateral_history(action_at);
 
--- Lending Pool Configuration Table
--- Stores protocol-level configuration
-CREATE TABLE IF NOT EXISTS lending_pool_config (
-    id SERIAL PRIMARY KEY,
-    parameter_key VARCHAR(50) NOT NULL UNIQUE,
-    parameter_value TEXT NOT NULL,
-    description TEXT,
-    is_global BOOLEAN NOT NULL DEFAULT TRUE,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_by UUID REFERENCES users(id) ON DELETE SET NULL
-);
-
--- Default pool configuration
 INSERT INTO lending_pool_config (parameter_key, parameter_value, description, is_global) VALUES
     ('min_loan_size', '1000000000', 'Minimum loan size in USDC (6 decimals)', true),
     ('max_loan_size', '1000000000000', 'Maximum loan size in USDC (6 decimals)', true),
@@ -218,8 +174,6 @@ INSERT INTO lending_pool_config (parameter_key, parameter_value, description, is
     ('min_credit_score', '60', 'Minimum credit score required', true)
 ON CONFLICT (parameter_key) DO NOTHING;
 
--- Lending Pool Stats Table
--- Aggregated pool statistics
 CREATE TABLE IF NOT EXISTS lending_pool_stats (
     id SERIAL PRIMARY KEY,
     record_date DATE NOT NULL UNIQUE,
@@ -244,7 +198,6 @@ CREATE TABLE IF NOT EXISTS lending_pool_stats (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for lending pool stats
 CREATE INDEX IF NOT EXISTS idx_lending_pool_stats_date ON lending_pool_stats(record_date);
 
 -- Trigger function for updated_at
@@ -257,13 +210,13 @@ END;
 $$ language 'plpgsql';
 
 -- Triggers for loans
-CREATE TRIGGER update_loans_updated_at
+CREATE OR REPLACE TRIGGER update_loans_updated_at
     BEFORE UPDATE ON loans
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Triggers for collateral_positions
-CREATE TRIGGER update_collateral_positions_updated_at
+CREATE OR REPLACE TRIGGER update_collateral_positions_updated_at
     BEFORE UPDATE ON collateral_positions
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
