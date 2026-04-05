@@ -14,6 +14,64 @@ router.use(requireKYC);
 router.use(paymentLimiter);
 
 /**
+ * POST /api/fiat-ramp/transak-link
+ * Create a Transak widget URL using their v4 Session API
+ */
+router.post('/transak-link', requireRole(['buyer', 'seller', 'investor', 'admin']), async (req, res) => {
+    try {
+        const { amount, currency = 'USD', cryptoCurrency = 'USDC', walletAddress } = req.body;
+
+        const transakApiKey = process.env.VITE_TRANSAK_API_KEY;
+        const transakApiSecret = process.env.TRANSAK_API_SECRET;
+
+        // 1. Get Access Token (Fixed URL and added api-secret header)
+        const tokenResponse = await axios.post('https://api-stg.transak.com/partners/api/v2/refresh-token', {
+            apiKey: transakApiKey
+        }, {
+            headers: {
+                'api-secret': transakApiSecret,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const accessToken = tokenResponse.data?.data?.accessToken;
+
+        // Parse frontend URL to get the hostname for the mandatory referrerDomain
+        const frontendUrl = new URL(process.env.FRONTEND_URL || 'http://localhost:5173');
+
+        // 2. Generate Widget URL / Session
+        const sessionResponse = await axios.post('https://api-gateway-stg.transak.com/api/v2/auth/session', {
+            widgetParams: {
+                apiKey: transakApiKey,
+                environment: 'STAGING',
+                defaultCryptoCurrency: cryptoCurrency,
+                walletAddress: walletAddress,
+                themeColor: '22c55e',
+                fiatAmount: parseFloat(amount),
+                fiatCurrency: currency,
+                redirectURL: process.env.FRONTEND_URL,
+                referrerDomain: frontendUrl.hostname, // <-- This is mandatory in v4
+                network: 'polygon'
+            }
+        }, {
+            headers: {
+                'access-token': accessToken,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        return res.json({
+            success: true,
+            widgetUrl: sessionResponse.data.data.widgetUrl
+        });
+
+    } catch (error) {
+        console.error('Transak session error:', error?.response?.data || error.message);
+        res.status(500).json({ error: 'Failed to generate Transak link' });
+    }
+});
+
+/**
  * POST /api/fiat-ramp/create-link
  * Create a MoonPay payment link for purchasing stablecoins
  */

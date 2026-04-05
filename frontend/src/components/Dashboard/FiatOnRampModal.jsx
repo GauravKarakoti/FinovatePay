@@ -76,24 +76,26 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
             let paymentUrl;
 
             if (provider === 'transak') {
+                const response = await api.post('/fiat-ramp/transak-link', {
+                    amount: parseFloat(amount),
+                    currency,
+                    cryptoCurrency,
+                    walletAddress
+                });
+
+                const { widgetUrl } = response.data;
+
+                if (!widgetUrl) {
+                    throw new Error("Failed to retrieve Transak widget URL from backend");
+                }
+
+                // Initialize Transak with the backend-generated URL
                 const transakConfig = {
-                    apiKey: import.meta.env.VITE_TRANSAK_API_KEY,
-                    environment: 'STAGING',
-                    defaultCryptoCurrency: cryptoCurrency,
-                    walletAddress: walletAddress,
-                    themeColor: '22c55e',
-                    fiatAmount: parseFloat(amount),
-                    fiatCurrency: currency,
-                    email: '', // Let user enter email in widget
-                    redirectURL: window.location.origin,
-                    hostURL: window.location.origin,
-                    widgetHeight: '625px',
-                    widgetWidth: '500px',
-                    network: 'polygon'
+                    widgetUrl: widgetUrl, 
+                    referrer: window.location.origin,
                 };
 
                 const transak = new Transak(transakConfig);
-
                 transak.init();
 
                 transak.on(transak.EVENTS.TRANSAK_ORDER_SUCCESSFUL, (orderData) => {
