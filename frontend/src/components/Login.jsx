@@ -28,9 +28,14 @@ const Login = ({ onLogin }) => {
       const response = await login(formData.email, formData.password);
       onLogin(response.data.user, response.data.token);
       navigate(from, { replace: true });
-      console.log('Login successful:', response.data, from);
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
+      // Safely extract the error message whether it's a string or an object
+      const resError = err.response?.data?.error;
+      const errorMessage = typeof resError === 'string' 
+        ? resError 
+        : resError?.message || err.message || 'Login failed. Please try again.';
+        
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

@@ -258,7 +258,6 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
       });
     }
 
-    // Fetch user data WITHOUT password_hash
     const userResult = await pool.query(
       `SELECT id, email, wallet_address, company_name, 
               first_name, last_name, role, created_at 
@@ -268,20 +267,15 @@ router.post('/login', authLimiter, validateLogin, async (req, res) => {
 
     const user = userResult.rows[0];
 
+    // Generate the access token
     const token = generateToken(user);
 
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-
-    // Return user data (excluding tokens)
+    // Return user data AND the token to satisfy the frontend's expectation
     res.json({
       success: true,
       message: 'Login successful',
-      user: sanitizeUser(user)
+      user: sanitizeUser(user),
+      token: token // <-- Crucial: Added token so Login.jsx can use it
     });
   } catch (error) {
     console.error('Login error:', error);

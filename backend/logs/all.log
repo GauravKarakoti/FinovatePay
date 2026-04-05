@@ -92,3 +92,128 @@
 [2026-03-28 11:11:37:349] [info] [server]: Database connection test completed successfully
 [2026-03-28 11:12:05:578] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-03-28 11:12:35:586] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:21:55:578] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:21:55:592] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:21:55:583] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:21:55:584] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:21:55:585] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:21:55:593] [info] [server]: Compliance listeners started
+[2026-04-05 12:21:55:596] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:21:55:599] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:21:57:548] [info] [server]: Database connection test completed successfully
+[2026-04-05 12:21:58:710] [info] [server]: Tokenization listener started
+[2026-04-05 12:22:25:842] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:22:55:856] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:23:25:925] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:23:55:939] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:24:25:866] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:24:55:870] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:25:25:878] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:25:33:442] [info] [request]: [3ccdd4c5-08f5-4588-975d-c02220fce9fe] GET /api/v1/notifications/subscriptions
+[2026-04-05 12:25:33:451] [info] [request]: [bef58eec-e4db-41ee-b3a9-3d0513fab14f] GET /api/v1/notifications/push-preferences
+[2026-04-05 12:25:34:064] [info] [request]: [8bcba66a-e792-49e7-9f39-3de31c1187ae] GET /api/v1/notifications/subscriptions
+[2026-04-05 12:25:34:070] [info] [request]: [20cf3b4b-5a1f-449e-9936-1d872ac8c00d] GET /api/v1/notifications/push-preferences
+[2026-04-05 12:25:49:896] [info] [request]: [4eaf40d0-f57b-412f-9658-3f81474c611e] POST /api/v1/auth/login
+[2026-04-05 12:25:57:451] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:26:25:884] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:26:55:136] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-05 12:29:35:675] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:29:35:690] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:29:35:681] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:29:35:682] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:29:35:683] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:29:35:692] [info] [server]: Compliance listeners started
+[2026-04-05 12:29:35:694] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:29:35:699] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:29:37:679] [info] [server]: Database connection test completed successfully
+[2026-04-05 12:29:39:512] [info] [server]: Tokenization listener started
+[2026-04-05 12:29:46:264] [info] [request]: [fd47e071-d4d7-43f2-a3cf-31b041c571b8] POST /api/v1/auth/login
+[2026-04-05 12:30:08:069] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:30:35:940] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:31:05:998] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:31:35:961] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:32:05:971] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:32:35:985] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:33:05:995] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:33:36:007] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:34:06:004] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:34:35:336] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-05 12:47:41:473] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:47:41:491] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:47:41:480] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:47:41:481] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:47:41:482] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:47:41:493] [info] [server]: Compliance listeners started
+[2026-04-05 12:47:41:496] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:47:41:499] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:47:43:884] [info] [server]: Database connection test completed successfully
+[2026-04-05 12:47:45:242] [info] [server]: Tokenization listener started
+[2026-04-05 12:48:00:362] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:48:00:375] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:48:00:367] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:48:00:368] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:48:00:369] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:48:00:376] [info] [server]: Compliance listeners started
+[2026-04-05 12:48:00:378] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:48:00:381] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:48:02:348] [info] [server]: Database connection test completed successfully
+[2026-04-05 12:48:04:121] [info] [server]: Tokenization listener started
+[2026-04-05 12:48:26:551] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:48:26:564] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:48:26:556] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:48:26:557] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:48:26:558] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:48:26:565] [info] [server]: Compliance listeners started
+[2026-04-05 12:48:26:567] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:48:26:569] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:48:28:468] [info] [server]: Database connection test completed successfully
+[2026-04-05 12:48:29:768] [info] [server]: Tokenization listener started
+[2026-04-05 12:48:40:655] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:48:40:674] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:48:40:662] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:48:40:663] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:48:40:664] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:48:40:675] [info] [server]: Compliance listeners started
+[2026-04-05 12:48:40:678] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:48:40:682] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:48:43:331] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:48:43:355] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:48:43:338] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:48:43:340] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:48:43:342] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:48:43:357] [info] [server]: Compliance listeners started
+[2026-04-05 12:48:43:362] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:48:43:367] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:48:45:189] [info] [server]: Database connection test completed successfully
+[2026-04-05 12:48:46:460] [info] [server]: Tokenization listener started
+[2026-04-05 12:49:13:603] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:49:42:409] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 12:49:42:423] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 12:49:42:415] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 12:49:42:416] [info] [server]: Invoice Sync Worker started
+[2026-04-05 12:49:42:417] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 12:49:42:424] [info] [server]: Compliance listeners started
+[2026-04-05 12:49:42:427] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 12:49:42:430] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 12:49:45:110] [info] [server]: Database connection test completed successfully
+[2026-04-05 12:49:46:173] [info] [server]: Tokenization listener started
+[2026-04-05 12:49:53:474] [info] [request]: [2ebf8172-caa5-4130-92b0-8a5218f9ce60] POST /api/v1/auth/login
+[2026-04-05 12:49:54:987] [info] [request]: [6b26e81c-84d3-4709-b1ba-018139a9124e] GET /api/v1/notifications/subscriptions
+[2026-04-05 12:49:55:002] [info] [request]: [4b6717d6-d052-4626-946a-ceda1a7489fa] GET /api/v1/notifications/push-preferences
+[2026-04-05 12:49:55:056] [info] [request]: [0b96795f-53c5-410b-9a47-babc7a0afbcb] GET /api/v1/kyc/status
+[2026-04-05 12:49:55:068] [info] [request]: [3fb1af57-5b26-46be-bbb1-dcfb002bb211] GET /api/v1/invoices/buyer
+[2026-04-05 12:49:57:289] [info] [request]: [659a17e7-8aed-44b4-b243-c59e44d372e4] GET /api/v1/notifications/subscriptions
+[2026-04-05 12:49:58:508] [info] [request]: [3a3ff858-0ed3-4a1f-8914-1ef33d96eb2c] GET /api/v1/notifications/push-preferences
+[2026-04-05 12:49:58:638] [info] [request]: [8d6af6e0-f078-4e2d-9cc9-dadd8cff362b] GET /api/v1/kyc/status
+[2026-04-05 12:50:00:374] [info] [request]: [f96bb8d6-4f07-49dc-9aa1-be3fed2a753c] GET /api/v1/invoices/buyer
+[2026-04-05 12:50:04:544] [info] [request]: [d4b76e51-4c30-45a7-976b-da881690a567] GET /api/v1/invoices/buyer
+[2026-04-05 12:50:06:694] [info] [request]: [7a3d9762-029c-40a6-b1ca-0bc38374c1c0] GET /api/v1/notifications/subscriptions
+[2026-04-05 12:50:06:703] [info] [request]: [2ec7b205-436b-4663-bcee-6554de40803c] GET /api/v1/notifications/push-preferences
+[2026-04-05 12:50:06:740] [info] [request]: [20225ccc-bd38-42f8-ac2a-2764467e9fda] GET /api/v1/kyc/status
+[2026-04-05 12:50:09:836] [info] [request]: [20c8ac97-1802-43be-9235-35c3569a4b51] GET /api/v1/invoices/buyer
+[2026-04-05 12:50:10:389] [info] [request]: [603dda85-0b5d-4033-bfbc-392e12b351ed] GET /api/v1/notifications/push-preferences
+[2026-04-05 12:50:10:396] [info] [request]: [9a2e77ea-97da-4bf4-b273-7ca86f106d4b] GET /api/v1/notifications/subscriptions
+[2026-04-05 12:50:11:212] [info] [request]: [21178cd5-1fa5-4ccc-af1a-7d9bbd06ec26] GET /api/v1/kyc/status
+[2026-04-05 12:50:14:198] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 12:50:14:195] [info] [request]: [66b64d2a-1453-4a02-bab4-f314064a2490] GET /api/v1/invoices/buyer
+[2026-04-05 12:50:15:215] [info] [request]: [cd9ef0bb-700b-4f5d-bdc1-02452c732423] GET /api/v1/invoices/buyer

@@ -40,6 +40,13 @@ api.interceptors.request.use(
   }
 );
 
+const getErrorMessage = (errorData, fallback) => {
+  if (typeof errorData?.message === 'string') return errorData.message;
+  if (typeof errorData?.error === 'string') return errorData.error;
+  if (errorData?.error?.message) return errorData.error.message;
+  return fallback;
+};
+
 // Handle API errors with comprehensive error handling
 
 api.interceptors.response.use(
@@ -223,7 +230,7 @@ api.interceptors.response.use(
           return api(originalRequest);
         }
 
-        message = errorData?.message || errorData?.error || 'Server error. Please try again later.';
+        message = getErrorMessage(errorData, 'Server error. Please try again later.');
         toast.error(message);
         return Promise.reject({
           ...error,

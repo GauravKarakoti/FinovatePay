@@ -227,15 +227,10 @@ class Whitelabel {
     return result.rows[0] || null;
   }
 
-  /**
-   * Get whitelabel configuration by domain
-   * @param {string} domain - Domain name
-   * @returns {Promise<Object|null>}
-   */
   static async getConfigurationByDomain(domain) {
     const query = `
       SELECT 
-        o.id as organization_id, o.name as organization_name, o.slug as organization_slug,
+        o.id as organization_id, o.name as organization_name,
         o.plan, o.status as organization_status,
         w.*
       FROM organizations o
