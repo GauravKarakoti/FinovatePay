@@ -71,22 +71,25 @@ class PushNotificationService {
     return permission;
   }
 
-  /**
-   * Subscribe to push notifications
-   */
   async subscribe() {
     try {
       if (!this.registration) {
         await this.initialize();
       }
 
+      // 1. Check for and clear any existing/stale subscriptions
+      const existingSubscription = await this.registration.pushManager.getSubscription();
+      if (existingSubscription) {
+        await existingSubscription.unsubscribe();
+      }
+
       if (!this.vapidPublicKey) {
         // Get VAPID public key from server
         const response = await api.get('/notifications/vapid-key');
-        if (response.data.success) {
+        if (response.data.success && response.data.publicKey) {
           this.vapidPublicKey = response.data.publicKey;
         } else {
-          throw new Error('Failed to get VAPID key');
+          throw new Error('Failed to get VAPID key from server');
         }
       }
 
@@ -111,7 +114,7 @@ class PushNotificationService {
         // Clean up local subscription if server fails
         await this.subscription.unsubscribe();
         this.subscription = null;
-        throw new Error(response.data.message || 'Failed to subscribe');
+        throw new Error(response.data.message || 'Failed to subscribe on server');
       }
     } catch (error) {
       console.error('Failed to subscribe to push notifications:', error);
