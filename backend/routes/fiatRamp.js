@@ -34,16 +34,13 @@ router.post('/create-link', requireRole(['buyer', 'seller', 'investor', 'admin']
         // Get MoonPay API keys from environment
         const moonpayApiKey = process.env.MOONPAY_API_KEY;
         const moonpaySecretKey = process.env.MOONPAY_SECRET_KEY;
-        const isTestnet = process.env.NODE_ENV !== 'production';
 
         if (!moonpayApiKey) {
             // Fallback: Generate a mock payment link for testing
             console.warn('MoonPay API key not configured. Using mock payment link.');
             
             const mockPaymentId = uuidv4();
-            const baseUrl = isTestnet 
-                ? 'https://buy-staging.moonpay.com' 
-                : 'https://buy.moonpay.com';
+            const baseUrl = 'https://buy-staging.moonpay.com';
             
             const mockParams = new URLSearchParams({
                 apiKey: 'test_key',
@@ -64,24 +61,14 @@ router.post('/create-link', requireRole(['buyer', 'seller', 'investor', 'admin']
                 currency,
                 cryptoCurrency,
                 walletAddress,
-                testMode: isTestnet
+                testMode: true
             });
         }
 
-        // Create a signed URL for MoonPay widget
-        const timestamp = Math.floor(Date.now() / 1000);
         const transactionId = uuidv4();
-        
-        // Build the signature base
-        const signatureBase = `${moonpaySecretKey}${timestamp}`;
-        const crypto = require('crypto');
-        const signature = crypto.createHash('sha256').update(signatureBase).digest('hex');
+        const baseUrl = 'https://buy-staging.moonpay.com';
 
-        // Build MoonPay URL parameters
-        const baseUrl = isTestnet 
-            ? 'https://buy-staging.moonpay.com' 
-            : 'https://buy.moonpay.com';
-
+        // 1. Build the parameters EXCEPT the signature
         const params = new URLSearchParams({
             apiKey: moonpayApiKey,
             currencyAbbreviation: cryptoCurrency.toLowerCase(),
@@ -89,10 +76,21 @@ router.post('/create-link', requireRole(['buyer', 'seller', 'investor', 'admin']
             baseCurrencyAmount: amount.toString(),
             baseCurrency: currency.toLowerCase(),
             externalTransactionId: transactionId,
-            signature: signature,
-            timestamp: timestamp.toString(),
             redirectURL: `${process.env.FRONTEND_URL}/?payment=success&provider=moonpay&txId=${transactionId}`,
         });
+
+        // 2. The query string to sign MUST include the leading '?'
+        const queryString = `?${params.toString()}`;
+        
+        // 3. Generate HMAC SHA256 base64 signature using your Secret Key
+        const crypto = require('crypto');
+        const signature = crypto
+            .createHmac('sha256', moonpaySecretKey)
+            .update(queryString)
+            .digest('base64');
+
+        // 4. Append the generated signature to the parameters
+        params.append('signature', signature);
 
         const paymentUrl = `${baseUrl}?${params.toString()}`;
 
@@ -110,7 +108,7 @@ router.post('/create-link', requireRole(['buyer', 'seller', 'investor', 'admin']
             currency,
             cryptoCurrency,
             walletAddress,
-            testMode: isTestnet
+            testMode: true
         });
 
     } catch (error) {
@@ -265,15 +263,12 @@ router.get('/quote', async (req, res) => {
         }
 
         const moonpayApiKey = process.env.MOONPAY_API_KEY;
-        const isTestnet = process.env.NODE_ENV !== 'production';
 
         // Try to get live quotes from MoonPay API
         if (moonpayApiKey) {
             try {
-                const baseUrl = isTestnet 
-                    ? 'https://api-staging.moonpay.com' 
-                    : 'https://api.moonpay.com';
-                
+                const baseUrl = 'https://api-staging.moonpay.com' ;
+
                 const response = await axios.get(
                     `${baseUrl}/v1/currencies/${cryptoCurrency.toLowerCase()}/buy_quote`,
                     {
@@ -289,7 +284,7 @@ router.get('/quote', async (req, res) => {
                     success: true,
                     provider: 'moonpay',
                     quote: response.data,
-                    testMode: isTestnet
+                    testMode: true
                 });
             } catch (apiError) {
                 console.warn('MoonPay quote API error:', apiError.message);
@@ -316,7 +311,7 @@ router.get('/quote', async (req, res) => {
                 networkFee: networkFee,
                 total: fiatAmount
             },
-            testMode: isTestnet,
+            testMode: true,
             note: 'Estimated quote (API unavailable)'
         });
 

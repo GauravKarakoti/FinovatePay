@@ -173,7 +173,7 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md border border-gray-100">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md border border-gray-100 max-h-[95vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center space-x-2">
                         <div className="bg-green-100 p-2 rounded-full">
