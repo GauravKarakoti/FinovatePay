@@ -1,7 +1,10 @@
 const { ethers } = require('ethers');
 const { contractAddresses, getSigner, getFinancingManagerContract } = require('../config/blockchain');
 const { pool } = require('../config/database');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interfaces.fragments;
+const extractAbi = (artifact) => {
+  return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
+};
+const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract.json'));
 const errorResponse = require('../utils/errorResponse');
 
 // Helper: UUID → bytes32

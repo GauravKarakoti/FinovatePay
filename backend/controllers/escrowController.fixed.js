@@ -1,7 +1,10 @@
 const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interface.fragments;
+const extractAbi = (artifact) => {
+  return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
+};
+const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract.json'));
 const logger = require('../utils/logger')('escrowController');
 const TransactionWrapper = require('../utils/transactionWrapper');
 const IdempotencyKeyManager = require('../utils/idempotencyKey');

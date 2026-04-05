@@ -7,7 +7,10 @@ const Redis = require('ioredis');
 const { ethers } = require('ethers');
 const { pool } = require('../config/database');
 const { getSigner, contractAddresses } = require('../config/blockchain');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interface.fragments;
+const extractAbi = (artifact) => {
+  return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
+};
+const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract.json'));
 
 const JOB_TYPES = {
   ESCROW_RELEASE: 'escrow:release',

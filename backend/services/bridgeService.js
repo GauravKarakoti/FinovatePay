@@ -1,10 +1,12 @@
 const { ethers } = require('ethers');
 const logger = require('../utils/logger')('bridgeService');
-
+const extractAbi = (artifact) => {
+  return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
+};
 // Import ABIs (assuming they are compiled and available)
-const BridgeAdapterABI = require('../../deployed/BridgeAdapter.json').abi;
-const LiquidityAdapterABI = require('../../deployed/LiquidityAdapter.json').abi;
-const FinancingManagerABI = require('../../deployed/FinancingManager.json').interface.fragments;
+const BridgeAdapterABI = extractAbi(require('../../deployed/BridgeAdapter.json'));
+const LiquidityAdapterABI = extractAbi(require('../../deployed/LiquidityAdapter.json'));
+const FinancingManagerABI = extractAbi(require('../../deployed/FinancingManager.json'));
 
 // Assuming these are deployed addresses; in real setup, fetch from config or DB
 const BRIDGE_ADAPTER_ADDRESS = process.env.BRIDGE_ADAPTER_ADDRESS;

@@ -4,7 +4,10 @@ const { ethers } = require('ethers');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const { contractAddresses } = require('../config/blockchain');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interface.fragments;
+const extractAbi = (artifact) => {
+  return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
+};
+const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract.json'));
 const { getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const { logAudit } = require('../middleware/auditLogger');

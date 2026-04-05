@@ -4,12 +4,17 @@ require("dotenv").config();
 // Import secrets provider for secure key management
 const { getSecret } = require("../services/secrets");
 
+// Helper to extract ABI safely whether it's a Hardhat Artifact or an ethers.js Contract dump
+const extractAbi = (artifact) => {
+  return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
+};
+
 // 1️⃣ Import ABIs and Deployed Addresses
-const FractionTokenABI = require("../../deployed/FractionToken.json").abi;
-const ComplianceManagerABI = require("../../deployed/ComplianceManager.json").abi;
-const FinancingManagerABI = require("../../deployed/FinancingManager.json").interface.fragments;
-const EscrowContractABI = require("../../deployed/EscrowContract.json").interface.fragments;
-const TreasuryManagerABI = require("../../deployed/TreasuryManager.json").abi;
+const FractionTokenABI = extractAbi(require("../../deployed/FractionToken.json"));
+const ComplianceManagerABI = extractAbi(require("../../deployed/ComplianceManager.json"));
+const FinancingManagerABI = extractAbi(require("../../deployed/FinancingManager.json"));
+const EscrowContractABI = extractAbi(require("../../deployed/EscrowContract.json"));
+const TreasuryManagerABI = extractAbi(require("../../deployed/TreasuryManager.json"));
 const deployedAddresses = require("../../deployed/contract-addresses.json");
 
 // --------------------------------------------------

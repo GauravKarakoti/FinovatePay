@@ -2,7 +2,10 @@ const { ethers } = require('ethers');
 const { pool } = require('../config/database');
 const errorResponse = require('../utils/errorResponse');
 const logger = require('../utils/logger')('relayerController');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interface.fragments;
+const extractAbi = (artifact) => {
+  return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
+};
+const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract.json'));
 
 /**
  * Verify EIP-712 signature for meta-transaction
