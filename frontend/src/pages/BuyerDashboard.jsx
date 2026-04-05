@@ -343,21 +343,41 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
   const loadAvailableLots = async () => {
     try {
-      const { data } = await getAvailableLots();
-      setAvailableLots(data || []);
+      const response = await getAvailableLots();
+      // Dig down to find the array, accommodating different API wrapper formats
+      const lotsData = response?.data?.data || response?.data || response;
+
+      // Safely set the state ONLY if it's an array
+      if (Array.isArray(lotsData)) {
+        setAvailableLots(lotsData);
+      } else {
+        console.error("Expected array of lots, but got:", lotsData);
+        setAvailableLots([]); // Fallback to prevent crashes
+      }
     } catch (error) {
       console.error('Failed to load lots:', error);
       toast.error("Could not load marketplace");
+      setAvailableLots([]);
     }
   };
 
   const loadPendingApprovals = async () => {
     try {
-      const { data } = await getPendingBuyerApprovals();
-      setPendingApprovals(data || []);
+      const response = await getPendingBuyerApprovals();
+      // Dig down to find the array
+      const approvalsData = response?.data?.data || response?.data || response;
+      
+      // Safely set the state ONLY if it's an array
+      if (Array.isArray(approvalsData)) {
+        setPendingApprovals(approvalsData);
+      } else {
+        console.error("Expected array of approvals, but got:", approvalsData);
+        setPendingApprovals([]); // Fallback to prevent crashes
+      }
     } catch (error) {
       console.error('Failed to load approvals:', error);
       toast.error("Could not load pending approvals");
+      setPendingApprovals([]);
     }
   };
 

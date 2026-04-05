@@ -223,7 +223,7 @@ function App() {
 
           <div className={`
             fixed top-0 bottom-0 left-0 md:relative md:top-auto md:bottom-auto md:left-auto
-            z-[100] h-full md:h-auto
+            h-full md:h-auto
             transition-transform duration-300 ease-in-out
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
             md:w-64 flex-shrink-0
