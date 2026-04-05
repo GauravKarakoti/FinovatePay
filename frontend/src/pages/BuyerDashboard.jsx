@@ -321,11 +321,23 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
   const loadInvoices = async () => {
     try {
-      const { data } = await getBuyerInvoices();
-      setInvoices(data || []);
+      // Fetch the response
+      const response = await getBuyerInvoices();
+      
+      // Dig down to find the array, accommodating different API wrapper formats
+      const invoiceData = response?.data?.data || response?.data || response;
+
+      // Safely set the state ONLY if it's an array
+      if (Array.isArray(invoiceData)) {
+        setInvoices(invoiceData);
+      } else {
+        console.error("Expected array of invoices, but got:", invoiceData);
+        setInvoices([]); // Fallback to prevent crashes
+      }
     } catch (error) {
       console.error('Failed to load invoices:', error);
       toast.error("Could not load your invoices");
+      setInvoices([]); // Fallback on error
     }
   };
 

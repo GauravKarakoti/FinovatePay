@@ -156,23 +156,20 @@ app.use("/api/v1/payments", paymentLimiter, require("./routes/payment"));
 
 app.use("/api/v1/escrow/milestones", require("./routes/multiPartyEscrow"));
 app.use("/api/v1/escrow", require("./routes/escrow"));
-
-/* ---------------- ADMIN ---------------- */
-
-app.use("/api/admin", require("./routes/admin"));
-app.use("/api/kyc", kycLimiter, require("./routes/kyc"));
-app.use("/api/produce", require("./routes/produce"));
-app.use("/api/quotations", require("./routes/quotation"));
-app.use("/api/market", require("./routes/market"));
-app.use("/api/dispute", require("./routes/dispute"));
-app.use("/api/relayer", relayerLimiter, require("./routes/relayer"));
-app.use("/api/chatbot", chatbotRoutes);
-app.use("/api/shipment", shipmentRoutes);
-app.use("/api/meta-tx", require("./routes/metaTransaction"));
-app.use("/api/notifications", notificationRoutes);
-app.use("/api/webhooks", require("./routes/webhooks"));
-app.use("/api/queue", require("./routes/queue"));
-app.use("/api/whitelabel", require("./routes/whitelabel"));
+app.use("/api/v1/admin", require("./routes/admin"));
+app.use("/api/v1/kyc", kycLimiter, require("./routes/kyc"));
+app.use("/api/v1/produce", require("./routes/produce"));
+app.use("/api/v1/quotations", require("./routes/quotation"));
+app.use("/api/v1/market", require("./routes/market"));
+app.use("/api/v1/dispute", require("./routes/dispute"));
+app.use("/api/v1/relayer", relayerLimiter, require("./routes/relayer"));
+app.use("/api/v1/chatbot", chatbotRoutes);
+app.use("/api/v1/shipment", shipmentRoutes);
+app.use("/api/v1/meta-tx", require("./routes/metaTransaction"));
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/webhooks", require("./routes/webhooks"));
+app.use("/api/v1/queue", require("./routes/queue"));
+app.use("/api/v1/whitelabel", require("./routes/whitelabel"));
 
 /* ---------------- API KEYS ---------------- */
 

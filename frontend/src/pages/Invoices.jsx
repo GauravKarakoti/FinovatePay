@@ -60,20 +60,25 @@ const Invoices = () => {
   const user = userStr ? JSON.parse(userStr) : null;
 
   const fetchInvoices = async () => {
-    if (!user) return;
     try {
-      let endpoint = '/invoices/seller';
-      if (user.role === 'buyer') endpoint = '/invoices/buyer';
-      // Fallback or specific logic for other roles
+        const res = await api.get('/invoices/buyer');
+        
+        // Check if your API nests the array inside a `data` property
+        // Example: res.data is the Axios body, and res.data.data is your backend payload
+        const invoiceArray = res.data.data || res.data; 
 
-      const res = await api.get(endpoint);
-      setInvoices(res.data);
-      setLoading(false);
-    } catch (err) {
-      console.error(err);
-      setLoading(false);
+        // Add a defensive check to guarantee it's an array before setting state
+        if (Array.isArray(invoiceArray)) {
+        setInvoices(invoiceArray);
+        } else {
+        console.error("API did not return an array of invoices:", invoiceArray);
+        setInvoices([]); // Fallback to an empty array so .filter() doesn't crash
+        }
+    } catch (error) {
+        console.error("Failed to fetch invoices", error);
+        setInvoices([]); // Fallback
     }
-  };
+    };
 
   useEffect(() => {
     fetchInvoices();
