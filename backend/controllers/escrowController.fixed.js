@@ -169,7 +169,7 @@ exports.releaseEscrowSync = async (req, res) => {
         // Step 3: Execute blockchain transaction
         const escrowContract = new ethers.Contract(
           contractAddresses.escrowContract,
-          EscrowContractArtifact.abi,
+          EscrowContractArtifact,
           getSigner()
         );
 

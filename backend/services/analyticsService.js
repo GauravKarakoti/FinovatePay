@@ -176,7 +176,7 @@ async function getRiskScore(invoiceId) {
         u.payment_history_score,
         u.credit_score
       FROM invoices i
-      LEFT JOIN users u ON i.seller_id = u.id
+      LEFT JOIN users u ON i.user_id = u.id
       WHERE i.invoice_id = $1
     `;
     const invoiceResult = await pool.query(invoiceQuery, [invoiceId]);
@@ -398,7 +398,7 @@ async function getDashboardOverview(userId, role) {
           COALESCE(SUM(amount), 0) as total_amount,
           COUNT(CASE WHEN is_tokenized = true THEN 1 END) as tokenized
         FROM invoices
-        WHERE seller_id = $1
+        WHERE user_id = $1
       `;
       const invoiceStats = await pool.query(invoiceStatsQuery, [userId]);
 

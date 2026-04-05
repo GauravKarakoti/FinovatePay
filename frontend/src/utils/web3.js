@@ -1,7 +1,6 @@
 import { createAppKit } from '@reown/appkit/react';
 import { EthersAdapter } from '@reown/appkit-adapter-ethers';
 import { BrowserProvider, Contract, ethers } from 'ethers';
-import { keccak256, toUtf8Bytes } from './formatters';
 
 // Import contract ABIs and addresses
 import EscrowContractArtifact from '../../../deployed/EscrowContract.json';
@@ -230,13 +229,13 @@ export async function disconnectWallet() {
 export async function getEscrowContract() {
   const { signer } = await connectWallet();
   const escrowAddress = contractAddresses.EscrowContract;
-  return new Contract(escrowAddress, EscrowContractArtifact.abi, signer);
+  return new Contract(escrowAddress, EscrowContractArtifact, signer);
 }
 
 export async function getFinancingManagerContract() {
   const { signer } = await connectWallet();
   const financingAddress = contractAddresses.FinancingManager;
-  return new Contract(financingAddress, FinancingManagerArtifact.abi, signer);
+  return new Contract(financingAddress, FinancingManagerArtifact, signer);
 }
 
 export async function getInvoiceFactoryContract() {

@@ -308,7 +308,7 @@ exports.resolveDispute = async (req, res) => {
 
     const escrow = new ethers.Contract(
       contractAddresses.escrowContract,
-      EscrowContractArtifact.abi,
+      EscrowContractArtifact,
       getSigner()
     );
 

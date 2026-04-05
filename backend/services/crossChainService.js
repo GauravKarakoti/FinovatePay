@@ -1,14 +1,11 @@
 const { ethers } = require('ethers');
 const { CrossChainFraction, CrossChainMarketplaceListing, CrossChainTrade } = require('../models/CrossChainFraction');
-const bridgeService = require('./bridgeService');
 
 // Import ABIs
 const FractionTokenABI = require('../../deployed/FractionToken.json').abi;
-const FinancingManagerABI = require('../../deployed/FinancingManager.json').abi;
 
 // Contract addresses (from environment)
 const FRACTION_TOKEN_ADDRESS = process.env.FRACTION_TOKEN_ADDRESS;
-const FINANCING_MANAGER_ADDRESS = process.env.FINANCING_MANAGER_ADDRESS;
 
 // Supported chains
 const SUPPORTED_CHAINS = {

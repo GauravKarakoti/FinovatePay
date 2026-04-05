@@ -273,7 +273,7 @@ class BlockchainQueue {
   async processEscrowRelease(data, job) {
     const { invoiceId, userId } = data;
     const signer = await getSigner();
-    const escrowContract = new ethers.Contract(contractAddresses.escrowContract, EscrowContractArtifact.abi, signer);
+    const escrowContract = new ethers.Contract(contractAddresses.escrowContract, EscrowContractArtifact, signer);
     const tx = await escrowContract.confirmRelease(this.uuidToBytes32(invoiceId), { gasLimit: 500000 });
     const receipt = await tx.wait();
     await pool.query('UPDATE invoices SET escrow_status = $1, release_tx_hash = $2, updated_at = NOW() WHERE invoice_id = $3', ['released', tx.hash, invoiceId]);
@@ -283,7 +283,7 @@ class BlockchainQueue {
   async processEscrowDispute(data, job) {
     const { invoiceId, reason, userId } = data;
     const signer = await getSigner();
-    const escrowContract = new ethers.Contract(contractAddresses.escrowContract, EscrowContractArtifact.abi, signer);
+    const escrowContract = new ethers.Contract(contractAddresses.escrowContract, EscrowContractArtifact, signer);
     const tx = await escrowContract.raiseDispute(this.uuidToBytes32(invoiceId), { gasLimit: 500000 });
     const receipt = await tx.wait();
     await pool.query('UPDATE invoices SET escrow_status = $1, dispute_reason = $2, dispute_tx_hash = $3, updated_at = NOW() WHERE invoice_id = $4', ['disputed', reason, tx.hash, invoiceId]);
@@ -293,7 +293,7 @@ class BlockchainQueue {
   async processEscrowDeposit(data, job) {
     const { invoiceId, amount, tokenAddress, userId } = data;
     const signer = await getSigner();
-    const escrowContract = new ethers.Contract(contractAddresses.escrowContract, EscrowContractArtifact.abi, signer);
+    const escrowContract = new ethers.Contract(contractAddresses.escrowContract, EscrowContractArtifact, signer);
     if (tokenAddress && tokenAddress !== ethers.ZeroAddress) {
       const tokenContract = new ethers.Contract(tokenAddress, ['function approve(address spender, uint256 amount) returns (bool)'], signer);
       const approveTx = await tokenContract.approve(contractAddresses.escrowContract, amount);

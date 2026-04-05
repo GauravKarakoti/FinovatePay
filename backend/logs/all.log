@@ -905,3 +905,77 @@
 [2026-04-05 17:51:28:260] [info] [request]: [0cb804bf-45a4-48fc-aab4-e46168b71692] GET /api/v1/analytics/overview
 [2026-04-05 17:51:33:909] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-05 17:52:02:567] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:00:14:493] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 18:00:14:506] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 18:00:14:498] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 18:00:14:499] [info] [server]: Invoice Sync Worker started
+[2026-04-05 18:00:14:500] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 18:00:14:507] [info] [server]: Compliance listeners started
+[2026-04-05 18:00:14:509] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 18:00:14:511] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 18:00:16:353] [info] [server]: Database connection test completed successfully
+[2026-04-05 18:00:17:282] [info] [server]: Tokenization listener started
+[2026-04-05 18:01:24:062] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-05 18:01:24:074] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-05 18:01:24:066] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-05 18:01:24:067] [info] [server]: Invoice Sync Worker started
+[2026-04-05 18:01:24:068] [info] [server]: Transaction Recovery Worker started
+[2026-04-05 18:01:24:075] [info] [server]: Compliance listeners started
+[2026-04-05 18:01:24:078] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-05 18:01:24:080] [info] [server]: 🚀 Server running on port 3000
+[2026-04-05 18:01:25:978] [info] [server]: Database connection test completed successfully
+[2026-04-05 18:01:27:003] [info] [server]: Tokenization listener started
+[2026-04-05 18:01:34:535] [info] [request]: [86048066-2a69-443d-8805-a00c9050a7b1] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:01:34:544] [info] [request]: [09a8100d-b581-43a0-822c-1cb90f79d534] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:01:34:815] [info] [request]: [e2e91b53-1a3e-4705-88a7-dc2bec002a53] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:01:34:823] [info] [request]: [eadab213-bf9b-4302-aba0-6050761a864c] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:01:34:840] [info] [request]: [44859e16-6aca-42dc-92c0-8abca3af767c] POST /api/v1/auth/logout
+[2026-04-05 18:01:34:855] [info] [request]: [96b7d708-117c-4a19-b22b-75cbb93a4177] POST /api/v1/auth/logout
+[2026-04-05 18:01:34:952] [info] [request]: [44bf8b13-e368-461e-bac8-28b8a97ee649] POST /api/v1/auth/logout
+[2026-04-05 18:01:34:969] [info] [request]: [c0c172b4-dde7-47a0-b1d0-b133f493c4f0] POST /api/v1/auth/logout
+[2026-04-05 18:01:37:458] [info] [request]: [f06e4785-1ac2-4329-9f84-0717c092deba] POST /api/v1/auth/login
+[2026-04-05 18:01:38:275] [info] [request]: [3ccd99c6-ba72-4b11-aba8-e318fbdcaf33] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:01:38:285] [info] [request]: [230cccaf-e545-4e4c-bf4d-8f4dd2c98d8b] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:01:38:329] [info] [request]: [2d398f71-a4de-4c6b-b692-0c7dd276b214] GET /api/v1/invoices/seller
+[2026-04-05 18:01:38:336] [info] [request]: [950bdee8-9b33-4b92-b5bb-90b092844907] GET /api/v1/kyc/status
+[2026-04-05 18:01:38:343] [info] [request]: [5a847d9a-ced8-4a51-a8d3-30523dad0a60] GET /api/v1/quotations
+[2026-04-05 18:01:38:788] [info] [request]: [1cc58e1b-8e02-4412-ba45-35381719750d] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:01:38:797] [info] [request]: [38565792-e88a-4a0e-a5bc-0c2ec2ba4400] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:01:38:836] [info] [request]: [40d792b2-3f7c-48d7-a45f-cabb08eb3fa8] GET /api/v1/invoices/seller
+[2026-04-05 18:01:41:092] [info] [request]: [18c4d8c2-2367-466b-b593-930572606420] GET /api/v1/quotations
+[2026-04-05 18:01:41:099] [info] [request]: [a0cf902d-9d15-42d0-9f9d-26deb7039d80] GET /api/v1/kyc/status
+[2026-04-05 18:01:46:330] [info] [request]: [7325beae-f531-4cbc-80d8-394f59b1e299] GET /api/v1/currencies
+[2026-04-05 18:01:46:988] [info] [request]: [31aa1539-daf1-407c-8214-c7543cb37aa2] GET /api/v1/currencies
+[2026-04-05 18:01:54:356] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:02:07:616] [info] [request]: [d2d17c77-5838-47f1-9bd0-dfcf4a26a306] POST /api/v1/fiat-ramp/create-link
+[2026-04-05 18:02:15:106] [info] [request]: [cc321ef0-049b-4b21-b971-4146f7ed14ae] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:02:15:112] [info] [request]: [dc2ed6b4-90bf-40e8-a98d-4730361ade1c] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:02:15:118] [info] [request]: [11d6c8d2-6643-49b7-9a18-ad546f049118] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:02:15:125] [info] [request]: [e41a4656-b26f-4a94-bc41-863f0a612e80] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:02:15:188] [info] [request]: [53ea3a6c-6ef0-439d-b73e-b3eda1d2cd13] POST /api/v1/auth/logout
+[2026-04-05 18:02:15:194] [info] [request]: [1f8adada-bc80-470b-8ddf-dd4e3029bfbc] POST /api/v1/auth/logout
+[2026-04-05 18:02:15:201] [info] [request]: [cd8ce3be-3746-4d88-bb65-2799884e686e] POST /api/v1/auth/logout
+[2026-04-05 18:02:15:208] [info] [request]: [89fa6759-5e32-4a1a-99c5-8553827f0903] POST /api/v1/auth/logout
+[2026-04-05 18:02:18:969] [info] [request]: [2cc50cf3-57ba-42a8-912a-0e75003026a2] POST /api/v1/auth/login
+[2026-04-05 18:02:19:894] [info] [request]: [d4432012-1f19-49e0-81be-2c1d854db4bc] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:02:19:902] [info] [request]: [cc385640-7d44-4639-ac23-8185ce288398] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:02:19:938] [info] [request]: [dabd8e02-80e0-4c62-b515-515ccccd942a] GET /api/v1/invoices/seller
+[2026-04-05 18:02:19:943] [info] [request]: [959659b9-c871-43c3-8138-8ad0e913dcb3] GET /api/v1/kyc/status
+[2026-04-05 18:02:19:950] [info] [request]: [964f1ca2-5475-484d-992e-57c26ce96e84] GET /api/v1/quotations
+[2026-04-05 18:02:20:477] [info] [request]: [30cab502-fa96-4e2b-b465-5e548cd8f05f] GET /api/v1/notifications/push-preferences
+[2026-04-05 18:02:20:482] [info] [request]: [5b5b590f-752d-4732-aa03-7a36310732f4] GET /api/v1/notifications/subscriptions
+[2026-04-05 18:02:20:488] [info] [request]: [59469c23-f054-4a32-8a2c-e2a6be0fdc42] GET /api/v1/invoices/seller
+[2026-04-05 18:02:20:780] [info] [request]: [f4d04c4f-9b75-49ad-9631-53944f7c9960] GET /api/v1/kyc/status
+[2026-04-05 18:02:21:103] [info] [request]: [4796abc4-7064-40f8-a082-179b33b78769] GET /api/v1/quotations
+[2026-04-05 18:02:21:973] [info] [request]: [5e7c3d34-05ee-4c33-a7e1-cff9d1d3c0e6] GET /api/v1/currencies
+[2026-04-05 18:02:22:225] [info] [request]: [dc7e6213-f9d1-4da0-9c5e-e653bb9d92b1] GET /api/v1/currencies
+[2026-04-05 18:02:24:361] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:02:27:269] [info] [request]: [eb07e335-5d2c-4da4-9091-6ad32b4c6706] POST /api/v1/fiat-ramp/create-link
+[2026-04-05 18:02:54:364] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:03:24:369] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:03:54:372] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:04:24:391] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:04:54:400] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:05:24:390] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:05:54:405] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-05 18:06:23:828] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')

@@ -27,7 +27,7 @@ const getYieldPoolContract = (signer) => {
 const getEscrowContract = (signer) => {
   return new ethers.Contract(
     contractAddresses.escrowContract,
-    EscrowContractArtifact.abi,
+    EscrowContractArtifact,
     signer || getSigner()
   );
 };

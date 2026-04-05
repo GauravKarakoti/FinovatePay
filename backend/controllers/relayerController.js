@@ -1,21 +1,8 @@
 const { ethers } = require('ethers');
-const path = require('path');
 const { pool } = require('../config/database');
 const errorResponse = require('../utils/errorResponse');
 const logger = require('../utils/logger')('relayerController');
-
-// Load artifact
-// Try to load from artifacts (dev) first, then deployed (prod)
-let EscrowContractArtifact;
-try {
-    EscrowContractArtifact = require('../../artifacts/contracts/EscrowContract.sol/EscrowContract.json');
-} catch (e) {
-    try {
-        EscrowContractArtifact = require('../../deployed/EscrowContract.json');
-    } catch (e2) {
-        logger.error("Could not load EscrowContract artifact");
-    }
-}
+const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
 
 /**
  * Verify EIP-712 signature for meta-transaction
@@ -199,7 +186,7 @@ const relayTransaction = async (req, res) => {
             return errorResponse(res, "Invalid signature", 401);
         }
 
-        const contract = new ethers.Contract(contractAddress, EscrowContractArtifact.abi, wallet);
+        const contract = new ethers.Contract(contractAddress, EscrowContractArtifact, wallet);
 
         logger.info(`Relaying transaction for user ${user} to contract ${contractAddress}`);
         logger.info(`   Nonce: ${nonceToUse}, Relayer: ${wallet.address}`);

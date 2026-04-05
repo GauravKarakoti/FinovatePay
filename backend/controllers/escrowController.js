@@ -79,7 +79,7 @@ exports.releaseEscrowSync = async (req, res) => {
 
     const escrowContract = new ethers.Contract(
       contractAddresses.escrowContract,
-      EscrowContractArtifact.abi,
+      EscrowContractArtifact,
       getSigner()
     );
 
@@ -219,15 +219,7 @@ exports.raiseDispute = async (req, res) => {
  */
 exports.raiseDisputeSync = async (req, res) => {
   try {
-    const { invoiceId, reason } = req.body;
-
-    const io = req.app.get("io");
-
-    const escrowContract = new ethers.Contract(
-      contractAddresses.escrowContract,
-      EscrowContractArtifact.abi,
-      getSigner()
-    );
+    const { invoiceId } = req.body;
 
     return res.json({
       success: true,
