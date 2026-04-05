@@ -267,7 +267,13 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const loadInvoices = useCallback(async () => {
     try {
       const res = await getSellerInvoices();
-      setInvoices(res?.data || []);
+      // Safely extract the array no matter how the API formats the response
+      let fetchedInvoices = [];
+      if (Array.isArray(res)) fetchedInvoices = res;
+      else if (Array.isArray(res?.data)) fetchedInvoices = res.data;
+      else if (Array.isArray(res?.data?.invoices)) fetchedInvoices = res.data.invoices;
+      
+      setInvoices(fetchedInvoices);
     } catch (err) {
       console.error('Invoice load failed:', err);
       toast.error('Failed to load invoices');
@@ -276,8 +282,13 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
   const loadQuotations = useCallback(async () => {
     try {
-      const { data } = await getQuotations();
-      setQuotations(data || []);
+      const res = await getQuotations();
+      let fetchedQuotations = [];
+      if (Array.isArray(res)) fetchedQuotations = res;
+      else if (Array.isArray(res?.data)) fetchedQuotations = res.data;
+      else if (Array.isArray(res?.data?.quotations)) fetchedQuotations = res.data.quotations;
+
+      setQuotations(fetchedQuotations);
     } catch (error) {
       console.error('Failed to load quotations:', error);
     }
@@ -476,33 +487,46 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     }
   }, [loadInvoices]);
 
+  useEffect(() => {
+    const safeInvoices = Array.isArray(invoices) ? invoices : [];
+    const activeEscrows = safeInvoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status)).length;
+    const completed = safeInvoices.filter(inv => inv.escrow_status === 'released').length;
+    
+    setGlobalStats({ 
+      totalInvoices: safeInvoices.length,
+      activeEscrows,
+      completed
+    });
+  }, [invoices, setGlobalStats]);
+
   // ------------------ DERIVED STATS ------------------
+  const safeInvoices = Array.isArray(invoices) ? invoices : [];
 
   const stats = useMemo(() => [
     {
       title: 'Pending',
-      value: invoices.filter(i => i.status === 'pending').length,
+      value: safeInvoices.filter(i => i.status === 'pending').length,
       icon: '📝', color: 'blue'
     },
     {
       title: 'Active Escrows',
-      value: invoices.filter(i => ['deposited', 'shipped'].includes(i.escrow_status)).length,
+      value: safeInvoices.filter(i => ['deposited', 'shipped'].includes(i.escrow_status)).length,
       icon: '🔒', color: 'green'
     },
     {
       title: 'Completed',
-      value: invoices.filter(i => i.escrow_status === 'released').length,
+      value: safeInvoices.filter(i => i.escrow_status === 'released').length,
       icon: '✅', color: 'purple'
     },
     {
       title: 'Disputed',
-      value: invoices.filter(i => i.escrow_status === 'disputed').length,
+      value: safeInvoices.filter(i => i.escrow_status === 'disputed').length,
       icon: '⚖️', color: 'red'
     }
-  ], [invoices]);
+  ], [safeInvoices]);
 
-  const escrowInvoices = useMemo(() => invoices.filter(inv => ['deposited', 'shipped', 'disputed'].includes(inv.escrow_status)), [invoices]);
-  const completedInvoices = useMemo(() => invoices.filter(inv => inv.escrow_status === 'released'), [invoices]);
+  const escrowInvoices = useMemo(() => safeInvoices.filter(inv => ['deposited', 'shipped', 'disputed'].includes(inv.escrow_status)), [safeInvoices]);
+  const completedInvoices = useMemo(() => safeInvoices.filter(inv => inv.escrow_status === 'released'), [safeInvoices]);
 
   // ------------------ TAB COMPONENTS ------------------
 
