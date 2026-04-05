@@ -6,21 +6,16 @@ const { pool } = require('../config/database');
  * payment history, financing metrics, and risk assessment scores.
  */
 
-/**
- * Get payment analytics for a user
- * @param {string} userId - The user ID
- * @returns {Object} Payment analytics including totals and volume trends
- */
 async function getPaymentAnalytics(userId) {
   try {
-    // Get total payments count and volume
+    // Get total completed payments count and volume for the buyer
     const totalPaymentsQuery = `
       SELECT 
         COUNT(*) as total_payments,
         COALESCE(SUM(amount), 0) as total_volume,
         COALESCE(AVG(amount), 0) as average_amount
-      FROM payments
-      WHERE user_id = $1
+      FROM invoices
+      WHERE buyer_address = $1 AND status = 'paid'
     `;
     const totalResult = await pool.query(totalPaymentsQuery, [userId]);
 
@@ -30,8 +25,9 @@ async function getPaymentAnalytics(userId) {
         TO_CHAR(created_at, 'YYYY-MM') as month,
         COUNT(*) as payment_count,
         COALESCE(SUM(amount), 0) as volume
-      FROM payments
-      WHERE user_id = $1 
+      FROM invoices
+      WHERE buyer_address = $1 
+        AND status = 'paid'
         AND created_at >= NOW() - INTERVAL '12 months'
       GROUP BY TO_CHAR(created_at, 'YYYY-MM')
       ORDER BY month ASC
@@ -44,8 +40,8 @@ async function getPaymentAnalytics(userId) {
         status,
         COUNT(*) as count,
         COALESCE(SUM(amount), 0) as amount
-      FROM payments
-      WHERE user_id = $1
+      FROM invoices
+      WHERE buyer_address = $1
       GROUP BY status
     `;
     const statusResult = await pool.query(statusQuery, [userId]);
@@ -53,13 +49,16 @@ async function getPaymentAnalytics(userId) {
     // Get recent payments
     const recentPaymentsQuery = `
       SELECT 
-        p.*,
-        i.invoice_id,
-        i.description as invoice_description
-      FROM payments p
-      LEFT JOIN invoices i ON p.invoice_id = i.invoice_id
-      WHERE p.user_id = $1
-      ORDER BY p.created_at DESC
+        id,
+        invoice_id,
+        amount,
+        currency,
+        status,
+        created_at,
+        description as invoice_description
+      FROM invoices
+      WHERE buyer_address = $1
+      ORDER BY created_at DESC
       LIMIT 10
     `;
     const recentResult = await pool.query(recentPaymentsQuery, [userId]);
@@ -80,11 +79,6 @@ async function getPaymentAnalytics(userId) {
   }
 }
 
-/**
- * Get financing analytics for a user (seller/investor)
- * @param {string} userId - The user ID
- * @returns {Object} Financing analytics including ROI and outstanding amounts
- */
 async function getFinancingAnalytics(userId) {
   try {
     // Get financing summary for seller
@@ -96,7 +90,7 @@ async function getFinancingAnalytics(userId) {
         COUNT(CASE WHEN financing_status = 'financed' THEN 1 END) as actively_financed,
         COUNT(CASE WHEN financing_status = 'repaid' THEN 1 END) as repaid
       FROM invoices
-      WHERE seller_id = $1 AND is_tokenized = true
+      WHERE seller_address = $1 AND is_tokenized = true
     `;
     const summaryResult = await pool.query(financingSummaryQuery, [userId]);
 
@@ -107,7 +101,7 @@ async function getFinancingAnalytics(userId) {
         COUNT(*) as invoice_count,
         COALESCE(SUM(amount), 0) as amount
       FROM invoices
-      WHERE seller_id = $1 
+      WHERE seller_address = $1 
         AND is_tokenized = true
         AND created_at >= NOW() - INTERVAL '12 months'
       GROUP BY TO_CHAR(created_at, 'YYYY-MM')
@@ -115,31 +109,15 @@ async function getFinancingAnalytics(userId) {
     `;
     const monthlyResult = await pool.query(monthlyFinancingQuery, [userId]);
 
-    // Get yield distribution for investors
-    const yieldDistributionQuery = `
-      SELECT 
-        yield_bps,
-        COUNT(*) as invoice_count,
-        COALESCE(SUM(amount), 0) as total_amount
-      FROM invoices
-      WHERE is_tokenized = true AND yield_bps IS NOT NULL
-      GROUP BY yield_bps
-      ORDER BY yield_bps DESC
-      LIMIT 10
-    `;
-    const yieldResult = await pool.query(yieldDistributionQuery);
+    // Yield distribution removed as yield_bps is not in the schema
+    // Returning empty array for frontend compatibility
+    const yieldDistribution = [];
 
-    // Calculate estimated ROI (simplified calculation)
-    const roiQuery = `
-      SELECT 
-        COALESCE(AVG(yield_bps), 0) as average_yield,
-        COALESCE(SUM(amount * yield_bps / 10000), 0) as estimated_returns
-      FROM invoices
-      WHERE seller_id = $1 
-        AND is_tokenized = true
-        AND financing_status IN ('listed', 'financed')
-    `;
-    const roiResult = await pool.query(roiQuery, [userId]);
+    // ROI calculation simplified to 0 since yield metrics aren't tracked on the invoice level currently
+    const roi = {
+      averageYield: 0,
+      estimatedReturns: 0
+    };
 
     return {
       summary: {
@@ -150,11 +128,8 @@ async function getFinancingAnalytics(userId) {
         repaid: parseInt(summaryResult.rows[0].repaid) || 0
       },
       monthlyFinancing: monthlyResult.rows,
-      yieldDistribution: yieldResult.rows,
-      roi: {
-        averageYield: parseFloat(roiResult.rows[0].average_yield) || 0,
-        estimatedReturns: parseFloat(roiResult.rows[0].estimated_returns) || 0
-      }
+      yieldDistribution: yieldDistribution,
+      roi: roi
     };
   } catch (error) {
     console.error('Error in getFinancingAnalytics:', error);
@@ -162,22 +137,17 @@ async function getFinancingAnalytics(userId) {
   }
 }
 
-/**
- * Calculate risk score for an invoice
- * @param {string} invoiceId - The invoice ID
- * @returns {Object} Risk assessment score and details
- */
 async function getRiskScore(invoiceId) {
   try {
-    // Get invoice details
+    // Get invoice details using seller_address
     const invoiceQuery = `
       SELECT 
         i.*,
         u.payment_history_score,
         u.credit_score
       FROM invoices i
-      LEFT JOIN users u ON i.user_id = u.id
-      WHERE seller_address = $1 OR buyer_address = $1
+      LEFT JOIN users u ON i.seller_address = u.id 
+      WHERE i.invoice_id = $1 
     `;
     const invoiceResult = await pool.query(invoiceQuery, [invoiceId]);
 
@@ -312,17 +282,16 @@ async function getRiskScore(invoiceId) {
       riskLevel = 'low';
     }
 
-    // Get historical payment data for this seller
     const sellerHistoryQuery = `
       SELECT 
         COUNT(*) as total_payments,
-        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as completed,
+        COUNT(CASE WHEN status IN ('overdue', 'cancelled') THEN 1 END) as failed,
         COALESCE(AVG(amount), 0) as avg_amount
-      FROM payments
-      WHERE user_id = $1
+      FROM invoices
+      WHERE seller_address = $1
     `;
-    const historyResult = await pool.query(sellerHistoryQuery, [invoice.seller_id]);
+    const historyResult = await pool.query(sellerHistoryQuery, [invoice.seller_address]);
 
     const paymentHistory = {
       totalPayments: parseInt(historyResult.rows[0].total_payments) || 0,
@@ -374,12 +343,6 @@ function getRecommendation(riskLevel, riskScore) {
   }
 }
 
-/**
- * Get dashboard overview - summary of all analytics
- * @param {string} userId - The user ID
- * @param {string} role - The user role
- * @returns {Object} Dashboard overview
- */
 async function getDashboardOverview(userId, role) {
   try {
     const overview = {
@@ -398,7 +361,7 @@ async function getDashboardOverview(userId, role) {
           COALESCE(SUM(amount), 0) as total_amount,
           COUNT(CASE WHEN is_tokenized = true THEN 1 END) as tokenized
         FROM invoices
-        WHERE user_id = $1
+        WHERE seller_address = $1
       `;
       const invoiceStats = await pool.query(invoiceStatsQuery, [userId]);
 
@@ -411,7 +374,7 @@ async function getDashboardOverview(userId, role) {
           COUNT(CASE WHEN escrow_status = 'disputed' THEN 1 END) as disputed,
           COALESCE(SUM(amount), 0) as total_escrowed
         FROM invoices
-        WHERE seller_id = $1 AND escrow_status IS NOT NULL
+        WHERE seller_address = $1 AND escrow_status IS NOT NULL
       `;
       const escrowStats = await pool.query(escrowStatsQuery, [userId]);
 
@@ -444,7 +407,7 @@ async function getDashboardOverview(userId, role) {
           COALESCE(SUM(amount), 0) as total_value,
           COUNT(CASE WHEN financing_status = 'listed' THEN 1 END) as available,
           COUNT(CASE WHEN financing_status = 'financed' THEN 1 END) as financed,
-          COALESCE(AVG(yield_bps), 0) as average_yield
+          0 as average_yield
         FROM invoices
         WHERE is_tokenized = true
       `;
@@ -455,7 +418,7 @@ async function getDashboardOverview(userId, role) {
         totalValue: parseFloat(marketplaceStats.rows[0].total_value) || 0,
         available: parseInt(marketplaceStats.rows[0].available) || 0,
         financed: parseInt(marketplaceStats.rows[0].financed) || 0,
-        averageYield: parseFloat(marketplaceStats.rows[0].average_yield) || 0
+        averageYield: 0
       };
 
       // Get financing data
@@ -463,15 +426,14 @@ async function getDashboardOverview(userId, role) {
       overview.financing = financingData.summary;
 
     } else if (role === 'buyer') {
-      // Get payment statistics for buyers
       const paymentStatsQuery = `
         SELECT 
           COUNT(*) as total_payments,
           COALESCE(SUM(amount), 0) as total_spent,
-          COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
-          COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending
-        FROM payments
-        WHERE user_id = $1
+          COUNT(CASE WHEN status = 'paid' THEN 1 END) as completed,
+          COUNT(CASE WHEN status IN ('created', 'sent') THEN 1 END) as pending
+        FROM invoices
+        WHERE buyer_address = $1
       `;
       const paymentStats = await pool.query(paymentStatsQuery, [userId]);
 
