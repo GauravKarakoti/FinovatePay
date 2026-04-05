@@ -170,6 +170,7 @@ app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/webhooks", require("./routes/webhooks"));
 app.use("/api/v1/queue", require("./routes/queue"));
 app.use("/api/v1/whitelabel", require("./routes/whitelabel"));
+app.use("/api/v1/streaming", require("./routes/streaming"));
 
 /* ---------------- API KEYS ---------------- */
 
