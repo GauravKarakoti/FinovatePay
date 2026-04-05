@@ -68,28 +68,33 @@ router.post('/create-link', requireRole(['buyer', 'seller', 'investor', 'admin']
         const transactionId = uuidv4();
         const baseUrl = 'https://buy-staging.moonpay.com';
 
-        // 1. Build the parameters EXCEPT the signature
+        let moonpayCurrencyCode = cryptoCurrency.toLowerCase();
+        if (moonpayCurrencyCode === 'usdc') moonpayCurrencyCode = 'usdc_polygon';
+        if (moonpayCurrencyCode === 'usdt') moonpayCurrencyCode = 'usdt_polygon';
+        if (moonpayCurrencyCode === 'dai') moonpayCurrencyCode = 'dai_polygon';
+
+        // 2. Build the parameters using the CORRECT MoonPay parameter names
         const params = new URLSearchParams({
             apiKey: moonpayApiKey,
-            currencyAbbreviation: cryptoCurrency.toLowerCase(),
-            walletAddress: walletAddress,
+            currencyCode: moonpayCurrencyCode,        // FIXED: was currencyAbbreviation
+            baseCurrencyCode: currency.toLowerCase(), // FIXED: was baseCurrency
             baseCurrencyAmount: amount.toString(),
-            baseCurrency: currency.toLowerCase(),
+            walletAddress: walletAddress,
             externalTransactionId: transactionId,
             redirectURL: `${process.env.FRONTEND_URL}/?payment=success&provider=moonpay&txId=${transactionId}`,
         });
 
-        // 2. The query string to sign MUST include the leading '?'
+        // 3. The query string to sign MUST include the leading '?'
         const queryString = `?${params.toString()}`;
         
-        // 3. Generate HMAC SHA256 base64 signature using your Secret Key
+        // 4. Generate HMAC SHA256 base64 signature using your Secret Key
         const crypto = require('crypto');
         const signature = crypto
             .createHmac('sha256', moonpaySecretKey)
             .update(queryString)
             .digest('base64');
 
-        // 4. Append the generated signature to the parameters
+        // 5. Append the generated signature to the parameters
         params.append('signature', signature);
 
         const paymentUrl = `${baseUrl}?${params.toString()}`;

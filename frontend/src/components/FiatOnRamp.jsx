@@ -51,7 +51,7 @@ const FiatOnRamp = ({ walletAddress }) => {
         </button>
       </div>
 
-      <div className="mb-6">
+      <div>
         <div className="text-3xl font-bold text-gray-900 flex items-baseline">
           {balance} <span className="text-sm font-medium text-gray-500 ml-2">USDC</span>
         </div>
