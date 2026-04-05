@@ -1,7 +1,7 @@
 const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
+const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interface.fragments;
 const logger = require('../utils/logger')('escrowController');
 const TransactionWrapper = require('../utils/transactionWrapper');
 const IdempotencyKeyManager = require('../utils/idempotencyKey');

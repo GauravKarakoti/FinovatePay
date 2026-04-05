@@ -7,7 +7,7 @@ const Redis = require('ioredis');
 const { ethers } = require('ethers');
 const { pool } = require('../config/database');
 const { getSigner, contractAddresses } = require('../config/blockchain');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
+const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interface.fragments;
 
 const JOB_TYPES = {
   ESCROW_RELEASE: 'escrow:release',

@@ -177,7 +177,7 @@ async function getRiskScore(invoiceId) {
         u.credit_score
       FROM invoices i
       LEFT JOIN users u ON i.user_id = u.id
-      WHERE i.invoice_id = $1
+      WHERE seller_address = $1 OR buyer_address = $1
     `;
     const invoiceResult = await pool.query(invoiceQuery, [invoiceId]);
 

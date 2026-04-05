@@ -4,7 +4,7 @@ const logger = require('../utils/logger')('bridgeService');
 // Import ABIs (assuming they are compiled and available)
 const BridgeAdapterABI = require('../../deployed/BridgeAdapter.json').abi;
 const LiquidityAdapterABI = require('../../deployed/LiquidityAdapter.json').abi;
-const FinancingManagerABI = require('../../deployed/FinancingManager.json');
+const FinancingManagerABI = require('../../deployed/FinancingManager.json').interface.fragments;
 
 // Assuming these are deployed addresses; in real setup, fetch from config or DB
 const BRIDGE_ADAPTER_ADDRESS = process.env.BRIDGE_ADAPTER_ADDRESS;

@@ -2,7 +2,7 @@ const { ethers } = require('ethers');
 const { pool } = require('../config/database');
 const errorResponse = require('../utils/errorResponse');
 const logger = require('../utils/logger')('relayerController');
-const EscrowContractArtifact = require('../../deployed/EscrowContract.json');
+const EscrowContractArtifact = require('../../deployed/EscrowContract.json').interface.fragments;
 
 /**
  * Verify EIP-712 signature for meta-transaction

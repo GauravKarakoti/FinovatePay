@@ -229,13 +229,13 @@ export async function disconnectWallet() {
 export async function getEscrowContract() {
   const { signer } = await connectWallet();
   const escrowAddress = contractAddresses.EscrowContract;
-  return new Contract(escrowAddress, EscrowContractArtifact, signer);
+  return new Contract(escrowAddress, EscrowContractArtifact.interface.fragments, signer);
 }
 
 export async function getFinancingManagerContract() {
   const { signer } = await connectWallet();
   const financingAddress = contractAddresses.FinancingManager;
-  return new Contract(financingAddress, FinancingManagerArtifact, signer);
+  return new Contract(financingAddress, FinancingManagerArtifact.interface.fragments, signer);
 }
 
 export async function getInvoiceFactoryContract() {

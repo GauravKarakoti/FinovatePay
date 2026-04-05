@@ -7,8 +7,8 @@ const { getSecret } = require("../services/secrets");
 // 1️⃣ Import ABIs and Deployed Addresses
 const FractionTokenABI = require("../../deployed/FractionToken.json").abi;
 const ComplianceManagerABI = require("../../deployed/ComplianceManager.json").abi;
-const FinancingManagerABI = require("../../deployed/FinancingManager.json");
-const EscrowContractABI = require("../../deployed/EscrowContract.json");
+const FinancingManagerABI = require("../../deployed/FinancingManager.json").interface.fragments;
+const EscrowContractABI = require("../../deployed/EscrowContract.json").interface.fragments;
 const TreasuryManagerABI = require("../../deployed/TreasuryManager.json").abi;
 const deployedAddresses = require("../../deployed/contract-addresses.json");
 

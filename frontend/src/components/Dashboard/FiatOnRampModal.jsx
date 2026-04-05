@@ -111,6 +111,7 @@ const FiatOnRampModal = ({ onClose, onSuccess, walletAddress }) => {
                 transak.on(transak.EVENTS.TRANSAK_WIDGET_CLOSE, () => {
                     transak.close();
                     setIsProcessing(false);
+                    onClose(); // <-- Add this line to close your custom modal when Transak is exited
                 });
 
                 return;
