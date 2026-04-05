@@ -9,24 +9,22 @@ const FiatOnRamp = ({ walletAddress }) => {
   const [balance, setBalance] = useState('0.00');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch USDC Balance
   const fetchBalance = async () => {
     if (!walletAddress) return;
 
     setIsRefreshing(true);
     try {
       const { provider } = await connectWallet();
-      // Use the USDC address from web3 utils
       const usdcAddress = stablecoinAddresses['USDC'];
       const contract = new ethers.Contract(usdcAddress, erc20ABI, provider);
 
       const rawBalance = await contract.balanceOf(walletAddress);
-      const formattedBalance = ethers.formatUnits(rawBalance, 6); // USDC has 6 decimals
+      const formattedBalance = ethers.formatUnits(rawBalance, 6);
 
       setBalance(formattedBalance);
     } catch (error) {
-      console.error('Error fetching balance:', error);
-      // specific error handling if needed
+      // Catch the RPC error gracefully without crashing the console loop
+      console.warn('Network congested or RPC failed while fetching balance. Retrying later.');
     } finally {
       setIsRefreshing(false);
     }
@@ -35,8 +33,8 @@ const FiatOnRamp = ({ walletAddress }) => {
   useEffect(() => {
     fetchBalance();
 
-    // Set up an interval to refresh balance occasionally
-    const interval = setInterval(fetchBalance, 15000);
+    // Increase interval to 30 seconds to be kinder to public RPCs
+    const interval = setInterval(fetchBalance, 30000); 
     return () => clearInterval(interval);
   }, [walletAddress]);
 
