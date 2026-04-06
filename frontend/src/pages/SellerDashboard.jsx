@@ -17,10 +17,13 @@ import {
   raiseDispute
 } from '../utils/api';
 import {
-  connectWallet, getEscrowContract
+  connectWallet, 
+  getEscrowContract,
+  isWalletConnected,   // <-- ADD THIS
+  getConnectedAddress  // <-- ADD THIS
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
-
+import GovernanceDashboard from '../pages/GovernanceDashboard';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import KYCStatus from '../components/KYC/KYCStatus';
@@ -296,13 +299,24 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
+    
+    // 1. Fetch backend database data FIRST (Does not require Web3)
     try {
-      const { address } = await connectWallet();
-      setWalletAddress(address);
       await Promise.all([loadInvoices(), loadKYCStatus(), loadQuotations()]);
-    } catch (error) {
-      console.error('Initial load failed', error);
-      toast.error('Please connect your wallet');
+    } catch (apiError) {
+      console.error('Failed to load database data:', apiError);
+      toast.error('Failed to load dashboard data');
+    }
+
+    // 2. Passively check for an existing wallet connection
+    // This prevents the modal from annoyingly popping up on every refresh
+    try {
+      if (isWalletConnected()) {
+        const address = getConnectedAddress();
+        if (address) setWalletAddress(address);
+      }
+    } catch (walletError) {
+      console.warn('Passive wallet check failed', walletError);
     } finally {
       setIsLoading(false);
     }
