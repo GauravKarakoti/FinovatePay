@@ -470,8 +470,9 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
       case 'overview': return <OverviewTab />;
       case 'invoices': return <InvoicesTab />;
       case 'admin': return <AdminTab />;
-      case 'upgrade': return <UpgradeManager />; // Add this case
+      case 'upgrade': return <UpgradeManager />;
       case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
+      case 'governance': return <GovernanceDashboard />; // <-- ADD THIS LINE
       default: return <PlaceholderTab />;
     }
   };

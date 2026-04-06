@@ -683,6 +683,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       case 'streaming': return <StreamingTabComponent />;
       case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
       case 'auctions': return <AuctionList />;
+      case 'governance': return <GovernanceDashboard />; // <-- ADD THIS LINE
       default: return <OverviewTab />;
     }
   };

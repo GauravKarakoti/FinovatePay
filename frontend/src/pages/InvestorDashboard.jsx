@@ -4,7 +4,7 @@ import { api } from '../utils/api';
 import { toast } from 'sonner';
 import io from 'socket.io-client';
 import { ethers } from 'ethers';
-
+import GovernanceDashboard from './GovernanceDashboard';
 import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 import { getFractionTokenContract, stablecoinAddresses } from '../utils/web3';
 import { BuyFractionToken } from '../components/Financing/BuyFractionToken';
@@ -111,8 +111,6 @@ const ListingRow = ({ invoice, onPurchaseSuccess }) => {
           const contract = await getFractionTokenContract();
           const details = await contract.tokenDetails(token_id);
           if (active && details) {
-            // Ethers v6 results are proxy objects or arrays, accessing by name usually works if ABI has names
-            // yieldBps is defined in ABI
              setFetchedDetails({
                yield: Number(details.yieldBps),
                maturity: Number(details.maturityDate)
@@ -697,11 +695,12 @@ const FinancingTab = () => (
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Tab Content */}
         <main className="animate-fadeIn">
-{activeTab === 'overview' && <OverviewTab />}
+          {activeTab === 'overview' && <OverviewTab />}
           {activeTab === 'financing' && <FinancingTab />}
           {activeTab === 'auctions' && <AuctionTab />}
           {activeTab === 'analytics' && <AnalyticsPage activeTab={activeTab} />}
-          {activeTab !== 'overview' && activeTab !== 'financing' && activeTab !== 'auctions' && activeTab !== 'analytics' && (
+          {activeTab === 'governance' && <GovernanceDashboard />}
+          {activeTab !== 'overview' && activeTab !== 'financing' && activeTab !== 'auctions' && activeTab !== 'analytics' && activeTab !== 'governance' && (
             <EmptyState message="Section under construction" icon="🚧" />
           )}
         </main>

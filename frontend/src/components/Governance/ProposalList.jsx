@@ -73,28 +73,6 @@ const ProposalList = ({ onSelectProposal }) => {
 
   return (
     <div className="p-6">
-      {/* Stats Overview */}
-      {stats && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-gray-500 text-sm">Total Proposals</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-            <div className="text-gray-500 text-sm">Active</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-purple-600">{stats.executed}</div>
-            <div className="text-gray-500 text-sm">Executed</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="text-2xl font-bold text-red-600">{stats.defeated}</div>
-            <div className="text-gray-500 text-sm">Defeated</div>
-          </div>
-        </div>
-      )}
-
       {/* Filter */}
       <div className="flex gap-2 mb-4">
         {['ALL', 'ACTIVE', 'PENDING', 'SUCCEEDED', 'DEFEATED', 'EXECUTED'].map((status) => (
