@@ -27,6 +27,7 @@ import ProduceQRCode from '../components/Produce/ProduceQRCode';
 import KYCVerification from '../components/KYC/KYCVerification';
 import { useStatsActions } from '../context/StatsContext';
 import FiatOnRamp from '../components/FiatOnRamp';
+import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -927,6 +928,13 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         onConfirm={handleConfirmPayment}
         isProcessing={loadingInvoiceId === (paymentInvoice?.invoice_id)}
       />
+
+      {showFiatModal && (
+        <FiatOnRampModal
+          onClose={() => setShowFiatModal(false)}
+          walletAddress={walletAddress}
+        />
+      )}
     </div>
   );
 };
