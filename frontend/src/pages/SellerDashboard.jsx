@@ -252,15 +252,16 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [tokenizingInvoice, setTokenizingInvoice] = useState(null); // <-- NEW STATE
   const { setStats: setGlobalStats } = useStatsActions();
 
-  // ------------------ DATA LOADERS ------------------
-
   const loadKYCStatus = useCallback(async () => {
     try {
       const { data } = await getKYCStatus();
+      // Unwrap the nested payload if it exists
+      const kycPayload = data?.data || data; 
+      
       setKycData({
-        status: data?.status || 'not_started',
-        riskLevel: data?.kyc_risk_level || 'unknown',
-        details: data?.details || (data?.status === 'verified' ? 'Verified' : 'Pending verification')
+        status: kycPayload?.status || 'not_started',
+        riskLevel: kycPayload?.kyc_risk_level || 'unknown',
+        details: kycPayload?.details || (kycPayload?.status === 'verified' ? 'Verified' : 'Pending verification')
       });
     } catch (err) {
       console.error('KYC load failed:', err);
@@ -270,12 +271,12 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const loadInvoices = useCallback(async () => {
     try {
       const res = await getSellerInvoices();
-      // Safely extract the array no matter how the API formats the response
       let fetchedInvoices = [];
       if (Array.isArray(res)) fetchedInvoices = res;
       else if (Array.isArray(res?.data)) fetchedInvoices = res.data;
       else if (Array.isArray(res?.data?.invoices)) fetchedInvoices = res.data.invoices;
-      
+      else if (Array.isArray(res?.data?.data)) fetchedInvoices = res.data.data; // Add this line!
+
       setInvoices(fetchedInvoices);
     } catch (err) {
       console.error('Invoice load failed:', err);
@@ -290,6 +291,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       if (Array.isArray(res)) fetchedQuotations = res;
       else if (Array.isArray(res?.data)) fetchedQuotations = res.data;
       else if (Array.isArray(res?.data?.quotations)) fetchedQuotations = res.data.quotations;
+      else if (Array.isArray(res?.data?.data)) fetchedQuotations = res.data.data; // Add this line!
 
       setQuotations(fetchedQuotations);
     } catch (error) {
