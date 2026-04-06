@@ -479,14 +479,14 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
     setProcessingLotId(lot.lot_id);
     try {
-      // Use environment variable for exchange rate or fallback to 50.75
       const exchangeRate = parseFloat(import.meta.env.VITE_EXCHANGE_RATE) || 50.75;
 
       await createQuotation({
-        lot_id: lot.lot_id,
-        seller_address: lot.farmer_address,
+        lotId: lot.lot_id,
+        sellerAddress: lot.farmer_address,
         quantity: parsedQty,
-        price_per_unit: lot.price / exchangeRate,
+        // ADD FALLBACK (lot.price || 0) to prevent sending NaN
+        pricePerUnit: (lot.price || 0) / exchangeRate, 
         description: `${parsedQty}kg of ${lot.produce_type} from lot #${lot.lot_id}`
       });
       toast.success("Quotation request sent to seller!");

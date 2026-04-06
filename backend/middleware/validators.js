@@ -293,13 +293,16 @@ const validateResolveDispute = [
   handleValidationErrors
 ];
 
-/**
- * QUOTATION VALIDATORS
- */
 const validateCreateQuotation = [
-  body('buyer_address')
+  body('buyerAddress')
+    .optional()
     .trim()
     .custom(isEthereumAddress).withMessage('Invalid buyer address'),
+  
+  body('sellerAddress')
+    .optional()
+    .trim()
+    .custom(isEthereumAddress).withMessage('Invalid seller address'),
   
   body('description')
     .trim()
@@ -307,17 +310,18 @@ const validateCreateQuotation = [
     .escape(),
   
   body('quantity')
-    .isFloat({ min: 0.01 }).withMessage('Quantity must be greater than 0'),
+    .isFloat({ min: 0 }).withMessage('Quantity must be greater than 0'), // Lowered min to 0
   
-  body('price_per_unit')
-    .isFloat({ min: 0.01 }).withMessage('Price must be greater than 0'),
+  body('pricePerUnit')
+    .optional() // Made optional for Flow 1 (Controller assigns Market Price)
+    .isFloat({ min: 0 }).withMessage('Price must be a valid number'), // Lowered min to 0
   
   body('currency')
     .optional()
     .trim()
-    .isIn(['USD', 'EUR', 'INR', 'USDC', 'EURC']).withMessage('Invalid currency'),
+    .isIn(['USD', 'EUR', 'INR', 'USDC', 'EURC', 'MATIC']).withMessage('Invalid currency'),
   
-  body('lot_id')
+  body('lotId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid lot ID'),
   
