@@ -2422,3 +2422,223 @@
 [2026-04-06 19:45:45:809] [info] [request]: [660d13c3-56bb-4d5a-b6dd-06be02607911] GET /api/v1/lending/loans
 [2026-04-06 19:45:47:032] [info] [request]: [ae1cd99d-ccc3-42f0-8f52-282fee652999] GET /api/v1/lending/loans
 [2026-04-06 19:45:49:699] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:50:02:689] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 19:50:02:702] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 19:50:02:694] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 19:50:02:695] [info] [server]: Invoice Sync Worker started
+[2026-04-06 19:50:02:696] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 19:50:02:703] [info] [server]: Compliance listeners started
+[2026-04-06 19:50:02:706] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 19:50:02:708] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 19:50:04:873] [info] [server]: Database connection test completed successfully
+[2026-04-06 19:50:05:673] [info] [server]: Tokenization listener started
+[2026-04-06 19:50:07:906] [info] [request]: [6f54995c-4a1a-4b6b-a634-6e9cc46652da] PUT /api/v1/auth/role
+[2026-04-06 19:50:09:057] [info] [request]: [7b9390cf-41f7-4df5-9771-179fc1bc42cd] GET /api/v1/financing/marketplace
+[2026-04-06 19:50:09:067] [info] [request]: [c2118c61-aa57-4efe-b6ca-3c6cce0981de] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:09:544] [info] [request]: [1573e572-03aa-44ff-84c2-626a02e616c4] GET /api/v1/financing/marketplace
+[2026-04-06 19:50:09:558] [info] [request]: [d244e6cf-f542-42a9-8183-8162b4503615] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:10:587] [info] [request]: [1a7f67cf-76d1-4b8a-8e81-5d27471589b0] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:11:196] [info] [request]: [ac772567-451a-42ce-9827-cac0d506a3c5] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:19:637] [info] [request]: [e5e0d93d-fbdb-4eb6-ad77-18cf2f8829d3] GET /api/v1/financing/marketplace
+[2026-04-06 19:50:19:649] [info] [request]: [268d91ac-6429-4c25-9026-57ca2236d9ef] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:19:680] [info] [request]: [6c4fcf13-bd5b-4a11-9632-22b978422a47] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:50:19:686] [info] [request]: [c28dce98-8ca5-47d4-8d2f-68b9b6a324d8] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:50:20:130] [info] [request]: [34bfae5b-a570-49b8-8554-12db959e383f] GET /api/v1/financing/marketplace
+[2026-04-06 19:50:20:143] [info] [request]: [b103c39e-4433-4da2-b6eb-3931ff3f4745] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:20:161] [info] [request]: [e1304930-174d-4580-b938-190d96e29907] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:50:21:148] [info] [request]: [e670557d-8bfc-4c4a-899d-5d4934c3d2b1] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:21:662] [info] [request]: [a0bd6b0c-bdbc-4f99-b689-275d95e08290] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:22:026] [info] [request]: [11871baa-3cdd-439b-b82f-dbc211bdbbcb] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:50:32:323] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 19:50:32:335] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 19:50:32:328] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 19:50:32:328] [info] [server]: Invoice Sync Worker started
+[2026-04-06 19:50:32:329] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 19:50:32:335] [info] [server]: Compliance listeners started
+[2026-04-06 19:50:32:338] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 19:50:32:341] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 19:50:34:100] [info] [server]: Database connection test completed successfully
+[2026-04-06 19:50:35:073] [info] [server]: Tokenization listener started
+[2026-04-06 19:50:40:571] [info] [request]: [07d2331c-3138-4ac5-9649-cc7a6a976f1e] GET /api/v1/financing/marketplace
+[2026-04-06 19:50:40:579] [info] [request]: [45053db9-3806-4bce-8944-cc9bc35d022a] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:40:582] [info] [request]: [bf7c59a0-9351-4a3e-8b05-d9f80076721a] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:50:40:585] [info] [request]: [85e7969b-7653-495e-bbae-4a2a83b12b85] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:50:41:305] [info] [request]: [418da38b-3871-46be-ae1f-25914f7b0cc9] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:50:41:314] [info] [request]: [c8ee73df-e0cb-4eae-a35d-5878b437b8e5] GET /api/v1/financing/marketplace
+[2026-04-06 19:50:41:338] [info] [request]: [ea56998c-bd70-4646-bb40-ef7a4da36200] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:42:356] [info] [request]: [e17c271e-8dd5-4697-ab82-8e06dd609454] GET /api/v1/investor/portfolio
+[2026-04-06 19:50:42:917] [info] [request]: [4b8ccfe3-553a-428d-8f27-688d58990fae] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:50:42:959] [info] [request]: [db42457b-3f85-4f4e-8189-cccc04cd878a] GET /api/v1/investor/portfolio
+[2026-04-06 19:51:02:590] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:51:32:588] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:52:02:584] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:52:32:633] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:52:53:653] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 19:52:53:666] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 19:52:53:658] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 19:52:53:659] [info] [server]: Invoice Sync Worker started
+[2026-04-06 19:52:53:660] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 19:52:53:668] [info] [server]: Compliance listeners started
+[2026-04-06 19:52:53:670] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 19:52:53:673] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 19:52:55:533] [info] [server]: Database connection test completed successfully
+[2026-04-06 19:52:57:878] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 19:52:57:891] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 19:52:57:884] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 19:52:57:884] [info] [server]: Invoice Sync Worker started
+[2026-04-06 19:52:57:886] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 19:52:57:893] [info] [server]: Compliance listeners started
+[2026-04-06 19:52:57:895] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 19:52:57:898] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 19:53:00:231] [info] [server]: Database connection test completed successfully
+[2026-04-06 19:53:01:365] [info] [server]: Tokenization listener started
+[2026-04-06 19:53:28:131] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:53:58:164] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:54:28:247] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:54:58:253] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:55:28:178] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:55:58:185] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:56:27:644] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 19:56:27:658] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 19:56:27:650] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 19:56:27:651] [info] [server]: Invoice Sync Worker started
+[2026-04-06 19:56:27:652] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 19:56:27:660] [info] [server]: Compliance listeners started
+[2026-04-06 19:56:27:663] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 19:56:27:666] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 19:56:29:428] [info] [server]: Database connection test completed successfully
+[2026-04-06 19:56:30:528] [info] [server]: Tokenization listener started
+[2026-04-06 19:56:37:610] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 19:56:37:629] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 19:56:37:619] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 19:56:37:620] [info] [server]: Invoice Sync Worker started
+[2026-04-06 19:56:37:622] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 19:56:37:630] [info] [server]: Compliance listeners started
+[2026-04-06 19:56:37:633] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 19:56:37:636] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 19:56:40:791] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 19:56:40:805] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 19:56:40:797] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 19:56:40:798] [info] [server]: Invoice Sync Worker started
+[2026-04-06 19:56:40:799] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 19:56:40:806] [info] [server]: Compliance listeners started
+[2026-04-06 19:56:40:808] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 19:56:40:811] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 19:56:42:785] [info] [server]: Database connection test completed successfully
+[2026-04-06 19:56:43:779] [info] [server]: Tokenization listener started
+[2026-04-06 19:56:51:151] [info] [request]: [cb318a15-edaa-4231-983e-debeb8db3dba] GET /api/v1/financing/marketplace
+[2026-04-06 19:56:51:158] [info] [request]: [9a07afcf-712a-4eee-ba1c-e30cba8c587c] GET /api/v1/investor/portfolio
+[2026-04-06 19:56:51:163] [info] [request]: [43dc75c5-40ab-4309-a98e-4a633ae159ce] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:56:51:167] [info] [request]: [a2fb107f-a4e7-4283-84ef-ecd39c09c502] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:56:52:048] [info] [request]: [b3c9532b-ea27-413d-a6ba-8636ce837c86] GET /api/v1/financing/marketplace
+[2026-04-06 19:56:52:056] [info] [request]: [f76f9ab9-cdf1-470e-b7ef-2914cd89a80e] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:56:52:618] [info] [request]: [e993ede7-bfd1-4f5a-876e-fb62e3361ab8] GET /api/v1/investor/portfolio
+[2026-04-06 19:56:54:050] [info] [request]: [0b545f0b-deeb-4497-bef9-f6e97f0b4c6c] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:57:11:062] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:57:22:940] [info] [request]: [0c888d63-5521-47ab-ac31-b41db0881fef] GET /api/v1/financing/marketplace
+[2026-04-06 19:57:22:949] [info] [request]: [3e452718-0d11-41dc-80f9-bf072b94ddc1] GET /api/v1/investor/portfolio
+[2026-04-06 19:57:22:956] [info] [request]: [b2c1f490-9d6e-46c0-acca-93be421b5a2f] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:57:22:966] [info] [request]: [772b0fa0-34de-42dc-9294-1d302258096e] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:57:23:475] [info] [request]: [53fb65a8-f068-4d25-8fc8-b924ee07b16a] GET /api/v1/notifications/push-preferences
+[2026-04-06 19:57:23:480] [info] [request]: [7f1a49c2-16c6-41cc-8bb8-6a129e3f622f] GET /api/v1/notifications/subscriptions
+[2026-04-06 19:57:23:486] [info] [request]: [516879e4-0457-4e0b-a73f-958e4d1d2567] GET /api/v1/financing/marketplace
+[2026-04-06 19:57:24:068] [info] [request]: [62e4224c-896f-48d5-9e7b-a9886e5876c0] GET /api/v1/investor/portfolio
+[2026-04-06 19:57:41:045] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:58:11:060] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:58:41:063] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:59:11:084] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 19:59:41:121] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:00:11:138] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:00:41:093] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:01:11:113] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:01:40:487] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-06 20:08:46:392] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 20:08:46:404] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 20:08:46:397] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 20:08:46:398] [info] [server]: Invoice Sync Worker started
+[2026-04-06 20:08:46:399] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 20:08:46:405] [info] [server]: Compliance listeners started
+[2026-04-06 20:08:46:407] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 20:08:46:410] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 20:08:48:554] [info] [server]: Database connection test completed successfully
+[2026-04-06 20:08:49:924] [info] [server]: Tokenization listener started
+[2026-04-06 20:09:11:023] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-06 20:09:11:037] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-06 20:09:11:028] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-06 20:09:11:029] [info] [server]: Invoice Sync Worker started
+[2026-04-06 20:09:11:030] [info] [server]: Transaction Recovery Worker started
+[2026-04-06 20:09:11:038] [info] [server]: Compliance listeners started
+[2026-04-06 20:09:11:041] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-06 20:09:11:043] [info] [server]: 🚀 Server running on port 3000
+[2026-04-06 20:09:13:485] [info] [server]: Database connection test completed successfully
+[2026-04-06 20:09:13:976] [info] [server]: Tokenization listener started
+[2026-04-06 20:09:29:381] [info] [request]: [f47bddcf-c528-41a0-a476-19c5042e9007] GET /api/v1/financing/marketplace
+[2026-04-06 20:09:29:398] [info] [request]: [a8d5fd45-a492-4ce7-89aa-95e30f50fe8c] GET /api/v1/investor/portfolio
+[2026-04-06 20:09:29:716] [info] [server]: User connected: SNoqdQrbTuuFUCE-AAAB | User: 5 | Role: investor
+[2026-04-06 20:09:29:713] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-06 20:09:29:720] [info] [server]: User 5 joined marketplace
+[2026-04-06 20:09:32:280] [info] [server]: User disconnected: SNoqdQrbTuuFUCE-AAAB
+[2026-04-06 20:09:32:348] [info] [request]: [d004e5bd-c200-40fb-8ee8-4302504f28ec] GET /api/v1/financing/marketplace
+[2026-04-06 20:09:32:357] [info] [request]: [2babc391-100a-4f7b-bab3-fe8feae4cf18] GET /api/v1/investor/portfolio
+[2026-04-06 20:09:32:624] [info] [server]: User connected: uRVGfgAuIeEawpdeAAAD | User: 5 | Role: investor
+[2026-04-06 20:09:32:626] [info] [server]: User 5 joined marketplace
+[2026-04-06 20:09:32:623] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-06 20:09:41:295] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:10:02:285] [info] [server]: User disconnected: uRVGfgAuIeEawpdeAAAD
+[2026-04-06 20:10:02:365] [info] [request]: [43d2b552-5420-4cc5-953b-1ad8940a1378] GET /api/v1/financing/marketplace
+[2026-04-06 20:10:02:371] [info] [request]: [a76244a6-d5d5-4c56-9ff6-b3a2de88dcb1] GET /api/v1/investor/portfolio
+[2026-04-06 20:10:02:656] [info] [server]: User connected: vcyZF4_DG5nZBdTVAAAF | User: 5 | Role: investor
+[2026-04-06 20:10:02:658] [info] [server]: User 5 joined marketplace
+[2026-04-06 20:10:02:655] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-06 20:10:06:270] [info] [server]: User disconnected: vcyZF4_DG5nZBdTVAAAF
+[2026-04-06 20:10:06:341] [info] [request]: [b8cf7c83-bebe-4557-9d2f-5e6cffd78134] GET /api/v1/financing/marketplace
+[2026-04-06 20:10:06:347] [info] [request]: [9a1f4cee-c9fd-4d2b-8601-13e82f2af9a2] GET /api/v1/investor/portfolio
+[2026-04-06 20:10:06:663] [info] [server]: User connected: 4O8pyQOHlWQ8Z2opAAAH | User: 5 | Role: investor
+[2026-04-06 20:10:06:665] [info] [server]: User 5 joined marketplace
+[2026-04-06 20:10:06:662] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-06 20:10:11:380] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:10:14:270] [info] [server]: User disconnected: 4O8pyQOHlWQ8Z2opAAAH
+[2026-04-06 20:10:14:343] [info] [request]: [aac9da7f-0dec-44b4-82ef-9a11a48b2147] GET /api/v1/financing/marketplace
+[2026-04-06 20:10:14:349] [info] [request]: [3bb9390b-c8cd-4548-979a-c8bf0ec2d74c] GET /api/v1/investor/portfolio
+[2026-04-06 20:10:14:607] [info] [server]: User connected: GrDh6t64GEIDvcSWAAAJ | User: 5 | Role: investor
+[2026-04-06 20:10:14:609] [info] [server]: User 5 joined marketplace
+[2026-04-06 20:10:14:606] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-06 20:10:18:269] [info] [server]: User disconnected: GrDh6t64GEIDvcSWAAAJ
+[2026-04-06 20:10:18:330] [info] [request]: [43788ba6-3928-43e9-8d05-3683f1118fb3] GET /api/v1/financing/marketplace
+[2026-04-06 20:10:18:337] [info] [request]: [41df99a2-7d30-4a13-8fec-e48a7475c18e] GET /api/v1/investor/portfolio
+[2026-04-06 20:10:18:597] [info] [server]: User connected: zfX31Vhz-rQ8T0AOAAAL | User: 5 | Role: investor
+[2026-04-06 20:10:18:598] [info] [server]: User 5 joined marketplace
+[2026-04-06 20:10:18:596] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-06 20:10:21:192] [info] [server]: User disconnected: zfX31Vhz-rQ8T0AOAAAL
+[2026-04-06 20:10:24:272] [info] [request]: [d2d1d301-b194-457e-b077-1e466ec0a5d3] GET /api/v1/financing/marketplace
+[2026-04-06 20:10:24:278] [info] [request]: [242a46ba-486d-4531-b19c-fdae8088134b] GET /api/v1/investor/portfolio
+[2026-04-06 20:10:24:309] [info] [request]: [8d445b0b-f10d-4db9-b048-87f0455c218b] GET /api/v1/notifications/push-preferences
+[2026-04-06 20:10:24:315] [info] [request]: [f047d68e-e53e-42c2-84b8-09430cffdbfb] GET /api/v1/notifications/subscriptions
+[2026-04-06 20:10:24:551] [info] [server]: User connected: KcnQYN9zrY-tHHktAAAO | User: 5 | Role: investor
+[2026-04-06 20:10:24:550] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-06 20:10:24:554] [info] [server]: User 5 joined marketplace
+[2026-04-06 20:10:24:794] [info] [request]: [b2263448-4f2b-4df1-a264-9988b4bb0b13] GET /api/v1/financing/marketplace
+[2026-04-06 20:10:24:804] [info] [request]: [37e8f1d3-3d88-4bc8-b621-d3ea7afac97f] GET /api/v1/notifications/push-preferences
+[2026-04-06 20:10:25:071] [info] [request]: [8f15d4ee-b0e9-45d4-b656-df53d13c1e60] GET /api/v1/investor/portfolio
+[2026-04-06 20:10:26:470] [info] [request]: [b03fba1a-2614-4be1-a830-95dd3ab04b48] GET /api/v1/notifications/subscriptions
+[2026-04-06 20:10:32:769] [info] [request]: [3e770e67-c248-4f3a-b794-768e749386eb] GET /api/v1/currencies
+[2026-04-06 20:10:33:129] [info] [request]: [81575809-65a0-49d2-8f8f-cfcd199bc1d0] GET /api/v1/currencies
+[2026-04-06 20:10:40:087] [info] [request]: [c8986c31-20d8-4944-9af3-b21178d7cd0f] GET /api/v1/analytics/overview
+[2026-04-06 20:10:41:123] [info] [request]: [2a3503be-5b8b-48a1-95b3-9a5a4c7fd830] GET /api/v1/analytics/overview
+[2026-04-06 20:10:41:137] [info] [request]: [eb09474b-2ace-4499-9cb4-1feaad12b94a] GET /api/v1/analytics/payments
+[2026-04-06 20:10:41:307] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:10:42:355] [info] [request]: [c65fc440-8a2f-4ba5-9e36-dd34c5c084ec] GET /api/v1/analytics/payments
+[2026-04-06 20:10:42:391] [info] [request]: [4df230d2-366f-4c25-a765-b4c94b097b44] GET /api/v1/analytics/financing
+[2026-04-06 20:10:43:583] [info] [request]: [d7c9971e-03e3-4650-8835-e07302110cb4] GET /api/v1/analytics/financing
+[2026-04-06 20:11:11:328] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:11:36:662] [info] [request]: [5a88f874-f331-4f9a-b509-17b73e7cbaf2] GET /api/v1/financing/marketplace
+[2026-04-06 20:11:41:321] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:11:42:359] [info] [request]: [eba10601-e9cf-4dec-a962-47ed55d1837a] GET /api/v1/auctions
+[2026-04-06 20:11:42:626] [info] [request]: [6fc5cdfb-f422-4f2b-ac10-38692937f996] GET /api/v1/auctions
+[2026-04-06 20:11:47:704] [info] [request]: [1c3c825a-8e84-4317-a16c-46bd32edc8ef] GET /api/v1/auctions
+[2026-04-06 20:11:47:969] [info] [request]: [7a0ae495-d06d-413e-a07c-fa9be22ef5f9] GET /api/v1/auctions
+[2026-04-06 20:12:11:398] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:12:41:400] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:13:11:347] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:13:41:334] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-06 20:14:10:789] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')

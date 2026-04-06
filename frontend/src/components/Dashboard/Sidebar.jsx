@@ -169,20 +169,13 @@ const tabs = [
            <div className="flex flex-col space-y-2 mb-4">
              {user.role === 'buyer' ? <>
                  <button onClick={() => handleRoleSwitch('seller')} className="w-full text-left px-4 py-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100 font-medium">Switch to Seller</button>
-                 <button onClick={() => handleRoleSwitch('shipment')} className="w-full text-left px-4 py-2 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Switch to Shipment</button>
                  <button onClick={() => handleRoleSwitch('investor')} className="w-full text-left px-4 py-2 rounded-md bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium">Switch to Investor</button>
              </> : user.role === 'seller' ? <>
                  <button onClick={() => handleRoleSwitch('buyer')} className="w-full text-left px-4 py-2 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">Switch to Buyer</button>
-                 <button onClick={() => handleRoleSwitch('shipment')} className="w-full text-left px-4 py-2 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Switch to Shipment</button>
-                 <button onClick={() => handleRoleSwitch('investor')} className="w-full text-left px-4 py-2 rounded-md bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium">Switch to Investor</button>
-             </> : user.role === 'shipment' ? <>
-                 <button onClick={() => handleRoleSwitch('buyer')} className="w-full text-left px-4 py-2 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">Switch to Buyer</button>
-                 <button onClick={() => handleRoleSwitch('seller')} className="w-full text-left px-4 py-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100 font-medium">Switch to Seller</button>
                  <button onClick={() => handleRoleSwitch('investor')} className="w-full text-left px-4 py-2 rounded-md bg-gray-50 text-gray-700 hover:bg-gray-100 font-medium">Switch to Investor</button>
              </> : <>
                  <button onClick={() => handleRoleSwitch('buyer')} className="w-full text-left px-4 py-2 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium">Switch to Buyer</button>
                  <button onClick={() => handleRoleSwitch('seller')} className="w-full text-left px-4 py-2 rounded-md bg-green-50 text-green-700 hover:bg-green-100 font-medium">Switch to Seller</button>
-                 <button onClick={() => handleRoleSwitch('shipment')} className="w-full text-left px-4 py-2 rounded-md bg-orange-50 text-orange-700 hover:bg-orange-100 font-medium">Switch to Shipment</button>
              </>}
            </div>
         )}

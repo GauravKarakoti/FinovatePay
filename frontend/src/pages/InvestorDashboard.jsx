@@ -318,7 +318,8 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
       return;
     }
 
-    const newSocket = io(import.meta.env.VITE_API_URL, {
+    const socketUrl = new URL(import.meta.env.VITE_API_URL).origin;
+    const newSocket = io(socketUrl, {
       auth: {
         token: token
       }
@@ -400,9 +401,12 @@ const InvestorDashboard = ({ activeTab = 'overview' }) => {
   const fetchPortfolio = useCallback(async () => {
     try {
       const res = await api.get('/investor/portfolio');
+      
+      // Safety check: ensure res.data is actually an array
+      const data = Array.isArray(res.data) ? res.data : [];
       const holdings = new Map();
       
-      (res.data || []).forEach(item => {
+      data.forEach(item => {
         const { invoice, tokens_owned, token_id } = item;
         if (!invoice?.invoice_id) return;
         

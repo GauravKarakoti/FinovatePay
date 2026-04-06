@@ -93,20 +93,13 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
                   {/* Desktop Role Switcher */}
                   {user.role === 'buyer' ? <>
                       <button onClick={() => handleRoleSwitch('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Seller</button>
-                      <button onClick={() => handleRoleSwitch('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">Shipment</button>
                       <button onClick={() => handleRoleSwitch('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">Investor</button>
                   </> : user.role === 'seller' ? <>
                       <button onClick={() => handleRoleSwitch('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Buyer</button>
-                      <button onClick={() => handleRoleSwitch('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">Shipment</button>
-                      <button onClick={() => handleRoleSwitch('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">Investor</button>
-                  </> : user.role === 'shipment' ? <>
-                      <button onClick={() => handleRoleSwitch('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Buyer</button>
-                      <button onClick={() => handleRoleSwitch('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Seller</button>
                       <button onClick={() => handleRoleSwitch('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">Investor</button>
                   </> : <>
                       <button onClick={() => handleRoleSwitch('buyer')} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Buyer</button>
                       <button onClick={() => handleRoleSwitch('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Seller</button>
-                      <button onClick={() => handleRoleSwitch('shipment')} className="px-3 py-1 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">Shipment</button>
                   </>}
                 </div>
               )}
