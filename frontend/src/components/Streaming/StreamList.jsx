@@ -24,10 +24,23 @@ const StreamList = ({ userRole = 'seller', onStreamUpdate }) => {
     try {
       setIsLoading(true);
       const response = await getMyStreams();
-      setStreams(response.data || []);
+      
+      // Extract the data based on how your backend nests it.
+      // If the backend returns { data: [...] } or { streams: [...] }
+      let streamData = response.data;
+      if (streamData && streamData.data) {
+        streamData = streamData.data;
+      } else if (streamData && streamData.streams) {
+        streamData = streamData.streams;
+      }
+
+      // Safely ensure we only ever set an array to state
+      setStreams(Array.isArray(streamData) ? streamData : []);
+      
     } catch (error) {
       console.error('Error loading streams:', error);
       toast.error('Failed to load streams');
+      setStreams([]); // Fallback to empty array on error
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +192,7 @@ const StreamList = ({ userRole = 'seller', onStreamUpdate }) => {
 
   return (
     <div className="space-y-4">
-      {streams.map((stream) => (
+      {Array.isArray(streams) && streams.map((stream) => (
         <div 
           key={stream.stream_id} 
           className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
