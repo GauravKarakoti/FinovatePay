@@ -1,10 +1,15 @@
 import { connectWallet, disconnectWallet } from '../../utils/web3';
 import { updateCurrentUserRole } from '../../utils/api';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 
 // FIX: Receive the onToggleRole prop
 const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Check if we are currently on the shipment route or if the user's role is shipment
+  const isShipmentContext = location.pathname.includes('shipment') || user?.role === 'shipment';
+
   const handleWalletConnect = async () => {
     try {
       await connectWallet();
@@ -25,14 +30,13 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
       console.log('Role switch response:', response);
 
       if (response && response.data.user) {
-        // 4. THIS IS THE FIX:
-        //    Update localStorage
+        // Update localStorage
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        //    Update the live React state in App.jsx
+        // Update the live React state in App.jsx
         onUserUpdate(response.data.user);
 
-        // 5. Navigate to the root. App.jsx's routing logic
-        //    will see the new role and navigate to the correct dashboard.
+        // Navigate to the root. App.jsx's routing logic
+        // will see the new role and navigate to the correct dashboard.
         navigate(`/`);
       } else {
         console.error('API response did not contain user object.', response);
@@ -46,8 +50,9 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
     <header className="bg-finovate-blue-800 text-white shadow-lg sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center space-x-4">
-          {/* Hamburger Menu for Mobile Sidebar */}
-          {user && (
+          
+          {/* Hamburger Menu for Mobile Sidebar - Hidden in Shipment Context */}
+          {user && !isShipmentContext && (
             <button
               onClick={onToggleSidebar}
               className="md:hidden text-white focus:outline-none"
@@ -58,6 +63,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
               </svg>
             </button>
           )}
+          
           <h1 className="text-xl font-bold">FinovatePay</h1>
           <Link
             to="/contributors"
@@ -68,7 +74,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-4">
-          {/* Wallet connect/disconnect buttons... */}
+          {/* Wallet connect/disconnect buttons */}
           {walletConnected ? (
               <button
                   onClick={handleWalletDisconnect}
@@ -88,9 +94,9 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
           {user && (
             <div className="flex items-center space-x-2">
               
-              {user.role !== 'admin' && (
+              {/* Desktop Role Switcher - Hidden in Shipment Context */}
+              {user.role !== 'admin' && !isShipmentContext && (
                 <div className="hidden lg:flex items-center space-x-2">
-                  {/* Desktop Role Switcher */}
                   {user.role === 'buyer' ? <>
                       <button onClick={() => handleRoleSwitch('seller')} className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Seller</button>
                       <button onClick={() => handleRoleSwitch('investor')} className="px-3 py-1 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700">Investor</button>
@@ -104,8 +110,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
                 </div>
               )}
 
-              {/* Mobile Role Switcher & Logout Dropdown (Simplified for now, can be expanded) */}
-
+              {/* Logout & Profile Display */}
               <button
                 onClick={onLogout}
                 className="hidden md:block bg-red-600 hover:bg-red-700 px-3 py-1 rounded-full text-sm"
@@ -115,7 +120,7 @@ const Header = ({ user, onLogout, walletConnected, onUserUpdate, onToggleSidebar
 
               <div className="flex items-center space-x-2">
                 <img
-                  src="/pfp.jpg" // ✅ Path from public
+                  src="/pfp.jpg"
                   alt="User PFP"
                   className="w-8 h-8 rounded-full object-cover"
                 />

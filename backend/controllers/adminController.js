@@ -6,6 +6,7 @@ const extractAbi = (artifact) => {
 };
 const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract.json'));
 const errorResponse = require('../utils/errorResponse');
+const { logAudit } = require('../middleware/auditLogger');
 
 // Helper: UUID → bytes32
 const uuidToBytes32 = (uuid) => {
