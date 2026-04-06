@@ -22,15 +22,13 @@ const CreditLineTab = ({ userRole }) => {
         try {
             setLoading(true);
             
-            // Fetch eligibility
-            const eligibilityRes = await fetch('/api/credit-line/eligibility', {
+            const eligibilityRes = await fetch(`${import.meta.env.VITE_API_URL}/v1/credit-line/eligibility`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const eligibilityData = await eligibilityRes.json();
             setEligibility(eligibilityData);
 
-            // Fetch user's credit line
-            const creditLineRes = await fetch('/api/credit-line', {
+            const creditLineRes = await fetch(`${import.meta.env.VITE_API_URL}/v1/credit-line`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const creditLineData = await creditLineRes.json();
@@ -54,7 +52,7 @@ const CreditLineTab = ({ userRole }) => {
             setSubmitting(true);
             const amountWei = ethers.parseEther(drawdownAmount).toString();
             
-            const res = await fetch('/api/credit-line/drawdown', {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/v1/credit-line/drawdown`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -92,8 +90,8 @@ const CreditLineTab = ({ userRole }) => {
         try {
             setSubmitting(true);
             const amountWei = ethers.parseEther(repayAmount).toString();
-            
-            const res = await fetch('/api/credit-line/repay', {
+
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/v1/credit-line/repay`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

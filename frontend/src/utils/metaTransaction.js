@@ -107,7 +107,7 @@ export async function buildMetaTransaction(
  */
 export async function submitMetaTransaction(request, signature) {
   try {
-    const response = await fetch('/api/meta-tx/submit', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/v1/meta-tx/submit`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

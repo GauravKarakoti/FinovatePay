@@ -56,7 +56,7 @@ const calculateScore = async (userId) => {
 
     // Get previous score
     const previousScoreResult = await client.query(
-      'SELECT score FROM credit_scores WHERE user_id = $1',
+      'SELECT score FROM credit_scores WHERE user_id::text = $1::text',
       [userId]
     );
     const previousScore = previousScoreResult.rows[0]?.score || null;
@@ -122,13 +122,13 @@ const calculateScore = async (userId) => {
  * Get payment statistics for a user
  */
 const getPaymentStats = async (client, userId) => {
-  // Get invoices where user is seller (payments they should receive)
   const result = await client.query(
     `SELECT 
-       COUNT(*) as total,
-       COUNT(CASE WHEN status = 'completed' OR status = 'paid' THEN 1 END) as completed
-     FROM invoices 
-     WHERE seller_id = $1`,
+      COUNT(i.*) as total,
+      COUNT(CASE WHEN i.status = 'completed' OR i.status = 'paid' THEN 1 END) as completed
+    FROM invoices i
+    JOIN users u ON u.wallet_address = i.seller_address
+    WHERE u.id::text = $1::text`,
     [userId]
   );
   
@@ -143,14 +143,14 @@ const getPaymentStats = async (client, userId) => {
  * Get dispute statistics for a user
  */
 const getDisputeStats = async (client, userId) => {
-  // Get invoices where user is seller and has disputes
   const result = await client.query(
     `SELECT 
-       COUNT(i.id) as total_invoices,
-       COUNT(d.id) as disputed
-     FROM invoices i
-     LEFT JOIN disputes d ON d.invoice_id = i.id
-     WHERE i.seller_id = $1`,
+      COUNT(i.invoice_id) as total_invoices,
+      COUNT(d.invoice_id) as disputed
+    FROM invoices i
+    JOIN users u ON u.wallet_address = i.seller_address
+    LEFT JOIN disputes d ON d.invoice_id = i.invoice_id
+    WHERE u.id::text = $1::text`,
     [userId]
   );
   
@@ -170,7 +170,7 @@ const getDisputeStats = async (client, userId) => {
  */
 const getKycStatus = async (client, userId) => {
   const result = await client.query(
-    'SELECT kyc_status, kyc_risk_level FROM users WHERE id = $1',
+    'SELECT kyc_status, kyc_risk_level FROM users WHERE id::text = $1::text',
     [userId]
   );
   
@@ -188,11 +188,11 @@ const getKycStatus = async (client, userId) => {
  * Get transaction volume for a user
  */
 const getTransactionVolume = async (client, userId) => {
-  // Sum of all invoice amounts where user is seller
   const result = await client.query(
     `SELECT COALESCE(SUM(CAST(amount AS NUMERIC)), 0) as total
-     FROM invoices 
-     WHERE seller_id = $1 AND status IN ('completed', 'paid')`,
+    FROM invoices i
+    JOIN users u ON u.wallet_address = i.seller_address
+    WHERE u.id::text = $1::text AND i.status IN ('completed', 'paid')`,
     [userId]
   );
   

@@ -25,14 +25,14 @@ const LendingDashboard = ({ userRole }) => {
             setLoading(true);
             
             // Fetch eligibility
-            const eligibilityRes = await fetch('/api/v1/lending/eligibility', {
+            const eligibilityRes = await fetch(`${import.meta.env.VITE_API_URL}/v1/lending/eligibility`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const eligibilityData = await eligibilityRes.json();
             setEligibility(eligibilityData);
 
             // Fetch user's loans
-            const loansRes = await fetch('/api/v1/lending/loans', {
+            const loansRes = await fetch(`${import.meta.env.VITE_API_URL}/v1/lending/loans`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const loansData = await loansRes.json();
@@ -60,8 +60,8 @@ const LendingDashboard = ({ userRole }) => {
             setSubmitting(true);
             const amountWei = ethers.parseUnits(borrowAmount, 6).toString();
             const collateralWei = ethers.parseUnits(collateralValue, 6).toString();
-            
-            const res = await fetch('/api/v1/lending/loans', {
+
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/v1/lending/loans`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -532,7 +532,7 @@ const LiquidationCandidates = ({ onLiquidate, submitting }) => {
 
     const fetchCandidates = async () => {
         try {
-            const res = await fetch('/api/v1/lending/liquidations?limit=10', {
+            const res = await fetch(`${import.meta.env.VITE_API_URL}/v1/lending/liquidations?limit=10`, {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             const data = await res.json();
