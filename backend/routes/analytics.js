@@ -80,15 +80,13 @@ router.get('/payments', async (req, res) => {
   }
 });
 
-/**
- * GET /api/analytics/financing
- * Get financing performance analytics
- */
 router.get('/financing', requireRole(['seller', 'investor', 'admin']), async (req, res) => {
   try {
     const userId = req.user.id;
+    const role = req.user.role; // Extract role
     
-    const analytics = await analyticsService.getFinancingAnalytics(userId);
+    // Pass role to service to determine if global or personal data should be returned
+    const analytics = await analyticsService.getFinancingAnalytics(userId, role);
     
     res.json({
       success: true,

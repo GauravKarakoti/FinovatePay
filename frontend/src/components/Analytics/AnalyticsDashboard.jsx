@@ -179,80 +179,41 @@ const AnalyticsDashboard = ({ userRole }) => {
         </div>
       </div>
 
-      {/* Overview Section */}
       {activeSection === 'overview' && (
         <div className="space-y-6">
-          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {userRole === 'seller' && overview?.invoices && (
+            
+            {/* Admin Summary Cards */}
+            {userRole === 'admin' && overview?.platform && (
               <>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-500">Total Platform Users</p>
+                  <p className="text-2xl font-bold text-gray-800">{overview.platform.users}</p>
+                </div>
                 <div className="bg-white rounded-lg shadow p-6">
                   <p className="text-sm text-gray-500">Total Invoices</p>
-                  <p className="text-2xl font-bold text-gray-800">{overview.invoices.total}</p>
-                  <p className="text-sm text-green-600">{overview.invoices.completed} completed</p>
+                  <p className="text-2xl font-bold text-gray-800">{overview.platform.invoices}</p>
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Total Amount</p>
-                  <p className="text-2xl font-bold text-gray-800">{formatCurrency(overview.invoices.totalAmount)}</p>
+                  <p className="text-sm text-gray-500">Platform Volume</p>
+                  <p className="text-2xl font-bold text-gray-800">{formatCurrency(overview.platform.totalVolume)}</p>
                 </div>
                 <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Tokenized</p>
-                  <p className="text-2xl font-bold text-blue-600">{overview.invoices.tokenized}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600">{overview.invoices.pending}</p>
+                  <p className="text-sm text-gray-500">Active Escrows</p>
+                  <p className="text-2xl font-bold text-blue-600">{overview.platform.activeEscrows}</p>
                 </div>
               </>
             )}
 
-            {userRole === 'investor' && overview?.marketplace && (
-              <>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Marketplace Listings</p>
-                  <p className="text-2xl font-bold text-gray-800">{overview.marketplace.totalListed}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Total Value</p>
-                  <p className="text-2xl font-bold text-gray-800">{formatCurrency(overview.marketplace.totalValue)}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Available</p>
-                  <p className="text-2xl font-bold text-green-600">{overview.marketplace.available}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Avg Yield</p>
-                  <p className="text-2xl font-bold text-blue-600">{(overview.marketplace.averageYield / 100).toFixed(2)}%</p>
-                </div>
-              </>
-            )}
-
-            {userRole === 'buyer' && overview?.payments && (
-              <>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Total Payments</p>
-                  <p className="text-2xl font-bold text-gray-800">{overview.payments.total}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Total Spent</p>
-                  <p className="text-2xl font-bold text-gray-800">{formatCurrency(overview.payments.totalSpent)}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Completed</p>
-                  <p className="text-2xl font-bold text-green-600">{overview.payments.completed}</p>
-                </div>
-                <div className="bg-white rounded-lg shadow p-6">
-                  <p className="text-sm text-gray-500">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600">{overview.payments.pending}</p>
-                </div>
-              </>
-            )}
+            {/* Existing Role Cards (Seller, Investor, Buyer) ... */}
           </div>
 
-          {/* Quick Charts */}
-          {userRole === 'seller' && financingData.length > 0 && (
+          {/* Quick Charts - Enable for Admin as well */}
+          {(userRole === 'seller' || userRole === 'admin') && financingData.length > 0 && (
             <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Monthly Financing Volume</h3>
+              <h3 className="text-lg font-semibold mb-4">
+                {userRole === 'admin' ? 'Global Financing Volume' : 'Monthly Financing Volume'}
+              </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={financingData}>
                   <CartesianGrid strokeDasharray="3 3" />

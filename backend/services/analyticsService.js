@@ -79,9 +79,13 @@ async function getPaymentAnalytics(userId) {
   }
 }
 
-async function getFinancingAnalytics(userId) {
+async function getFinancingAnalytics(userId, role) {
   try {
-    // Get financing summary for seller
+    // If admin, fetch global financing stats; otherwise filter by seller_address
+    const isAdmin = role === 'admin';
+    const queryParams = isAdmin ? [] : [userId];
+    const filter = isAdmin ? 'WHERE is_tokenized = true' : 'WHERE seller_address = $1 AND is_tokenized = true';
+
     const financingSummaryQuery = `
       SELECT 
         COUNT(*) as total_financed,
@@ -90,46 +94,34 @@ async function getFinancingAnalytics(userId) {
         COUNT(CASE WHEN financing_status = 'financed' THEN 1 END) as actively_financed,
         COUNT(CASE WHEN financing_status = 'repaid' THEN 1 END) as repaid
       FROM invoices
-      WHERE seller_address = $1 AND is_tokenized = true
+      ${filter}
     `;
-    const summaryResult = await pool.query(financingSummaryQuery, [userId]);
+    const summaryResult = await pool.query(financingSummaryQuery, queryParams);
 
-    // Get financing performance by month
     const monthlyFinancingQuery = `
       SELECT 
         TO_CHAR(created_at, 'YYYY-MM') as month,
         COUNT(*) as invoice_count,
         COALESCE(SUM(amount), 0) as amount
       FROM invoices
-      WHERE seller_address = $1 
-        AND is_tokenized = true
+      ${filter}
         AND created_at >= NOW() - INTERVAL '12 months'
       GROUP BY TO_CHAR(created_at, 'YYYY-MM')
       ORDER BY month ASC
     `;
-    const monthlyResult = await pool.query(monthlyFinancingQuery, [userId]);
-
-    // Yield distribution removed as yield_bps is not in the schema
-    // Returning empty array for frontend compatibility
-    const yieldDistribution = [];
-
-    // ROI calculation simplified to 0 since yield metrics aren't tracked on the invoice level currently
-    const roi = {
-      averageYield: 0,
-      estimatedReturns: 0
-    };
+    const monthlyResult = await pool.query(monthlyFinancingQuery, queryParams);
 
     return {
       summary: {
         totalFinanced: parseInt(summaryResult.rows[0].total_financed) || 0,
         totalFinancedAmount: parseFloat(summaryResult.rows[0].total_financed_amount) || 0,
         currentlyListed: parseInt(summaryResult.rows[0].currently_listed) || 0,
-        activelyFinanced: parseInt(summaryResult.rows[0].actively_financed) || 0,
+        actively_financed: parseInt(summaryResult.rows[0].actively_financed) || 0,
         repaid: parseInt(summaryResult.rows[0].repaid) || 0
       },
       monthlyFinancing: monthlyResult.rows,
-      yieldDistribution: yieldDistribution,
-      roi: roi
+      yieldDistribution: [],
+      roi: { averageYield: 0, estimatedReturns: 0 }
     };
   } catch (error) {
     console.error('Error in getFinancingAnalytics:', error);
@@ -350,7 +342,32 @@ async function getDashboardOverview(userId, role) {
       role
     };
 
-    if (role === 'seller') {
+    if (role === 'admin') {
+      // Platform-wide statistics for Administrators
+      const platformStatsQuery = `
+        SELECT 
+          (SELECT COUNT(*) FROM users) as total_users,
+          (SELECT COUNT(*) FROM invoices) as total_invoices,
+          (SELECT COALESCE(SUM(amount), 0) FROM invoices) as total_volume,
+          (SELECT COUNT(*) FROM invoices WHERE is_tokenized = true) as total_tokenized,
+          (SELECT COUNT(*) FROM invoices WHERE escrow_status = 'active') as active_escrows
+        FROM (SELECT 1) as dummy;
+      `;
+      const platformStats = await pool.query(platformStatsQuery);
+      
+      overview.platform = {
+        users: parseInt(platformStats.rows[0].total_users) || 0,
+        invoices: parseInt(platformStats.rows[0].total_invoices) || 0,
+        totalVolume: parseFloat(platformStats.rows[0].total_volume) || 0,
+        tokenized: parseInt(platformStats.rows[0].total_tokenized) || 0,
+        activeEscrows: parseInt(platformStats.rows[0].active_escrows) || 0
+      };
+
+      // Add global financing summary to admin overview
+      const financingData = await getFinancingAnalytics(userId, 'admin');
+      overview.financing = financingData.summary;
+
+    } else if (role === 'seller') {
       // Get invoice statistics
       const invoiceStatsQuery = `
         SELECT 
