@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../utils/api';
-import { Link } from 'react-router-dom';
 
 // Timeline Component
 const Timeline = ({ status }) => {
@@ -80,6 +79,9 @@ const Invoices = () => {
     } catch (error) {
         console.error("Failed to fetch invoices", error);
         setInvoices([]); // Fallback
+    } finally {
+        // Add this line to clear the loading state after the request finishes
+        setLoading(false); 
     }
   };
 
