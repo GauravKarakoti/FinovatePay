@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import AnalyticsPage from './AnalyticsPage';
 import {
@@ -15,6 +15,7 @@ import InvoiceList from '../components/Invoice/InvoiceList';
 import FraudAlerts from '../components/Admin/FraudAlerts';
 import { toast } from 'sonner';
 import { useStatsActions } from '../context/StatsContext';
+import UpgradeManager from '../components/Admin/UpgradeManager';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
@@ -469,8 +470,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
       case 'overview': return <OverviewTab />;
       case 'invoices': return <InvoicesTab />;
       case 'admin': return <AdminTab />;
-      case 'payments':
-      case 'escrow': return <PlaceholderTab />;
+      case 'upgrade': return <UpgradeManager />; // Add this case
       case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
       default: return <PlaceholderTab />;
     }
