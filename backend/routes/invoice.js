@@ -122,11 +122,10 @@ router.get('/seller', requireRole(['seller', 'admin']), async (req, res) => {
   }
 });
 
-// Sync invoice status from blockchain
-router.post('/:id/sync', validateInvoiceId, async (req, res) => {
+router.post('/:invoiceId/sync', validateInvoiceId, async (req, res) => {
   try {
-    await syncInvoiceStatus(req.params.id);
-    const invoice = await Invoice.findById(req.params.id);
+    await syncInvoiceStatus(req.params.invoiceId);
+    const invoice = await Invoice.findById(req.params.invoiceId);
     res.json(invoice);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -154,12 +153,9 @@ router.get('/:invoiceId/offer', validateInvoiceId, requireRole(['buyer', 'seller
 // Only buyers settle invoices
 router.post('/:invoiceId/settle-early', validateInvoiceId, requireKYC, requireRole(['buyer', 'admin']), settleInvoiceEarly);
 
-// --------------------------------------
-
-// Get specific invoice
-router.get('/:id', validateInvoiceId, async (req, res) => {
+router.get('/:invoiceId', validateInvoiceId, async (req, res) => {
   try {
-    const invoice = await Invoice.findById(req.params.id);
+    const invoice = await Invoice.findById(req.params.invoiceId);
     
     if (!invoice) {
       return res.status(404).json({ error: 'Invoice not found' });
