@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ignition");
+require("@openzeppelin/hardhat-upgrades");
 require("dotenv/config");
 
 /** @type import('hardhat/config').HardhatUserConfig */

@@ -29,7 +29,7 @@ describe("EscrowContractV2 - Auto Cancel Regression", function () {
     await compliance.connect(owner).mintIdentity(seller.address);
     await compliance.connect(owner).mintIdentity(buyer.address);
 
-    const ArbitratorsRegistryFactory = await ethers.getContractFactory("ArbitratorsRegistry");
+    const ArbitratorsRegistryFactory = await ethers.getContractFactory("contracts/ArbitratorsRegistry.sol:ArbitratorsRegistry");
     registry = await ArbitratorsRegistryFactory.deploy();
     await registry.waitForDeployment();
 
@@ -54,7 +54,7 @@ describe("EscrowContractV2 - Auto Cancel Regression", function () {
 
     escrow = EscrowImplFactory.attach(proxy.target);
 
-    const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+    const MockERC20Factory = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
     token = await MockERC20Factory.deploy("Test Token", "TEST", ethers.parseEther("1000000"));
     await token.waitForDeployment();
 
@@ -79,7 +79,9 @@ describe("EscrowContractV2 - Auto Cancel Regression", function () {
       token.target,
       duration,
       ethers.ZeroAddress,
-      0
+      0,
+      0, // Added missing _discountRate
+      0  // Added missing _discountDeadline
     );
 
     await token.connect(buyer).approve(escrow.target, amount);

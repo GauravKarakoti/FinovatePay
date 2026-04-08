@@ -7,7 +7,6 @@ describe("EscrowContract V2 Comprehensive Suite", function () {
 
   const INVOICE_ID = ethers.encodeBytes32String("INV-001");
   const AMOUNT = ethers.parseEther("100");
-  const FEE_PERCENTAGE = 50n; // 0.5%
 
   beforeEach(async function () {
     [owner, seller, buyer, treasury, arbitrator, other, manager1] = await ethers.getSigners();
@@ -36,16 +35,16 @@ describe("EscrowContract V2 Comprehensive Suite", function () {
 
     // 4. Deploy EscrowContractV2 (Implementation)
     const EscrowContractFactory = await ethers.getContractFactory("EscrowContractV2");
-    escrow = await EscrowContractFactory.deploy(forwarder.target);
-    await escrow.waitForDeployment();
-
-    // 5. Initialize Proxy Logic (Simulating the initialize call)
-    await escrow.initialize(
-      forwarder.target,
-      compliance.target,
-      registry.target,
-      owner.address
+    escrow = await upgrades.deployProxy(
+      EscrowContractFactory, 
+      [forwarder.target, compliance.target, registry.target, owner.address], 
+      {
+        initializer: 'initialize',
+        kind: 'uups',
+        constructorArgs: [forwarder.target] 
+      }
     );
+    await escrow.waitForDeployment();
 
     // 6. Deploy MockERC20
     const MockERC20Factory = await ethers.getContractFactory("contracts/MockERC20.sol:MockERC20");

@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -19,17 +18,10 @@ import "./ArbitratorsRegistry.sol";
 import "./EscrowYieldPool.sol";
 import "./MultiSigWallet.sol";
 
-/**
- * @title EscrowContractV2
- * @author FinovatePay Team
- * @notice Upgradeable UUPS proxy version of EscrowContract
- * @dev This contract uses UUPS upgradeable pattern from OpenZeppelin
- */
 contract EscrowContractV2 is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
-    ReentrancyGuard,
     PausableUpgradeable,
     ERC2771ContextUpgradeable,
     IERC721Receiver,
@@ -91,12 +83,12 @@ contract EscrowContractV2 is
     ArbitratorsRegistry public arbitratorsRegistry;
 
     EscrowYieldPool public yieldPool;
-    bool public yieldPoolEnabled = false;
+    bool public yieldPoolEnabled; // FIX: Remove '= false'
     mapping(bytes32 => bool) public escrowInYieldPool;
     mapping(bytes32 => uint256) public escrowYieldEarned;
 
-    uint256 public multiSigThreshold = 1000000000;
-    uint256 public multiSigRequiredConfirmations = 2;
+    uint256 public multiSigThreshold; // FIX: Remove initial value
+    uint256 public multiSigRequiredConfirmations; // FIX: Remove initial value
     MultiSigWallet public multiSigWallet;
     mapping(bytes32 => address[]) public multiSigApprovers;
     mapping(bytes32 => mapping(address => bool)) public hasMultiSigApproved;
@@ -104,7 +96,7 @@ contract EscrowContractV2 is
     mapping(bytes32 => bool) public highValueTxReleased;
 
     address public governanceManager;
-    bool public governanceEnabled = false;
+    bool public governanceEnabled;
     
     struct PendingParameterChange {
         uint256 newValue;
@@ -125,7 +117,7 @@ contract EscrowContractV2 is
     uint256 public pendingMinimumEscrowAmount;
     address public pendingTreasury;
     uint256 public pendingQuorumPercentage;
-    uint256 public parameterChangeDelay = 2 days;
+    uint256 public parameterChangeDelay; // FIX: Remove initial value
 
     address public admin;
     address public treasury;
@@ -133,11 +125,9 @@ contract EscrowContractV2 is
     uint256 public quorumPercentage;
     uint256 public minimumEscrowAmount;
 
-    // Version tracking for upgrades
     uint256 public version;
     string public constant VERSION_NAME = "EscrowContractV2";
 
-    // Appended storage: role-based staged approvals per escrow (keep append-only for proxy safety)
     mapping(bytes32 => ApprovalStage[]) public approvalStages;
     mapping(bytes32 => mapping(uint256 => mapping(address => bool))) public hasStageApproved;
 
@@ -214,10 +204,18 @@ contract EscrowContractV2 is
         admin = _initialAdmin;
         complianceManager = ComplianceManager(_complianceManager);
         treasury = _initialAdmin;
-        feePercentage = 50;           // 0.5%
-        quorumPercentage = 51;        // FIXED: Set here for proxies
-        minimumEscrowAmount = 100;    // FIXED: Set here for proxies
+        feePercentage = 50;
+        quorumPercentage = 51;
+        minimumEscrowAmount = 100;
         arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
+        
+        // FIX: Set values in initialize instead of declaration
+        yieldPoolEnabled = false;
+        multiSigThreshold = 1000000000;
+        multiSigRequiredConfirmations = 2;
+        governanceEnabled = false;
+        parameterChangeDelay = 2 days;
+
         version = 2;
     }
 
@@ -423,7 +421,7 @@ contract EscrowContractV2 is
     /**
      * @notice Auto-cancel escrow after expiry and refund buyer. Anyone may call.
      */
-    function autoCancelEscrow(bytes32 _invoiceId) external nonReentrant {
+    function autoCancelEscrow(bytes32 _invoiceId) external {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.status == EscrowStatus.Funded, "Escrow not funded");
         require(escrow.amount > 0, "Escrow already finalized");
@@ -451,7 +449,7 @@ contract EscrowContractV2 is
         required = multiSigRequiredConfirmations;
     }
 
-    function addMultiSigApproval(bytes32 _invoiceId) external {
+    function addMultiSigApproval(bytes32 _invoiceId) whenNotPaused external {
         Escrow storage escrow = escrows[_invoiceId];
         require(escrow.amount >= multiSigThreshold, "Not a high-value transaction");
         require(
@@ -527,7 +525,7 @@ contract EscrowContractV2 is
         uint256 _rwaTokenId,
         uint256 _discountRate,      // Add this
         uint256 _discountDeadline
-    ) external returns (bool) {
+    ) external whenNotPaused returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
         require(_amount >= minimumEscrowAmount, "Amount below minimum");
 
@@ -571,7 +569,7 @@ contract EscrowContractV2 is
     function deposit(bytes32 _invoiceId)
         external
         payable
-        nonReentrant
+        whenNotPaused
         onlyCompliant(_msgSender())
     {
         Escrow storage escrow = escrows[_invoiceId];
@@ -597,7 +595,7 @@ contract EscrowContractV2 is
         emit DepositConfirmed(_invoiceId, escrow.buyer, payableAmount);
     }
 
-    function confirmRelease(bytes32 _invoiceId) external nonReentrant {
+    function confirmRelease(bytes32 _invoiceId) whenNotPaused external {
         Escrow storage escrow = escrows[_invoiceId];
         require(
             _msgSender() == escrow.seller || _msgSender() == escrow.buyer,
@@ -616,7 +614,7 @@ contract EscrowContractV2 is
         }
     }
 
-    function raiseDispute(bytes32 invoiceId) external {
+    function raiseDispute(bytes32 invoiceId) whenNotPaused external {
         Escrow storage e = escrows[invoiceId];
 
         require(
@@ -698,7 +696,7 @@ contract EscrowContractV2 is
     function _transferNFT(
         address from,
         address to,
-        Escrow storage escrow
+        Escrow memory escrow
     ) internal {
         if (escrow.rwaNftContract != address(0)) {
             IERC721(escrow.rwaNftContract).safeTransferFrom(
@@ -769,7 +767,7 @@ contract EscrowContractV2 is
         external
         whenNotPaused
         onlyArbitrator
-        nonReentrant
+    
     {
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Disputed, "Not disputed");
@@ -846,7 +844,7 @@ contract EscrowContractV2 is
     function safeEscape(bytes32 invoiceId, bool sellerWins)
         external
         onlyAdmin
-        nonReentrant
+    
     {
         Escrow storage e = escrows[invoiceId];
         require(e.status == EscrowStatus.Disputed, "Not disputed");
@@ -865,8 +863,10 @@ contract EscrowContractV2 is
     }
 
     function _resolveEscrow(bytes32 invoiceId, bool sellerWins) internal {
-        Escrow storage e = escrows[invoiceId];
+        Escrow memory e = escrows[invoiceId];
         require(e.status == EscrowStatus.Disputed, "Not disputed");
+
+        delete escrows[invoiceId];
 
         e.disputeResolver = _msgSender();
         e.status = EscrowStatus.Released;
@@ -878,17 +878,23 @@ contract EscrowContractV2 is
 
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
-        uint256 payoutAmount = amount;
-        if (fee > 0) {
-            IERC20(e.token).safeTransfer(treasury, fee);
+        uint256 payoutAmount = e.amount;
+        if (e.feeAmount > 0) {
+            IERC20(e.token).safeTransfer(treasury, e.feeAmount);
             emit FeeCollected(invoiceId, fee);
-            payoutAmount -= fee;
+            payoutAmount -= e.feeAmount;
         }
 
         IERC20(e.token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
         _transferNFT(address(this), sellerWins ? buyer : seller, e);
+    }
 
-        delete escrows[invoiceId];
+    function pause() external onlyAdmin {
+        _pause();
+    }
+
+    function unpause() external onlyAdmin {
+        _unpause();
     }
 
     /*//////////////////////////////////////////////////////////////

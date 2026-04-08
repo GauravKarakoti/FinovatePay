@@ -1,5 +1,5 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 describe("EscrowContract - CEI Pattern Compliance", function () {
   let escrow, compliance, registry, token, nftToken, forwarder;
@@ -30,9 +30,16 @@ describe("EscrowContract - CEI Pattern Compliance", function () {
     await registry.waitForDeployment();
     
     const EscrowContract = await ethers.getContractFactory("EscrowContractV2");
-    escrow = await EscrowContract.deploy(forwarder.target);
+    escrow = await upgrades.deployProxy(
+      EscrowContract, 
+      [forwarder.target, compliance.target, registry.target, owner.address], 
+      {
+        initializer: 'initialize',
+        kind: 'uups',
+        constructorArgs: [forwarder.target] 
+      }
+    );
     await escrow.waitForDeployment();
-    await escrow.initialize(forwarder.target, compliance.target, registry.target, owner.address);
     
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
@@ -70,7 +77,8 @@ describe("EscrowContract - CEI Pattern Compliance", function () {
       expect(event).to.not.be.undefined;
 
       const updatedEscrow = await escrow.escrows(invoiceId);
-      expect(updatedEscrow.status).to.equal(3n); // Released
+      expect(updatedEscrow.seller).to.equal(ethers.ZeroAddress); // Entry is gone
+      expect(updatedEscrow.status).to.equal(0n);
     });
   });
 });
