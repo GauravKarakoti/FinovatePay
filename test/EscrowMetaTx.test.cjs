@@ -167,4 +167,28 @@ describe("EscrowContract Meta-Transactions", function () {
           ).to.be.revertedWith("Invalid signature");
       });
   });
+
+  describe("EscrowContract ERC2771 Gasless Support", function () {
+    it("Should accept transactions from trusted forwarder", async function () {
+        const invoiceId = ethers.encodeBytes32String("GASLESS-01");
+        const amount = ethers.parseEther("10");
+
+        await escrow.createEscrow(invoiceId, seller.address, buyer.address, amount, token.target, 3600, ethers.ZeroAddress, 0, 0, 0);
+        await token.connect(buyer).approve(escrow.target, amount);
+
+        // Encode the deposit call
+        const data = escrow.interface.encodeFunctionData("deposit", [invoiceId]);
+
+        // In a real gasless flow, the forwarder sends the tx. 
+        // Here we verify the contract recognizes _msgSender() correctly when called via forwarder.
+        await forwarder.connect(relayer).execute({
+        from: buyer.address,
+        to: escrow.target,
+        value: 0,
+        gas: 1000000,
+        nonce: await forwarder.getNonce(buyer.address),
+        data: data
+        }, signature); // Signature from buyer
+    });
+    });
 });

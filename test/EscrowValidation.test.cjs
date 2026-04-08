@@ -73,6 +73,31 @@ describe("EscrowContract - Validation Fix", function () {
         ).to.be.revertedWith("Invalid Arbitrator");
     });
 
+    it("Should fail if amount is below minimumEscrowAmount", async function () {
+        const invoiceId = ethers.encodeBytes32String("low-amt");
+        const smallAmount = 10n; // Less than 100 default
+
+        await expect(
+            escrow.createEscrow(
+                invoiceId, seller.address, buyer.address, smallAmount, 
+                mockToken.target, 86400, ethers.ZeroAddress, 0, 0, 0
+            )
+        ).to.be.revertedWith("Amount below minimum");
+    });
+
+    it("Should succeed with valid discount parameters", async function () {
+        const invoiceId = ethers.encodeBytes32String("discount-valid");
+        const amount = ethers.parseUnits("100", 18);
+        const deadline = Math.floor(Date.now() / 1000) + 3600;
+
+        await expect(
+            escrow.createEscrow(
+                invoiceId, seller.address, buyer.address, amount, 
+                mockToken.target, 86400, ethers.ZeroAddress, 0, 200, deadline
+            )
+        ).to.emit(escrow, "EscrowCreated");
+    });
+
     it("Should fail if zero address is passed as arbitrator", async function () {
         const invoiceId = ethers.encodeBytes32String("invoice-002");
         const amount = ethers.parseUnits("100", 18);

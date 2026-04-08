@@ -393,15 +393,17 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       
       toast.loading('Mining transaction...', { id: toastId });
       const receipt = await tx.wait();
-      const event = receipt.events?.find(e => e.event === 'EscrowCreated');
-      
+      const event = receipt.logs
+        .map(log => contract.interface.parseLog(log))
+        .find(e => e?.name === 'EscrowCreated');
+
       if (!event) throw new Error("EscrowCreated event not found");
 
       await createInvoice({
         quotation_id: quotation.id,
         invoice_id: invoiceId,
         invoice_hash: invoiceHash,
-        contract_address: contract.address, 
+        contract_address: contract.target,
         token_address: tokenAddress,
         due_date: new Date((Date.now() + 86400 * 30 * 1000)).toISOString(),
         discount_rate: discountBps,

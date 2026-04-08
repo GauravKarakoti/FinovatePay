@@ -329,9 +329,8 @@ const validateCreateQuotation = [
 ];
 
 const validateQuotationId = [
-  param('quotationId')
-    .isInt({ min: 1 }).withMessage('Invalid quotation ID'),
-  
+  param('id')
+    .custom(isUUID).withMessage('Invalid quotation ID format'),
   handleValidationErrors
 ];
 

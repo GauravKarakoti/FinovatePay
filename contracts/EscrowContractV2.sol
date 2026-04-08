@@ -130,8 +130,8 @@ contract EscrowContractV2 is
     address public admin;
     address public treasury;
     uint256 public feePercentage;
-    uint256 public quorumPercentage = 51;
-    uint256 public minimumEscrowAmount = 100;
+    uint256 public quorumPercentage;
+    uint256 public minimumEscrowAmount;
 
     // Version tracking for upgrades
     uint256 public version;
@@ -214,7 +214,9 @@ contract EscrowContractV2 is
         admin = _initialAdmin;
         complianceManager = ComplianceManager(_complianceManager);
         treasury = _initialAdmin;
-        feePercentage = 50;
+        feePercentage = 50;           // 0.5%
+        quorumPercentage = 51;        // FIXED: Set here for proxies
+        minimumEscrowAmount = 100;    // FIXED: Set here for proxies
         arbitratorsRegistry = ArbitratorsRegistry(_arbitratorsRegistry);
         version = 2;
     }
@@ -522,13 +524,17 @@ contract EscrowContractV2 is
         address _token,
         uint256 _duration,
         address _rwaNftContract,
-        uint256 _rwaTokenId
-    ) external onlyAdmin returns (bool) {
+        uint256 _rwaTokenId,
+        uint256 _discountRate,      // Add this
+        uint256 _discountDeadline
+    ) external returns (bool) {
         require(escrows[_invoiceId].seller == address(0), "Escrow already exists");
         require(_amount >= minimumEscrowAmount, "Amount below minimum");
 
         uint256 calculatedFee = (_amount * feePercentage) / 10000;
-        require(calculatedFee > 0, "Fee amount is zero");
+        if (feePercentage > 0) {
+            require(calculatedFee > 0, "Amount too small for current fee %");
+        }
 
         if (_rwaNftContract != address(0)) {
             IERC721(_rwaNftContract).safeTransferFrom(
@@ -554,8 +560,8 @@ contract EscrowContractV2 is
             rwaNftContract: _rwaNftContract,
             rwaTokenId: _rwaTokenId,
             feeAmount: calculatedFee,
-            discountRate: 0,
-            discountDeadline: 0
+            discountRate: _discountRate,    // Use parameter instead of 0
+            discountDeadline: _discountDeadline
         });
 
         emit EscrowCreated(_invoiceId, _seller, _buyer, _amount);
