@@ -238,6 +238,30 @@ export async function getFinancingManagerContract() {
   return new Contract(financingAddress, FinancingManagerArtifact.interface.fragments, signer);
 }
 
+export async function getAmoyGasOverrides() {
+  const { provider } = await connectWallet();
+  const feeData = await provider.getFeeData();
+  
+  // Polygon Amoy requires a minimum 25 Gwei priority fee
+  const minPriorityFee = ethers.parseUnits('30', 'gwei'); // Set to 30 to be safe
+  
+  let maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
+  if (!maxPriorityFeePerGas || maxPriorityFeePerGas < minPriorityFee) {
+    maxPriorityFeePerGas = minPriorityFee;
+  }
+  
+  // Ensure maxFeePerGas is at least equal to maxPriorityFeePerGas
+  let maxFeePerGas = feeData.maxFeePerGas;
+  if (!maxFeePerGas || maxFeePerGas < maxPriorityFeePerGas) {
+    maxFeePerGas = maxPriorityFeePerGas + ethers.parseUnits('5', 'gwei');
+  }
+
+  return {
+    maxPriorityFeePerGas,
+    maxFeePerGas
+  };
+}
+
 export async function getInvoiceFactoryContract() {
   const { signer } = await connectWallet();
   return new Contract(contractAddresses.InvoiceFactory, InvoiceFactoryArtifact.abi, signer);

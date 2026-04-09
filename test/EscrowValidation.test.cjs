@@ -1,13 +1,12 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("EscrowContract - Validation Fix", function () {
-  let EscrowContract, ComplianceManager, ArbitratorsRegistry;
-  let escrow, compliance, registry, mockToken, mockNFT;
-  let owner, seller, buyer, arbitrator, other, nonArbitrator;
+describe("EscrowContractV2 - Validation Fix", function () {
+  let escrow, compliance, registry, mockToken, mockNFT, forwarder;
+  let owner, seller, buyer, other;
 
   beforeEach(async function () {
-    [owner, seller, buyer, arbitrator, other, nonArbitrator] = await ethers.getSigners();
+    [owner, seller, buyer, other] = await ethers.getSigners();
 
     // Deploy Mock ERC20
     const MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
@@ -20,63 +19,50 @@ describe("EscrowContract - Validation Fix", function () {
     await mockNFT.waitForDeployment();
     
     // Deploy Registries
-    // 1. Deploy MinimalForwarder for ComplianceManager
     const MinimalForwarder = await ethers.getContractFactory("MinimalForwarder");
-    const forwarder = await MinimalForwarder.deploy();
+    forwarder = await MinimalForwarder.deploy();
     await forwarder.waitForDeployment();
 
     const ComplianceFactory = await ethers.getContractFactory("ComplianceManager");
-    compliance = await ComplianceFactory.deploy(await forwarder.getAddress());
+    compliance = await ComplianceFactory.deploy(forwarder.target);
     await compliance.waitForDeployment();
 
     const RegistryFactory = await ethers.getContractFactory("contracts/ArbitratorsRegistry.sol:ArbitratorsRegistry");
     registry = await RegistryFactory.deploy();
     await registry.waitForDeployment();
 
-    // Deploy Escrow
-    const EscrowFactory = await ethers.getContractFactory("EscrowContract");
-    escrow = await EscrowFactory.deploy(
-        ethers.ZeroAddress, // Forwarder
-        await compliance.getAddress(),
-        await registry.getAddress()
-    );
-    await escrow.waitForDeployment();
+    // Deploy EscrowContractV2 via UUPS Proxy
+    const EscrowImplFactory = await ethers.getContractFactory("EscrowContractV2");
+    const escrowImpl = await EscrowImplFactory.deploy(forwarder.target);
+    await escrowImpl.waitForDeployment();
 
-    // Setup: Add arbitrators (must be odd number total)
-    // Constructor adds deployer (1). Adding 2 more makes 3.
-    await registry.addArbitrators([arbitrator.address, other.address]);
+    const initData = EscrowImplFactory.interface.encodeFunctionData("initialize", [
+      forwarder.target,
+      compliance.target,
+      registry.target,
+      owner.address,
+    ]);
+
+    const ERC1967ProxyFactory = await ethers.getContractFactory(
+      "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy"
+    );
+    const proxy = await ERC1967ProxyFactory.deploy(escrowImpl.target, initData);
+    await proxy.waitForDeployment();
+
+    escrow = EscrowImplFactory.attach(proxy.target);
     
     // Setup: Mock KYC
     await compliance.verifyKYC(seller.address);
-    await compliance.mintIdentity(seller.address);
+    try { await compliance.mintIdentity(seller.address); } catch(e) {}
   });
 
   describe("Create Escrow Validation", function () {
-    it("Should fail if invalid arbitrator is passed", async function () {
-        const invoiceId = ethers.encodeBytes32String("invoice-001");
-        const amount = ethers.parseUnits("100", 18);
-        
-        await expect(
-            escrow.createEscrow(
-                invoiceId,
-                seller.address,
-                buyer.address,
-                amount,
-                await mockToken.getAddress(),
-                86400,
-                ethers.ZeroAddress,
-                0,
-                0,
-                0,
-                nonArbitrator.address // Non-arbitrator
-            )
-        ).to.be.revertedWith("Invalid Arbitrator");
-    });
-
+    
     it("Should fail if amount is below minimumEscrowAmount", async function () {
         const invoiceId = ethers.encodeBytes32String("low-amt");
         const smallAmount = 10n; // Less than 100 default
 
+        // Only 10 arguments are passed here (matching V2)
         await expect(
             escrow.createEscrow(
                 invoiceId, seller.address, buyer.address, smallAmount, 
@@ -98,49 +84,24 @@ describe("EscrowContract - Validation Fix", function () {
         ).to.emit(escrow, "EscrowCreated");
     });
 
-    it("Should fail if zero address is passed as arbitrator", async function () {
-        const invoiceId = ethers.encodeBytes32String("invoice-002");
+    it("Should fail if escrow already exists with the same ID", async function () {
+        const invoiceId = ethers.encodeBytes32String("duplicate-inv");
         const amount = ethers.parseUnits("100", 18);
-        
+
+        // Create first time
+        await escrow.createEscrow(
+            invoiceId, seller.address, buyer.address, amount, 
+            mockToken.target, 86400, ethers.ZeroAddress, 0, 0, 0
+        );
+
+        // Create second time should fail
         await expect(
             escrow.createEscrow(
-                invoiceId,
-                seller.address,
-                buyer.address,
-                amount,
-                await mockToken.getAddress(),
-                86400,
-                ethers.ZeroAddress,
-                0,
-                0,
-                0,
-                ethers.ZeroAddress // Zero address
+                invoiceId, seller.address, buyer.address, amount, 
+                mockToken.target, 86400, ethers.ZeroAddress, 0, 0, 0
             )
-        ).to.be.revertedWith("Invalid Arbitrator");
+        ).to.be.revertedWith("Escrow already exists");
     });
 
-    it("Should succeed if valid arbitrator is passed", async function () {
-        const invoiceId = ethers.encodeBytes32String("invoice-003");
-        const amount = ethers.parseUnits("100", 18);
-        
-        await expect(
-            escrow.createEscrow(
-                invoiceId,
-                seller.address,
-                buyer.address,
-                amount,
-                await mockToken.getAddress(),
-                86400,
-                ethers.ZeroAddress,
-                0,
-                0,
-                0,
-                arbitrator.address // Valid arbitrator
-            )
-        ).to.emit(escrow, "EscrowCreated");
-        
-        const escrowData = await escrow.escrows(invoiceId);
-        expect(escrowData.disputeResolver).to.equal(arbitrator.address);
-    });
   });
 });

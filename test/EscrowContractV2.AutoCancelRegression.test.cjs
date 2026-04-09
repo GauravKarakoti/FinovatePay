@@ -94,7 +94,6 @@ describe("EscrowContractV2 - Auto Cancel Regression", function () {
     expect(releasedEscrow.status).to.equal(3n); // Released
     expect(releasedEscrow.amount).to.equal(0n);
 
-    // Fund another escrow using the same token to prove pooled liquidity exists.
     await escrow.connect(owner).createEscrow(
       activeInvoiceId,
       seller.address,
@@ -103,7 +102,9 @@ describe("EscrowContractV2 - Auto Cancel Regression", function () {
       token.target,
       duration,
       ethers.ZeroAddress,
-      0
+      0,
+      0, // _discountRate
+      0  // _discountDeadline
     );
 
     await token.connect(buyer).approve(escrow.target, amount);

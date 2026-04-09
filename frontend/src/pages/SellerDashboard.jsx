@@ -19,8 +19,9 @@ import {
 import {
   connectWallet, 
   getEscrowContract,
-  isWalletConnected,   // <-- ADD THIS
-  getConnectedAddress  // <-- ADD THIS
+  isWalletConnected,
+  getConnectedAddress,
+  getAmoyGasOverrides // <-- ADDED THIS
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import GovernanceDashboard from '../pages/GovernanceDashboard';
@@ -249,13 +250,12 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [confirmingShipment, setConfirmingShipment] = useState(null);
   const [proofFile, setProofFile] = useState(null);
   const [invoiceQuotation, setInvoiceQuotation] = useState(null); 
-  const [tokenizingInvoice, setTokenizingInvoice] = useState(null); // <-- NEW STATE
+  const [tokenizingInvoice, setTokenizingInvoice] = useState(null); 
   const { setStats: setGlobalStats } = useStatsActions();
 
   const loadKYCStatus = useCallback(async () => {
     try {
       const { data } = await getKYCStatus();
-      // Unwrap the nested payload if it exists
       const kycPayload = data?.data || data; 
       
       setKycData({
@@ -275,7 +275,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       if (Array.isArray(res)) fetchedInvoices = res;
       else if (Array.isArray(res?.data)) fetchedInvoices = res.data;
       else if (Array.isArray(res?.data?.invoices)) fetchedInvoices = res.data.invoices;
-      else if (Array.isArray(res?.data?.data)) fetchedInvoices = res.data.data; // Add this line!
+      else if (Array.isArray(res?.data?.data)) fetchedInvoices = res.data.data;
 
       setInvoices(fetchedInvoices);
     } catch (err) {
@@ -291,7 +291,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       if (Array.isArray(res)) fetchedQuotations = res;
       else if (Array.isArray(res?.data)) fetchedQuotations = res.data;
       else if (Array.isArray(res?.data?.quotations)) fetchedQuotations = res.data.quotations;
-      else if (Array.isArray(res?.data?.data)) fetchedQuotations = res.data.data; // Add this line!
+      else if (Array.isArray(res?.data?.data)) fetchedQuotations = res.data.data;
 
       setQuotations(fetchedQuotations);
     } catch (error) {
@@ -301,8 +301,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
-    
-    // 1. Fetch backend database data FIRST (Does not require Web3)
     try {
       await Promise.all([loadInvoices(), loadKYCStatus(), loadQuotations()]);
     } catch (apiError) {
@@ -310,8 +308,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       toast.error('Failed to load dashboard data');
     }
 
-    // 2. Passively check for an existing wallet connection
-    // This prevents the modal from annoyingly popping up on every refresh
     try {
       if (isWalletConnected()) {
         const address = getConnectedAddress();
@@ -378,6 +374,9 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
       toast.loading('Waiting for wallet confirmation...', { id: toastId });
       
+      // --- ADDED GAS OVERRIDES HELPER ---
+      const gasOverrides = await getAmoyGasOverrides();
+
       const tx = await contract.createEscrow(
         bytes32InvoiceId,
         sellerAddress,
@@ -388,7 +387,8 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         ethers.ZeroAddress, // rwaNftContract
         0, // rwaTokenId
         discountBps,
-        discountDeadlineTs
+        discountDeadlineTs,
+        gasOverrides // <-- INJECTED HERE
       );
       
       toast.loading('Mining transaction...', { id: toastId });
@@ -491,7 +491,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         invoiceId,
         faceValue,
         maturityDate,
-        yieldBps // Passed as string/number, the API handles conversion on the backend
+        yieldBps
       );
 
       toast.success('Invoice tokenized successfully!', { id: toastId });
@@ -504,18 +504,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       setIsSubmitting(false);
     }
   }, [loadInvoices]);
-
-  useEffect(() => {
-    const safeInvoices = Array.isArray(invoices) ? invoices : [];
-    const activeEscrows = safeInvoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status)).length;
-    const completed = safeInvoices.filter(inv => inv.escrow_status === 'released').length;
-    
-    setGlobalStats({ 
-      totalInvoices: safeInvoices.length,
-      activeEscrows,
-      completed
-    });
-  }, [invoices, setGlobalStats]);
 
   // ------------------ DERIVED STATS ------------------
   const safeInvoices = Array.isArray(invoices) ? invoices : [];
@@ -570,7 +558,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
                   userRole="seller"
                   onRaiseDispute={handleRaiseDispute}
                   onConfirmShipment={(invoice) => setConfirmingShipment(invoice)}
-                  onShowQRCode={(invoice) => setSelectedQRCode(invoice)} // <-- ADD THIS
+                  onShowQRCode={(invoice) => setSelectedQRCode(invoice)} 
                 />
               ) : (
                 <EmptyState message="No invoices yet" />
@@ -607,7 +595,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
             userRole="seller"
             onRaiseDispute={handleRaiseDispute}
             onConfirmShipment={(invoice) => setConfirmingShipment(invoice)}
-            onShowQRCode={(invoice) => setSelectedQRCode(invoice)} // <-- ADD THIS
+            onShowQRCode={(invoice) => setSelectedQRCode(invoice)} 
           />
         ) : (
           <EmptyState message="No invoices found" />
@@ -663,7 +651,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
             userRole="seller"
             onRaiseDispute={handleRaiseDispute}
             onConfirmShipment={(invoice) => setConfirmingShipment(invoice)}
-            onShowQRCode={(invoice) => setSelectedQRCode(invoice)} // <-- ADD THIS
+            onShowQRCode={(invoice) => setSelectedQRCode(invoice)} 
           />
         ) : (
           <EmptyState message="No active escrows" icon="🔓" />
@@ -701,7 +689,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       case 'streaming': return <StreamingTabComponent />;
       case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
       case 'auctions': return <AuctionList />;
-      case 'governance': return <GovernanceDashboard />; // <-- ADD THIS LINE
+      case 'governance': return <GovernanceDashboard />;
       default: return <OverviewTab />;
     }
   };

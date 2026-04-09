@@ -1,194 +1,194 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("EscrowContract Meta-Transactions", function () {
-  let EscrowContract, ComplianceManager, MockERC20;
-  let escrow, compliance, token;
+describe("EscrowContractV2 Meta-Transactions (ERC-2771)", function () {
+  let ComplianceManager, MockERC20;
+  let escrow, compliance, token, registry, forwarder;
   let owner, seller, buyer, relayer, other;
 
-  const domainName = "EscrowContract";
-  const domainVersion = "1";
-
-  // Helper to sign meta-tx
-  async function signMetaTx(signer, contract, functionData) {
-      const nonce = await contract.nonces(signer.address);
+  // Helper to sign meta-tx specifically for OpenZeppelin's MinimalForwarder
+  async function signMetaTx(signer, forwarderContract, request) {
       const network = await ethers.provider.getNetwork();
-      const chainId = network.chainId;
-
+      
+      // Standard EIP712 domain for OpenZeppelin MinimalForwarder
       const domain = {
-          name: domainName,
-          version: domainVersion,
-          chainId: chainId,
-          verifyingContract: contract.address
+          name: "MinimalForwarder",
+          version: "0.0.1", 
+          chainId: network.chainId,
+          verifyingContract: forwarderContract.target
       };
 
       const types = {
-          MetaTransaction: [
-              { name: "nonce", type: "uint256" },
+          ForwardRequest: [
               { name: "from", type: "address" },
-              { name: "functionSignature", type: "bytes" }
+              { name: "to", type: "address" },
+              { name: "value", type: "uint256" },
+              { name: "gas", type: "uint256" },
+              { name: "nonce", type: "uint256" },
+              { name: "data", type: "bytes" }
           ]
       };
 
-      const value = {
-          nonce: nonce,
-          from: signer.address,
-          functionSignature: functionData
-      };
-
-      const signature = await signer._signTypedData(domain, types, value);
-      return signature;
+      return await signer.signTypedData(domain, types, request);
   }
 
   beforeEach(async function () {
     [owner, seller, buyer, relayer, other] = await ethers.getSigners();
 
-    // Deploy MockERC20
-    MockERC20 = await ethers.getContractFactory("MockERC20");
-    token = await MockERC20.deploy("Test Token", "TEST", ethers.utils.parseEther("1000"));
-    await token.deployed();
+    // 1. Deploy Minimal Forwarder First (Crucial for ERC-2771)
+    const ForwarderFactory = await ethers.getContractFactory("MinimalForwarder");
+    forwarder = await ForwarderFactory.deploy();
+    await forwarder.waitForDeployment();
 
-    // Deploy ComplianceManager
+    // 2. Deploy Mock Token
+    MockERC20 = await ethers.getContractFactory("contracts/mocks/MockERC20.sol:MockERC20");
+    token = await MockERC20.deploy("Test Token", "TEST", ethers.parseEther("1000"));
+    await token.waitForDeployment();
+
+    // 3. Deploy Compliance Manager (Pass the forwarder!)
     ComplianceManager = await ethers.getContractFactory("ComplianceManager");
-    compliance = await ComplianceManager.deploy(ethers.constants.AddressZero);
-    await compliance.deployed();
+    compliance = await ComplianceManager.deploy(forwarder.target);
+    await compliance.waitForDeployment();
 
-    // Setup compliance
+    // Setup Compliance Data
     await compliance.verifyKYC(seller.address);
     await compliance.verifyKYC(buyer.address);
-
-    // Mint Identity (SBT) for buyer and seller
     try {
-        // We need to try/catch in case test re-runs confuse state (though beforeEach resets)
-        // ComplianceManager.mintIdentity(to)
         await compliance.mintIdentity(buyer.address);
         await compliance.mintIdentity(seller.address);
     } catch (e) {
         console.log("Mint identity failed/skipped:", e.message);
     }
 
-    // Deploy EscrowContract
-    EscrowContract = await ethers.getContractFactory("EscrowContract");
-    escrow = await EscrowContract.deploy(
-      compliance.address,
-      ethers.constants.AddressZero,
-      [owner.address],
-      1
-    );
-    await escrow.deployed();
+    // 4. Deploy Arbitrators Registry (Required for V2 initialization)
+    const ArbitratorsRegistryFactory = await ethers.getContractFactory("contracts/ArbitratorsRegistry.sol:ArbitratorsRegistry");
+    registry = await ArbitratorsRegistryFactory.deploy();
+    await registry.waitForDeployment();
 
-    // Distribute tokens
-    await token.transfer(buyer.address, ethers.utils.parseEther("100"));
+    // 5. Deploy EscrowContractV2 via UUPS Proxy
+    const EscrowImplFactory = await ethers.getContractFactory("EscrowContractV2");
+    // Notice: V2 constructor requires the forwarder target
+    const escrowImpl = await EscrowImplFactory.deploy(forwarder.target); 
+    await escrowImpl.waitForDeployment();
+
+    const initData = EscrowImplFactory.interface.encodeFunctionData("initialize", [
+      forwarder.target,
+      compliance.target,
+      registry.target,
+      owner.address,
+    ]);
+
+    const ERC1967ProxyFactory = await ethers.getContractFactory(
+      "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy"
+    );
+    const proxy = await ERC1967ProxyFactory.deploy(escrowImpl.target, initData);
+    await proxy.waitForDeployment();
+
+    escrow = EscrowImplFactory.attach(proxy.target);
+
+    // Distribute tokens to buyer
+    await token.transfer(buyer.address, ethers.parseEther("100"));
   });
 
-  describe("Meta-Transaction Execution", function () {
-      it("Should execute deposit via meta-tx", async function () {
-          const invoiceId = ethers.utils.formatBytes32String("INV-123");
-          const amount = ethers.utils.parseEther("10");
+  describe("Gasless Transactions via MinimalForwarder", function () {
+      it("Should execute a deposit using a trusted forwarder", async function () {
+          const invoiceId = ethers.encodeBytes32String("INV-GASLESS-1");
+          const amount = ethers.parseEther("10");
           const duration = 3600;
 
-          // Create Escrow
+          // Admin creates the escrow normally
           await escrow.createEscrow(
-              invoiceId,
-              seller.address,
-              buyer.address,
-              amount,
-              token.address,
-              duration,
-              ethers.constants.AddressZero,
-              0
+            invoiceId, seller.address, buyer.address, amount, token.target,
+            duration, ethers.ZeroAddress, 0, 0, 0
           );
 
-          // Approve tokens (standard tx)
-          await token.connect(buyer).approve(escrow.address, amount);
+          // Buyer approves tokens (this could also be gasless via EIP-2612 permit, but standard here)
+          await token.connect(buyer).approve(escrow.target, amount);
 
-          // Prepare function data for deposit(bytes32, uint256)
-          const functionData = escrow.interface.encodeFunctionData("deposit", [invoiceId, amount]);
+          // 1. Encode the function we want to execute gasless (deposit)
+          const functionData = escrow.interface.encodeFunctionData("deposit", [invoiceId]);
 
-          // Sign meta-tx
-          const signature = await signMetaTx(buyer, escrow, functionData);
+          // 2. Construct the ForwardRequest object
+          const request = {
+              from: buyer.address,
+              to: escrow.target,
+              value: 0n,
+              gas: 1000000n,
+              nonce: await forwarder.getNonce(buyer.address),
+              data: functionData
+          };
 
-          // Relayer executes
-          // Note: executeMetaTx(user, functionData, signature)
-          const tx = await escrow.connect(relayer).executeMetaTx(buyer.address, functionData, signature);
+          // 3. Buyer signs the request off-chain
+          const signature = await signMetaTx(buyer, forwarder, request);
 
-          // Verify event
+          // 4. Relayer (who pays gas) executes the transaction on the forwarder
+          const tx = await forwarder.connect(relayer).execute(request, signature);
+
+          // Verify event was emitted by the Escrow contract
           await expect(tx).to.emit(escrow, "DepositConfirmed")
                .withArgs(invoiceId, buyer.address, amount);
 
-          // Verify state
+          // Verify Escrow state was updated correctly
           const escrowData = await escrow.escrows(invoiceId);
-          expect(escrowData.buyerConfirmed).to.be.true;
-
-          // Verify nonce increment
-          expect(await escrow.nonces(buyer.address)).to.equal(1);
+          expect(escrowData.status).to.equal(1n); // 1 = Funded
+          
+          // Verify forwarder nonce incremented
+          expect(await forwarder.getNonce(buyer.address)).to.equal(1n);
       });
 
-      it("Should fail with invalid signature", async function () {
-          const invoiceId = ethers.utils.formatBytes32String("INV-FAIL");
-          const amount = ethers.utils.parseEther("10");
-          const functionData = escrow.interface.encodeFunctionData("deposit", [invoiceId, amount]);
+      it("Should fail if an invalid signature is provided to the forwarder", async function () {
+          const invoiceId = ethers.encodeBytes32String("INV-FAIL");
+          const functionData = escrow.interface.encodeFunctionData("deposit", [invoiceId]);
 
-          // Sign with wrong user (other) but claiming to be buyer
-          const signature = await signMetaTx(other, escrow, functionData);
+          const request = {
+              from: buyer.address,
+              to: escrow.target,
+              value: 0n,
+              gas: 1000000n,
+              nonce: await forwarder.getNonce(buyer.address),
+              data: functionData
+          };
 
+          // Sign with the WRONG user (other) but claiming to be the buyer
+          const badSignature = await signMetaTx(other, forwarder, request);
+
+          // The forwarder should revert because the signature recovered doesn't match 'request.from'
           await expect(
-              escrow.connect(relayer).executeMetaTx(buyer.address, functionData, signature)
-          ).to.be.revertedWith("Invalid signature");
+              forwarder.connect(relayer).execute(request, badSignature)
+          ).to.be.reverted; 
       });
 
-      it("Should fail replay attack", async function () {
-          const invoiceId = ethers.utils.formatBytes32String("INV-REPLAY");
-          const amount = ethers.utils.parseEther("1");
-          const duration = 3600;
+      it("Should fail on replay attack (using same nonce twice)", async function () {
+          const invoiceId = ethers.encodeBytes32String("INV-REPLAY");
+          const amount = ethers.parseEther("1");
 
           await escrow.createEscrow(
-              invoiceId,
-              seller.address,
-              buyer.address,
-              amount,
-              token.address,
-              duration,
-              ethers.constants.AddressZero,
-              0
+            invoiceId, seller.address, buyer.address, amount, token.target,
+            3600, ethers.ZeroAddress, 0, 0, 0
           );
 
-          await token.connect(buyer).approve(escrow.address, amount.mul(2));
+          await token.connect(buyer).approve(escrow.target, amount * 2n);
 
-          const functionData = escrow.interface.encodeFunctionData("deposit", [invoiceId, amount]);
-          const signature = await signMetaTx(buyer, escrow, functionData);
+          const functionData = escrow.interface.encodeFunctionData("deposit", [invoiceId]);
+          
+          const request = {
+              from: buyer.address,
+              to: escrow.target,
+              value: 0n,
+              gas: 1000000n,
+              nonce: await forwarder.getNonce(buyer.address),
+              data: functionData
+          };
 
-          // First execution
-          await escrow.connect(relayer).executeMetaTx(buyer.address, functionData, signature);
+          const signature = await signMetaTx(buyer, forwarder, request);
 
-          // Second execution (replay)
+          // First execution works
+          await forwarder.connect(relayer).execute(request, signature);
+
+          // Second execution with the exact same request/signature fails
           await expect(
-              escrow.connect(relayer).executeMetaTx(buyer.address, functionData, signature)
-          ).to.be.revertedWith("Invalid signature");
+              forwarder.connect(relayer).execute(request, signature)
+          ).to.be.reverted;
       });
   });
-
-  describe("EscrowContract ERC2771 Gasless Support", function () {
-    it("Should accept transactions from trusted forwarder", async function () {
-        const invoiceId = ethers.encodeBytes32String("GASLESS-01");
-        const amount = ethers.parseEther("10");
-
-        await escrow.createEscrow(invoiceId, seller.address, buyer.address, amount, token.target, 3600, ethers.ZeroAddress, 0, 0, 0);
-        await token.connect(buyer).approve(escrow.target, amount);
-
-        // Encode the deposit call
-        const data = escrow.interface.encodeFunctionData("deposit", [invoiceId]);
-
-        // In a real gasless flow, the forwarder sends the tx. 
-        // Here we verify the contract recognizes _msgSender() correctly when called via forwarder.
-        await forwarder.connect(relayer).execute({
-        from: buyer.address,
-        to: escrow.target,
-        value: 0,
-        gas: 1000000,
-        nonce: await forwarder.getNonce(buyer.address),
-        data: data
-        }, signature); // Signature from buyer
-    });
-    });
 });

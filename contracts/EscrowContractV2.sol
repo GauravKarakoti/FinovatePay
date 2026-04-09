@@ -148,8 +148,7 @@ contract EscrowContractV2 is
     event FundsWithdrawnFromYield(bytes32 indexed invoiceId, uint256 principal, uint256 yield);
     event EscrowCreated(bytes32 indexed invoiceId, address seller, address buyer, uint256 amount);
     event DepositConfirmed(bytes32 indexed invoiceId, address buyer, uint256 amount);
-    event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);
-    event DisputeRaised(bytes32 indexed invoiceId, address raisedBy);
+    event EscrowReleased(bytes32 indexed invoiceId, uint256 amount);    
     event DisputeRaised(bytes32 indexed invoiceId, address raisedBy, uint256 arbitratorCount);
     event DisputeResolved(bytes32 indexed invoiceId, address resolver, bool sellerWins);
     event DisputeResolved(bytes32 indexed invoiceId, bool sellerWins, uint256 votesForSeller, uint256 votesForBuyer);
@@ -574,7 +573,9 @@ contract EscrowContractV2 is
     {
         Escrow storage escrow = escrows[_invoiceId];
         require(_msgSender() == escrow.buyer, "Not buyer");
-        require(!escrow.buyerConfirmed, "Already paid");
+        
+        // FIX: Check status instead of buyerConfirmed to prevent double deposits
+        require(escrow.status == EscrowStatus.Created, "Escrow already funded");
 
         uint256 payableAmount = _getPayableAmount(escrow);
 
@@ -589,7 +590,6 @@ contract EscrowContractV2 is
         }
 
         escrow.amount = payableAmount;
-        escrow.buyerConfirmed = true;
         escrow.status = EscrowStatus.Funded;
 
         emit DepositConfirmed(_invoiceId, escrow.buyer, payableAmount);
