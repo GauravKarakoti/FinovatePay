@@ -75,6 +75,30 @@ class BlockchainQueue {
     this.io = null;
     this.connection = null;
     this.initialized = false;
+    this.isRateLimited = false;
+  }
+
+  async handleRateLimit(error) {
+    if (this.isRateLimited) return; // Prevent multiple triggers
+    this.isRateLimited = true;
+    
+    console.error('\n===============================================================');
+    console.error('🚨 [CRITICAL] REDIS RATE LIMIT EXCEEDED');
+    console.error('🚨 ' + error.message);
+    console.error('🚨 Pausing all queue processing to prevent further limit hits.');
+    console.error('===============================================================\n');
+
+    try {
+      // Pause worker and queue to stop fetching and processing
+      if (this.worker && !this.worker.isPaused()) {
+        await this.worker.pause();
+      }
+      if (this.queue) {
+        await this.queue.pause();
+      }
+    } catch (err) {
+      console.error('[BlockchainQueue] Failed to pause gracefully:', err.message);
+    }
   }
 
   initialize(io) {
@@ -100,13 +124,20 @@ class BlockchainQueue {
       connection: getRedisConnection(),
     });
 
-    // Prevent Unhandled Exception crashes from BullMQ internal connections
     this.queue.on('error', (err) => {
-      if (err.code !== 'ECONNRESET') console.error('[Queue] Error:', err.message);
+      if (err.message && err.message.includes('max requests limit exceeded')) {
+        this.handleRateLimit(err);
+      } else if (err.code !== 'ECONNRESET') {
+        console.error('[Queue] Error:', err.message);
+      }
     });
     
     this.queueEvents.on('error', (err) => {
-      if (err.code !== 'ECONNRESET') console.error('[QueueEvents] Error:', err.message);
+      if (err.message && err.message.includes('max requests limit exceeded')) {
+        this.handleRateLimit(err);
+      } else if (err.code !== 'ECONNRESET') {
+        console.error('[QueueEvents] Error:', err.message);
+      }
     });
 
     this.setupEventListeners();
@@ -152,6 +183,12 @@ class BlockchainQueue {
 
   async addJob(jobType, data, options = {}) {
     if (!this.initialized) throw new Error('BlockchainQueue not initialized.');
+    
+    // Prevent adding to queue if we've hit the monthly limits
+    if (this.isRateLimited) {
+      throw new Error('Service temporarily unavailable due to database rate limits. Please try again later.');
+    }
+
     const job = await this.queue.add(jobType, data, {
       ...options,
       jobId: options.jobId || `${jobType}:${Date.now()}:${Math.random().toString(36).substr(2, 9)}`,
@@ -220,8 +257,11 @@ class BlockchainQueue {
     });
 
     this.worker.on('error', (error) => {
-      // Silence expected Upstash ECONNRESET drops
-      if (error.code !== 'ECONNRESET') console.error('[BlockchainQueue] Worker error:', error.message);
+      if (error.message && error.message.includes('max requests limit exceeded')) {
+        this.handleRateLimit(error);
+      } else if (error.code !== 'ECONNRESET') {
+        console.error('[BlockchainQueue] Worker error:', error.message);
+      }
     });
 
     console.log('[BlockchainQueue] Worker started');
