@@ -1,8 +1,12 @@
 const { ethers } = require('ethers');
 const logger = require('../utils/logger')('bridgeService');
+// 1. Import the shared signer from your central blockchain config
+const { getSigner } = require('../config/blockchain');
+
 const extractAbi = (artifact) => {
   return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
 };
+
 // Import ABIs (assuming they are compiled and available)
 const BridgeAdapterABI = extractAbi(require('../../deployed/BridgeAdapter.json'));
 const LiquidityAdapterABI = extractAbi(require('../../deployed/LiquidityAdapter.json'));
@@ -13,16 +17,14 @@ const BRIDGE_ADAPTER_ADDRESS = process.env.BRIDGE_ADAPTER_ADDRESS;
 const LIQUIDITY_ADAPTER_ADDRESS = process.env.LIQUIDITY_ADAPTER_ADDRESS;
 const FINANCING_MANAGER_ADDRESS = process.env.FINANCING_MANAGER_ADDRESS;
 
-// Provider and signer setup (use environment variables for RPC URL, private key)
-const provider = new ethers.JsonRpcProvider(process.env.BLOCKCHAIN_RPC_URL);
-const signer = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
-
 // Contract instances
 let bridgeAdapter, liquidityAdapter, financingManager;
 
+// 2. Update all getters to use the shared signer
 const getBridgeAdapter = () => {
     if (!bridgeAdapter) {
         if (!BRIDGE_ADAPTER_ADDRESS) throw new BridgeServiceError('BRIDGE_ADAPTER_ADDRESS not set');
+        const signer = getSigner();
         bridgeAdapter = new ethers.Contract(BRIDGE_ADAPTER_ADDRESS, BridgeAdapterABI, signer);
     }
     return bridgeAdapter;
@@ -31,6 +33,7 @@ const getBridgeAdapter = () => {
 const getLiquidityAdapter = () => {
     if (!liquidityAdapter) {
         if (!LIQUIDITY_ADAPTER_ADDRESS) throw new BridgeServiceError('LIQUIDITY_ADAPTER_ADDRESS not set');
+        const signer = getSigner();
         liquidityAdapter = new ethers.Contract(LIQUIDITY_ADAPTER_ADDRESS, LiquidityAdapterABI, signer);
     }
     return liquidityAdapter;
@@ -39,6 +42,7 @@ const getLiquidityAdapter = () => {
 const getFinancingManager = () => {
     if (!financingManager) {
         if (!FINANCING_MANAGER_ADDRESS) throw new BridgeServiceError('FINANCING_MANAGER_ADDRESS not set');
+        const signer = getSigner();
         financingManager = new ethers.Contract(FINANCING_MANAGER_ADDRESS, FinancingManagerABI, signer);
     }
     return financingManager;
@@ -210,7 +214,8 @@ async function borrowFromKatana(asset, amount, collateralTokenId) {
         
         logger.info(`[BridgeService] Borrowing from pool: assetAddress=${assetAddress}, amount=${amount}`);
         
-        // Borrow from pool
+        // 3. Update the borrowing logic to get the address from the shared signer dynamically
+        const signer = getSigner();
         const borrowTx = await getLiquidityAdapter().borrowFromPool(
             assetAddress, 
             amount, 

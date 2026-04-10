@@ -11,6 +11,7 @@ async function processTokenizedEvent(
     tokenId,
     totalFractions,
     pricePerFraction,
+    yieldBps,
     blockNumber
 ) {
     const client = await pool.connect();
@@ -31,6 +32,9 @@ async function processTokenizedEvent(
             await client.query('COMMIT');
             return true;
         }
+
+        // Calculate face value correctly here
+        const faceValue = BigInt(totalFractions) * BigInt(pricePerFraction);
 
         // --- UPDATE INVOICE ---
         const updateQuery = `
@@ -66,8 +70,6 @@ async function processTokenizedEvent(
         console.log(`✅ Tokenized: ${invoiceHash} → Token ${tokenId}`);
 
         // --- TRIGGER FINANCING PIPELINE (POST-COMMIT) ---
-        // Calculate face value: totalFractions * pricePerFraction
-        const faceValue = BigInt(totalFractions) * BigInt(pricePerFraction);
         const amount = faceValue.toString();
         await financeInvoice(
             invoiceHash,
@@ -90,7 +92,6 @@ async function processTokenizedEvent(
 async function replayMissedEvents(contract, fromBlock, toBlock) {
     console.log(`🔄 Replaying InvoiceFractionalized events from ${fromBlock} → ${toBlock}`);
 
-    // Update the filter name here
     const filter = contract.filters.InvoiceFractionalized(); 
     const events = await contract.queryFilter(filter, fromBlock, toBlock);
 
@@ -108,6 +109,7 @@ async function replayMissedEvents(contract, fromBlock, toBlock) {
                 tokenId,
                 totalFractions,
                 pricePerFraction,
+                yieldBps,
                 event.blockNumber
             );
 
@@ -153,21 +155,18 @@ async function listenForTokenization() {
 
         console.log("🎧 Listening for new InvoiceFractionalized events...");
 
-
-        // Update event name and parameter list, adding TotalValue and yieldBps
         contract.on(
             "InvoiceFractionalized",
             async (invoiceId, tokenId, seller, totalFractions, pricePerFraction, totalValue, yieldBps, event) => {
                 try {
-                    // Calculate faceValue: totalFractions * pricePerFraction
-                    const faceValue = totalFractions * pricePerFraction;
-                    
                     await processTokenizedEvent(
                         invoiceId,
                         tokenId,
-                        totalFractions, // totalSupply = totalFractions
-                        faceValue,      // faceValue = totalFractions * pricePerFraction
-                        event.log.blockNumber
+                        totalFractions, 
+                        pricePerFraction, 
+                        yieldBps,
+                        // In ethers v6, the event payload is the last argument. log is nested inside.
+                        event.log ? event.log.blockNumber : event.blockNumber 
                     );
                 } catch (err) {
                     console.error("❌ Live event processing failed:", err);

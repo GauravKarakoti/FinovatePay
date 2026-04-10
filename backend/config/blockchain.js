@@ -17,16 +17,11 @@ const EscrowContractABI = extractAbi(require("../../deployed/EscrowContract.json
 const TreasuryManagerABI = extractAbi(require("../../deployed/TreasuryManager.json"));
 const deployedAddresses = require("../../deployed/contract-addresses.json");
 
-// --------------------------------------------------
-// Configuration Validation
-// --------------------------------------------------
-
-let configError = null;
-
 // Async validation of configuration
 const validateConfig = async () => {
-  if (!process.env.BLOCKCHAIN_RPC_URL) {
-    return "Missing BLOCKCHAIN_RPC_URL in .env file. Please provide a valid RPC URL.";
+  const rpcUrl = process.env.WS_RPC_URL || process.env.BLOCKCHAIN_RPC_URL;
+  if (!rpcUrl) {
+    return "Missing WS_RPC_URL or BLOCKCHAIN_RPC_URL in .env file. Please provide a valid RPC URL.";
   }
 
   // Check for private key in secrets provider or env
@@ -47,20 +42,33 @@ validateConfig().then(err => {
 const getConfigError = () => _configError;
 
 // --------------------------------------------------
-// Provider & Signer (Fail-Fast)
+// Provider & Signer (Singletons to prevent Rate Limits)
 // --------------------------------------------------
 
+let cachedProvider = null;
+let cachedSignerPromise = null;
+let cachedSignerSync = null;
+
 const getProvider = () => {
-  if (!process.env.BLOCKCHAIN_RPC_URL) {
-    throw new Error("BLOCKCHAIN_RPC_URL not configured.");
+  if (cachedProvider) return cachedProvider;
+
+  const rpcUrl = process.env.WS_RPC_URL || process.env.BLOCKCHAIN_RPC_URL;
+
+  if (!rpcUrl) {
+    throw new Error("RPC URL not configured. Set WS_RPC_URL or BLOCKCHAIN_RPC_URL.");
   }
 
   try {
-    return new ethers.JsonRpcProvider(process.env.BLOCKCHAIN_RPC_URL);
+    if (rpcUrl.startsWith("ws://") || rpcUrl.startsWith("wss://")) {
+      console.log("✅ Using WebSocketProvider");
+      cachedProvider = new ethers.WebSocketProvider(rpcUrl);
+    } else {
+      console.log("⚠️ Using JsonRpcProvider (THIS WILL CAUSE FILTER ERRORS)");
+      cachedProvider = new ethers.JsonRpcProvider(rpcUrl);
+    }
+    return cachedProvider;
   } catch (error) {
-    throw new Error(
-      `Failed to create JSON-RPC provider: ${error.message}`
-    );
+    throw new Error(`Failed to create provider: ${error.message}`);
   }
 };
 
@@ -69,33 +77,33 @@ const getProvider = () => {
  * Falls back to environment variable for backward compatibility.
  */
 const getSigner = async () => {
-  // Try to get private key from secrets provider first
-  let privateKey = await getSecret("DEPLOYER_PRIVATE_KEY");
-  
-  // Fall back to environment variable
-  if (!privateKey) {
-    privateKey = process.env.DEPLOYER_PRIVATE_KEY;
-  }
+  if (cachedSignerPromise) return cachedSignerPromise;
 
-  if (!privateKey) {
-    throw new Error("DEPLOYER_PRIVATE_KEY not configured. Set via secrets provider or environment variable.");
-  }
+  cachedSignerPromise = (async () => {
+    let privateKey = await getSecret("DEPLOYER_PRIVATE_KEY");
+    
+    if (!privateKey) {
+      privateKey = process.env.DEPLOYER_PRIVATE_KEY;
+    }
 
-  const provider = getProvider();
+    if (!privateKey) {
+      throw new Error("DEPLOYER_PRIVATE_KEY not configured. Set via secrets provider or environment variable.");
+    }
 
-  try {
+    const provider = getProvider();
     return new ethers.Wallet(privateKey, provider);
-  } catch (error) {
-    throw new Error(`Failed to create signer: ${error.message}`);
-  }
+  })();
+
+  return cachedSignerPromise;
 };
 
 /**
  * Synchronous version of getSigner for backward compatibility.
- * Uses environment variable only.
  * @deprecated Use async getSigner() instead
  */
 const getSignerSync = () => {
+  if (cachedSignerSync) return cachedSignerSync;
+
   if (!process.env.DEPLOYER_PRIVATE_KEY) {
     throw new Error("DEPLOYER_PRIVATE_KEY not configured.");
   }
@@ -103,10 +111,8 @@ const getSignerSync = () => {
   const provider = getProvider();
 
   try {
-    return new ethers.Wallet(
-      process.env.DEPLOYER_PRIVATE_KEY,
-      provider
-    );
+    cachedSignerSync = new ethers.Wallet(process.env.DEPLOYER_PRIVATE_KEY, provider);
+    return cachedSignerSync;
   } catch (error) {
     throw new Error(`Failed to create signer: ${error.message}`);
   }
@@ -118,54 +124,18 @@ const getSignerSync = () => {
 // --------------------------------------------------
 
 const contractAddresses = {
-  invoiceFactory:
-    deployedAddresses.InvoiceFactory ||
-    process.env.INVOICE_FACTORY_ADDRESS,
-
-  escrowContract:
-    deployedAddresses.EscrowContract ||
-    process.env.ESCROW_CONTRACT_ADDRESS,
-
-  complianceManager:
-    deployedAddresses.ComplianceManager ||
-    process.env.COMPLIANCE_MANAGER_ADDRESS,
-
-  produceTracking:
-    deployedAddresses.ProduceTracking ||
-    process.env.PRODUCE_TRACKING_ADDRESS,
-
-  fractionToken:
-    deployedAddresses.FractionToken ||
-    process.env.FRACTION_TOKEN_ADDRESS,
-
-  financingManager:
-    deployedAddresses.FinancingManager ||
-    process.env.FINANCING_MANAGER_ADDRESS,
-
-  // Proxy Admin for upgrades
-  proxyAdmin:
-    deployedAddresses.ProxyAdmin ||
-    process.env.PROXY_ADMIN_ADDRESS,
-
-  // Multi-Sig Wallet
-  multiSigWallet:
-    deployedAddresses.MultiSigWallet ||
-    process.env.MULTISIG_WALLET_ADDRESS,
-
-  // Governance Contracts
-  governanceToken:
-    deployedAddresses.FinovateToken ||
-    process.env.GOVENNANCE_TOKEN_ADDRESS,
-  governanceManager:
-    deployedAddresses.GovernanceManager ||
-    process.env.GOVERNANCE_MANAGER_ADDRESS,
-  timeLock:
-    deployedAddresses.TimeLock ||
-    process.env.TIMELOCK_ADDRESS,
-  // Treasury manager (protocol treasury)
-  treasuryManager:
-    deployedAddresses.TreasuryManager ||
-    process.env.TREASURY_MANAGER_ADDRESS,
+  invoiceFactory: deployedAddresses.InvoiceFactory || process.env.INVOICE_FACTORY_ADDRESS,
+  escrowContract: deployedAddresses.EscrowContract || process.env.ESCROW_CONTRACT_ADDRESS,
+  complianceManager: deployedAddresses.ComplianceManager || process.env.COMPLIANCE_MANAGER_ADDRESS,
+  produceTracking: deployedAddresses.ProduceTracking || process.env.PRODUCE_TRACKING_ADDRESS,
+  fractionToken: deployedAddresses.FractionToken || process.env.FRACTION_TOKEN_ADDRESS,
+  financingManager: deployedAddresses.FinancingManager || process.env.FINANCING_MANAGER_ADDRESS,
+  proxyAdmin: deployedAddresses.ProxyAdmin || process.env.PROXY_ADMIN_ADDRESS,
+  multiSigWallet: deployedAddresses.MultiSigWallet || process.env.MULTISIG_WALLET_ADDRESS,
+  governanceToken: deployedAddresses.FinovateToken || process.env.GOVENNANCE_TOKEN_ADDRESS,
+  governanceManager: deployedAddresses.GovernanceManager || process.env.GOVERNANCE_MANAGER_ADDRESS,
+  timeLock: deployedAddresses.TimeLock || process.env.TIMELOCK_ADDRESS,
+  treasuryManager: deployedAddresses.TreasuryManager || process.env.TREASURY_MANAGER_ADDRESS,
 };
 
 // --------------------------------------------------
@@ -186,9 +156,7 @@ const createContract = (address, abi, signerOrProvider, contractName) => {
   try {
     return new ethers.Contract(address, abi, provider);
   } catch (error) {
-    throw new Error(
-      `Failed to initialize ${contractName} contract: ${error.message}`
-    );
+    throw new Error(`Failed to initialize ${contractName} contract: ${error.message}`);
   }
 };
 
@@ -197,44 +165,19 @@ const createContract = (address, abi, signerOrProvider, contractName) => {
 // --------------------------------------------------
 
 const getFractionTokenContract = (signerOrProvider) =>
-  createContract(
-    contractAddresses.fractionToken,
-    FractionTokenABI,
-    signerOrProvider,
-    "FractionToken"
-  );
+  createContract(contractAddresses.fractionToken, FractionTokenABI, signerOrProvider, "FractionToken");
 
 const getComplianceManagerContract = (signerOrProvider) =>
-  createContract(
-    contractAddresses.complianceManager,
-    ComplianceManagerABI,
-    signerOrProvider,
-    "ComplianceManager"
-  );
+  createContract(contractAddresses.complianceManager, ComplianceManagerABI, signerOrProvider, "ComplianceManager");
 
 const getFinancingManagerContract = (signerOrProvider) =>
-  createContract(
-    contractAddresses.financingManager,
-    FinancingManagerABI,
-    signerOrProvider,
-    "FinancingManager"
-  );
+  createContract(contractAddresses.financingManager, FinancingManagerABI, signerOrProvider, "FinancingManager");
 
 const getEscrowContract = (signerOrProvider) =>
-  createContract(
-    contractAddresses.escrowContract,
-    EscrowContractABI,
-    signerOrProvider,
-    "EscrowContract"
-  );
+  createContract(contractAddresses.escrowContract, EscrowContractABI, signerOrProvider, "EscrowContract");
 
 const getTreasuryManagerContract = (signerOrProvider) =>
-  createContract(
-    contractAddresses.treasuryManager,
-    TreasuryManagerABI,
-    signerOrProvider,
-    "TreasuryManager"
-  );
+  createContract(contractAddresses.treasuryManager, TreasuryManagerABI, signerOrProvider, "TreasuryManager");
 
 // --------------------------------------------------
 // Exports
