@@ -7,7 +7,6 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import Invoices from './pages/Invoices';
 import InvoiceDetails from './pages/InvoiceDetails';
 import DisputeDashboard from './pages/DisputeDashboard';
 import FinovateChatbot from './components/Chatbot/Chatbot';
@@ -100,29 +99,22 @@ function NavigationSetup() {
 }
 
 /* -------------------- Session Sync Setup -------------------- */
-// Syncs React state with localStorage using native storage event
-// Catches token deletions from Axios interceptors, manual storage clearing, and cross-tab logouts
 function SessionSync({ user, onLogout }) {
   const location = useLocation();
   
   useEffect(() => {
-    // Check if React state thinks user is logged in, but localStorage was wiped
     if (user && !localStorage.getItem('user')) {
       onLogout();
     }
   }, [location.pathname, user, onLogout]);
   
   useEffect(() => {
-    // Listen for storage events (fires when localStorage changes in ANY tab or programmatically)
     const handleStorageChange = (e) => {
-      // Check if 'user' or 'token' was removed from localStorage
       if ((e.key === 'user' || e.key === 'token') && e.newValue === null) {
-        // Storage was cleared, logout the user
         if (user) {
           onLogout();
         }
       }
-      // Also handle when storage is completely cleared
       if (e.key === null && user) {
         onLogout();
       }
@@ -154,6 +146,20 @@ function RequireAuth({ children, allowedRoles }) {
   return children;
 }
 
+/* -------------------- Route Redirects -------------------- */
+// Unifies the /invoices route to use the fully-featured Dashboard tabs
+function InvoiceRouteRedirect({ setActiveTab }) {
+  const user = JSON.parse(localStorage.getItem('user'));
+  
+  useEffect(() => {
+    setActiveTab('invoices');
+  }, [setActiveTab]);
+
+  if (user?.role === 'buyer') return <Navigate to="/buyer" replace />;
+  if (user?.role === 'seller') return <Navigate to="/seller" replace />;
+  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
+  return <Navigate to="/" replace />;
+}
 
 /* -------------------- App -------------------- */
 function App() {
@@ -186,20 +192,17 @@ function App() {
   }, [user]);
 
   const handleLogin = (userData, token) => {
-    // 1. Save synchronously FIRST to prevent RequireAuth from failing
     localStorage.setItem('user', JSON.stringify(userData));
     if (token) {
-      localStorage.setItem('token', token); // Save the JWT token
+      localStorage.setItem('token', token);
     }
-    // 2. Then update React state
     setUser(userData);
   };
 
-  // Update handleLogout to clear the token as well
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('user');
-    localStorage.removeItem('token'); // Clear the token
+    localStorage.removeItem('token'); 
     resetStats();
   };
 
@@ -213,12 +216,10 @@ function App() {
       onStatsChange: setDashboardStats 
     });
 
-    // Check if the sidebar should be hidden
     const hideSidebar = user?.role === 'shipment';
 
     return (
       <div className="flex min-h-screen bg-gradient-to-l from-white via-[#6DD5FA] to-[#2980B9] relative">
-          {/* Hide the mobile overlay if it's a shipment user */}
           {isSidebarOpen && !hideSidebar && (
             <div
               className="fixed inset-0 bg-black bg-opacity-50 z-[90] md:hidden"
@@ -226,7 +227,6 @@ function App() {
             />
           )}
 
-          {/* Conditionally render the Sidebar */}
           {!hideSidebar && (
             <div className={`
               fixed top-0 bottom-0 left-0 md:relative md:top-auto md:bottom-auto md:left-auto
@@ -258,7 +258,6 @@ function App() {
     <ErrorBoundary>
       <Router>
         <NavigationSetup />
-        {/* Added SessionSync here to listen to route changes and clear stale state */}
         <SessionSync user={user} onLogout={handleLogout} /> 
         <Toaster position="top" richColors />
         
@@ -354,11 +353,12 @@ function App() {
                 }
               />
 
+              {/* Refactored Invoices Route */}
               <Route
                 path="/invoices"
                 element={
                   <RequireAuth>
-                    {renderDashboard(<Invoices />)}
+                    <InvoiceRouteRedirect setActiveTab={setActiveTab} />
                   </RequireAuth>
                 }
               />

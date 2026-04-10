@@ -15,3 +15,20 @@ ALTER TABLE organizations
 -- You might also need to populate a placeholder slug for existing rows since it's supposed to be UNIQUE NOT NULL
 UPDATE organizations SET slug = 'org-' || id WHERE slug IS NULL;
 ALTER TABLE organizations ALTER COLUMN slug SET NOT NULL;
+
+-- Drop the existing strict constraint
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
+
+-- Add the updated constraint including all states from your application logic
+ALTER TABLE invoices ADD CONSTRAINT invoices_status_check 
+CHECK (status IN (
+    'created', 
+    'CREATED', 
+    'PAYMENT_PENDING', 
+    'ESCROW_LOCKED', 
+    'RELEASED', 
+    'DISPUTED', 
+    'CANCELLED', 
+    'FAILED', 
+    'SETTLED'
+));

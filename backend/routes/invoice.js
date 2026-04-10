@@ -122,16 +122,6 @@ router.get('/seller', requireRole(['seller', 'admin']), async (req, res) => {
   }
 });
 
-router.post('/:invoiceId/sync', validateInvoiceId, async (req, res) => {
-  try {
-    await syncInvoiceStatus(req.params.invoiceId);
-    const invoice = await Invoice.findById(req.params.invoiceId);
-    res.json(invoice);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Get buyer's invoices - Only accessible by buyers and admins
 router.get('/buyer', requireRole(['buyer', 'admin']), async (req, res) => {
   try {

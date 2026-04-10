@@ -140,22 +140,31 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
         try {
             const contract = await getEscrowContract();
             const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
-            const amount = await contract.getCurrentPayableAmount(bytes32Id);
-            setPayableAmount(amount);
 
             const escrow = await contract.escrows(bytes32Id);
+            
+            const amount = escrow.amount; 
             const rate = escrow.discountRate ? Number(escrow.discountRate) : 0;
-            setDiscountBps(rate);
+            const deadline = escrow.discountDeadline ? Number(escrow.discountDeadline) : 0;
+
+            let currentPayableAmount = amount;
 
             if (rate > 0) {
                  const now = Math.floor(Date.now() / 1000);
-                 const deadline = Number(escrow.discountDeadline);
                  if (deadline > now) {
                      setTimeLeft(deadline - now);
+                     const discount = (amount * BigInt(rate)) / 10000n;
+                     currentPayableAmount = amount - discount;
                  } else {
                      setTimeLeft(0);
                  }
+            } else {
+                 setTimeLeft(0);
             }
+
+            setPayableAmount(currentPayableAmount);
+            setDiscountBps(rate);
+
         } catch (err) {
             console.error(err);
             toast.error("Failed to fetch payable amount");
@@ -173,7 +182,7 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
     if (!isOpen || !invoice) return null;
 
     const formatEth = (bn) => bn ? formatEther(bn) : '0';
-    const originalAmountEth = invoice.amount; // Assuming invoice.amount is string/number from DB
+    const originalAmountEth = invoice.amount; 
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Confirm Payment">
@@ -231,7 +240,6 @@ const PaymentModal = ({ isOpen, onClose, invoice, onConfirm, isProcessing }) => 
 };
 
 const BuyerDashboard = ({ activeTab = 'overview' }) => {
-  // State Management
   const [invoices, setInvoices] = useState([]);
   const [availableLots, setAvailableLots] = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
@@ -244,25 +252,22 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     details: 'Verification pending or not initiated'
   });
   
-  // UI State
   const [isLoading, setIsLoading] = useState(true);
   const [loadingInvoiceId, setLoadingInvoiceId] = useState(null);
   const [processingLotId, setProcessingLotId] = useState(null);
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedLot, setSelectedLot] = useState(null);
   const [showKYCVerification, setShowKYCVerification] = useState(false);
-  const [paymentInvoice, setPaymentInvoice] = useState(null); // For modal
+  const [paymentInvoice, setPaymentInvoice] = useState(null); 
   const { setStats: setGlobalStats } = useStatsActions();
   const [showFiatModal, setShowFiatModal] = useState(false);
 
-  // Load Initial Data
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { address } = await connectWallet();
       setWalletAddress(address);
       
-      // Load KYC status in parallel with tab-specific data
       const kycPromise = loadKYCStatus();
       
       await Promise.all([
@@ -317,44 +322,37 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       });
     } catch (error) {
       console.error('Failed to load KYC status:', error);
-      // Silent fail - user might not have started KYC yet
     }
   };
 
   const loadInvoices = async () => {
     try {
-      // Fetch the response
       const response = await getBuyerInvoices();
-      
-      // Dig down to find the array, accommodating different API wrapper formats
       const invoiceData = response?.data?.data || response?.data || response;
 
-      // Safely set the state ONLY if it's an array
       if (Array.isArray(invoiceData)) {
         setInvoices(invoiceData);
       } else {
         console.error("Expected array of invoices, but got:", invoiceData);
-        setInvoices([]); // Fallback to prevent crashes
+        setInvoices([]); 
       }
     } catch (error) {
       console.error('Failed to load invoices:', error);
       toast.error("Could not load your invoices");
-      setInvoices([]); // Fallback on error
+      setInvoices([]); 
     }
   };
 
   const loadAvailableLots = async () => {
     try {
       const response = await getAvailableLots();
-      // Dig down to find the array, accommodating different API wrapper formats
       const lotsData = response?.data?.data || response?.data || response;
 
-      // Safely set the state ONLY if it's an array
       if (Array.isArray(lotsData)) {
         setAvailableLots(lotsData);
       } else {
         console.error("Expected array of lots, but got:", lotsData);
-        setAvailableLots([]); // Fallback to prevent crashes
+        setAvailableLots([]); 
       }
     } catch (error) {
       console.error('Failed to load lots:', error);
@@ -366,15 +364,13 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   const loadPendingApprovals = async () => {
     try {
       const response = await getPendingBuyerApprovals();
-      // Dig down to find the array
       const approvalsData = response?.data?.data || response?.data || response;
       
-      // Safely set the state ONLY if it's an array
       if (Array.isArray(approvalsData)) {
         setPendingApprovals(approvalsData);
       } else {
         console.error("Expected array of approvals, but got:", approvalsData);
-        setPendingApprovals([]); // Fallback to prevent crashes
+        setPendingApprovals([]); 
       }
     } catch (error) {
       console.error('Failed to load approvals:', error);
@@ -383,7 +379,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     }
   };
 
-  // Memoized Calculations
   const { escrowInvoices, completedInvoices, stats } = useMemo(() => {
     const escrow = invoices.filter(inv => ['deposited', 'disputed', 'shipped'].includes(inv.escrow_status));
     const completed = invoices.filter(inv => inv.escrow_status === 'released');
@@ -430,13 +425,11 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       produceLots: availableLots.length
     };
 
-    // Only update if data is loaded and actually different
     if (!isLoading) {
       setGlobalStats(nextStats);
     }
   }, [invoices.length, escrowInvoices.length, completedInvoices.length, availableLots.length, isLoading, setGlobalStats]);
 
-  // Handlers
   const handleKYCComplete = useCallback((result) => {
     setShowKYCVerification(false);
     loadKYCStatus();
@@ -486,7 +479,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         lotId: lot.lot_id,
         sellerAddress: lot.farmer_address,
         quantity: parsedQty,
-        // ADD FALLBACK (lot.price || 0) to prevent sending NaN
         pricePerUnit: (lot.price || 0) / exchangeRate, 
         description: `${parsedQty}kg of ${lot.produce_type} from lot #${lot.lot_id}`
       });
@@ -504,8 +496,8 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
   }, []);
 
   const handleConfirmPayment = useCallback(async (invoice, payableAmount) => {
-    if (!isAddress(invoice.contract_address)) {
-      toast.error('Invalid contract address');
+    if (kycData.status !== 'verified') {
+      toast.error("You must complete KYC verification before making a payment.");
       return;
     }
 
@@ -514,47 +506,71 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
     try {
       const { signer } = await connectWallet();
-      const { currency, contract_address, token_address } = invoice;
-      const amountWei = payableAmount; // Already BigInt from modal fetch
+      const amountWei = payableAmount; 
       
-      // Use EscrowContract
+      const buyerAddress = await signer.getAddress();
+      const nativeBalance = await signer.provider.getBalance(buyerAddress);
+      
       const contract = await getEscrowContract();
-      // Need bytes32 ID
+      const escrowAddress = await contract.getAddress(); 
       const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+
+      // PRE-FLIGHT CHECK: Verify on-chain state to prevent orphaned transactions
+      const escrowData = await contract.escrows(bytes32Id);
+      if (escrowData.amount === 0n) {
+          throw new Error("Escrow record not found on the blockchain. Contact support.");
+      }
+      if (escrowData.status !== 0n) { 
+          throw new Error("This invoice is no longer awaiting payment.");
+      }
+
+      const onchainTokenAddress = escrowData.token?.toLowerCase();
+      
+      // CRITICAL FIX: Treat 'MATIC' and the Polygon 0x1010 precompile as Native Deposits
+      const isNativeDeposit = 
+          invoice.currency === 'MATIC' || 
+          onchainTokenAddress === ethers.ZeroAddress || 
+          onchainTokenAddress === '0x0000000000000000000000000000000000000000' ||
+          onchainTokenAddress === '0x0000000000000000000000000000000000001010';
 
       let tx;
 
-      if (currency === 'MATIC') {
-        const address = await signer.getAddress();
-        const balance = await signer.provider.getBalance(address);
-        if (balance < amountWei) {
-            toast.error("Insufficient MATIC balance.", { id: toastId });
-            return;
-        }
-        // New deposit signature: deposit(bytes32) payable
-        tx = await contract.deposit(bytes32Id, { value: amountWei });
-      } else {
-        const tokenContract = new ethers.Contract(token_address, erc20ABI, signer);
-        const buyerAddress = await signer.getAddress();
-        const tokenBalance = await tokenContract.balanceOf(buyerAddress);
-        if (tokenBalance < amountWei) {
-          toast.error(`Insufficient ${currency} token balance.`, { id: toastId });
-          return;
-        }
-
-        if (balance < amountWei) {
-            toast.error(`Insufficient ${currency} balance. Please use the "Buy Stablecoins" widget.`, { id: toastId });
-            return;
+      if (isNativeDeposit) {
+        // Safe Native Deposit
+        if (nativeBalance < amountWei) {
+            throw new Error("Insufficient MATIC balance.");
         }
         
-        // Approve and deposit tokens via escrow contract
-        const allowance = await tokenContract.allowance(buyerAddress, contract_address);
+        // Manual gasLimit overrides estimateGas failures
+        tx = await contract.deposit(bytes32Id, { 
+            value: amountWei,
+            gasLimit: 300000
+        });
+        
+      } else {
+        // Standard ERC20 Flow
+        const tokenContract = new ethers.Contract(onchainTokenAddress, erc20ABI, signer);
+        const tokenBalance = await tokenContract.balanceOf(buyerAddress);
+        
+        if (tokenBalance < amountWei) {
+            throw new Error(`Insufficient token balance. You need more funds in ${invoice.currency}.`);
+        }
+        if (nativeBalance === 0n) {
+            throw new Error(`Insufficient MATIC to cover network gas fees.`);
+        }
+        
+        const allowance = await tokenContract.allowance(buyerAddress, escrowAddress);
         if (allowance < amountWei) {
-          const approveTx = await tokenContract.approve(contract_address, amountWei);
+          toast.loading("Approving tokens...", { id: toastId });
+          const approveTx = await tokenContract.approve(escrowAddress, amountWei);
           await approveTx.wait();
+          toast.loading("Tokens approved. Proceeding with deposit...", { id: toastId });
         }
 
-        tx = await contract.deposit(bytes32Id);
+        // Manual gasLimit overrides estimateGas failures
+        tx = await contract.deposit(bytes32Id, {
+            gasLimit: 400000
+        });
       }
       
       await tx.wait();
@@ -565,18 +581,26 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       await loadInvoices();
     } catch (error) {
       console.error('Payment failed:', error);
-      toast.error(error.reason || error.message || 'Payment failed', { id: toastId });
+      
+      let errorMessage = error.reason || error.data?.message || error.message || 'Payment failed';
+      
+      if (error.code === 'CALL_EXCEPTION' || errorMessage.includes('reverted')) {
+          toast.error("Contract rejected the transaction. The smart contract may require address(0) for MATIC instead of 0x1010.", { id: toastId });
+      } else if (errorMessage.includes("user rejected")) {
+          toast.error("Transaction was cancelled by the user.", { id: toastId });
+      } else {
+          toast.error(errorMessage, { id: toastId });
+      }
     } finally {
       setLoadingInvoiceId(null);
     }
-  }, []);
+  }, [kycData.status, loadInvoices]);
 
   const handleReleaseFunds = useCallback(async (invoice) => {
     if (!window.confirm("Release funds to seller? This cannot be undone.")) return;
 
     setLoadingInvoiceId(invoice.invoice_id);
     try {
-      // Use EscrowContract
       const contract = await getEscrowContract();
       const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
@@ -599,7 +623,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
     setLoadingInvoiceId(invoice.invoice_id);
     try {
-      // Use EscrowContract
       const contract = await getEscrowContract();
       const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
@@ -630,7 +653,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     setShowQRCode(true);
   }, []);
 
-  // Tab Components
   const QuotationsTab = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
