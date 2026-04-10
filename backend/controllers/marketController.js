@@ -1,5 +1,5 @@
 const marketService = require('../services/marketService');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 exports.getMarketPrices = async (req, res) => {
     try {

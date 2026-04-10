@@ -9,7 +9,7 @@ const router = express.Router();
 const { blockchainQueue, JOB_TYPES } = require('../queues/blockchainQueue');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 /**
  * @route   GET /api/queue/stats

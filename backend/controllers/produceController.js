@@ -2,7 +2,7 @@ const { ethers } = require('ethers');
 const { contractAddresses, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const ProduceTrackingArtifact = require('../../deployed/ProduceTracking.json');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 exports.createProduceLot = async (req, res) => {
   try {

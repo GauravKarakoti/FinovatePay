@@ -10,7 +10,7 @@ const TransactionWrapper = require('../utils/transactionWrapper');
 const IdempotencyKeyManager = require('../utils/idempotencyKey');
 const StateSnapshotManager = require('../utils/stateSnapshot');
 const TransactionAuditTrail = require('../utils/transactionAuditTrail');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const { blockchainQueue, JOB_TYPES } = require('../queues/blockchainQueue');
 const {
   createTransactionState,

@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('../config/database');
 const { getSigner, contractAddresses } = require('../config/blockchain');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 // Standard UUPS Upgradeable ABI for proxy interaction
 const UUPS_ABI = [

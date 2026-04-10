@@ -5,7 +5,7 @@ const { body, param, query, validationResult } = require('express-validator');
 const Webhook = require('../models/Webhook');
 const WebhookDelivery = require('../models/WebhookDelivery');
 const WebhookService = require('../services/webhookService');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 /*//////////////////////////////////////////////////////////////
                     VALIDATION MIDDLEWARE

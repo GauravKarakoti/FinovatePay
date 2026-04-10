@@ -10,7 +10,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { pool } = require('../config/database');
 const proxyService = require('../services/proxyService');
 const { logAudit } = require('../middleware/auditLogger');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const { getSigner } = require('../config/blockchain');
 
 /**

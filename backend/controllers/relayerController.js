@@ -1,6 +1,6 @@
 const { ethers } = require('ethers');
 const { pool } = require('../config/database');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const logger = require('../utils/logger')('relayerController');
 const extractAbi = (artifact) => {
   return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;

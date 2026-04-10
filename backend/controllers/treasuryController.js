@@ -1,6 +1,6 @@
 const { ethers } = require('ethers');
 const { getProvider, getSigner, contractAddresses, getTreasuryManagerContract } = require('../config/blockchain');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 // GET /api/v1/treasury/balance
 exports.getBalance = async (req, res) => {

@@ -8,7 +8,7 @@ const {
   getDiscrepancies,
   getReconciliationHistory
 } = require('../services/reconciliationService');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 // All reconciliation routes require authentication
 router.use(authenticateToken);

@@ -1,5 +1,5 @@
 const { ethers } = require('ethers');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const StreamingPayment = require('../models/StreamingPayment');
 const {
   createStreamOnChain,

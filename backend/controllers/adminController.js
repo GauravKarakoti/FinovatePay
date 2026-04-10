@@ -5,7 +5,7 @@ const extractAbi = (artifact) => {
   return artifact.abi || (artifact.interface && artifact.interface.fragments) || artifact;
 };
 const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract.json'));
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const { logAudit } = require('../middleware/auditLogger');
 
 // Helper: UUID → bytes32

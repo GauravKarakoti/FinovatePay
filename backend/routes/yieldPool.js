@@ -7,7 +7,7 @@ const { contractAddresses } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const yieldPoolService = require('../services/yieldPoolService');
 const { logAudit } = require('../middleware/auditLogger');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 // Helper: UUID → bytes32
 const uuidToBytes32 = (uuid) => {

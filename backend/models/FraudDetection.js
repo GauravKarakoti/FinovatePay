@@ -21,9 +21,9 @@ class FraudDetection {
        FROM suspicious_transactions
        WHERE created_at >= NOW() - ($1::TEXT || ' days')::INTERVAL
          AND (
-           ($2::UUID IS NOT NULL AND user_id = $2)
-           OR ($3::TEXT IS NOT NULL AND LOWER(wallet_address) = LOWER($3))
-         )`,
+            ($2::INT IS NOT NULL AND user_id = $2)
+            OR ($3::TEXT IS NOT NULL AND LOWER(wallet_address) = LOWER($3))
+          )`,
       [String(windowDays), userId || null, walletAddress || null]
     );
 
@@ -41,9 +41,9 @@ class FraudDetection {
        FROM suspicious_transactions
        WHERE created_at >= NOW() - ($1::TEXT || ' minutes')::INTERVAL
          AND (
-           ($2::UUID IS NOT NULL AND user_id = $2)
-           OR ($3::TEXT IS NOT NULL AND LOWER(wallet_address) = LOWER($3))
-         )`,
+            ($2::INT IS NOT NULL AND user_id = $2)
+            OR ($3::TEXT IS NOT NULL AND LOWER(wallet_address) = LOWER($3))
+          )`,
       [String(minutes), userId || null, walletAddress || null]
     );
 
@@ -158,7 +158,7 @@ class FraudDetection {
       `UPDATE fraud_alerts
        SET
          status = $2,
-         resolved_by = CASE WHEN $3::BOOLEAN THEN $4::UUID ELSE resolved_by END,
+         resolved_by = CASE WHEN $3::BOOLEAN THEN $4::INT ELSE resolved_by END,
          resolved_at = CASE WHEN $3::BOOLEAN THEN NOW() ELSE resolved_at END,
          resolution_note = CASE WHEN $3::BOOLEAN THEN $5 ELSE resolution_note END,
          updated_at = NOW()

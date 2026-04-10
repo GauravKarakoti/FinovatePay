@@ -144,12 +144,10 @@ const validateRoleUpdate = [
   handleValidationErrors
 ];
 
-/**
- * INVOICE VALIDATORS
- */
 const validateCreateInvoice = [
   body('quotation_id')
-    .isInt({ min: 1 }).withMessage('Invalid quotation ID'),
+    // CHANGED: Use isUUID instead of isInt
+    .custom(isUUID).withMessage('Invalid quotation ID format'),
   
   body('invoice_id')
     .trim()
@@ -181,7 +179,8 @@ const validateCreateInvoice = [
 
   body('discount_rate')
     .optional()
-    .isFloat({ min: 0, max: 100 }).withMessage('Discount rate must be between 0 and 100'),
+    // CHANGED: Accept basis points (max 10000 = 100.00%)
+    .isInt({ min: 0, max: 10000 }).withMessage('Discount rate must be between 0 and 10000 basis points'),
 
   body('annual_apr')
     .optional()

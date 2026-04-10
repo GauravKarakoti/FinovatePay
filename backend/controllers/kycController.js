@@ -3,7 +3,7 @@ const sandboxService = require('../services/sandboxService');
 const { ethers } = require('ethers');
 const { getSigner, contractAddresses } = require('../config/blockchain');
 const ComplianceManagerArtifact = require('../../deployed/ComplianceManager.json');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const logger = require('../utils/logger')('kycController');
 
 /**

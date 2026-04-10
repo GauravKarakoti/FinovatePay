@@ -1,5 +1,5 @@
 const storageService = require('../services/storageServices');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const logger = require('../utils/logger')('documentController');
 
 // Max file size: 10MB

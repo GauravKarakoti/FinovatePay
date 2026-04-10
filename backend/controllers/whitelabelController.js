@@ -5,7 +5,7 @@
  */
 
 const Whitelabel = require('../models/Whitelabel');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
 /**

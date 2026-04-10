@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const logger = require('../utils/logger')('invoiceController');
 
 // Constants for validation
@@ -80,14 +80,25 @@ exports.createInvoice = async (req, res) => {
         }
 
         // 3. RBAC / Authorization Check
-        if (!req.user || !req.user.organization_id) {
-            logger.error('User missing organization_id', { userId: req.user?.id });
-            return errorResponse(res, 'User organization not set', 401);
+        if (!req.user) {
+            logger.error('User missing from request');
+            return errorResponse(res, 'User authentication required', 401);
         }
 
-        if (quotation.seller_org_id !== req.user.organization_id) {
-            logger.warn('Authorization failed for quotation', { quotation_id, userId: req.user.id });
-            return errorResponse(res, 'Not authorized: Quotation belongs to a different organization', 403);
+        const isWalletMatch = quotation.seller_address && req.user.wallet_address && 
+            (quotation.seller_address.toLowerCase() === req.user.wallet_address.toLowerCase());
+            
+        const isOrgMatch = quotation.seller_org_id && req.user.organization_id && 
+            (quotation.seller_org_id === req.user.organization_id);
+
+        if (!isWalletMatch && !isOrgMatch) {
+            logger.warn('Authorization failed for quotation', { 
+                quotation_id, 
+                userId: req.user.id,
+                quotation_seller: quotation.seller_address,
+                user_wallet: req.user.wallet_address
+            });
+            return errorResponse(res, 'Not authorized: You do not own this quotation', 403);
         }
 
         // 4. Quantity Validation

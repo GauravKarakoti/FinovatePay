@@ -6,7 +6,7 @@ const { requireKYC } = require('../middleware/kycValidation');
 const { contractAddresses } = require('../config/blockchain');
 const insuranceService = require('../services/insuranceService');
 const { pool } = require('../config/database');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const { logAudit } = require('../middleware/auditLogger');
 
 // Helper: UUID → bytes32 (ethers v6)

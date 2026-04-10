@@ -1,7 +1,7 @@
 const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const { generateToken } = require('../utils/jwt');
 
 // Utility function to sanitize user object (remove sensitive fields)

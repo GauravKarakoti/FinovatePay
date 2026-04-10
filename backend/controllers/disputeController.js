@@ -1,7 +1,7 @@
 const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 const { getSigner, getEscrowContract } = require('../config/blockchain');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const logger = require('../utils/logger')('disputeController');
 
 // Helper function to create a log entry

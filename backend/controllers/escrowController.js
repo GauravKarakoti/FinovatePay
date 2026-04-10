@@ -8,7 +8,7 @@ const EscrowContractArtifact = extractAbi(require('../../deployed/EscrowContract
 const {
   updateTransactionState
 } = require('../services/recoveryService');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 const { blockchainQueue, JOB_TYPES } = require('../queues/blockchainQueue');
 const { logAudit } = require('../middleware/auditLogger');
 

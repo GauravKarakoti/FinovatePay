@@ -55,3 +55,4 @@ TypeError: Cannot read properties of undefined (reading 'entries')
 [2026-04-08 19:27:03:489] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
 [2026-04-08 21:55:16:141] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
 [2026-04-08 22:11:59:896] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-10 18:59:51:728] [error] [invoiceController]: Error creating invoice from quotation

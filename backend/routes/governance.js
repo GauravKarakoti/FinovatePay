@@ -4,7 +4,7 @@ const { authenticateToken, requireRole } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
 const governanceService = require('../services/governanceService');
 const { getSigner } = require('../config/blockchain');
-const errorResponse = require('../utils/errorResponse');
+const { errorResponse } = require('../utils/errorResponse');
 
 // All governance routes require authentication
 router.use(authenticateToken);
