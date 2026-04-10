@@ -4365,3 +4365,44 @@
 [2026-04-10 21:24:16:725] [info] [server]: 🚀 Server running on port 3000
 [2026-04-10 21:24:18:841] [info] [server]: Database connection test completed successfully
 [2026-04-10 21:24:20:424] [info] [server]: Tokenization listener started
+[2026-04-10 21:35:11:607] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-10 21:35:11:626] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-10 21:35:11:613] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-10 21:35:11:614] [info] [server]: Invoice Sync Worker started
+[2026-04-10 21:35:11:616] [info] [server]: Transaction Recovery Worker started
+[2026-04-10 21:35:11:627] [info] [server]: Compliance listeners started
+[2026-04-10 21:35:11:630] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-10 21:35:11:634] [info] [server]: 🚀 Server running on port 3000
+[2026-04-10 21:35:14:044] [info] [server]: Database connection test completed successfully
+[2026-04-10 21:35:15:316] [info] [server]: Tokenization listener started
+[2026-04-10 21:35:39:142] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-10 21:35:39:156] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-10 21:35:39:148] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-10 21:35:39:148] [info] [server]: Invoice Sync Worker started
+[2026-04-10 21:35:39:150] [info] [server]: Transaction Recovery Worker started
+[2026-04-10 21:35:39:157] [info] [server]: Compliance listeners started
+[2026-04-10 21:35:39:159] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-10 21:35:39:162] [info] [server]: 🚀 Server running on port 3000
+[2026-04-10 21:35:41:533] [info] [server]: Database connection test completed successfully
+[2026-04-10 21:35:42:556] [info] [server]: Tokenization listener started
+[2026-04-10 21:36:09:415] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 21:36:24:832] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-10 21:36:24:847] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-10 21:36:24:836] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-10 21:36:24:837] [info] [server]: Invoice Sync Worker started
+[2026-04-10 21:36:24:838] [info] [server]: Transaction Recovery Worker started
+[2026-04-10 21:36:24:848] [info] [server]: Compliance listeners started
+[2026-04-10 21:36:24:851] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-10 21:36:24:854] [info] [server]: 🚀 Server running on port 3000
+[2026-04-10 21:36:26:909] [info] [server]: Database connection test completed successfully
+[2026-04-10 21:36:27:957] [info] [server]: Tokenization listener started
+[2026-04-10 21:36:42:693] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-10 21:36:42:706] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-10 21:36:42:698] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-10 21:36:42:699] [info] [server]: Invoice Sync Worker started
+[2026-04-10 21:36:42:700] [info] [server]: Transaction Recovery Worker started
+[2026-04-10 21:36:42:707] [info] [server]: Compliance listeners started
+[2026-04-10 21:36:42:709] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-10 21:36:42:712] [info] [server]: 🚀 Server running on port 3000
+[2026-04-10 21:36:45:098] [info] [server]: Database connection test completed successfully
+[2026-04-10 21:36:45:680] [info] [server]: Tokenization listener started
