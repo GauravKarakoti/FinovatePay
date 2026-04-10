@@ -526,12 +526,11 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
 
       const onchainTokenAddress = escrowData.token?.toLowerCase();
       
-      // CRITICAL FIX: Treat 'MATIC' and the Polygon 0x1010 precompile as Native Deposits
+      // FIX: Align exactly with Smart Contract. It ONLY checks for address(0). 
+      // If 0x1010 was used to create the escrow, it MUST flow through the ERC20 path.
       const isNativeDeposit = 
-          invoice.currency === 'MATIC' || 
           onchainTokenAddress === ethers.ZeroAddress || 
-          onchainTokenAddress === '0x0000000000000000000000000000000000000000' ||
-          onchainTokenAddress === '0x0000000000000000000000000000000000001010';
+          onchainTokenAddress === '0x0000000000000000000000000000000000000000';
 
       let tx;
 
@@ -541,7 +540,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
             throw new Error("Insufficient MATIC balance.");
         }
         
-        // Manual gasLimit overrides estimateGas failures
         tx = await contract.deposit(bytes32Id, { 
             value: amountWei,
             gasLimit: 300000
@@ -553,7 +551,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
         const tokenBalance = await tokenContract.balanceOf(buyerAddress);
         
         if (tokenBalance < amountWei) {
-            throw new Error(`Insufficient token balance. You need more funds in ${invoice.currency}.`);
+            throw new Error(`Insufficient token balance. You need more funds in this token.`);
         }
         if (nativeBalance === 0n) {
             throw new Error(`Insufficient MATIC to cover network gas fees.`);
@@ -567,7 +565,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
           toast.loading("Tokens approved. Proceeding with deposit...", { id: toastId });
         }
 
-        // Manual gasLimit overrides estimateGas failures
+        // Send transaction WITHOUT msg.value to satisfy the smart contract 'else' branch
         tx = await contract.deposit(bytes32Id, {
             gasLimit: 400000
         });
@@ -585,7 +583,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       let errorMessage = error.reason || error.data?.message || error.message || 'Payment failed';
       
       if (error.code === 'CALL_EXCEPTION' || errorMessage.includes('reverted')) {
-          toast.error("Contract rejected the transaction. The smart contract may require address(0) for MATIC instead of 0x1010.", { id: toastId });
+          toast.error("Contract rejected the transaction. Make sure you have sufficient token allowance and balance.", { id: toastId });
       } else if (errorMessage.includes("user rejected")) {
           toast.error("Transaction was cancelled by the user.", { id: toastId });
       } else {

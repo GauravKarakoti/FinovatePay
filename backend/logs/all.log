@@ -4552,3 +4552,23 @@
 [2026-04-10 22:28:08:007] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-10 22:28:37:927] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-10 22:29:08:011] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:37:57:971] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-10 22:37:57:989] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-10 22:37:57:977] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-10 22:37:57:979] [info] [server]: Invoice Sync Worker started
+[2026-04-10 22:37:57:980] [info] [server]: Transaction Recovery Worker started
+[2026-04-10 22:37:57:990] [info] [server]: Compliance listeners started
+[2026-04-10 22:37:57:992] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-10 22:37:57:998] [info] [server]: 🚀 Server running on port 3000
+[2026-04-10 22:38:00:526] [info] [server]: Database connection test completed successfully
+[2026-04-10 22:38:01:303] [info] [server]: Tokenization listener started
+[2026-04-10 22:38:28:236] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:38:58:254] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:39:28:496] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:39:58:271] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:40:28:290] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:40:58:380] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:41:28:341] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:41:58:315] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:42:28:325] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-10 22:42:57:643] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
