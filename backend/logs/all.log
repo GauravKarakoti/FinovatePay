@@ -4572,3 +4572,87 @@
 [2026-04-10 22:41:58:315] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-10 22:42:28:325] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-10 22:42:57:643] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-12 19:23:55:259] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-12 19:23:55:276] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-12 19:23:55:264] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-12 19:23:55:265] [info] [server]: Invoice Sync Worker started
+[2026-04-12 19:23:55:266] [info] [server]: Transaction Recovery Worker started
+[2026-04-12 19:23:55:278] [info] [server]: Compliance listeners started
+[2026-04-12 19:23:55:282] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-12 19:23:55:287] [info] [server]: 🚀 Server running on port 3000
+[2026-04-12 19:23:58:689] [info] [server]: Database connection test completed successfully
+[2026-04-12 19:24:00:030] [info] [server]: Tokenization listener started
+[2026-04-12 19:24:08:642] [info] [request]: [33d04011-2919-4080-b949-e6059bfe00f1] GET /api/v1/notifications/push-preferences
+[2026-04-12 19:24:08:652] [info] [request]: [fe72c6fd-9e6f-4da4-ac8e-479e8af9651d] GET /api/v1/notifications/subscriptions
+[2026-04-12 19:24:09:026] [info] [request]: [b9ec61bd-a118-4667-bd19-348078fe78a3] GET /api/v1/notifications/subscriptions
+[2026-04-12 19:24:09:034] [info] [request]: [42ace61d-0ce3-4977-9054-51350bd3a516] GET /api/v1/notifications/push-preferences
+[2026-04-12 19:24:09:049] [info] [request]: [ccbb7dd8-1a8c-4675-bf5f-16c8edb00f5b] POST /api/v1/auth/logout
+[2026-04-12 19:24:09:056] [info] [request]: [f9d3671c-34b8-48f5-8e87-7840e6440478] POST /api/v1/auth/logout
+[2026-04-12 19:24:09:064] [info] [request]: [befee880-dd3d-4afe-8d9d-a3423bb08e39] POST /api/v1/auth/logout
+[2026-04-12 19:24:09:071] [info] [request]: [993a0976-6bf3-4135-8c1b-4caaee37b059] POST /api/v1/auth/logout
+[2026-04-12 19:24:11:292] [info] [request]: [a461e645-88c1-4bbd-b5f3-cc22ff80c98e] POST /api/v1/auth/login
+[2026-04-12 19:24:12:308] [info] [request]: [30974b83-8260-46c8-8327-0fd92a8d629d] GET /api/v1/notifications/subscriptions
+[2026-04-12 19:24:12:318] [info] [request]: [36113f79-ee5e-41b0-b1a7-35762925ad99] GET /api/v1/notifications/push-preferences
+[2026-04-12 19:24:12:371] [info] [request]: [4b4ce8fa-e247-4b4c-9948-a97b49f947e5] GET /api/v1/kyc/status
+[2026-04-12 19:24:12:383] [info] [request]: [0444eac8-bc10-4cdf-b935-cdb0452aad37] GET /api/v1/invoices/buyer
+[2026-04-12 19:24:12:895] [info] [request]: [4b108257-94ac-447a-b89b-aa7f5f8f3108] GET /api/v1/notifications/push-preferences
+[2026-04-12 19:24:12:906] [info] [request]: [e65cffff-98c1-4d7b-b7f6-8771316437f0] GET /api/v1/notifications/subscriptions
+[2026-04-12 19:24:13:223] [info] [request]: [3e7616ec-543b-4d96-bff5-b1c90accda37] GET /api/v1/kyc/status
+[2026-04-12 19:24:15:256] [info] [request]: [8811005a-a892-4b62-bbd4-aca3c38dc3a8] GET /api/v1/invoices/buyer
+[2026-04-12 19:24:15:841] [info] [request]: [c9de37b0-a532-452d-9a4b-29707b09a180] GET /api/v1/invoices/buyer
+[2026-04-12 19:24:17:734] [info] [request]: [067eb4ae-1930-48d3-8edc-12700ae1efdf] GET /api/v1/quotations/pending-for-buyer
+[2026-04-12 19:24:18:390] [info] [request]: [40790fba-5cab-4e9f-8190-33d1ed0cf0ad] GET /api/v1/kyc/status
+[2026-04-12 19:24:18:397] [info] [request]: [041a8317-a534-4bd4-82eb-7d182ac8c29c] GET /api/v1/invoices/buyer
+[2026-04-12 19:24:18:992] [info] [request]: [a7d29d59-d940-478e-b28a-f8173da3fc17] GET /api/v1/invoices/buyer
+[2026-04-12 19:24:19:285] [info] [request]: [cd2fca32-8cb1-4168-b825-9dcc822607a5] GET /api/v1/kyc/status
+[2026-04-12 19:24:19:606] [info] [request]: [cbc98b6d-2cd8-485c-91d3-e7c4ed928b92] GET /api/v1/invoices/buyer
+[2026-04-12 19:24:25:631] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:24:55:595] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:25:25:638] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:25:55:610] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:26:25:593] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:26:55:604] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:27:25:621] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:27:55:662] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:28:25:637] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:28:54:889] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-12 19:30:10:506] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-12 19:30:10:519] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-12 19:30:10:511] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-12 19:30:10:511] [info] [server]: Invoice Sync Worker started
+[2026-04-12 19:30:10:513] [info] [server]: Transaction Recovery Worker started
+[2026-04-12 19:30:10:520] [info] [server]: Compliance listeners started
+[2026-04-12 19:30:10:522] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-12 19:30:10:526] [info] [server]: 🚀 Server running on port 3000
+[2026-04-12 19:30:13:107] [info] [server]: Database connection test completed successfully
+[2026-04-12 19:30:13:950] [info] [server]: Tokenization listener started
+[2026-04-12 19:30:40:804] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:31:10:804] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:31:40:842] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:32:10:846] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:32:40:851] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:33:10:854] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:33:34:856] [info] [request]: [c828cd3a-8901-43f6-b518-876f63766583] GET /api/v1/invoices/buyer
+[2026-04-12 19:33:37:692] [info] [request]: [763421ea-288c-4771-8080-89eba1c189c7] GET /api/v1/invoices/buyer
+[2026-04-12 19:33:40:194] [info] [request]: [151892f1-c360-4a4d-bd0b-996fea020b91] GET /api/v1/invoices/buyer
+[2026-04-12 19:33:40:840] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:34:10:856] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:34:40:851] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:35:10:237] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-12 19:40:42:013] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-12 19:40:42:032] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-12 19:40:42:017] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-12 19:40:42:019] [info] [server]: Invoice Sync Worker started
+[2026-04-12 19:40:42:020] [info] [server]: Transaction Recovery Worker started
+[2026-04-12 19:40:42:033] [info] [server]: Compliance listeners started
+[2026-04-12 19:40:42:035] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-12 19:40:42:039] [info] [server]: 🚀 Server running on port 3000
+[2026-04-12 19:40:44:665] [info] [server]: Database connection test completed successfully
+[2026-04-12 19:40:45:387] [info] [server]: Tokenization listener started
+[2026-04-12 19:41:12:354] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:41:42:359] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:42:12:313] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:42:42:367] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:43:12:337] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-12 19:43:39:810] [info] [request]: [b2eb0ccb-d6cc-4d99-a758-1771bfa84a41] GET /api/v1/invoices/buyer
+[2026-04-12 19:43:42:356] [info] [recoveryService]: Processing 0 operations from recovery queue

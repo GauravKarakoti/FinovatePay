@@ -515,7 +515,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       const escrowAddress = await contract.getAddress(); 
       const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
-      // PRE-FLIGHT CHECK: Verify on-chain state to prevent orphaned transactions
       const escrowData = await contract.escrows(bytes32Id);
       if (escrowData.amount === 0n) {
           throw new Error("Escrow record not found on the blockchain. Contact support.");
@@ -524,10 +523,25 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
           throw new Error("This invoice is no longer awaiting payment.");
       }
 
-      const onchainTokenAddress = escrowData.token?.toLowerCase();
+      // --- MOVE THIS BLOCK TO THE TOP ---
+      const feeData = await signer.provider.getFeeData();
+      const minTip = ethers.parseUnits('30', 'gwei'); 
       
-      // FIX: Align exactly with Smart Contract. It ONLY checks for address(0). 
-      // If 0x1010 was used to create the escrow, it MUST flow through the ERC20 path.
+      const maxPriorityFeePerGas = feeData.maxPriorityFeePerGas && feeData.maxPriorityFeePerGas > minTip 
+          ? feeData.maxPriorityFeePerGas 
+          : minTip;
+          
+      const maxFeePerGas = feeData.maxFeePerGas && feeData.maxFeePerGas > maxPriorityFeePerGas 
+          ? feeData.maxFeePerGas 
+          : maxPriorityFeePerGas + ethers.parseUnits('10', 'gwei'); 
+
+      const gasOptions = {
+          maxPriorityFeePerGas,
+          maxFeePerGas
+      };
+      // ---------------------------------
+
+      const onchainTokenAddress = escrowData.token?.toLowerCase();
       const isNativeDeposit = 
           onchainTokenAddress === ethers.ZeroAddress || 
           onchainTokenAddress === '0x0000000000000000000000000000000000000000';
@@ -535,39 +549,37 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       let tx;
 
       if (isNativeDeposit) {
-        // Safe Native Deposit
         if (nativeBalance < amountWei) {
             throw new Error("Insufficient MATIC balance.");
         }
         
-        tx = await contract.deposit(bytes32Id, { 
+        // Use gasOptions here
+        tx = await contract.getFunction("deposit")(bytes32Id, { 
             value: amountWei,
-            gasLimit: 300000
+            gasLimit: 300000,
+            ...gasOptions 
         });
         
       } else {
-        // Standard ERC20 Flow
         const tokenContract = new ethers.Contract(onchainTokenAddress, erc20ABI, signer);
         const tokenBalance = await tokenContract.balanceOf(buyerAddress);
         
         if (tokenBalance < amountWei) {
             throw new Error(`Insufficient token balance. You need more funds in this token.`);
         }
-        if (nativeBalance === 0n) {
-            throw new Error(`Insufficient MATIC to cover network gas fees.`);
-        }
         
         const allowance = await tokenContract.allowance(buyerAddress, escrowAddress);
         if (allowance < amountWei) {
           toast.loading("Approving tokens...", { id: toastId });
-          const approveTx = await tokenContract.approve(escrowAddress, amountWei);
+          const approveTx = await tokenContract.approve(escrowAddress, amountWei, { ...gasOptions });
           await approveTx.wait();
           toast.loading("Tokens approved. Proceeding with deposit...", { id: toastId });
         }
 
-        // Send transaction WITHOUT msg.value to satisfy the smart contract 'else' branch
-        tx = await contract.deposit(bytes32Id, {
-            gasLimit: 400000
+        tx = await contract.getFunction("deposit")(bytes32Id, {
+            value: 0n,
+            gasLimit: 400000,
+            ...gasOptions 
         });
       }
       
