@@ -519,7 +519,11 @@ export const updateUserRole = (userId, role) => {
 };
 
 export const updateInvoiceStatus = (invoiceId, status, txHash, disputeReason = '') => {
-  return api.post(`/invoices/${invoiceId}/status`, { status, txHash, disputeReason });
+  return api.post(`/invoices/${invoiceId}/status`, { 
+    status, 
+    tx_hash: txHash, 
+    dispute_reason: disputeReason 
+  });
 };
 
 export const resolveDispute = async (invoiceId, sellerWins) => {
