@@ -146,16 +146,8 @@ const relayTransaction = async (req, res) => {
 
         const wallet = new ethers.Wallet(privateKey, provider);
 
-        // Get Contract Address
-        let contractAddress = process.env.ESCROW_CONTRACT_ADDRESS;
-        if (!contractAddress) {
-            try {
-                const addresses = require('../../deployed/contract-addresses.json');
-                contractAddress = addresses.EscrowContract;
-            } catch (e) {
-                console.warn("Could not load contract-addresses.json");
-            }
-        }
+        const addresses = require('../../deployed/contract-addresses.json');
+        const contractAddress = addresses.EscrowContractProxy;
 
         if (!contractAddress) {
             return errorResponse(res, "Contract address not configured", 500);

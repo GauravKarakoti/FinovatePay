@@ -124,18 +124,14 @@ const getSignerSync = () => {
 // --------------------------------------------------
 
 const contractAddresses = {
-  invoiceFactory: deployedAddresses.InvoiceFactory || process.env.INVOICE_FACTORY_ADDRESS,
-  escrowContract: deployedAddresses.EscrowContract || process.env.ESCROW_CONTRACT_ADDRESS,
-  complianceManager: deployedAddresses.ComplianceManager || process.env.COMPLIANCE_MANAGER_ADDRESS,
-  produceTracking: deployedAddresses.ProduceTracking || process.env.PRODUCE_TRACKING_ADDRESS,
-  fractionToken: deployedAddresses.FractionToken || process.env.FRACTION_TOKEN_ADDRESS,
-  financingManager: deployedAddresses.FinancingManager || process.env.FINANCING_MANAGER_ADDRESS,
-  proxyAdmin: deployedAddresses.ProxyAdmin || process.env.PROXY_ADMIN_ADDRESS,
-  multiSigWallet: deployedAddresses.MultiSigWallet || process.env.MULTISIG_WALLET_ADDRESS,
-  governanceToken: deployedAddresses.FinovateToken || process.env.GOVENNANCE_TOKEN_ADDRESS,
-  governanceManager: deployedAddresses.GovernanceManager || process.env.GOVERNANCE_MANAGER_ADDRESS,
-  timeLock: deployedAddresses.TimeLock || process.env.TIMELOCK_ADDRESS,
-  treasuryManager: deployedAddresses.TreasuryManager || process.env.TREASURY_MANAGER_ADDRESS,
+  invoiceFactory: deployedAddresses.InvoiceFactory,
+  escrowContract: deployedAddresses.EscrowContractProxy,
+  complianceManager: deployedAddresses.ComplianceManager,
+  produceTracking: deployedAddresses.ProduceTracking,
+  fractionToken: deployedAddresses.FractionToken,
+  financingManager: deployedAddresses.FinancingManagerProxy,
+  governanceToken: deployedAddresses.FinovateToken,
+  treasuryManager: deployedAddresses.TreasuryManager
 };
 
 // --------------------------------------------------

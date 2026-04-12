@@ -11,11 +11,12 @@ const extractAbi = (artifact) => {
 const BridgeAdapterABI = extractAbi(require('../../deployed/BridgeAdapter.json'));
 const LiquidityAdapterABI = extractAbi(require('../../deployed/LiquidityAdapter.json'));
 const FinancingManagerABI = extractAbi(require('../../deployed/FinancingManager.json'));
+const contractAddresses = require('../../deployed/contract-addresses.json');
 
 // Assuming these are deployed addresses; in real setup, fetch from config or DB
-const BRIDGE_ADAPTER_ADDRESS = process.env.BRIDGE_ADAPTER_ADDRESS;
-const LIQUIDITY_ADAPTER_ADDRESS = process.env.LIQUIDITY_ADAPTER_ADDRESS;
-const FINANCING_MANAGER_ADDRESS = process.env.FINANCING_MANAGER_ADDRESS;
+const BRIDGE_ADAPTER_ADDRESS = contractAddresses.BridgeAdapter;
+const LIQUIDITY_ADAPTER_ADDRESS = contractAddresses.LiquidityAdapter;
+const FINANCING_MANAGER_ADDRESS = contractAddresses.FinancingManagerProxy;
 
 // Contract instances
 let bridgeAdapter, liquidityAdapter, financingManager;
@@ -127,7 +128,7 @@ function handleBlockchainError(error, operation) {
 async function bridgeToKatana(collateralTokenId, amount, userId) {
     try {
         // Assuming collateral is FractionToken
-        const fractionTokenAddress = process.env.FRACTION_TOKEN_ADDRESS;
+        const fractionTokenAddress = require('../../deployed/contract-addresses.json').FractionToken;
         
         if (!fractionTokenAddress) {
             throw new BridgeServiceError(

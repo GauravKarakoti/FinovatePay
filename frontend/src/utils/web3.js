@@ -228,13 +228,13 @@ export async function disconnectWallet() {
 // Contract helper functions
 export async function getEscrowContract() {
   const { signer } = await connectWallet();
-  const escrowAddress = contractAddresses.EscrowContract;
+  const escrowAddress = contractAddresses.EscrowContractProxy;
   return new Contract(escrowAddress, EscrowContractArtifact.interface.fragments, signer);
 }
 
 export async function getFinancingManagerContract() {
   const { signer } = await connectWallet();
-  const financingAddress = contractAddresses.FinancingManager;
+  const financingAddress = contractAddresses.FinancingManagerProxy;
   return new Contract(financingAddress, FinancingManagerArtifact.interface.fragments, signer);
 }
 
@@ -286,7 +286,7 @@ export async function getErc20Contract(tokenAddress) {
 export async function approveFinancingManager() {
   const contract = await getFractionTokenContract();
   console.log("Got contract")
-  const tx = await contract.setApprovalForAll(contractAddresses.FinancingManager, true);
+  const tx = await contract.setApprovalForAll(contractAddresses.FinancingManagerProxy, true);
   console.log("Tx recieved")
   return tx.wait();
 }
@@ -294,20 +294,20 @@ export async function approveFinancingManager() {
 export async function checkFinancingManagerApproval() {
   const { address } = await connectWallet();
   const contract = await getFractionTokenContract();
-  return await contract.isApprovedForAll(address, contractAddresses.FinancingManager);
+  return await contract.isApprovedForAll(address, contractAddresses.FinancingManagerProxy);
 }
 
 export async function approveStablecoin(stablecoinAddress, amount) {
   const { signer } = await connectWallet();
   const contract = new Contract(stablecoinAddress, ERC20Artifact.abi, signer);
-  const tx = await contract.approve(contractAddresses.FinancingManager, amount);
+  const tx = await contract.approve(contractAddresses.FinancingManagerProxy, amount);
   return tx.wait();
 }
 
 export async function checkStablecoinAllowance(stablecoinAddress) {
   const { address, signer } = await connectWallet();
   const contract = new Contract(stablecoinAddress, ERC20Artifact.abi, signer);
-  return await contract.allowance(address, contractAddresses.FinancingManager);
+  return await contract.allowance(address, contractAddresses.FinancingManagerProxy);
 }
 
 // Transaction functions

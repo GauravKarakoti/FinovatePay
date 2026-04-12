@@ -26,7 +26,7 @@ async function main() {
   await verify(addresses.ComplianceManager, []);
   
   // Verify EscrowContract with its constructor argument
-  await verify(addresses.EscrowContract, [addresses.ComplianceManager]);
+  await verify(addresses.EscrowContractProxy, [addresses.ComplianceManager]);
   
   
   // Verify FractionToken

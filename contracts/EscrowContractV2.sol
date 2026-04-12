@@ -141,7 +141,8 @@ contract EscrowContractV2 is
     event ApprovalStagesSet(bytes32 indexed invoiceId);
     event StageApproved(bytes32 indexed invoiceId, uint256 indexed stageIndex, address approver);
     event EscrowAutoCancelled(bytes32 indexed invoiceId);
-
+    event ComplianceManagerUpdated(address indexed oldManager, address indexed newManager);
+    event AdminTransferred(address indexed oldAdmin, address indexed newAdmin);
     event YieldPoolUpdated(address indexed oldPool, address indexed newPool);
     event YieldPoolEnabled(bool enabled);
     event FundsDepositedToYield(bytes32 indexed invoiceId, uint256 amount);
@@ -988,6 +989,23 @@ contract EscrowContractV2 is
         });
 
         emit TreasuryChangeQueued(newTreasury, proposalId);
+    }
+
+    function setComplianceManager(address _complianceManager) external onlyAdmin {
+        require(_complianceManager != address(0), "Invalid address");
+        address oldManager = address(complianceManager);
+        complianceManager = ComplianceManager(_complianceManager);
+        emit ComplianceManagerUpdated(oldManager, _complianceManager);
+    }
+
+    /**
+     * @notice Transfer the admin role to a new address
+     */
+    function transferAdmin(address _newAdmin) external onlyAdmin {
+        require(_newAdmin != address(0), "Invalid address");
+        address oldAdmin = admin;
+        admin = _newAdmin;
+        emit AdminTransferred(oldAdmin, _newAdmin);
     }
 
     function executeTreasuryChange() external {

@@ -101,7 +101,7 @@ async function main() {
   console.log("FractionToken deployed to:", fractionToken.target);
 
   console.log("\n🔗 Setting up EscrowContract authorization...");
-  const tx = await fractionToken.setEscrowContract(escrowContractV2Implementation.target);
+  const tx = await fractionToken.setEscrowContract(escrowProxy.target);
   await tx.wait();
   console.log("✅ EscrowContract authorized:", escrowContractV2Implementation.target);
   console.log("- Payment Token:", await fractionToken.paymentToken());

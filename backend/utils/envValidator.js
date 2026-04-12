@@ -48,21 +48,6 @@ const ENV_CONFIG = {
       required: true,
       validate: (val) => val && /^https?:\/\/.+/.test(val),
       errorMsg: 'BLOCKCHAIN_RPC_URL must be a valid HTTP/HTTPS URL'
-    },
-    ESCROW_CONTRACT_ADDRESS: {
-      required: true,
-      validate: (val) => val && /^0x[a-fA-F0-9]{40}$/.test(val),
-      errorMsg: 'ESCROW_CONTRACT_ADDRESS must be a valid Ethereum address'
-    },
-    COMPLIANCE_MANAGER_ADDRESS: {
-      required: true,
-      validate: (val) => val && /^0x[a-fA-F0-9]{40}$/.test(val),
-      errorMsg: 'COMPLIANCE_MANAGER_ADDRESS must be a valid Ethereum address'
-    },
-    FORWARDER_ADDRESS: {
-      required: true,
-      validate: (val) => val && /^0x[a-fA-F0-9]{40}$/.test(val),
-      errorMsg: 'FORWARDER_ADDRESS must be a valid Ethereum address'
     }
   },
 

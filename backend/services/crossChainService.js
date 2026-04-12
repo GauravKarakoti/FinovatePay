@@ -5,7 +5,7 @@ const { CrossChainFraction, CrossChainMarketplaceListing, CrossChainTrade } = re
 const FractionTokenABI = require('../../deployed/FractionToken.json').abi;
 
 // Contract addresses (from environment)
-const FRACTION_TOKEN_ADDRESS = process.env.FRACTION_TOKEN_ADDRESS;
+const FRACTION_TOKEN_ADDRESS = require('../../deployed/contract-addresses.json').FractionToken;
 
 // Supported chains
 const SUPPORTED_CHAINS = {
