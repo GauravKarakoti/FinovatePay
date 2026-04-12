@@ -132,7 +132,7 @@ const relayTransaction = async (req, res) => {
         }
 
         // Initialize provider and signer (Relayer)
-        const providerUrl = process.env.ALCHEMY_AMOY_URL;
+        const providerUrl = process.env.BLOCKCHAIN_RPC_URL;
         if (!providerUrl) {
             return errorResponse(res, "RPC URL not configured", 500);
         }
