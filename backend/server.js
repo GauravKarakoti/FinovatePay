@@ -213,8 +213,6 @@ app.use('/api/v1/credit-scores', require('./routes/creditScore'));
 
 /* ---------------- CREDIT RISK (AI-POWERED) ---------------- */
 
-app.use('/api/credit-risk', require('./routes/creditRisk'));
-// Also expose v1 path for backwards compatibility / ML integrations
 app.use('/api/v1/credit-risk', require('./routes/creditRisk'));
 
 /* ---------------- FRAUD DETECTION (AI-POWERED) ---------------- */

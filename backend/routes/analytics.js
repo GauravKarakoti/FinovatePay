@@ -95,11 +95,7 @@ router.get('/financing', requireRole(['seller', 'investor', 'admin']), async (re
   }
 });
 
-/**
- * GET /api/analytics/risk/:invoiceId
- * Get risk assessment for a specific invoice
- */
-router.get('/risk/:invoiceId', requireRole(['seller', 'investor', 'admin']), async (req, res) => {
+router.get('/risk/:invoiceId', requireRole(['investor', 'admin']), async (req, res) => {
   try {
     const { invoiceId } = req.params;
     

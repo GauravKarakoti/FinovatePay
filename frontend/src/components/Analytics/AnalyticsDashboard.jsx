@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LineChart,
   Line,
@@ -18,6 +18,7 @@ import {
 } from 'recharts';
 import { toast } from 'react-hot-toast';
 import { getAnalyticsOverview, getPaymentAnalytics, getFinancingAnalytics, getRiskScore } from '../../utils/api';
+import RiskAnalytics from '../Profile/RiskAnalytics';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
@@ -183,7 +184,7 @@ const AnalyticsDashboard = ({ userRole }) => {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            Risk Assessment
+            {userRole === 'seller' ? 'My Credit Profile' : 'Risk Assessment'}
           </button>
         </div>
       </div>
@@ -410,103 +411,110 @@ const AnalyticsDashboard = ({ userRole }) => {
         </div>
       )}
 
-      {/* Risk Assessment Section */}
       {activeSection === 'risk' && (
         <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">Invoice Risk Assessment</h3>
-            <form onSubmit={handleRiskAssessment} className="flex gap-4 mb-6">
-              <input
-                type="text"
-                value={riskInvoiceId}
-                onChange={(e) => setRiskInvoiceId(e.target.value)}
-                placeholder="Enter Invoice ID"
-                className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Assess Risk
-              </button>
-            </form>
+          {userRole === 'seller' ? (
+            /* Sellers see their own profile metrics */
+            <div className="max-w-4xl mx-auto">
+              <RiskAnalytics /> {/* */}
+            </div>
+          ) : (
+            /* Investors and Admins see the Invoice Search tool */
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold mb-4">Invoice Risk Assessment</h3>
+              <form onSubmit={handleRiskAssessment} className="flex gap-4 mb-6">
+                <input
+                  type="text"
+                  value={riskInvoiceId}
+                  onChange={(e) => setRiskInvoiceId(e.target.value)}
+                  placeholder="Enter Invoice ID"
+                  className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="submit"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Assess Risk
+                </button>
+              </form>
 
-            {riskAssessment && (
-              <div className="space-y-6">
-                {/* Risk Score Card */}
-                <div className="flex items-center justify-between p-6 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="text-sm text-gray-500">Risk Score</p>
-                    <p className="text-4xl font-bold">{riskAssessment.riskScore}/100</p>
-                  </div>
-                  <div className={`px-4 py-2 rounded-lg ${
-                    riskAssessment.riskLevel === 'low' ? 'bg-green-100 text-green-800' :
-                    riskAssessment.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    <span className="text-lg font-semibold capitalize">{riskAssessment.riskLevel} Risk</span>
-                  </div>
-                </div>
-
-                {/* Recommendation */}
-                <div className={`p-4 rounded-lg ${
-                  riskAssessment.recommendation.action === 'invest' ? 'bg-green-50 border-green-200' :
-                  riskAssessment.recommendation.action === 'caution' ? 'bg-yellow-50 border-yellow-200' :
-                  'bg-red-50 border-red-200'
-                } border`}>
-                  <p className="font-semibold mb-1 capitalize">{riskAssessment.recommendation.action}</p>
-                  <p className="text-gray-700">{riskAssessment.recommendation.message}</p>
-                </div>
-
-                {/* Risk Factors */}
-                <div>
-                  <h4 className="font-semibold mb-3">Risk Factors</h4>
-                  <div className="space-y-2">
-                    {riskAssessment.riskFactors.map((factor, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium">{factor.factor}</p>
-                          <p className="text-sm text-gray-500">{factor.description}</p>
-                        </div>
-                        <span className={`px-2 py-1 text-xs rounded ${
-                          factor.impact === 'high' ? 'bg-red-100 text-red-800' :
-                          factor.impact === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {factor.impact}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Invoice Details */}
-                {riskAssessment.invoiceDetails && (
-                  <div>
-                    <h4 className="font-semibold mb-3">Invoice Details</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-500">Amount</p>
-                        <p className="font-semibold">{formatCurrency(riskAssessment.invoiceDetails.amount)}</p>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-500">Currency</p>
-                        <p className="font-semibold">{riskAssessment.invoiceDetails.currency}</p>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-500">Status</p>
-                        <p className="font-semibold">{riskAssessment.invoiceDetails.status}</p>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-500">Financing</p>
-                        <p className="font-semibold">{riskAssessment.invoiceDetails.financingStatus}</p>
-                      </div>
+              {riskAssessment && (
+                <div className="space-y-6">
+                  {/* Risk Score Card */}
+                  <div className="flex items-center justify-between p-6 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="text-sm text-gray-500">Risk Score</p>
+                      <p className="text-4xl font-bold">{riskAssessment.riskScore}/100</p>
+                    </div>
+                    <div className={`px-4 py-2 rounded-lg ${
+                      riskAssessment.riskLevel === 'low' ? 'bg-green-100 text-green-800' :
+                      riskAssessment.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      <span className="text-lg font-semibold capitalize">{riskAssessment.riskLevel} Risk</span>
                     </div>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+
+                  {/* Recommendation */}
+                  <div className={`p-4 rounded-lg ${
+                    riskAssessment.recommendation.action === 'invest' ? 'bg-green-50 border-green-200' :
+                    riskAssessment.recommendation.action === 'caution' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-red-50 border-red-200'
+                  } border`}>
+                    <p className="font-semibold mb-1 capitalize">{riskAssessment.recommendation.action}</p>
+                    <p className="text-gray-700">{riskAssessment.recommendation.message}</p>
+                  </div>
+
+                  {/* Risk Factors */}
+                  <div>
+                    <h4 className="font-semibold mb-3">Risk Factors</h4>
+                    <div className="space-y-2">
+                      {riskAssessment.riskFactors.map((factor, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div>
+                            <p className="font-medium">{factor.factor}</p>
+                            <p className="text-sm text-gray-500">{factor.description}</p>
+                          </div>
+                          <span className={`px-2 py-1 text-xs rounded ${
+                            factor.impact === 'high' ? 'bg-red-100 text-red-800' :
+                            factor.impact === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {factor.impact}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Invoice Details */}
+                  {riskAssessment.invoiceDetails && (
+                    <div>
+                      <h4 className="font-semibold mb-3">Invoice Details</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Amount</p>
+                          <p className="font-semibold">{formatCurrency(riskAssessment.invoiceDetails.amount)}</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Currency</p>
+                          <p className="font-semibold">{riskAssessment.invoiceDetails.currency}</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Status</p>
+                          <p className="font-semibold">{riskAssessment.invoiceDetails.status}</p>
+                        </div>
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-500">Financing</p>
+                          <p className="font-semibold">{riskAssessment.invoiceDetails.financingStatus}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

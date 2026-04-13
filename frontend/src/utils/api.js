@@ -379,6 +379,8 @@ export const createQuotation = (quotationData) => {
   return api.post('/quotations', quotationData);
 };
 
+export const getMyCreditRisk = () => api.get('/credit-risk/me');
+
 export const getQuotations = () => {
   return api.get('/quotations');
 };

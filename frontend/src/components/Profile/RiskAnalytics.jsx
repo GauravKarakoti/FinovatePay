@@ -14,7 +14,8 @@ const RiskAnalytics = ({ userId, onClose }) => {
   const fetchRiskProfile = async () => {
     try {
       setLoading(true);
-      const endpoint = userId ? `/api/credit-risk/${userId}` : '/api/credit-risk/me';
+      // Remove '/api' from the beginning of these strings
+      const endpoint = userId ? `/credit-risk/${userId}` : '/credit-risk/me'; 
       const response = await api.get(endpoint);
       
       if (response.data.success) {
@@ -33,7 +34,8 @@ const RiskAnalytics = ({ userId, onClose }) => {
   const handleRecalculate = async () => {
     try {
       setIsRecalculating(true);
-      const response = await api.post('/api/credit-risk/calculate');
+      // Remove '/api' from the beginning of this string
+      const response = await api.post('/credit-risk/calculate'); 
       
       if (response.data.success) {
         setRiskData(response.data.data);
