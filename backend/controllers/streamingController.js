@@ -47,8 +47,7 @@ exports.createStream = async (req, res) => {
     // Generate stream ID
     const streamId = uuidToBytes32(require('uuid').v4());
     
-    // Create stream on blockchain
-    const amountInWei = ethers.utils.parseUnits(totalAmount.toString(), 18);
+    const amountInWei = ethers.parseUnits(totalAmount.toString(), 18);
     
     const chainResult = await createStreamOnChain(
       streamId,
@@ -110,8 +109,7 @@ exports.approveStream = async (req, res) => {
       return errorResponse(res, 'Stream is not pending', 400);
     }
     
-    // Approve on chain
-    const amountInWei = ethers.utils.parseUnits(amount.toString(), 18);
+    const amountInWei = ethers.parseUnits(amount.toString(), 18);
     const result = await approveStreamOnChain(streamId, amountInWei, stream.token_address);
     
     // Update database

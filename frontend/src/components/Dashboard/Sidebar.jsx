@@ -52,7 +52,7 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
     tabs.push({ id: 'analytics', label: 'Analytics', icon: '📈' });
   }
 
-  if (user?.role === 'seller') {
+  if (['seller', 'buyer'].includes(user?.role)) {
     tabs.push({ id: 'streaming', label: 'Streaming', icon: '📺' });
   }
 

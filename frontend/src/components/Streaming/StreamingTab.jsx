@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
 import { connectWallet } from '../../utils/web3';
 import CreateSubscriptionModal from './CreateSubscriptionModal';
 import StreamList from './StreamList';
@@ -7,7 +6,6 @@ import StreamList from './StreamList';
 const StreamingTab = ({ userRole = 'seller' }) => {
   const [walletAddress, setWalletAddress] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [activeView, setActiveView] = useState('all'); // 'all', 'seller', 'buyer'
 
   useEffect(() => {
     const initWallet = async () => {
@@ -50,40 +48,6 @@ const StreamingTab = ({ userRole = 'seller' }) => {
         )}
       </div>
 
-      {/* View Toggle */}
-      <div className="flex gap-2 border-b border-gray-200">
-        <button
-          onClick={() => setActiveView('all')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeView === 'all'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          All Streams
-        </button>
-        <button
-          onClick={() => setActiveView('seller')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeView === 'seller'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          As Seller
-        </button>
-        <button
-          onClick={() => setActiveView('buyer')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            activeView === 'buyer'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          As Buyer
-        </button>
-      </div>
-
       {/* Info Card */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
@@ -103,9 +67,7 @@ const StreamingTab = ({ userRole = 'seller' }) => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-200">
           <h3 className="font-semibold text-gray-900">
-            {activeView === 'all' && 'All Subscription Streams'}
-            {activeView === 'seller' && 'Streams You Created (As Seller)'}
-            {activeView === 'buyer' && 'Streams You\'re Paying (As Buyer)'}
+            {userRole === 'seller' ? 'Streams You Created (As Seller)' : 'Streams You\'re Paying (As Buyer)'}
           </h3>
         </div>
         <div className="p-4">
