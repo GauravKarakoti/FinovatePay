@@ -85,13 +85,22 @@ const AnalyticsDashboard = ({ userRole }) => {
   };
 
   const formatCurrency = (value) => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(2)}M`;
+    // Convert to number to handle strings from API
+    const numValue = parseFloat(value);
+    
+    // Handle cases where value might be null, undefined, or non-numeric
+    if (isNaN(numValue)) {
+      return '$0.00';
     }
-    if (value >= 1000) {
-      return `$${(value / 1000).toFixed(2)}K`;
+
+    if (numValue >= 1000000) {
+      return `$${(numValue / 1000000).toFixed(2)}M`;
     }
-    return `$${value?.toFixed(2) || '0.00'}`;
+    if (numValue >= 1000) {
+      return `$${(numValue / 1000).toFixed(2)}K`;
+    }
+    
+    return `$${numValue.toFixed(2)}`;
   };
 
   // Prepare chart data

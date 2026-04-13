@@ -15,21 +15,15 @@ const analyticsService = require('../services/analyticsService');
 // All analytics routes require authentication
 router.use(authenticateToken);
 
-/**
- * GET /api/analytics/overview
- * Get dashboard summary including invoice, escrow, and financing stats
- */
 router.get('/overview', async (req, res) => {
   try {
-    const userId = req.user.id;
+    // Use wallet_address instead of id for address-based queries
+    const userIdentifier = req.user.role === 'admin' ? req.user.id : req.user.wallet_address;
     const role = req.user.role;
     
-    const overview = await analyticsService.getDashboardOverview(userId, role);
+    const overview = await analyticsService.getDashboardOverview(userIdentifier, role);
     
-    res.json({
-      success: true,
-      data: overview
-    });
+    res.json({ success: true, data: overview });
   } catch (error) {
     console.error('Error fetching analytics overview:', error);
     res.status(500).json({

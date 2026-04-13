@@ -131,14 +131,14 @@ async function getFinancingAnalytics(userId, role) {
 
 async function getRiskScore(invoiceId) {
   try {
-    // Get invoice details using seller_address
     const invoiceQuery = `
       SELECT 
         i.*,
-        u.payment_history_score,
-        u.credit_score
+        cs.payment_history_score,
+        cs.score AS credit_score
       FROM invoices i
-      LEFT JOIN users u ON i.seller_address = u.id 
+      LEFT JOIN users u ON i.seller_address = u.wallet_address
+      LEFT JOIN credit_scores cs ON u.id = cs.user_id
       WHERE i.invoice_id = $1 
     `;
     const invoiceResult = await pool.query(invoiceQuery, [invoiceId]);
