@@ -184,22 +184,25 @@ const analyzeBehavioralPatterns = async (client, userId) => {
   };
 };
 
-/**
- * Analyze payment velocity and patterns
- */
 const analyzePaymentVelocity = async (client, userId) => {
+  // 1. First, get the user's wallet address 
+  const userRes = await client.query('SELECT wallet_address FROM users WHERE id = $1', [userId]);
+  const walletAddress = userRes.rows[0]?.wallet_address;
+
+  if (!walletAddress) return { total_invoices: 0, completed_invoices: 0, overdue_invoices: 0, completion_rate: 0, overdue_rate: 0, avg_days_early: 0, payment_consistency_score: 0.5 };
+
   // Get seller's invoice payment data
   const sellerPayments = await client.query(
     `SELECT 
       COUNT(*) as total,
-      COUNT(CASE WHEN status IN ('completed', 'paid') THEN 1 END) as paid,
-      COUNT(CASE WHEN status = 'pending' AND due_date < NOW() THEN 1 END) as overdue,
-      AVG(CASE WHEN status IN ('completed', 'paid') 
-        THEN EXTRACT(EPOCH FROM (paid_at - due_date))/86400 
+      COUNT(CASE WHEN status IN ('RELEASED', 'SETTLED') THEN 1 END) as paid,
+      COUNT(CASE WHEN status NOT IN ('RELEASED', 'SETTLED', 'CANCELLED', 'FAILED') AND due_date < NOW() THEN 1 END) as overdue,
+      AVG(CASE WHEN status IN ('RELEASED', 'SETTLED') 
+        THEN EXTRACT(EPOCH FROM (updated_at - due_date))/86400 
         ELSE NULL END) as avg_days_early
      FROM invoices 
-     WHERE seller_id = $1`,
-    [userId]
+     WHERE seller_address = $1`,
+    [walletAddress]
   );
 
   const seller = sellerPayments.rows[0];
@@ -208,14 +211,14 @@ const analyzePaymentVelocity = async (client, userId) => {
   const buyerPayments = await client.query(
     `SELECT 
       COUNT(*) as total,
-      COUNT(CASE WHEN status IN ('completed', 'paid') THEN 1 END) as paid,
-      COUNT(CASE WHEN status = 'pending' AND due_date < NOW() THEN 1 END) as overdue,
-      AVG(CASE WHEN status IN ('completed', 'paid') 
-        THEN EXTRACT(EPOCH FROM (paid_at - due_date))/86400 
+      COUNT(CASE WHEN status IN ('RELEASED', 'SETTLED') THEN 1 END) as paid,
+      COUNT(CASE WHEN status NOT IN ('RELEASED', 'SETTLED', 'CANCELLED', 'FAILED') AND due_date < NOW() THEN 1 END) as overdue,
+      AVG(CASE WHEN status IN ('RELEASED', 'SETTLED') 
+        THEN EXTRACT(EPOCH FROM (updated_at - due_date))/86400 
         ELSE NULL END) as avg_days_early
      FROM invoices 
-     WHERE buyer_id = $1`,
-    [userId]
+     WHERE buyer_address = $1`,
+    [walletAddress]
   );
 
   const buyer = buyerPayments.rows[0];
@@ -235,10 +238,11 @@ const analyzePaymentVelocity = async (client, userId) => {
   };
 };
 
-/**
- * Analyze market alignment
- */
 const analyzeMarketAlignment = async (client, userId) => {
+  // Get user's wallet address
+  const userRes = await client.query('SELECT wallet_address FROM users WHERE id = $1', [userId]);
+  const walletAddress = userRes.rows[0]?.wallet_address;
+
   // Get market benchmarks (would be from external data in production)
   const marketBenchmarks = await getMarketBenchmarks();
 
@@ -249,8 +253,8 @@ const analyzeMarketAlignment = async (client, userId) => {
       COUNT(*) as invoice_count,
       COALESCE(SUM(CAST(amount AS NUMERIC)), 0) as total_volume
      FROM invoices 
-     WHERE seller_id = $1 AND status IN ('completed', 'paid')`,
-    [userId]
+     WHERE seller_address = $1 AND status IN ('RELEASED', 'SETTLED')`,
+    [walletAddress]
   );
 
   const user = userPerformance.rows[0];
@@ -268,24 +272,23 @@ const analyzeMarketAlignment = async (client, userId) => {
   };
 };
 
-/**
- * Analyze financial health indicators
- */
 const analyzeFinancialHealth = async (client, userId) => {
+  // Get user's wallet address
+  const userRes = await client.query('SELECT wallet_address FROM users WHERE id = $1', [userId]);
+  const walletAddress = userRes.rows[0]?.wallet_address;
+
   // Get revenue and outstanding amounts
   const financialData = await client.query(
     `SELECT 
-      -- As Seller (receivables)
-      COUNT(CASE WHEN seller_id = $1 AND status IN ('completed', 'paid') THEN 1 END) as completed_sales,
-      COALESCE(SUM(CASE WHEN seller_id = $1 AND status IN ('completed', 'paid') THEN CAST(amount AS NUMERIC) ELSE 0 END), 0) as total_revenue,
-      COUNT(CASE WHEN seller_id = $1 AND status = 'pending' THEN 1 END) as pending_receivables,
-      COALESCE(SUM(CASE WHEN seller_id = $1 AND status = 'pending' THEN CAST(amount AS NUMERIC) ELSE 0 END), 0) as outstanding_receivables,
+      COUNT(CASE WHEN seller_address = $1 AND status IN ('RELEASED', 'SETTLED') THEN 1 END) as completed_sales,
+      COALESCE(SUM(CASE WHEN seller_address = $1 AND status IN ('RELEASED', 'SETTLED') THEN CAST(amount AS NUMERIC) ELSE 0 END), 0) as total_revenue,
+      COUNT(CASE WHEN seller_address = $1 AND status IN ('CREATED', 'PAYMENT_PENDING', 'ESCROW_LOCKED') THEN 1 END) as pending_receivables,
+      COALESCE(SUM(CASE WHEN seller_address = $1 AND status IN ('CREATED', 'PAYMENT_PENDING', 'ESCROW_LOCKED') THEN CAST(amount AS NUMERIC) ELSE 0 END), 0) as outstanding_receivables,
       
-      -- As Buyer (payables)
-      COUNT(CASE WHEN buyer_id = $1 AND status = 'pending' THEN 1 END) as pending_payables,
-      COALESCE(SUM(CASE WHEN buyer_id = $1 AND status = 'pending' THEN CAST(amount AS NUMERIC) ELSE 0 END), 0) as outstanding_payables
+      COUNT(CASE WHEN buyer_address = $1 AND status IN ('CREATED', 'PAYMENT_PENDING', 'ESCROW_LOCKED') THEN 1 END) as pending_payables,
+      COALESCE(SUM(CASE WHEN buyer_address = $1 AND status IN ('CREATED', 'PAYMENT_PENDING', 'ESCROW_LOCKED') THEN CAST(amount AS NUMERIC) ELSE 0 END), 0) as outstanding_payables
      FROM invoices`,
-    [userId]
+    [walletAddress]
   );
 
   const data = financialData.rows[0];

@@ -7117,3 +7117,69 @@
 [2026-04-13 21:41:19:757] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-13 21:41:49:759] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-13 21:42:19:203] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-13 21:49:15:534] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-13 21:49:15:587] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-13 21:49:15:541] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-13 21:49:15:542] [info] [server]: Invoice Sync Worker started
+[2026-04-13 21:49:15:545] [info] [server]: Transaction Recovery Worker started
+[2026-04-13 21:49:15:594] [info] [server]: Compliance listeners started
+[2026-04-13 21:49:15:599] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-13 21:49:15:605] [info] [server]: 🚀 Server running on port 3000
+[2026-04-13 21:49:18:335] [info] [server]: Database connection test completed successfully
+[2026-04-13 21:49:19:118] [info] [server]: Tokenization listener started
+[2026-04-13 21:49:26:933] [info] [request]: [e7b287d5-37b6-4578-b247-d3d70c6b874c] GET /api/v1/credit-risk/me
+[2026-04-13 21:49:30:884] [info] [request]: [738860ce-4c9f-4140-a249-2ad9cf65aea9] GET /api/v1/credit-risk/me
+[2026-04-13 21:49:45:831] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:50:15:826] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:50:45:942] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:51:15:947] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:51:45:848] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:52:15:853] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:52:45:959] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:53:15:973] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:53:45:860] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:54:15:361] [error] [server]: Uncaught Exception: Cannot read properties of undefined (reading 'entries')
+[2026-04-13 21:55:41:247] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-13 21:55:41:271] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-13 21:55:41:257] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-13 21:55:41:258] [info] [server]: Invoice Sync Worker started
+[2026-04-13 21:55:41:260] [info] [server]: Transaction Recovery Worker started
+[2026-04-13 21:55:41:272] [info] [server]: Compliance listeners started
+[2026-04-13 21:55:41:285] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-13 21:55:41:291] [info] [server]: 🚀 Server running on port 3000
+[2026-04-13 21:55:43:811] [info] [server]: Database connection test completed successfully
+[2026-04-13 21:55:44:737] [info] [server]: Tokenization listener started
+[2026-04-13 21:55:54:534] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-13 21:55:54:556] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-13 21:55:54:540] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-13 21:55:54:541] [info] [server]: Invoice Sync Worker started
+[2026-04-13 21:55:54:542] [info] [server]: Transaction Recovery Worker started
+[2026-04-13 21:55:54:557] [info] [server]: Compliance listeners started
+[2026-04-13 21:55:54:559] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-13 21:55:54:565] [info] [server]: 🚀 Server running on port 3000
+[2026-04-13 21:55:57:263] [info] [server]: Database connection test completed successfully
+[2026-04-13 21:55:58:037] [info] [server]: Tokenization listener started
+[2026-04-13 21:56:17:925] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-13 21:56:17:943] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-13 21:56:17:931] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-13 21:56:17:931] [info] [server]: Invoice Sync Worker started
+[2026-04-13 21:56:17:932] [info] [server]: Transaction Recovery Worker started
+[2026-04-13 21:56:17:944] [info] [server]: Compliance listeners started
+[2026-04-13 21:56:17:946] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-13 21:56:17:951] [info] [server]: 🚀 Server running on port 3000
+[2026-04-13 21:56:20:750] [info] [server]: Database connection test completed successfully
+[2026-04-13 21:56:24:925] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-13 21:56:24:941] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-13 21:56:24:930] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-13 21:56:24:931] [info] [server]: Invoice Sync Worker started
+[2026-04-13 21:56:24:933] [info] [server]: Transaction Recovery Worker started
+[2026-04-13 21:56:24:942] [info] [server]: Compliance listeners started
+[2026-04-13 21:56:24:945] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-13 21:56:24:950] [info] [server]: 🚀 Server running on port 3000
+[2026-04-13 21:56:27:689] [info] [server]: Database connection test completed successfully
+[2026-04-13 21:56:28:489] [info] [server]: Tokenization listener started
+[2026-04-13 21:56:44:294] [info] [request]: [9f188f71-902a-4ec8-a2e0-8156990f4a86] GET /api/v1/credit-risk/me
+[2026-04-13 21:56:53:318] [info] [request]: [dbd58203-abf9-4cc2-bd82-e942541051e6] GET /api/v1/credit-risk/me
+[2026-04-13 21:56:55:311] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:57:25:315] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 21:57:55:318] [info] [recoveryService]: Processing 0 operations from recovery queue

@@ -5,16 +5,12 @@ const { pool } = require('../config/database');
  * Represents AI/ML-based credit risk assessments
  */
 class CreditRiskProfile {
-  /**
-   * Find risk profile by user ID
-   */
   static async findByUserId(userId) {
     try {
       const result = await pool.query(
         `SELECT 
           crp.*,
-          cs.score as traditional_score,
-          cs.grade as traditional_grade
+          cs.score as traditional_score
          FROM credit_risk_profiles crp
          LEFT JOIN credit_scores cs ON crp.credit_score_id = cs.id
          WHERE crp.user_id = $1`,
