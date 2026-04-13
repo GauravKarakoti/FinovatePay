@@ -453,16 +453,14 @@ exports.settleInvoiceEarly = async (req, res) => {
     const discountAmount = (amount * apr * daysRemaining) / 365;
     const offerAmount = amount - discountAmount;
 
-    /*----------------------------------------------------------
-      4. Update Invoice Status
-    ----------------------------------------------------------*/
     const updateResult = await client.query(
       `UPDATE invoices 
-       SET escrow_status = 'settled', 
-           settlement_tx_hash = COALESCE($1, settlement_tx_hash),
-           settled_at = NOW()
-       WHERE invoice_id = $2 
-       RETURNING *`,
+      SET escrow_status = 'settled', 
+          status = 'completed',
+          settlement_tx_hash = COALESCE($1, settlement_tx_hash),
+          settled_at = NOW()
+      WHERE invoice_id = $2 
+      RETURNING *`,
       [tx_hash || null, invoiceId]
     );
 

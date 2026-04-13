@@ -158,15 +158,14 @@ const analyzeBehavioralPatterns = async (client, userId) => {
   const user = userResult.rows[0];
   const accountAge = (Date.now() - new Date(user.created_at).getTime()) / (1000 * 60 * 60 * 24 * 30); // months
 
-  // Get activity metrics from recent invoices/transactions
   const activityResult = await client.query(
     `SELECT 
       COUNT(*) as total_invoices,
       COUNT(CASE WHEN created_at > NOW() - INTERVAL '30 days' THEN 1 END) as recent_invoices,
       COALESCE(SUM(CAST(amount AS NUMERIC)), 0) as total_volume
-     FROM invoices 
-     WHERE seller_id = $1 OR buyer_id = $1`,
-    [userId]
+    FROM invoices 
+    WHERE seller_address = $1 OR buyer_address = $1`,
+    [user.wallet_address] // FIX: Use wallet address instead of userId
   );
 
   const activity = activityResult.rows[0];
