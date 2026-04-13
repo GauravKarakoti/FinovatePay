@@ -2,8 +2,6 @@ const { pool } = require('../config/database');
 const { errorResponse } = require('../utils/errorResponse');
 const logger = require('../utils/logger')('invoiceController');
 
-// Constants for validation
-const BATCH_PROCESSING_LIMIT = 100; // Max items per batch
 const MIN_AMOUNT = 0.01;
 const MAX_AMOUNT = 1000000000; // 1 billion
 const REQUIRED_FIELDS = ['quotation_id', 'invoice_id', 'contract_address'];
@@ -19,12 +17,13 @@ exports.createInvoice = async (req, res) => {
 
         const {
             quotation_id,
-            // On-chain data passed from frontend
             invoice_id,
             invoice_hash,
             contract_address,
             token_address,
-            due_date
+            due_date,
+            discount_rate,     // <-- ADD THIS
+            discount_deadline  // <-- ADD THIS
         } = req.body;
 
         logger.info('Creating invoice', { quotation_id, invoice_id });
@@ -149,16 +148,14 @@ exports.createInvoice = async (req, res) => {
             await client.query(updateLotQuery, [quotation.quantity, quotation.lot_id]);
         }
 
-        // 7. Insert Invoice
-        // Trusting quotation data for financial fields
         const insertInvoiceQuery = `
             INSERT INTO invoices (
                 invoice_id, invoice_hash, seller_address, buyer_address,
                 amount, due_date, description, items, currency,
                 contract_address, token_address, lot_id, quotation_id, escrow_status,
-                financing_status
+                financing_status, discount_rate, discount_deadline
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none')
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'created', 'none', $14, $15)
             RETURNING *
         `;
 
@@ -205,7 +202,9 @@ exports.createInvoice = async (req, res) => {
             contract_address,
             token_address,
             quotation.lot_id,
-            quotation_id
+            quotation_id,
+            discount_rate || null, // <-- ADD THIS
+            discount_deadline ? new Date(discount_deadline * 1000).toISOString() : null
         ];
 
         const result = await client.query(insertInvoiceQuery, values);
@@ -258,72 +257,41 @@ exports.createInvoice = async (req, res) => {
     }
 };
 
-/*//////////////////////////////////////////////////////////////
-                GET EARLY PAYMENT OFFER
-//////////////////////////////////////////////////////////////*/
 exports.getEarlyPaymentOffer = async (req, res) => {
   try {
     const { invoiceId } = req.params;
 
-    // Input validation
     if (!invoiceId || typeof invoiceId !== 'string') {
-      logger.warn('getEarlyPaymentOffer called with invalid invoiceId', { invoiceId });
-      return errorResponse(res, 'Invalid invoiceId: Must be a non-empty string', 400);
+      return errorResponse(res, 'Invalid invoiceId', 400);
     }
 
-    logger.info('Fetching early payment offer', { invoiceId });
-
+    // FIX 1: Add discount_rate and discount_deadline to the SELECT query
     const result = await pool.query(
-      'SELECT amount, annual_apr, due_date, escrow_status FROM invoices WHERE invoice_id = $1',
+      'SELECT amount, annual_apr, due_date, escrow_status, discount_rate, discount_deadline FROM invoices WHERE invoice_id = $1',
       [invoiceId]
     );
 
     if (!result.rows || result.rows.length === 0) {
-      logger.warn('Invoice not found', { invoiceId });
       return errorResponse(res, `Invoice with ID ${invoiceId} not found`, 404);
     }
 
     const invoice = result.rows[0];
-
-    // Validate required fields
-    if (invoice.amount === null || invoice.amount === undefined) {
-      logger.error('Invoice missing amount field', { invoiceId });
-      return errorResponse(res, 'Invalid invoice state: missing amount', 500);
-    }
-
-    if (!invoice.due_date) {
-      logger.error('Invoice missing due_date field', { invoiceId });
-      return errorResponse(res, 'Invalid invoice state: missing due_date', 500);
-    }
-
-    // Check if invoice is already settled
-    if (invoice.escrow_status === 'settled' || invoice.escrow_status === 'paid') {
-      logger.info('Invoice already settled', { invoiceId, status: invoice.escrow_status });
-      return res.json({
-        eligible: false,
-        message: `Invoice is already ${invoice.escrow_status}`,
-        invoiceId
-      });
-    }
-
-    const amount = Number(invoice.amount);
-    if (isNaN(amount) || amount <= 0) {
-      logger.error('Invalid invoice amount', { invoiceId, amount });
-      return errorResponse(res, 'Invalid invoice amount', 500);
-    }
-
-    const apr = Number(invoice.annual_apr || 18.0) / 100;
-    if (apr < 0) {
-      logger.error('Invalid APR value', { invoiceId, apr: invoice.annual_apr });
-      return errorResponse(res, 'Invalid APR value in invoice', 500);
-    }
-
     const today = new Date();
     const dueDate = new Date(invoice.due_date);
 
-    if (isNaN(dueDate.getTime())) {
-      logger.error('Invalid due_date format', { invoiceId, due_date: invoice.due_date });
-      return errorResponse(res, 'Invalid invoice due date format', 500);
+    // FIX 2: Use the custom seller deadline if it exists
+    let expirationDate = dueDate;
+    if (invoice.discount_deadline) {
+        expirationDate = new Date(invoice.discount_deadline);
+    }
+
+    // Expiration check against the custom timer
+    if (expirationDate.getTime() < today.getTime()) {
+      return res.json({
+        eligible: false,
+        message: 'Discount offer has expired',
+        invoiceId
+      });
     }
 
     const daysRemaining = Math.ceil(
@@ -331,34 +299,45 @@ exports.getEarlyPaymentOffer = async (req, res) => {
     );
 
     if (daysRemaining <= 0) {
-      logger.info('Invoice is due or overdue', { invoiceId, daysRemaining });
       return res.json({
         eligible: false,
-        message: `Invoice is ${daysRemaining === 0 ? 'due today' : 'overdue by ' + Math.abs(daysRemaining) + ' days'}`,
-        invoiceId,
-        daysRemaining
+        message: `Invoice is ${daysRemaining === 0 ? 'due today' : 'overdue'}`,
+        invoiceId
       });
     }
 
-    const discountAmount = (amount * apr * daysRemaining) / 365;
+    const amount = Number(invoice.amount);
+    const apr = Number(invoice.annual_apr || 18.0) / 100;
+
+    // FIX 3: Calculate using custom BPS rate if set, otherwise fallback to APR calculation
+    let discountAmount = 0;
+    let finalApr = apr * 100;
+
+    if (invoice.discount_rate) {
+        const customRateDecimal = Number(invoice.discount_rate) / 10000;
+        discountAmount = amount * customRateDecimal;
+        finalApr = customRateDecimal * 100;
+    } else {
+        discountAmount = (amount * apr * daysRemaining) / 365;
+    }
+
     const offerAmount = amount - discountAmount;
 
-    logger.info('Early payment offer calculated', { invoiceId, offerAmount, discountAmount, daysRemaining });
-
+    // FIX 4: Ensure keys match what EarlyPaymentCard.jsx expects (finalAmount, daysEarly)
     return res.json({
       eligible: true,
       invoiceId,
       originalAmount: amount.toFixed(2),
       discountAmount: discountAmount.toFixed(2),
-      offerAmount: offerAmount.toFixed(2),
-      daysRemaining,
-      apr: (apr * 100).toFixed(2),
-      offerExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      finalAmount: offerAmount.toFixed(2), 
+      daysEarly: daysRemaining,            
+      apr: finalApr.toFixed(2),
+      offerExpiresAt: expirationDate.toISOString() 
     });
 
   } catch (error) {
     logger.error('Error calculating early payment offer', { error: error.message, invoiceId: req.params?.invoiceId });
-    return errorResponse(res, `Failed to calculate early payment offer: ${error.message || 'Unknown error'}`, 500);
+    return errorResponse(res, `Calculation failed: ${error.message}`, 500);
   }
 };
 

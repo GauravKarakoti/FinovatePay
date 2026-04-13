@@ -257,7 +257,6 @@ api.interceptors.response.use(
 // --- Fixed Functions (Now using 'api' instance) ---
 
 export const tokenizeInvoice = (invoiceId, faceValue, maturityDate) => {
-  // Removed raw axios and manual headers
   return api.post('/financing/tokenize', { invoiceId, faceValue, maturityDate });
 };
 
@@ -305,16 +304,12 @@ export const register = (userData) => {
 
 export const logout = async () => {
   try {
-    // Call logout endpoint to clear server-side sessions/cookies
     await api.post('/auth/logout');
   } catch (error) {
-    // Continue with local cleanup even if server logout fails
     console.error('Server logout failed:', error);
   } finally {
-    // Always clear ALL authentication data from localStorage
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    
     console.log('[AUTH] User logged out - all tokens cleared from localStorage');
   }
 };
@@ -431,55 +426,43 @@ export const raiseDispute = (invoiceId, reason) => {
 };
 
 // --- Multi-Signature Escrow API ---
-
-// Add multi-signature approval for an escrow
 export const approveMultiSig = (invoiceId) => {
   return api.post(`/escrow/${invoiceId}/approve`);
 };
 
-// Get multi-signature approval status for an escrow
 export const getMultiSigApprovals = (invoiceId) => {
   return api.get(`/escrow/${invoiceId}/approvals`);
 };
 
-// Get full escrow status including multi-sig details
 export const getEscrowStatus = (invoiceId) => {
   return api.get(`/escrow/${invoiceId}/status`);
 };
 
-// Create a multi-party escrow for an invoice
 export const createMultiPartyEscrow = (invoiceId, durationSeconds) => {
   return api.post('/escrow/multi-party', { invoiceId, durationSeconds });
 };
 
 // --- High-Value Transaction Multi-Sig API ---
-
-// Check if a transaction requires multi-sig
 export const checkHighValueRequired = (invoiceId) => {
   return api.get(`/multi-sig/check-require/${invoiceId}`);
 };
 
-// Get high-value transaction status
 export const getHighValueStatus = (invoiceId) => {
   return api.get(`/multi-sig/status/${invoiceId}`);
 };
 
-// Add approval for high-value transaction
 export const approveHighValue = (invoiceId) => {
   return api.post(`/multi-sig/approve/${invoiceId}`);
 };
 
-// Get all high-value transactions
 export const getHighValueTransactions = (status) => {
   return api.get('/multi-sig/transactions', { params: { status } });
 };
 
-// Get multi-sig configuration
 export const getMultiSigConfig = () => {
   return api.get('/multi-sig/config');
 };
 
-// Update multi-sig configuration (admin)
 export const updateMultiSigConfig = (key, value) => {
   return api.put('/multi-sig/config', { key, value });
 };
@@ -518,13 +501,25 @@ export const updateUserRole = (userId, role) => {
   return api.put(`/admin/users/${userId}/role`, { role });
 };
 
-export const updateInvoiceStatus = (invoiceId, status, txHash, disputeReason = '') => {
-  return api.post(`/invoices/${invoiceId}/status`, { 
-    status, 
-    tx_hash: txHash, 
-    dispute_reason: disputeReason 
-  });
+export const updateInvoiceStatus = (invoiceId, status, txHash, disputeReason) => {
+  // Construct the payload with only the required status first
+  const payload = { status };
+
+  // Only add tx_hash if it's provided and not empty
+  if (txHash) {
+    payload.tx_hash = txHash;
+  }
+
+  // Only add dispute_reason if it's provided and has content
+  // This prevents the backend length validator from failing on an empty string
+  if (disputeReason && disputeReason.trim().length > 0) {
+    payload.dispute_reason = disputeReason;
+  }
+
+  return api.post(`/invoices/${invoiceId}/status`, payload);
 };
+
+// ======================================
 
 export const resolveDispute = async (invoiceId, sellerWins) => {
   const response = await api.post('/admin/resolve-dispute', { invoiceId, sellerWins });
@@ -549,115 +544,91 @@ export const updateFraudAlertStatus = (alertId, status, resolutionNote) => {
 };
 
 // --- Streaming Payments API ---
-
-// Create a new subscription stream (seller)
 export const createStream = (streamData) => {
   return api.post('/streaming', streamData);
 };
 
-// Get all streams for current user
 export const getMyStreams = () => {
   return api.get('/streaming');
 };
 
-// Get streams where user is seller
 export const getSellerStreams = () => {
   return api.get('/streaming/seller');
 };
 
-// Get streams where user is buyer
 export const getBuyerStreams = () => {
   return api.get('/streaming/buyer');
 };
 
-// Get stream details
 export const getStream = (streamId) => {
   return api.get(`/streaming/${streamId}`);
 };
 
-// Approve and fund a stream (buyer)
 export const approveStream = (streamId, amount) => {
   return api.post(`/streaming/${streamId}/approve`, { amount });
 };
 
-// Release payment for completed interval
 export const releasePayment = (streamId) => {
   return api.post(`/streaming/${streamId}/release`);
 };
 
-// Pause a stream (buyer)
 export const pauseStream = (streamId) => {
   return api.post(`/streaming/${streamId}/pause`);
 };
 
-// Resume a paused stream (buyer)
 export const resumeStream = (streamId) => {
   return api.post(`/streaming/${streamId}/resume`);
 };
 
-// Cancel a stream (seller or buyer)
 export const cancelStream = (streamId) => {
   return api.post(`/streaming/${streamId}/cancel`);
 };
 
 // --- Auction API ---
-
-// Create a new auction
 export const createAuction = (auctionData) => {
   return api.post('/auctions', auctionData);
 };
 
-// Get all active auctions
 export const getAuctions = (params) => {
   return api.get('/auctions', { params });
 };
 
-// Get auctions for current seller
 export const getSellerAuctions = () => {
   return api.get('/auctions/seller');
 };
 
-// Get auctions the user has bid on
 export const getBidderAuctions = () => {
   return api.get('/auctions/bidder');
 };
 
-// Get auction statistics
 export const getAuctionStats = () => {
   return api.get('/auctions/stats');
 };
 
-// Get auction details
 export const getAuction = (auctionId) => {
   return api.get(`/auctions/${auctionId}`);
 };
 
-// Get bids for an auction
 export const getAuctionBids = (auctionId) => {
   return api.get(`/auctions/${auctionId}/bids`);
 };
 
-// Start an auction
 export const startAuction = (auctionId) => {
   return api.post(`/auctions/${auctionId}/start`);
 };
 
-// Place a bid on an auction
 export const placeBid = (auctionId, bidData) => {
   return api.post(`/auctions/${auctionId}/bid`, bidData);
 };
 
-// End an auction
 export const endAuction = (auctionId) => {
   return api.post(`/auctions/${auctionId}/end`);
 };
 
-// Settle an auction
 export const settleAuction = (auctionId) => {
   return api.post(`/auctions/${auctionId}/settle`);
 };
 
-// Cancel an auction
 export const cancelAuction = (auctionId) => {
   return api.post(`/auctions/${auctionId}/cancel`);
 };
@@ -679,109 +650,86 @@ export const getInvoiceRisk = (invoiceId) => {
   return api.get(`/analytics/risk/${invoiceId}`);
 };
 
-// Alias for getInvoiceRisk used by AnalyticsDashboard
 export const getRiskScore = getInvoiceRisk;
 
 // --- Insurance API ---
-
-// Get insurance configuration
 export const getInsuranceConfig = () => {
   return api.get('/insurance/config');
 };
 
-// Calculate premium for given coverage and duration
 export const calculateInsurancePremium = (coverageAmount, durationSeconds) => {
   return api.get('/insurance/calculate-premium', { params: { coverageAmount, durationSeconds } });
 };
 
-// Purchase insurance for an escrow
 export const purchaseInsurance = (data) => {
   return api.post('/insurance/purchase', data);
 };
 
-// Get user's insurance policies
 export const getInsurancePolicies = () => {
   return api.get('/insurance/policies');
 };
 
-// Get specific policy details
 export const getInsurancePolicy = (policyId) => {
   return api.get(`/insurance/policy/${policyId}`);
 };
 
-// Get insurance policies for an invoice
 export const getInvoiceInsurance = (invoiceId) => {
   return api.get(`/insurance/invoice/${invoiceId}`);
 };
 
-// File a claim on an insurance policy
 export const fileInsuranceClaim = (data) => {
   return api.post('/insurance/claim', data);
 };
 
-// Approve a claim (admin only)
 export const approveInsuranceClaim = (data) => {
   return api.post('/insurance/approve-claim', data);
 };
 
-// Get insurance statistics (admin only)
 export const getInsuranceStats = () => {
   return api.get('/insurance/stats');
 };
 
-// Get all pending claims (admin only)
 export const getPendingClaims = () => {
   return api.get('/insurance/claims');
 };
 
 // --- Governance API ---
-
-// Get all proposals
 export const getProposals = (params) => {
   return api.get('/governance/proposals', { params });
 };
 
-// Get a specific proposal
 export const getProposal = (proposalId) => {
   return api.get(`/governance/proposals/${proposalId}`);
 };
 
-// Create a new proposal
 export const createProposal = (proposalData) => {
   return api.post('/governance/proposals', proposalData);
 };
 
-// Cast a vote on a proposal
 export const castVote = (voteData) => {
   return api.post('/governance/vote', voteData);
 };
 
-// Get governance parameters
 export const getGovernanceParameters = () => {
   return api.get('/governance/parameters');
 };
 
-// Update a governance parameter (admin)
 export const updateGovernanceParameter = (name, value) => {
   return api.put(`/governance/parameters/${name}`, { value });
 };
 
-// Get voting power for a wallet
 export const getVotingPower = (wallet) => {
   return api.get(`/governance/voting-power/${wallet}`);
 };
 
-// Get delegation info
 export const getDelegation = (wallet) => {
   return api.get(`/governance/delegation/${wallet}`);
 };
 
-// Get governance statistics
 export const getGovernanceStats = () => {
   return api.get('/governance/stats');
 };
 
-// Execute a parameter change
 export const executeParameterChange = (parameterName) => {
   return api.post('/governance/execute', { parameterName });
 };
@@ -821,65 +769,27 @@ export const claimStakingRewards = (stakeId) => {
 };
 
 // --- Multi-Party Conditional Escrow (milestone-based) ---
-
-/**
- * Create a new multi-party conditional escrow with milestones.
- * @param {object} payload - { invoiceId, title, totalAmount, currency, durationSeconds, participants, milestones }
- */
 export const createMultiPartyConditionalEscrow = (payload) =>
   api.post('/escrow/milestones', payload);
 
-/**
- * Publish a draft escrow to the blockchain (status: draft → active).
- * @param {string} escrowId UUID of multi_party_escrows record
- * @param {object} [opts] - { tokenAddress, durationSeconds }
- */
 export const activateMultiPartyEscrow = (escrowId, opts = {}) =>
   api.post(`/escrow/milestones/${escrowId}/activate`, opts);
 
-/**
- * Add a participant to an existing multi-party escrow.
- * @param {string} escrowId
- * @param {{ walletAddress: string, role: string, userId?: string, onChain?: boolean }} participant
- */
 export const addEscrowParticipant = (escrowId, participant) =>
   api.post(`/escrow/milestones/${escrowId}/participants`, participant);
 
-/**
- * Add a milestone to an existing multi-party escrow.
- * @param {string} escrowId
- * @param {{ title: string, description?: string, amount: number, requiredApprovals?: number, onChain?: boolean }} milestone
- */
 export const addEscrowMilestone = (escrowId, milestone) =>
   api.post(`/escrow/milestones/${escrowId}/milestones`, milestone);
 
-/**
- * Approve a specific milestone.
- * @param {string} escrowId
- * @param {number|string} milestoneId  Primary key of escrow_milestones
- * @param {{ txHash?: string, blockNumber?: number }} [opts]
- */
 export const approveMilestoneOnEscrow = (escrowId, milestoneId, opts = {}) =>
   api.post(`/escrow/milestones/${escrowId}/milestones/${milestoneId}/approve`, opts);
 
-/**
- * Fetch full escrow details (header + participants + milestones with approvals).
- * @param {string} escrowId
- */
 export const getMultiPartyEscrow = (escrowId) =>
   api.get(`/escrow/milestones/${escrowId}`);
 
-/**
- * Fetch only the milestones and participants for an escrow.
- * @param {string} escrowId
- */
 export const getEscrowMilestones = (escrowId) =>
   api.get(`/escrow/milestones/${escrowId}/milestones`);
 
-/**
- * List all multi-party escrows created by the current user.
- * @param {string} [status] Optional status filter
- */
 export const listMultiPartyEscrows = (status) =>
   api.get('/escrow/milestones', status ? { params: { status } } : undefined);
 

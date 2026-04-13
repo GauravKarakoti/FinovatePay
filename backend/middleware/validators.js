@@ -463,7 +463,7 @@ const validateInvoiceStatus = [
   body('dispute_reason')
     .optional()
     .trim()
-    .isLength({ min: 10, max: 1000 }).withMessage('Dispute reason must be 10-1000 characters')
+    .isLength({ min: 1, max: 1000 }).withMessage('Dispute reason must be 10-1000 characters')
     .escape(),
   
   handleValidationErrors
