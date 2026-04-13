@@ -14,7 +14,7 @@ import {
   getQuotations,
   sellerApproveQuotation,
   rejectQuotation,
-  raiseDispute,
+  getSellerLots,
   createQuotation,
   createProduceLot
 } from '../utils/api';
@@ -255,6 +255,8 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const [invoiceQuotation, setInvoiceQuotation] = useState(null); 
   const [tokenizingInvoice, setTokenizingInvoice] = useState(null); 
   const { setStats: setGlobalStats } = useStatsActions();
+  const [produceLots, setProduceLots] = useState([]);
+  const [isProduceModalOpen, setIsProduceModalOpen] = useState(false);
 
   const loadKYCStatus = useCallback(async () => {
     try {
@@ -268,6 +270,17 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       });
     } catch (err) {
       console.error('KYC load failed:', err);
+    }
+  }, []);
+
+  const loadProduceLots = useCallback(async () => {
+    try {
+      const res = await getSellerLots();
+      // Handle different response structures from api.js
+      const fetchedLots = res.data?.data || res.data?.lots || res.data || [];
+      setProduceLots(Array.isArray(fetchedLots) ? fetchedLots : []);
+    } catch (err) {
+      console.error('Failed to load produce lots:', err);
     }
   }, []);
 
@@ -305,9 +318,14 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const loadInitialData = useCallback(async () => {
     setIsLoading(true);
     try {
-      await Promise.all([loadInvoices(), loadKYCStatus(), loadQuotations()]);
+      await Promise.all([
+        loadInvoices(), 
+        loadKYCStatus(), 
+        loadQuotations(),
+        loadProduceLots() // <-- ADDED
+      ]);
     } catch (apiError) {
-      console.error('Failed to load database data:', apiError);
+      console.error('Failed to load dashboard data:', apiError);
       toast.error('Failed to load dashboard data');
     }
 
@@ -321,7 +339,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadInvoices, loadKYCStatus, loadQuotations]);
+  }, [loadInvoices, loadKYCStatus, loadQuotations, loadProduceLots]);
 
   useEffect(() => {
     loadInitialData();
@@ -668,11 +686,60 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
   const ProduceTab = () => (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-gray-900">Manage Produce</h2>
-      <CreateProduceLot 
-        onSubmit={handleRegisterProduce} 
-        isSubmitting={isSubmitting} 
-      />
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Manage Produce</h2>
+          <p className="text-sm text-gray-500">Track your registered produce lots and their RWA status</p>
+        </div>
+        <ActionButton 
+          variant="primary"
+          onClick={() => setIsProduceModalOpen(true)}
+        >
+          ➕ Register New Lot
+        </ActionButton>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {produceLots.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Lot ID</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Quantity</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Harvest Date</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {produceLots.map((lot) => (
+                  <tr key={lot.lotId} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 font-mono text-sm text-blue-600">#{lot.lotId}</td>
+                    <td className="px-6 py-4 font-medium">{lot.produceType}</td>
+                    <td className="px-6 py-4">{lot.quantity} units</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{new Date(lot.harvestDate).toLocaleDateString()}</td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">Active</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <button 
+                        onClick={() => setSelectedQRCode({ invoice_id: lot.lotId, description: lot.produceType })}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        View QR
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState message="No produce lots registered yet" icon="🌱" />
+        )}
+      </div>
     </div>
   );
 
@@ -709,22 +776,17 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
 
       if (!lotId) throw new Error("Transaction succeeded, but Lot ID was not found in logs.");
 
-      // Sync with backend
-      try {
-        await createProduceLot({
-          ...produceData,
-          lotId: lotId,
-          txHash: tx.hash
-        });
-        toast.success('Produce RWA created and synced!', { id: toastId });
-      } catch (apiError) {
-        // Handle the 409 specifically inside the sync step
-        if (apiError.response?.status === 409) {
-          toast.info('Blockchain lot created, but it was already synced to the database.', { id: toastId });
-          return;
-        }
-        throw apiError; // Re-throw other API errors to the main catch block
-      }
+      await createProduceLot({
+        ...produceData,
+        lotId: lotId,
+        txHash: tx.hash
+      });
+
+      toast.success('Produce RWA created and synced!', { id: toastId });
+      
+      // REFRESH & CLOSE MODAL
+      await loadProduceLots(); 
+      setIsProduceModalOpen(false);
 
     } catch (error) {
       console.error('Registration failed:', error);
@@ -747,7 +809,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     } finally {
       setIsSubmitting(false);
     }
-  }, []);
+  }, [loadProduceLots]);
 
   const PaymentsTab = () => (
     <div className="space-y-6">
@@ -872,6 +934,18 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         <main className="animate-fadeIn">
           {renderContent()}
         </main>
+
+        <Modal
+          isOpen={isProduceModalOpen}
+          onClose={() => setIsProduceModalOpen(false)}
+          title="Register Produce Lot"
+        >
+          <CreateProduceLot 
+            onSubmit={handleRegisterProduce} 
+            isSubmitting={isSubmitting} 
+            onCancel={() => setIsProduceModalOpen(false)}
+          />
+        </Modal>
       </div>
 
       {/* Modals */}
