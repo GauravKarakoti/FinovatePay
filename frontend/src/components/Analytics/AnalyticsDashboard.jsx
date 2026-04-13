@@ -215,7 +215,56 @@ const AnalyticsDashboard = ({ userRole }) => {
               </>
             )}
 
-            {/* Existing Role Cards (Seller, Investor, Buyer) ... */}
+            {userRole === 'seller' && overview && (
+              <>
+                {overview.invoices && (
+                  <>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <p className="text-sm text-gray-500">Total Invoices</p>
+                      <p className="text-2xl font-bold text-gray-800">{overview.invoices.total}</p>
+                    </div>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <p className="text-sm text-gray-500">Total Invoice Volume</p>
+                      <p className="text-2xl font-bold text-gray-800">{formatCurrency(overview.invoices.totalAmount)}</p>
+                    </div>
+                  </>
+                )}
+                {overview.escrow && (
+                  <>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <p className="text-sm text-gray-500">Active Escrows</p>
+                      <p className="text-2xl font-bold text-blue-600">{overview.escrow.active}</p>
+                    </div>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <p className="text-sm text-gray-500">Total Escrowed</p>
+                      <p className="text-2xl font-bold text-gray-800">{formatCurrency(overview.escrow.totalEscrowed)}</p>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Investor Summary Cards */}
+            {userRole === 'investor' && overview?.marketplace && (
+              <>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-500">Marketplace Invoices</p>
+                  <p className="text-2xl font-bold text-gray-800">{overview.marketplace.totalListed}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-500">Total Market Value</p>
+                  <p className="text-2xl font-bold text-gray-800">{formatCurrency(overview.marketplace.totalValue)}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-500">Available to Finance</p>
+                  <p className="text-2xl font-bold text-blue-600">{overview.marketplace.available}</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-500">Already Financed</p>
+                  <p className="text-2xl font-bold text-green-600">{overview.marketplace.financed}</p>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Quick Charts - Enable for Admin as well */}

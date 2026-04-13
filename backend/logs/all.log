@@ -7183,3 +7183,38 @@
 [2026-04-13 21:56:55:311] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-13 21:57:25:315] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-13 21:57:55:318] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 22:01:46:338] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-13 22:01:46:354] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-13 22:01:46:343] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-13 22:01:46:344] [info] [server]: Invoice Sync Worker started
+[2026-04-13 22:01:46:345] [info] [server]: Transaction Recovery Worker started
+[2026-04-13 22:01:46:355] [info] [server]: Compliance listeners started
+[2026-04-13 22:01:46:357] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-13 22:01:46:361] [info] [server]: 🚀 Server running on port 3000
+[2026-04-13 22:01:48:920] [info] [server]: Database connection test completed successfully
+[2026-04-13 22:01:49:695] [info] [server]: Tokenization listener started
+[2026-04-13 22:01:52:920] [info] [request]: [547615d3-6058-446d-9064-a19f94f05f81] PUT /api/v1/auth/role
+[2026-04-13 22:01:54:377] [info] [request]: [6e8ebc32-54b4-4e5d-b94c-a6b76fda8c9c] GET /api/v1/kyc/status
+[2026-04-13 22:01:55:029] [info] [request]: [04b0cecb-24d4-43ee-8eab-d34f79d80641] GET /api/v1/kyc/status
+[2026-04-13 22:02:04:032] [info] [request]: [1ad538d7-fcd2-422d-95d9-6225cfc90c85] PUT /api/v1/auth/role
+[2026-04-13 22:02:04:975] [info] [request]: [3c3db3ca-4490-426e-8b21-57d6c988d4fc] GET /api/v1/invoices/seller
+[2026-04-13 22:02:04:984] [info] [request]: [4f70cd7f-3f1b-4711-80c4-ea8b069b4968] GET /api/v1/kyc/status
+[2026-04-13 22:02:04:992] [info] [request]: [96b5b4ef-e75e-469c-8278-eb3da531f8fd] GET /api/v1/produce/lots/seller
+[2026-04-13 22:02:05:000] [info] [request]: [dfa32ef7-c02d-4d45-9072-ce0e93d59941] GET /api/v1/quotations
+[2026-04-13 22:02:05:576] [info] [request]: [b6afa24f-b2a6-44f5-ae43-43b515ea6a90] GET /api/v1/invoices/seller
+[2026-04-13 22:02:05:906] [info] [request]: [d0a4a690-124d-4c6d-8326-34fc345d5bbc] GET /api/v1/kyc/status
+[2026-04-13 22:02:05:911] [info] [request]: [e824bf5b-b888-4169-a61c-1786f5d56f74] GET /api/v1/produce/lots/seller
+[2026-04-13 22:02:08:127] [info] [request]: [bc78ca93-d3cd-4e84-a79d-62889aab9c85] GET /api/v1/quotations
+[2026-04-13 22:02:08:147] [info] [request]: [6b9b8ee3-a403-4fd5-a56c-5c14d0174480] GET /api/v1/analytics/overview
+[2026-04-13 22:02:09:590] [info] [request]: [c7ca2695-8ee1-484b-ada5-c20126d8259e] GET /api/v1/analytics/overview
+[2026-04-13 22:02:09:601] [info] [request]: [9847015f-ad97-4c9b-89d5-0f32ae7f5106] GET /api/v1/analytics/payments
+[2026-04-13 22:02:11:141] [info] [request]: [f3c0e366-0c06-4ebf-b098-1eaa8aa0b14b] GET /api/v1/analytics/payments
+[2026-04-13 22:02:11:145] [info] [request]: [7e87c987-4d82-4223-b2cf-713fb83515c7] GET /api/v1/analytics/financing
+[2026-04-13 22:02:12:670] [info] [request]: [d00388d5-161d-46b3-80c8-05e6d9ff5099] GET /api/v1/analytics/financing
+[2026-04-13 22:02:16:618] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 22:02:20:896] [info] [request]: [e7948534-f4f5-41b2-b104-6d9c2bf0d92f] GET /api/v1/credit-risk/me
+[2026-04-13 22:02:21:921] [info] [request]: [7b64c23e-cb64-41f2-931a-a7fc2e7f59ff] GET /api/v1/credit-risk/me
+[2026-04-13 22:02:24:089] [info] [request]: [8439bc25-e9c2-4fb1-ab8a-24f5e9b7b437] GET /api/v1/streaming
+[2026-04-13 22:02:25:054] [info] [request]: [aa794187-0ff2-472a-aef0-2cacfaef3319] GET /api/v1/streaming
+[2026-04-13 22:02:46:656] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-13 22:03:16:630] [info] [recoveryService]: Processing 0 operations from recovery queue
