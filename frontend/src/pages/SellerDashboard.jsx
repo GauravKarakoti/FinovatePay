@@ -14,7 +14,8 @@ import {
   getQuotations,
   sellerApproveQuotation,
   rejectQuotation,
-  raiseDispute
+  raiseDispute,
+  createQuotation
 } from '../utils/api';
 import {
   connectWallet, 
@@ -43,6 +44,7 @@ import StreamingTab from '../components/Streaming/StreamingTab';
 import FiatOnRamp from '../components/FiatOnRamp';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import AuctionList from '../components/Auction/AuctionList';
+import CreateQuotation from '../components/Quotation/CreateQuotation';
 
 // ------------------ HELPER COMPONENTS ------------------
 
@@ -242,8 +244,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     riskLevel: 'unknown',
     details: 'Pending'
   });
-  
-  // UI State
+  const [showCreateQuote, setShowCreateQuote] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showKYCVerification, setShowKYCVerification] = useState(false);
@@ -607,19 +608,43 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const QuotationsTab = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Quotations</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Quotations</h2>
+          <p className="text-sm text-gray-500">Manage incoming requests or create a new quote for a buyer</p>
+        </div>
+        <ActionButton 
+          variant={showCreateQuote ? "secondary" : "primary"}
+          onClick={() => setShowCreateQuote(!showCreateQuote)}
+        >
+          {showCreateQuote ? "Cancel" : "➕ Create New Quote"}
+        </ActionButton>
       </div>
-      {quotations.length > 0 ? (
-        <QuotationList 
-          quotations={quotations} 
-          userRole="seller" 
-          onApprove={handleApproveQuotation} 
-          onReject={handleRejectQuotation} 
-          onCreateInvoice={(quotation) => setInvoiceQuotation(quotation)}
-        />
-      ) : (
-        <EmptyState message="No quotations found" icon="📋" />
+
+      {/* Manual Creation Form */}
+      {showCreateQuote && (
+        <div className="bg-white p-6 rounded-xl border border-blue-100 shadow-sm animate-fadeIn">
+          <CreateQuotation 
+            onSubmit={handleManualQuotationSubmit}
+            onCancel={() => setShowCreateQuote(false)}
+            isSubmitting={isSubmitting}
+          />
+        </div>
       )}
+
+      {/* Quotation List */}
+      <div className={showCreateQuote ? "opacity-50 pointer-events-none" : ""}>
+        {quotations.length > 0 ? (
+          <QuotationList 
+            quotations={quotations} 
+            userRole="seller" 
+            onApprove={handleApproveQuotation} 
+            onReject={handleRejectQuotation} 
+            onCreateInvoice={(quotation) => setInvoiceQuotation(quotation)}
+          />
+        ) : (
+          <EmptyState message="No quotations found" icon="📋" />
+        )}
+      </div>
     </div>
   );
 
@@ -694,7 +719,30 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
     }
   };
 
-  // ------------------ RENDER ------------------
+  const handleManualQuotationSubmit = useCallback(async (formData) => {
+    setIsSubmitting(true);
+    const toastId = toast.loading('Sending quotation to buyer...');
+    try {
+      // Note: In the Seller context, formData.buyer_address is the target recipient
+      await createQuotation({
+        buyerAddress: formData.buyer_address,
+        quantity: parseFloat(formData.quantity),
+        pricePerUnit: parseFloat(formData.price_per_unit),
+        description: formData.description,
+        discountRate: formData.discount_rate,
+        discountDeadline: formData.discount_deadline
+      });
+
+      toast.success('Quotation sent successfully!', { id: toastId });
+      setShowCreateQuote(false);
+      await loadQuotations();
+    } catch (error) {
+      console.error('Failed to send quotation:', error);
+      toast.error(error.response?.data?.error || 'Failed to send quotation', { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [loadQuotations]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
