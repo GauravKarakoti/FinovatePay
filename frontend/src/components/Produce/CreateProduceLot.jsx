@@ -17,10 +17,14 @@ const CreateProduceLot = ({ onSubmit, onCancel, isSubmitting }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit({
-      ...formData,
-      harvestDate: Math.floor(new Date(formData.harvestDate).getTime() / 1000)
-    });
+    if (typeof onSubmit === 'function') {
+      onSubmit({
+        ...formData,
+        harvestDate: Math.floor(new Date(formData.harvestDate).getTime() / 1000)
+      });
+    } else {
+      console.error("onSubmit prop is missing in CreateProduceLot");
+    }
   };
 
   return (

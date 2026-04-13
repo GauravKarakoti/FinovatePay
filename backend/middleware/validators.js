@@ -333,11 +333,8 @@ const validateQuotationId = [
   handleValidationErrors
 ];
 
-/**
- * PRODUCE VALIDATORS
- */
 const validateCreateProduceLot = [
-  body('produce_type')
+  body('produceType') // Changed from produce_type
     .trim()
     .isLength({ min: 1, max: 100 }).withMessage('Produce type must be 1-100 characters')
     .escape(),
@@ -350,9 +347,9 @@ const validateCreateProduceLot = [
     .isLength({ min: 1, max: 255 }).withMessage('Origin must be 1-255 characters')
     .escape(),
   
-  body('price')
-    .optional()
-    .isFloat({ min: 0 }).withMessage('Price must be non-negative'),
+  // Also add optional validation for lotId and txHash since they are required by the controller
+  body('lotId').notEmpty().withMessage('Lot ID is required'),
+  body('txHash').notEmpty().withMessage('Transaction hash is required'),
   
   handleValidationErrors
 ];

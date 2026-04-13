@@ -242,15 +242,14 @@ export async function getAmoyGasOverrides() {
   const { provider } = await connectWallet();
   const feeData = await provider.getFeeData();
   
-  // Polygon Amoy requires a minimum 25 Gwei priority fee
-  const minPriorityFee = ethers.parseUnits('30', 'gwei'); // Set to 30 to be safe
+  // Force minimum 30 Gwei to exceed the 25 Gwei requirement
+  const minPriorityFee = ethers.parseUnits('30', 'gwei'); 
   
   let maxPriorityFeePerGas = feeData.maxPriorityFeePerGas;
   if (!maxPriorityFeePerGas || maxPriorityFeePerGas < minPriorityFee) {
     maxPriorityFeePerGas = minPriorityFee;
   }
   
-  // Ensure maxFeePerGas is at least equal to maxPriorityFeePerGas
   let maxFeePerGas = feeData.maxFeePerGas;
   if (!maxFeePerGas || maxFeePerGas < maxPriorityFeePerGas) {
     maxFeePerGas = maxPriorityFeePerGas + ethers.parseUnits('5', 'gwei');

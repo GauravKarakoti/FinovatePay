@@ -15,14 +15,16 @@ import {
   sellerApproveQuotation,
   rejectQuotation,
   raiseDispute,
-  createQuotation
+  createQuotation,
+  createProduceLot
 } from '../utils/api';
 import {
   connectWallet, 
   getEscrowContract,
   isWalletConnected,
   getConnectedAddress,
-  getAmoyGasOverrides // <-- ADDED THIS
+  getAmoyGasOverrides, // <-- ADDED THIS
+  getProduceTrackingContract
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
 import GovernanceDashboard from '../pages/GovernanceDashboard';
@@ -472,14 +474,30 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const handleRaiseDispute = useCallback(async (invoice) => {
     const reason = prompt('Enter reason for dispute:');
     if (!reason?.trim()) return;
+
+    const toastId = toast.loading('Initiating on-chain dispute...');
     try {
-      if(raiseDispute) {
-         await raiseDispute(invoice.invoice_id, reason);
-      }
-      toast.success('Dispute raised');
+      // 1. Get contract instance and convert UUID to bytes32
+      const contract = await getEscrowContract();
+      const bytes32InvoiceId = uuidToBytes32(invoice.invoice_id);
+      
+      // 2. Fetch the required gas overrides for Amoy (Min 25 Gwei)
+      const gasOverrides = await getAmoyGasOverrides();
+
+      // 3. Execute the on-chain dispute
+      const tx = await contract.raiseDispute(bytes32InvoiceId, gasOverrides);
+      
+      toast.loading('Waiting for blockchain confirmation...', { id: toastId });
+      await tx.wait();
+
+      // 4. Update the backend status to stay in sync
+      await updateInvoiceStatus(invoice.invoice_id, 'disputed', tx.hash, reason);
+      
+      toast.success('Dispute raised successfully on-chain!', { id: toastId });
       await loadInvoices();
     } catch (error) {
-      toast.error('Failed to raise dispute');
+      console.error('Failed to raise dispute:', error);
+      toast.error(error.reason || error.message || 'Failed to raise dispute', { id: toastId });
     }
   }, [loadInvoices]);
 
@@ -651,9 +669,85 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
   const ProduceTab = () => (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Manage Produce</h2>
-      <CreateProduceLot onSuccess={() => toast.success('Produce lot created successfully!')} />
+      <CreateProduceLot 
+        onSubmit={handleRegisterProduce} 
+        isSubmitting={isSubmitting} 
+      />
     </div>
   );
+
+  const handleRegisterProduce = useCallback(async (produceData) => {
+    setIsSubmitting(true);
+    const toastId = toast.loading('Minting Produce RWA NFT...');
+
+    try {
+      const contract = await getProduceTrackingContract();
+      const gasOverrides = await getAmoyGasOverrides();
+      const tokenURI = produceData.tokenURI || `https://api.finovatepay.com/metadata/${Date.now()}`;
+
+      const tx = await contract.createProduceLot(
+        produceData.produceType,
+        produceData.harvestDate,
+        produceData.qualityMetrics || "",
+        produceData.origin,
+        parseUnits(produceData.quantity.toString(), 18),
+        tokenURI,
+        gasOverrides
+      );
+
+      toast.loading('Mining transaction...', { id: toastId });
+      const receipt = await tx.wait();
+
+      const event = receipt.logs
+        .map(log => {
+          try { return contract.interface.parseLog(log); } 
+          catch (e) { return null; }
+        })
+        .find(e => e?.name === 'ProduceLotCreated');
+      
+      const lotId = event ? event.args[0].toString() : null;
+
+      if (!lotId) throw new Error("Transaction succeeded, but Lot ID was not found in logs.");
+
+      // Sync with backend
+      try {
+        await createProduceLot({
+          ...produceData,
+          lotId: lotId,
+          txHash: tx.hash
+        });
+        toast.success('Produce RWA created and synced!', { id: toastId });
+      } catch (apiError) {
+        // Handle the 409 specifically inside the sync step
+        if (apiError.response?.status === 409) {
+          toast.info('Blockchain lot created, but it was already synced to the database.', { id: toastId });
+          return;
+        }
+        throw apiError; // Re-throw other API errors to the main catch block
+      }
+
+    } catch (error) {
+      console.error('Registration failed:', error);
+      
+      // SAFE ERROR EXTRACTION: Ensures only strings reach the Toast
+      let finalMessage = 'Registration failed';
+
+      if (error.response?.data?.error?.message) {
+        // Handles the specific {message, code, requestId} object seen in your logs
+        finalMessage = String(error.response.data.error.message);
+      } else if (error.response?.data?.message) {
+        finalMessage = String(error.response.data.message);
+      } else if (error.reason) {
+        finalMessage = error.reason; // ethers.js error
+      } else {
+        finalMessage = error.message || 'An unknown error occurred';
+      }
+
+      toast.error(finalMessage, { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, []);
 
   const PaymentsTab = () => (
     <div className="space-y-6">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ethers } from 'ethers';
-import { formatEther, zeroPadValue, isAddress } from '../utils/formatters';
+import { formatEther, zeroPadValue } from '../utils/formatters';
 import {
   getBuyerInvoices,
   updateInvoiceStatus,
@@ -12,7 +12,7 @@ import {
   rejectQuotation,
   getKYCStatus
 } from '../utils/api';
-import { connectWallet, erc20ABI, getEscrowContract } from '../utils/web3';
+import { connectWallet, erc20ABI, getAmoyGasOverrides, getEscrowContract } from '../utils/web3';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import EscrowStatus from '../components/Escrow/EscrowStatus';
@@ -614,18 +614,20 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       const contract = await getEscrowContract();
       const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
 
-      const tx = await contract.confirmRelease(bytes32Id);
+      // 4. Also add overrides here
+      const gasOverrides = await getAmoyGasOverrides();
+      const tx = await contract.confirmRelease(bytes32Id, gasOverrides);
       await tx.wait();
       
       await updateInvoiceStatus(invoice.invoice_id, 'released', tx.hash);
-      toast.success(`Funds released! ${tx.hash.slice(0, 10)}...`);
+      toast.success(`Funds released!`);
       await loadInvoices();
     } catch (error) {
       toast.error(error.reason || 'Failed to release funds');
     } finally {
       setLoadingInvoiceId(null);
     }
-  }, []);
+  }, [loadInvoices]);
 
   const handleRaiseDispute = useCallback(async (invoice) => {
     const reason = prompt('Enter reason for dispute:');
@@ -635,8 +637,12 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     try {
       const contract = await getEscrowContract();
       const bytes32Id = zeroPadValue('0x' + invoice.invoice_id.replace(/-/g, ''), 32);
+      
+      // 2. Fetch the required gas overrides for Amoy
+      const gasOverrides = await getAmoyGasOverrides();
 
-      const tx = await contract.raiseDispute(bytes32Id);
+      // 3. Pass overrides as the last argument
+      const tx = await contract.raiseDispute(bytes32Id, gasOverrides);
       await tx.wait();
       
       await updateInvoiceStatus(invoice.invoice_id, 'disputed', tx.hash, reason);
@@ -647,7 +653,7 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
     } finally {
       setLoadingInvoiceId(null);
     }
-  }, []);
+  }, [loadInvoices]);
 
   const handleSelectInvoice = useCallback((invoice) => {
     setSelectedInvoice(invoice);
