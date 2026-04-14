@@ -1,76 +1,29 @@
 const { ethers } = require('ethers');
-const { getProvider, getSigner, contractAddresses } = require('../config/blockchain');
+const { getSigner, contractAddresses } = require('../config/blockchain');
 
-// StreamingPayment contract ABI (minimal for now)
-const StreamingPaymentABI = [
-  // Struct
-  "enum Interval { Daily, Weekly, Monthly }",
-  "enum StreamStatus { Pending, Active, Paused, Cancelled, Completed }",
-  "struct Stream { bytes32 streamId; address seller; address buyer; uint256 amount; uint256 perIntervalAmount; address token; Interval interval; StreamStatus status; uint256 startTime; uint256 nextReleaseTime; uint256 totalReleased; uint256 totalPaid; uint256 intervalsCompleted; uint256 createdAt; string description; }",
-  
-  // Read functions
-  "function streams(bytes32) view returns (tuple(bytes32 streamId, address seller, address buyer, uint256 amount, uint256 perIntervalAmount, address token, uint8 interval, uint8 status, uint256 startTime, uint256 nextReleaseTime, uint256 totalReleased, uint256 totalPaid, uint256 intervalsCompleted, uint256 createdAt, string description))",
-  "function canRelease(bytes32) view returns (bool)",
-  "function getRemainingBalance(bytes32) view returns (uint256)",
-  "function protocolFeeBps() view returns (uint256)",
-  
-  // Write functions
-  "function createStream(bytes32, address, uint256, uint8, uint256, address, string) returns (bool)",
-  "function approveStream(bytes32) payable",
-  "function releasePayment(bytes32)",
-  "function pauseStream(bytes32)",
-  "function resumeStream(bytes32)",
-  "function cancelStream(bytes32)",
-  
-  // Events
-  "event StreamCreated(bytes32 indexed, address indexed, address indexed, uint256, uint256, address, uint8, string)",
-  "event StreamApproved(bytes32 indexed, address indexed, uint256)",
-  "event StreamStarted(bytes32 indexed, uint256, uint256)",
-  "event PaymentReleased(bytes32 indexed, uint256, uint256)",
-  "event StreamPaused(bytes32 indexed, address indexed)",
-  "event StreamResumed(bytes32 indexed, address indexed)",
-  "event StreamCancelled(bytes32 indexed, address indexed, uint256)",
-  "event StreamCompleted(bytes32 indexed, uint256, uint256)"
-];
-
-let streamingContract = null;
-let configError = null;
 
 /**
  * Get StreamingPayment contract instance
- */
-const getStreamingContract = (signerOrProvider) => {
+*/
+const getStreamingContract = async () => {
   if (!contractAddresses.streamingPayment) {
     console.warn("[StreamingService] StreamingPayment address not configured");
     return null;
   }
   
+  const signer = await getSigner();
+  const StreamingPaymentABI = require('../../deployed/StreamingPayment.json').abi;
+  
   try {
-    const provider = signerOrProvider || getProvider();
-    if (!provider) {
-      throw new Error('Provider not available');
+    if (!signer) {
+      throw new Error('Signer not available');
     }
     
-    return new ethers.Contract(
-      contractAddresses.streamingPayment,
-      StreamingPaymentABI,
-      provider
-    );
+    return new ethers.Contract(contractAddresses.streamingPayment, StreamingPaymentABI, signer);
   } catch (error) {
     console.error("[StreamingService] Failed to get contract:", error.message);
     return null;
   }
-};
-
-/**
- * Get contract with signer for write operations
- */
-const getStreamingContractWithSigner = () => {
-  const signer = getSigner();
-  if (!signer) {
-    throw new Error('Signer not available');
-  }
-  return getStreamingContract(signer);
 };
 
 /**
@@ -114,7 +67,7 @@ const createStreamOnChain = async (
   tokenAddress,
   description
 ) => {
-  const contract = getStreamingContractWithSigner();
+  const contract = await getStreamingContract();
   
   const tx = await contract.createStream(
     streamId,
@@ -145,13 +98,20 @@ const createStreamOnChain = async (
   };
 };
 
-/**
- * Approve and fund a stream (buyer)
- */
-const approveStreamOnChain = async (streamId, amount, tokenAddress) => {
-  const contract = getStreamingContractWithSigner();
+const approveStreamOnChain = async (streamId, _dbAmount, tokenAddress) => {
+  const contract = await getStreamingContract();
   
-  const overrides = tokenAddress === ethers.ZeroAddress ? { value: amount } : {};
+  // 👉 FIX: Fetch the exact required amount directly from the contract
+  // This ensures the 1% protocol fee is correctly included in the msg.value
+  const streamData = await contract.streams(streamId);
+  const requiredAmount = streamData.amount;
+  
+  const isNativeToken = !tokenAddress || 
+    tokenAddress.toLowerCase() === ethers.ZeroAddress.toLowerCase() ||
+    tokenAddress === '0x0000000000000000000000000000000000000000';
+    
+  // Use the requiredAmount from the contract instead of the one from the DB
+  const overrides = isNativeToken ? { value: requiredAmount } : {};
   
   const tx = await contract.approveStream(streamId, overrides);
   const receipt = await tx.wait();
@@ -166,7 +126,7 @@ const approveStreamOnChain = async (streamId, amount, tokenAddress) => {
  * Release payment for a completed interval
  */
 const releasePaymentOnChain = async (streamId) => {
-  const contract = getStreamingContractWithSigner();
+  const contract = await getStreamingContract();
   
   const tx = await contract.releasePayment(streamId);
   const receipt = await tx.wait();
@@ -193,7 +153,7 @@ const releasePaymentOnChain = async (streamId) => {
  * Pause a stream
  */
 const pauseStreamOnChain = async (streamId) => {
-  const contract = getStreamingContractWithSigner();
+  const contract = await getStreamingContract();
   
   const tx = await contract.pauseStream(streamId);
   await tx.wait();
@@ -205,7 +165,7 @@ const pauseStreamOnChain = async (streamId) => {
  * Resume a paused stream
  */
 const resumeStreamOnChain = async (streamId) => {
-  const contract = getStreamingContractWithSigner();
+  const contract = await getStreamingContract();
   
   const tx = await contract.resumeStream(streamId);
   await tx.wait();
@@ -217,7 +177,7 @@ const resumeStreamOnChain = async (streamId) => {
  * Cancel a stream
  */
 const cancelStreamOnChain = async (streamId) => {
-  const contract = getStreamingContractWithSigner();
+  const contract = await getStreamingContract();
   
   const tx = await contract.cancelStream(streamId);
   const receipt = await tx.wait();
@@ -243,7 +203,7 @@ const cancelStreamOnChain = async (streamId) => {
  * Get stream details from chain
  */
 const getStreamFromChain = async (streamId) => {
-  const contract = getStreamingContract();
+  const contract = await getStreamingContract();
   
   if (!contract) {
     return null;
@@ -279,7 +239,7 @@ const getStreamFromChain = async (streamId) => {
  * Check if a stream can be released
  */
 const canReleaseOnChain = async (streamId) => {
-  const contract = getStreamingContract();
+  const contract = await getStreamingContract();
   
   if (!contract) {
     return false;
@@ -296,7 +256,7 @@ const canReleaseOnChain = async (streamId) => {
  * Get remaining balance
  */
 const getRemainingBalanceOnChain = async (streamId) => {
-  const contract = getStreamingContract();
+  const contract = await getStreamingContract();
   
   if (!contract) {
     return '0';
@@ -356,7 +316,6 @@ const processDuePayments = async () => {
 
 module.exports = {
   getStreamingContract,
-  getStreamingContractWithSigner,
   createStreamOnChain,
   approveStreamOnChain,
   releasePaymentOnChain,

@@ -166,6 +166,11 @@ async function main() {
   const treasuryManager = await TreasuryManager.deploy();
   await treasuryManager.waitForDeployment();
 
+  const StreamingPayment = await ethers.getContractFactory("StreamingPayment");
+  const streamingPayment = await StreamingPayment.deploy("0x2E1fa302932a133E7144719b9c02269c3158AAd9", "0xECD6f5268126a0d36dD6D1D4629146C1abA49Fd3", "0xC74DD3254077E748c3DcBcCE0fd74C7BB6082C80");
+  await streamingPayment.waitForDeployment();
+  console.log("Streaming Payment deployed to: ", streamingPayment.target);
+
   // 👉 NEW: Update Financing Manager Dependencies
   console.log("\n🔗 Connecting new dependencies to Financing Manager Proxy...");
   updateTx = await financingProxyContract.setContracts(fractionToken.target, stablecoinAddress, feeWalletAddress);
@@ -191,7 +196,8 @@ async function main() {
     BridgeAdapter: bridgeAdapter.target,
     LiquidityAdapter: liquidityAdapter.target,
     MockWaltBridge: actualWaltBridgeAddress,
-    TreasuryManager: treasuryManager.target
+    TreasuryManager: treasuryManager.target,
+    StreamingPayment: streamingPayment.target
   };
 
   fs.writeFileSync(addressPath, JSON.stringify(addressMap, null, 2));
@@ -199,7 +205,8 @@ async function main() {
   const contractNames = [
     "FinovateToken", "MinimalForwarder", "ComplianceManager", "TreasuryManager",
     "InvoiceFactory", "FractionToken", "Invoice", "ProduceTracking", 
-    "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking", "MockWaltBridge"
+    "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking", "MockWaltBridge",
+    "StreamingPayment"
   ];
 
   for (const name of contractNames) {

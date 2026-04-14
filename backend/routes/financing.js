@@ -3,7 +3,7 @@ const router = express.Router();
 const bridgeService = require('../services/bridgeService');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { requireKYC } = require('../middleware/kycValidation');
-const { getFractionTokenContract } = require('../config/blockchain');
+const { getFractionTokenContract, getSigner } = require('../config/blockchain');
 const { pool } = require('../config/database');
 const { ethers } = require('ethers');
 
@@ -52,10 +52,9 @@ router.post('/request', authenticateToken, requireRole(['seller', 'admin']), req
 
         await client.query('BEGIN');
 
-        // 1. Validate invoice exists, belongs to user, and is eligible
         const invoiceQuery = await client.query(
-            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_id = $2 FOR UPDATE',
-            [invoiceId, userId]
+            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_address = $2 FOR UPDATE',
+            [invoiceId, req.user.wallet_address]
         );
 
         if (invoiceQuery.rows.length === 0) {
@@ -178,10 +177,9 @@ router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requi
 
         const targetInvoiceId = invoiceId || financingId;
 
-        // 1. Validate repayment target belongs to user and is currently financed
         const invoiceQuery = await pool.query(
-            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_id = $2',
-            [targetInvoiceId, userId]
+            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_address = $2',
+            [targetInvoiceId, req.user.wallet_address]
         );
 
         if (invoiceQuery.rows.length === 0) {
@@ -221,16 +219,15 @@ router.post('/repay', authenticateToken, requireRole(['seller', 'admin']), requi
 router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), requireKYC, validateTokenizeInvoice, async (req, res) => {
     try {
         const { invoiceId, faceValue, maturityDate, yieldBps } = req.body;
-        const userId = req.user.id;
 
         if (!invoiceId || !faceValue || !maturityDate || yieldBps === undefined) {
              return res.status(400).json({ error: 'Missing required tokenization parameters' });
         }
 
-        // Validate invoice exists and belongs to user
         const invoiceQuery = await pool.query(
-            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_id = $2',
-            [invoiceId, userId]
+            // 👉 FIX: Use seller_address instead of seller_id
+            'SELECT * FROM invoices WHERE invoice_id = $1 AND seller_address = $2',
+            [invoiceId, req.user.wallet_address] // Pass the wallet address, not the user ID
         );
 
         if (invoiceQuery.rows.length === 0) {
@@ -243,8 +240,11 @@ router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), re
             return res.status(400).json({ error: 'Invoice already tokenized' });
         }
 
-        // Get FractionToken contract
-        const contract = await getFractionTokenContract();
+        let contract = await getFractionTokenContract();
+        const signer = await getSigner();
+        
+        // 👉 FIX: Connect the contract to the signer so it can send transactions
+        contract = contract.connect(signer);
 
         // Convert maturity date to timestamp
         const maturityTimestamp = Math.floor(new Date(maturityDate).getTime() / 1000);
@@ -260,43 +260,45 @@ router.post('/tokenize', authenticateToken, requireRole(['seller', 'admin']), re
              bytes32InvoiceId = ethers.zeroPadValue(ethers.toUtf8Bytes(invoiceId), 32);
         }
 
-        // Calculate total supply (faceValue in wei)
         const totalSupply = ethers.parseUnits(faceValue.toString(), 18);
+        const pricePerFraction = 1; // 1 base unit of payment token per fraction
 
-        // Call tokenizeInvoice
+        // Call tokenizeInvoice matching exactly the FractionToken.sol ABI:
+        // (bytes32 _invoiceId, address _seller, uint256 _totalFractions, uint256 _pricePerFraction, uint256 _maturityDate, uint256 _totalValue, uint256 _yieldBps)
         const tx = await contract.tokenizeInvoice(
             bytes32InvoiceId,
-            totalSupply,
-            totalSupply, // faceValue
-            maturityTimestamp,
-            req.user.wallet_address, // issuer
-            yieldBps // yield in bps
+            req.user.wallet_address, // _seller
+            totalSupply,             // _totalFractions
+            pricePerFraction,        // _pricePerFraction
+            maturityTimestamp,       // _maturityDate
+            totalSupply,             // _totalValue
+            yieldBps                 // _yieldBps
         );
 
         const receipt = await tx.wait();
+        
+        // 👉 FIX: Look for 'InvoiceFractionalized' instead of 'Tokenized'
         const event = receipt.logs?.find(
-            e => e.fragment && e.fragment.name === 'Tokenized'
-        ) || receipt.events?.find(e => e.event === 'Tokenized');
+            e => e.fragment && e.fragment.name === 'InvoiceFractionalized'
+        ) || receipt.events?.find(e => e.event === 'InvoiceFractionalized');
 
-        if (!event) throw new Error("Tokenized event not emitted by the contract");
+        if (!event) throw new Error("InvoiceFractionalized event not emitted by the contract");
 
-        // Accommodate both ethers v5 (event.args.tokenId) and v6 (event.args[0] or similar)
-        const tokenId = event.args ? (event.args.tokenId || event.args[0]) : null;
+        // The second argument in InvoiceFractionalized is the tokenId
+        const tokenId = event.args ? (event.args.tokenId || event.args[1]) : null;
 
         if (!tokenId) {
             throw new Error("Could not parse Token ID from event logs");
         }
 
-        // Update database
         await pool.query(
             `UPDATE invoices 
              SET token_id = $1, 
                  financing_status = $2, 
                  is_tokenized = true, 
-                 yield_bps = $3,
                  updated_at = NOW() 
-             WHERE invoice_id = $4`,
-            [tokenId.toString(), 'listed', yieldBps, invoiceId]
+             WHERE invoice_id = $3`,
+            [tokenId.toString(), 'listed', invoiceId]
         );
 
         res.json({

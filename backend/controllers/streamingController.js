@@ -91,7 +91,8 @@ exports.createStream = async (req, res) => {
  */
 exports.approveStream = async (req, res) => {
   try {
-    const { streamId, amount } = req.body;
+    const { streamId } = req.params; 
+    const { amount } = req.body;
     const buyerAddress = req.user.wallet_address;
     
     // Get stream from DB
@@ -109,7 +110,8 @@ exports.approveStream = async (req, res) => {
       return errorResponse(res, 'Stream is not pending', 400);
     }
     
-    const amountInWei = ethers.parseUnits(amount.toString(), 18);
+    const amountInWei = amount.toString(); 
+    
     const result = await approveStreamOnChain(streamId, amountInWei, stream.token_address);
     
     // Update database
@@ -136,7 +138,7 @@ exports.approveStream = async (req, res) => {
  */
 exports.releasePayment = async (req, res) => {
   try {
-    const { streamId } = req.body;
+    const { streamId } = req.params;
     
     // Get stream from DB
     const stream = await StreamingPayment.findById(streamId);
@@ -183,7 +185,7 @@ exports.releasePayment = async (req, res) => {
  */
 exports.pauseStream = async (req, res) => {
   try {
-    const { streamId } = req.body;
+    const { streamId } = req.params;
     const userAddress = req.user.wallet_address;
     
     const stream = await StreamingPayment.findById(streamId);
@@ -215,7 +217,7 @@ exports.pauseStream = async (req, res) => {
  */
 exports.resumeStream = async (req, res) => {
   try {
-    const { streamId } = req.body;
+    const { streamId } = req.params;
     const userAddress = req.user.wallet_address;
     
     const stream = await StreamingPayment.findById(streamId);
@@ -250,7 +252,7 @@ exports.resumeStream = async (req, res) => {
  */
 exports.cancelStream = async (req, res) => {
   try {
-    const { streamId } = req.body;
+    const { streamId } = req.params;
     const userAddress = req.user.wallet_address;
     
     const stream = await StreamingPayment.findById(streamId);

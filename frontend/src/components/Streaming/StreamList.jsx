@@ -55,7 +55,15 @@ const StreamList = ({ userRole = 'seller', onStreamUpdate }) => {
       onStreamUpdate?.();
     } catch (error) {
       console.error('Error approving stream:', error);
-      toast.error(error.response?.data?.error || 'Failed to approve stream');
+      
+      // 👉 FIX: Safely extract nested string errors to prevent React object crashes
+      const errorMessage = 
+        error?.response?.data?.error?.message || 
+        error?.response?.data?.message || 
+        (typeof error?.message === 'string' ? error.message : null) || 
+        "Failed to approve stream";
+        
+      toast.error(errorMessage);
     } finally {
       setActionLoading(null);
     }

@@ -36,15 +36,12 @@ async function processTokenizedEvent(
         // Calculate face value correctly here
         const faceValue = BigInt(totalFractions) * BigInt(pricePerFraction);
 
-        // --- UPDATE INVOICE ---
         const updateQuery = `
             UPDATE invoices
             SET
                 token_id = $1,
                 financing_status = 'listed',
                 is_tokenized = true,
-                face_value = $3,
-                yield_bps = $4,
                 updated_at = CURRENT_TIMESTAMP
             WHERE invoice_hash = $2
             RETURNING *
@@ -52,9 +49,7 @@ async function processTokenizedEvent(
 
         const updateResult = await client.query(updateQuery, [
             tokenId.toString(),
-            invoiceHash,
-            faceValue.toString(),
-            yieldBps.toString()
+            invoiceHash
         ]);
 
         if (updateResult.rows.length === 0) {

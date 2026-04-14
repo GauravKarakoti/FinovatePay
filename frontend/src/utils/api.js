@@ -254,10 +254,8 @@ api.interceptors.response.use(
   }
 );
 
-// --- Fixed Functions (Now using 'api' instance) ---
-
-export const tokenizeInvoice = (invoiceId, faceValue, maturityDate) => {
-  return api.post('/financing/tokenize', { invoiceId, faceValue, maturityDate });
+export const tokenizeInvoice = (invoiceId, faceValue, maturityDate, yieldBps) => {
+  return api.post('/financing/tokenize', { invoiceId, faceValue, maturityDate, yieldBps });
 };
 
 export const getMarketplaceListings = () => {
