@@ -4,21 +4,22 @@ import { toast } from 'sonner';
 import { 
   getAuctions, 
   getSellerAuctions, 
-  getAuctionBids,
   startAuction,
   endAuction,
   settleAuction,
   cancelAuction
 } from '../../utils/api';
 import AuctionBidModal from './AuctionBidModal';
+import AuctionCreateModal from './AuctionCreateModal';
 
-const AuctionList = ({ userRole = 'seller', onAuctionUpdate }) => {
+const AuctionList = ({ userRole = 'seller', eligibleInvoices, onAuctionUpdate }) => {
   const [auctions, setAuctions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAuction, setSelectedAuction] = useState(null);
   const [showBidModal, setShowBidModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
   const [view, setView] = useState('all'); // 'all', 'mine', 'bids'
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadAuctions();
@@ -193,123 +194,151 @@ const AuctionList = ({ userRole = 'seller', onAuctionUpdate }) => {
     );
   }
 
-  if (auctions.length === 0) {
-    return (
-      <div className="text-center py-12 bg-gray-50 rounded-lg">
-        <div className="text-4xl mb-2">🏷️</div>
-        <p className="text-gray-500">No auctions found</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {auctions.map((auction) => (
-        <div 
-          key={auction.auction_id} 
-          className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-        >
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            {/* Auction Info */}
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                {getStatusBadge(auction.status)}
-                <span className="text-sm text-gray-500">
-                  Invoice: {auction.invoice_id?.slice(0, 8)}...
-                </span>
-              </div>
-              
-              <div className="text-sm text-gray-600 mb-1">
-                <span className="font-medium">Face Value:</span> ${formatAmount(auction.face_value)}
-              </div>
-              
-              <div className="text-sm text-gray-600 mb-1">
-                <span className="font-medium">Min Yield:</span> {formatYield(auction.min_yield_bps)}
-              </div>
-              
-              {auction.highest_bid && parseFloat(auction.highest_bid) > 0 && (
-                <div className="text-sm text-gray-600 mb-1">
-                  <span className="font-medium">Highest Bid:</span> ${formatAmount(auction.highest_bid)}
-                  {auction.highest_bidder && (
-                    <span className="text-gray-400 ml-1">
-                      by {formatAddress(auction.highest_bidder)}
-                    </span>
-                  )}
-                </div>
-              )}
-              
-              <div className="text-xs text-gray-400">
-                <span>Seller: {formatAddress(auction.seller_address)}</span>
-                <span className="ml-3">
-                  Time: {getTimeRemaining(auction.auction_end_time)}
-                </span>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-wrap gap-2">
-              {canStart(auction) && (
-                <button
-                  onClick={() => handleStart(auction.auction_id)}
-                  disabled={actionLoading === auction.auction_id}
-                  className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-                >
-                  {actionLoading === auction.auction_id ? 'Starting...' : 'Start Auction'}
-                </button>
-              )}
-              
-              {canBid(auction) && (
-                <button
-                  onClick={() => handleBid(auction)}
-                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Place Bid
-                </button>
-              )}
-              
-              {canEnd(auction) && (
-                <button
-                  onClick={() => handleEnd(auction.auction_id)}
-                  disabled={actionLoading === auction.auction_id}
-                  className="px-3 py-1.5 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
-                >
-                  {actionLoading === auction.auction_id ? 'Ending...' : 'End Auction'}
-                </button>
-              )}
-              
-              {canSettle(auction) && (
-                <button
-                  onClick={() => handleSettle(auction.auction_id)}
-                  disabled={actionLoading === auction.auction_id}
-                  className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {actionLoading === auction.auction_id ? 'Settling...' : 'Settle'}
-                </button>
-              )}
-              
-              {canCancel(auction) && (
-                <button
-                  onClick={() => handleCancel(auction.auction_id)}
-                  disabled={actionLoading === auction.auction_id}
-                  className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
-                >
-                  {actionLoading === auction.auction_id ? 'Cancelling...' : 'Cancel'}
-                </button>
-              )}
-            </div>
+      {/* ADDED HEADER WITH CREATE BUTTON */}
+      {userRole === 'seller' && (
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Invoice Auctions</h2>
+            <p className="text-sm text-gray-500">Sell your invoices to the highest bidder</p>
           </div>
-          
-          {/* Winner Info */}
-          {auction.status === 'settled' && auction.winner_address && (
-            <div className="mt-3 pt-3 border-t border-gray-100 text-sm">
-              <span className="font-medium text-green-600">
-                ✓ Won by {formatAddress(auction.winner_address)} 
-                (Yield: {formatYield(auction.winning_yield_bps)})
-              </span>
-            </div>
-          )}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            ➕ Create Auction
+          </button>
         </div>
-      ))}
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      ) : auctions.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <div className="text-4xl mb-2">🏷️</div>
+          <p className="text-gray-500">No auctions found</p>
+        </div>
+      ) : (
+        auctions.map((auction) => (
+          <div 
+            key={auction.auction_id} 
+            className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              {/* Auction Info */}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  {getStatusBadge(auction.status)}
+                  <span className="text-sm text-gray-500">
+                    Invoice: {auction.invoice_id?.slice(0, 8)}...
+                  </span>
+                </div>
+                
+                <div className="text-sm text-gray-600 mb-1">
+                  <span className="font-medium">Face Value:</span> ${formatAmount(auction.face_value)}
+                </div>
+                
+                <div className="text-sm text-gray-600 mb-1">
+                  <span className="font-medium">Min Yield:</span> {formatYield(auction.min_yield_bps)}
+                </div>
+                
+                {auction.highest_bid && parseFloat(auction.highest_bid) > 0 && (
+                  <div className="text-sm text-gray-600 mb-1">
+                    <span className="font-medium">Highest Bid:</span> ${formatAmount(auction.highest_bid)}
+                    {auction.highest_bidder && (
+                      <span className="text-gray-400 ml-1">
+                        by {formatAddress(auction.highest_bidder)}
+                      </span>
+                    )}
+                  </div>
+                )}
+                
+                <div className="text-xs text-gray-400">
+                  <span>Seller: {formatAddress(auction.seller_address)}</span>
+                  <span className="ml-3">
+                    Time: {getTimeRemaining(auction.auction_end_time)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-wrap gap-2">
+                {canStart(auction) && (
+                  <button
+                    onClick={() => handleStart(auction.auction_id)}
+                    disabled={actionLoading === auction.auction_id}
+                    className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {actionLoading === auction.auction_id ? 'Starting...' : 'Start Auction'}
+                  </button>
+                )}
+                
+                {canBid(auction) && (
+                  <button
+                    onClick={() => handleBid(auction)}
+                    className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    Place Bid
+                  </button>
+                )}
+                
+                {canEnd(auction) && (
+                  <button
+                    onClick={() => handleEnd(auction.auction_id)}
+                    disabled={actionLoading === auction.auction_id}
+                    className="px-3 py-1.5 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
+                  >
+                    {actionLoading === auction.auction_id ? 'Ending...' : 'End Auction'}
+                  </button>
+                )}
+                
+                {canSettle(auction) && (
+                  <button
+                    onClick={() => handleSettle(auction.auction_id)}
+                    disabled={actionLoading === auction.auction_id}
+                    className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {actionLoading === auction.auction_id ? 'Settling...' : 'Settle'}
+                  </button>
+                )}
+                
+                {canCancel(auction) && (
+                  <button
+                    onClick={() => handleCancel(auction.auction_id)}
+                    disabled={actionLoading === auction.auction_id}
+                    className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                  >
+                    {actionLoading === auction.auction_id ? 'Cancelling...' : 'Cancel'}
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            {/* Winner Info */}
+            {auction.status === 'settled' && auction.winner_address && (
+              <div className="mt-3 pt-3 border-t border-gray-100 text-sm">
+                <span className="font-medium text-green-600">
+                  ✓ Won by {formatAddress(auction.winner_address)} 
+                  (Yield: {formatYield(auction.winning_yield_bps)})
+                </span>
+              </div>
+            )}
+          </div>
+        ))
+      )}
+
+      <AuctionCreateModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        eligibleInvoices={eligibleInvoices}
+        onSuccess={() => {
+          loadAuctions();
+          onAuctionUpdate?.();
+        }}
+      />
 
       {/* Bid Modal */}
       <AuctionBidModal

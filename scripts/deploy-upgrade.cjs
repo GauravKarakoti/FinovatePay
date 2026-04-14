@@ -17,15 +17,18 @@ async function main() {
   const existingAddresses = JSON.parse(fs.readFileSync(addressPath, "utf8"));
   console.log("✅ Loaded existing proxy addresses.");
 
+  const TreasuryManager = await ethers.getContractFactory("TreasuryManager");
+  const treasuryManager = await TreasuryManager.deploy();
+  await treasuryManager.waitForDeployment();
+
   // 0. Deploy FinovateToken (Governance Token)
   console.log("\n0. Deploying FinovateToken (Governance Token)...");
-  const treasuryAddress = deployer.address; 
   const FinovateToken = await ethers.getContractFactory("FinovateToken");
-  const finovateToken = await FinovateToken.deploy(treasuryAddress);
+  const finovateToken = await FinovateToken.deploy(treasuryManager.target);
   await finovateToken.waitForDeployment();
   const governanceTokenAddress = finovateToken.target;
   console.log("FinovateToken redeployed to:", governanceTokenAddress);
-
+  
   // 1. Deploy MinimalForwarder
   console.log("\n1. Deploying MinimalForwarder...");
   const MinimalForwarder = await ethers.getContractFactory("MinimalForwarder");
@@ -66,8 +69,9 @@ async function main() {
   // =========================================================
   console.log("\n6. Deploying NEW EscrowContractV2 Implementation...");
   const EscrowContractV2 = await ethers.getContractFactory("EscrowContractV2");
-  const escrowContractV2Implementation = await EscrowContractV2.deploy(minimalForwarder.target);
+  const escrowContractV2Implementation = await EscrowContractV2.deploy("0x2E1fa302932a133E7144719b9c02269c3158AAd9");
   await escrowContractV2Implementation.waitForDeployment();
+  console.log("EscrowContractV2 Implementation deployed to:", escrowContractV2Implementation.target);
 
   console.log("\n7. Upgrading EXISTING EscrowContract Proxy...");
   const escrowProxyAddress = existingAddresses.EscrowContractProxy;
@@ -162,12 +166,8 @@ async function main() {
   const liquidityAdapter = await LiquidityAdapter.deploy(actualWaltBridgeAddress, complianceManager.target);
   await liquidityAdapter.waitForDeployment();
 
-  const TreasuryManager = await ethers.getContractFactory("TreasuryManager");
-  const treasuryManager = await TreasuryManager.deploy();
-  await treasuryManager.waitForDeployment();
-
   const StreamingPayment = await ethers.getContractFactory("StreamingPayment");
-  const streamingPayment = await StreamingPayment.deploy("0x2E1fa302932a133E7144719b9c02269c3158AAd9", "0xECD6f5268126a0d36dD6D1D4629146C1abA49Fd3", "0xC74DD3254077E748c3DcBcCE0fd74C7BB6082C80");
+  const streamingPayment = await StreamingPayment.deploy(minimalForwarder.target, complianceManager.target, treasuryManager.target);
   await streamingPayment.waitForDeployment();
   console.log("Streaming Payment deployed to: ", streamingPayment.target);
 
@@ -203,7 +203,8 @@ async function main() {
   fs.writeFileSync(addressPath, JSON.stringify(addressMap, null, 2));
 
   const contractNames = [
-    "FinovateToken", "MinimalForwarder", "ComplianceManager", "TreasuryManager",
+    "FinovateToken", 
+    "MinimalForwarder", "ComplianceManager", "TreasuryManager",
     "InvoiceFactory", "FractionToken", "Invoice", "ProduceTracking", 
     "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking", "MockWaltBridge",
     "StreamingPayment"

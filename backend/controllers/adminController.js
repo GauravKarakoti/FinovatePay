@@ -315,9 +315,11 @@ exports.resolveDispute = async (req, res) => {
       EscrowContractArtifact,
       getSigner()
     );
+    console.log("Calling resolveDispute on contract with invoiceId (bytes32):", uuidToBytes32(invoiceId), "Seller wins?", sellerWins);
 
     const tx = await escrow.resolveDispute(uuidToBytes32(invoiceId), sellerWins);
     await tx.wait();
+    console.log("Dispute resolved on-chain, tx hash:", tx.hash);
 
     const status = sellerWins ? 'resolved_seller_wins' : 'resolved_buyer_wins';
 
@@ -341,6 +343,7 @@ exports.resolveDispute = async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.get('user-agent')
     });
+    console.log("Audit log created for dispute resolution");
 
     res.json({ success: true, txHash: tx.hash });
   } catch (error) {

@@ -688,7 +688,9 @@ contract EscrowContractV2 is
 
     function _payout(address to, address token, uint256 amount) internal {
         if (token == address(0)) {
-            payable(to).transfer(amount);
+            // ✅ FIX 1: Use .call instead of .transfer to prevent Out-Of-Gas reverts when sending to Treasury contracts
+            (bool success, ) = to.call{value: amount}("");
+            require(success, "Native token transfer failed");
         } else {
             IERC20(token).safeTransfer(to, amount);
         }
@@ -864,29 +866,29 @@ contract EscrowContractV2 is
     }
 
     function _resolveEscrow(bytes32 invoiceId, bool sellerWins) internal {
-        Escrow memory e = escrows[invoiceId];
+        // ✅ FIX 2: Use storage instead of memory so updates persist
+        Escrow storage e = escrows[invoiceId]; 
         require(e.status == EscrowStatus.Disputed, "Not disputed");
-
-        delete escrows[invoiceId];
 
         e.disputeResolver = _msgSender();
         e.status = EscrowStatus.Released;
 
         address seller = e.seller;
         address buyer = e.buyer;
-        uint256 amount = e.amount;
         uint256 fee = e.feeAmount;
+
+        uint256 payoutAmount = e.amount;
+        e.amount = 0; // ✅ FIX 3: Zero out the amount to prevent reentrancy instead of deleting the struct
 
         emit DisputeResolved(invoiceId, _msgSender(), sellerWins);
 
-        uint256 payoutAmount = e.amount;
-        if (e.feeAmount > 0) {
-            IERC20(e.token).safeTransfer(treasury, e.feeAmount);
+        if (fee > 0) {
+            _payout(treasury, e.token, fee);
             emit FeeCollected(invoiceId, fee);
-            payoutAmount -= e.feeAmount;
+            payoutAmount -= fee;
         }
 
-        IERC20(e.token).safeTransfer(sellerWins ? seller : buyer, payoutAmount);
+        _payout(sellerWins ? seller : buyer, e.token, payoutAmount);
         _transferNFT(address(this), sellerWins ? buyer : seller, e);
     }
 

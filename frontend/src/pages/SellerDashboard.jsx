@@ -869,7 +869,13 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
       case 'financing': return <FinancingTabComponent />;
       case 'streaming': return <StreamingTabComponent />;
       case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
-      case 'auctions': return <AuctionList />;
+      case 'auctions': 
+        return (
+          <AuctionList 
+            userRole="seller" 
+            eligibleInvoices={invoices.filter(i => i.status === 'pending' || i.status === 'tokenized')} 
+          />
+        );
       case 'governance': return <GovernanceDashboard />;
       default: return <OverviewTab />;
     }

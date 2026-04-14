@@ -1,11 +1,12 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, upgrades } = require("hardhat");
 
 describe("EscrowContract V2 Comprehensive Suite", function () {
   let forwarder, compliance, registry, escrow, token;
   let owner, seller, buyer, treasury, arbitrator, other, manager1;
 
   const INVOICE_ID = ethers.encodeBytes32String("INV-001");
+  const NATIVE_INVOICE_ID = ethers.encodeBytes32String("INV-002");
   const AMOUNT = ethers.parseEther("100");
 
   beforeEach(async function () {
@@ -46,6 +47,9 @@ describe("EscrowContract V2 Comprehensive Suite", function () {
     );
     await escrow.waitForDeployment();
 
+    // 5. Set external treasury
+    await escrow.setTreasury(treasury.address);
+
     // 6. Deploy MockERC20
     const MockERC20Factory = await ethers.getContractFactory("contracts/MockERC20.sol:MockERC20");
     token = await MockERC20Factory.deploy("Test Token", "TEST", ethers.parseEther("10000"));
@@ -59,12 +63,14 @@ describe("EscrowContract V2 Comprehensive Suite", function () {
       expect(await escrow.admin()).to.equal(owner.address);
       expect(await escrow.feePercentage()).to.equal(50n);
       expect(await escrow.minimumEscrowAmount()).to.equal(100n);
+      expect(await escrow.treasury()).to.equal(treasury.address);
     });
 
     it("Should allow admin to update treasury and fees", async function () {
-      await expect(escrow.setTreasury(treasury.address))
+      const newTreasury = other.address;
+      await expect(escrow.setTreasury(newTreasury))
         .to.emit(escrow, "TreasuryUpdated")
-        .withArgs(owner.address, treasury.address);
+        .withArgs(treasury.address, newTreasury);
 
       await expect(escrow.setFeePercentage(100))
         .to.emit(escrow, "FeePercentageUpdated")
@@ -97,20 +103,24 @@ describe("EscrowContract V2 Comprehensive Suite", function () {
       await escrow.createEscrow(INVOICE_ID, seller.address, buyer.address, AMOUNT, token.target, 86400, ethers.ZeroAddress, 0, 0, 0);
 
       await token.connect(buyer).approve(escrow.target, AMOUNT);
-      // V2 Change: deposit no longer takes the amount as an argument
       await escrow.connect(buyer).deposit(INVOICE_ID);
 
       await escrow.connect(buyer).confirmRelease(INVOICE_ID);
       const sellerBefore = await token.balanceOf(seller.address);
+      
       await escrow.connect(seller).confirmRelease(INVOICE_ID);
+      
       const sellerAfter = await token.balanceOf(seller.address);
+      const expectedFee = (AMOUNT * 50n) / 10000n;
+      const expectedPayout = AMOUNT - expectedFee; // Assuming fees might be taken on release depending on logic
 
-      expect(sellerAfter - sellerBefore).to.equal(AMOUNT);
+      // If your standard release routes 100% to seller without taking fees:
+      expect(sellerAfter - sellerBefore).to.equal(AMOUNT); 
     });
   });
 
-  describe("Dispute Resolution", function () {
-    it("Should collect fees and payout winner on dispute resolution", async function () {
+  describe("Dispute Resolution (Storage & Payout Testing)", function () {
+    it("Should resolve dispute using ERC20 Token (Seller Wins) and persist state", async function () {
       await escrow.createEscrow(INVOICE_ID, seller.address, buyer.address, AMOUNT, token.target, 86400, ethers.ZeroAddress, 0, 0, 0);
       await token.connect(buyer).approve(escrow.target, AMOUNT);
       await escrow.connect(buyer).deposit(INVOICE_ID);
@@ -121,14 +131,69 @@ describe("EscrowContract V2 Comprehensive Suite", function () {
       const payout = AMOUNT - fee;
 
       const sellerBefore = await token.balanceOf(seller.address);
-      const treasuryBefore = await token.balanceOf(owner.address);
+      const treasuryBefore = await token.balanceOf(treasury.address);
 
       await expect(escrow.resolveDispute(INVOICE_ID, true))
+        // Explicitly avoid ambiguous event matches
+        .to.emit(escrow, "DisputeResolved(bytes32,address,bool)") 
+        .withArgs(INVOICE_ID, owner.address, true)
         .to.emit(escrow, "FeeCollected")
         .withArgs(INVOICE_ID, fee);
 
-      expect(await token.balanceOf(owner.address) - treasuryBefore).to.equal(fee);
+      expect(await token.balanceOf(treasury.address) - treasuryBefore).to.equal(fee);
       expect(await token.balanceOf(seller.address) - sellerBefore).to.equal(payout);
+
+      // ✅ FIX 2 & 3 Validation: Ensure struct was updated via storage, not deleted
+      const escrowState = await escrow.escrows(INVOICE_ID);
+      expect(escrowState.status).to.equal(3n); // EscrowStatus.Released == 3
+      expect(escrowState.amount).to.equal(0n); // Amount should be securely zeroed
+      expect(escrowState.disputeResolver).to.equal(owner.address); // Resolver properly recorded
+    });
+
+    it("Should resolve dispute using Native ETH/MATIC, route via _payout .call, and persist state (Buyer Wins)", async function () {
+      const ETH_AMOUNT = ethers.parseEther("10");
+      
+      await escrow.createEscrow(
+        NATIVE_INVOICE_ID, 
+        seller.address, 
+        buyer.address, 
+        ETH_AMOUNT, 
+        ethers.ZeroAddress, // Native token flag
+        86400, 
+        ethers.ZeroAddress, 
+        0, 0, 0
+      );
+
+      // Deposit Native ETH
+      await escrow.connect(buyer).deposit(NATIVE_INVOICE_ID, { value: ETH_AMOUNT });
+
+      // Raise Dispute
+      await escrow.connect(buyer).raiseDispute(NATIVE_INVOICE_ID);
+
+      const fee = (ETH_AMOUNT * 50n) / 10000n;
+      const payout = ETH_AMOUNT - fee;
+
+      const buyerBalBefore = await ethers.provider.getBalance(buyer.address);
+      const treasuryBalBefore = await ethers.provider.getBalance(treasury.address);
+
+      await expect(escrow.resolveDispute(NATIVE_INVOICE_ID, false))
+        // Explicitly avoid ambiguous event matches
+        .to.emit(escrow, "DisputeResolved(bytes32,address,bool)")
+        .withArgs(NATIVE_INVOICE_ID, owner.address, false)
+        .to.emit(escrow, "FeeCollected")
+        .withArgs(NATIVE_INVOICE_ID, fee);
+
+      const buyerBalAfter = await ethers.provider.getBalance(buyer.address);
+      const treasuryBalAfter = await ethers.provider.getBalance(treasury.address);
+
+      // Verify native token balances increased correctly using .call without OOG revert
+      expect(buyerBalAfter - buyerBalBefore).to.equal(payout);
+      expect(treasuryBalAfter - treasuryBalBefore).to.equal(fee);
+
+      // ✅ FIX 2 & 3 Validation for Native flow
+      const escrowState = await escrow.escrows(NATIVE_INVOICE_ID);
+      expect(escrowState.status).to.equal(3n); // EscrowStatus.Released == 3
+      expect(escrowState.amount).to.equal(0n); // Amount should be securely zeroed
     });
   });
 
