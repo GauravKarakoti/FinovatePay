@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import './UpgradeManager.css';
 
 const UpgradeManager = () => {
-  const navigate = useNavigate();
   const [proxies, setProxies] = useState([]);
   const [stats, setStats] = useState({ totalProxies: 0, activeProxies: 0, totalUpgrades: 0 });
   const [loading, setLoading] = useState(true);
@@ -29,7 +27,8 @@ const UpgradeManager = () => {
       setLoading(true);
       const response = await api.get('/proxy');
       if (response.data.success) {
-        setProxies(response.data.proxies);
+        // DEFENSIVE: Ensure it's always an array
+        setProxies(Array.isArray(response.data.proxies) ? response.data.proxies : []);
       }
     } catch (err) {
       console.error('Error fetching proxies:', err);
@@ -43,7 +42,8 @@ const UpgradeManager = () => {
     try {
       const response = await api.get('/proxy/stats');
       if (response.data.success) {
-        setStats(response.data.stats);
+        // DEFENSIVE: Fallback to initial state if stats object is missing
+        setStats(response.data.stats || { totalProxies: 0, activeProxies: 0, totalUpgrades: 0 });
       }
     } catch (err) {
       console.error('Error fetching stats:', err);
@@ -54,7 +54,8 @@ const UpgradeManager = () => {
     try {
       const response = await api.get(`/proxy/${contractName}/history`);
       if (response.data.success) {
-        setUpgradeHistory(response.data.history);
+        // DEFENSIVE: Ensure it's always an array
+        setUpgradeHistory(Array.isArray(response.data.history) ? response.data.history : []);
       }
     } catch (err) {
       console.error('Error fetching upgrade history:', err);
@@ -145,10 +146,12 @@ const UpgradeManager = () => {
   };
 
   const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
     return new Date(timestamp).toLocaleString();
   };
 
-  if (loading && proxies.length === 0) {
+  // DEFENSIVE: Fallback checking against proxies.length safely
+  if (loading && (!proxies || proxies.length === 0)) {
     return (
       <div className="upgrade-manager">
         <div className="loading-spinner">Loading...</div>
@@ -173,15 +176,16 @@ const UpgradeManager = () => {
       {/* Stats Overview */}
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-value">{stats.totalProxies}</div>
+          {/* DEFENSIVE OPTIONAL CHAINING */}
+          <div className="stat-value">{stats?.totalProxies || 0}</div>
           <div className="stat-label">Total Proxies</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{stats.activeProxies}</div>
+          <div className="stat-value">{stats?.activeProxies || 0}</div>
           <div className="stat-label">Active Proxies</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{stats.totalUpgrades}</div>
+          <div className="stat-value">{stats?.totalUpgrades || 0}</div>
           <div className="stat-label">Total Upgrades</div>
         </div>
       </div>
@@ -190,7 +194,7 @@ const UpgradeManager = () => {
       <div className="proxies-section">
         <h2>Deployed Proxy Contracts</h2>
         
-        {proxies.length === 0 ? (
+        {!proxies || proxies.length === 0 ? (
           <div className="empty-state">
             <p>No proxy contracts deployed yet.</p>
           </div>
@@ -320,7 +324,7 @@ const UpgradeManager = () => {
           {/* Upgrade History */}
           <div className="upgrade-history">
             <h3>Upgrade History</h3>
-            {upgradeHistory.length === 0 ? (
+            {!upgradeHistory || upgradeHistory.length === 0 ? (
               <p className="empty-history">No upgrades recorded yet.</p>
             ) : (
               <div className="history-list">
@@ -444,4 +448,3 @@ const UpgradeManager = () => {
 };
 
 export default UpgradeManager;
-

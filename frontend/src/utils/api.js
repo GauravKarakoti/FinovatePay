@@ -494,7 +494,7 @@ export const unfreezeAccount = (userId) => {
 };
 
 export const checkCompliance = (walletAddress) => {
-  return api.post('/admin/compliance/check', { walletAddress });
+  return api.post('/admin/check-compliance', { walletAddress });
 };
 
 export const updateUserRole = (userId, role) => {

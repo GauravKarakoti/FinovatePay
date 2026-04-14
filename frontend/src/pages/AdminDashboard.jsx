@@ -16,6 +16,7 @@ import FraudAlerts from '../components/Admin/FraudAlerts';
 import { toast } from 'sonner';
 import { useStatsActions } from '../context/StatsContext';
 import UpgradeManager from '../components/Admin/UpgradeManager';
+import GovernanceDashboard from './GovernanceDashboard';
 
 // Loading Spinner Component
 const LoadingSpinner = () => (
