@@ -13,11 +13,15 @@ const { logAudit } = require('../middleware/auditLogger');
 const { errorResponse } = require('../utils/errorResponse');
 const { getSigner } = require('../config/blockchain');
 
+// ==========================================
+// 1. STATIC ROUTES (Must come before parameterized routes)
+// ==========================================
+
 /**
  * GET /api/proxy/stats
  * Get proxy deployment statistics
  */
-router.get('/stats', async (req, res) => {
+router.get('/stats', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const stats = await proxyService.getProxyStats();
     res.json({
@@ -31,39 +35,10 @@ router.get('/stats', async (req, res) => {
 });
 
 /**
- * GET /api/proxy/:contractName
- * Get proxy information by contract name
- */
-router.get('/:contractName', async (req, res) => {
-  try {
-    const { contractName } = req.params;
-    const proxyInfo = await proxyService.getProxyInfo(contractName);
-    
-    if (!proxyInfo) {
-      return errorResponse(res, 'Proxy not found', 404);
-    }
-    
-    // Get on-chain implementation
-    const onChainImplementation = await proxyService.getCurrentImplementation(proxyInfo.proxy_address);
-    
-    res.json({
-      success: true,
-      proxy: {
-        ...proxyInfo,
-        onChainImplementation
-      }
-    });
-  } catch (error) {
-    console.error('Error getting proxy info:', error);
-    return errorResponse(res, error.message, 500);
-  }
-});
-
-/**
  * GET /api/proxy
  * Get all proxy contracts
  */
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { activeOnly } = req.query;
     const proxies = await proxyService.getAllProxies(activeOnly === 'true');
@@ -98,45 +73,18 @@ router.get('/', async (req, res) => {
   }
 });
 
-/**
- * GET /api/proxy/:contractName/history
- * Get upgrade history for a proxy
- */
-router.get('/:contractName/history', async (req, res) => {
-  try {
-    const { contractName } = req.params;
-    const proxyInfo = await proxyService.getProxyInfo(contractName);
-    
-    if (!proxyInfo) {
-      return errorResponse(res, 'Proxy not found', 404);
-    }
-    
-    const history = await proxyService.getUpgradeHistory(proxyInfo.proxy_address);
-    
-    res.json({
-      success: true,
-      contractName,
-      proxyAddress: proxyInfo.proxy_address,
-      history
-    });
-  } catch (error) {
-    console.error('Error getting upgrade history:', error);
-    return errorResponse(res, error.message, 500);
-  }
-});
+// ==========================================
+// 2. ACTION ROUTES
+// ==========================================
 
 /**
  * POST /api/proxy/deploy
  * Deploy a new proxy contract (Admin only)
  */
-router.post(
-  '/deploy',
-  authenticateToken,
-  requireRole(['admin']),
-  async (req, res) => {
-    const client = await pool?.connect();
-    
+router.post('/deploy', authenticateToken, requireRole(['admin']), async (req, res) => {
+    let client;
     try {
+      client = await pool.connect();
       const {
         contractName,
         implementationAddress,
@@ -211,6 +159,8 @@ router.post(
       }
       
       return errorResponse(res, error.message, 500);
+    } finally {
+        if(client) client.release();
     }
   }
 );
@@ -219,11 +169,7 @@ router.post(
  * POST /api/proxy/upgrade
  * Upgrade an existing proxy (Admin only)
  */
-router.post(
-  '/upgrade',
-  authenticateToken,
-  requireRole(['admin']),
-  async (req, res) => {
+router.post('/upgrade', authenticateToken, requireRole(['admin']), async (req, res) => {
     try {
       const {
         contractName,
@@ -232,12 +178,10 @@ router.post(
         reason
       } = req.body;
       
-      // Validate required fields
       if (!contractName || !newImplementationAddress || !newVersion) {
         return errorResponse(res, 'Missing required fields: contractName, newImplementationAddress, newVersion', 400);
       }
       
-      // Get proxy address from contract name
       const proxyInfo = await proxyService.getProxyInfo(contractName);
       
       if (!proxyInfo) {
@@ -253,7 +197,6 @@ router.post(
         reason || `Upgrade to version ${newVersion}`
       );
       
-      // Log audit event
       await logAudit({
         operationType: 'PROXY_UPGRADE',
         entityType: 'PROXY_CONTRACT',
@@ -282,26 +225,6 @@ router.post(
       });
     } catch (error) {
       console.error('Error upgrading proxy:', error);
-      
-      // Log audit event for failure
-      try {
-        await logAudit({
-          operationType: 'PROXY_UPGRADE',
-          entityType: 'PROXY_CONTRACT',
-          entityId: req.body.contractName,
-          actorId: req.user?.id,
-          actorWallet: req.user?.wallet_address,
-          actorRole: req.user?.role,
-          action: 'UPGRADE',
-          status: 'FAILED',
-          errorMessage: error.message,
-          ipAddress: req.ip,
-          userAgent: req.get('user-agent')
-        });
-      } catch (auditError) {
-        console.error('Error logging audit:', auditError);
-      }
-      
       return errorResponse(res, error.message, 500);
     }
   }
@@ -309,16 +232,10 @@ router.post(
 
 /**
  * POST /api/proxy/verify/:contractName
- * Verify proxy integrity (check on-chain implementation matches database)
  */
-router.post(
-  '/verify/:contractName',
-  authenticateToken,
-  requireRole(['admin']),
-  async (req, res) => {
+router.post('/verify/:contractName', authenticateToken, requireRole(['admin']), async (req, res) => {
     try {
       const { contractName } = req.params;
-      
       const verificationResult = await proxyService.verifyProxyIntegrity(contractName);
       
       res.json({
@@ -334,32 +251,11 @@ router.post(
 
 /**
  * POST /api/proxy/pause/:contractName
- * Pause/deactivate a proxy (Admin only)
  */
-router.post(
-  '/pause/:contractName',
-  authenticateToken,
-  requireRole(['admin']),
-  async (req, res) => {
+router.post('/pause/:contractName', authenticateToken, requireRole(['admin']), async (req, res) => {
     try {
       const { contractName } = req.params;
-      
       const result = await proxyService.pauseProxy(contractName);
-      
-      // Log audit event
-      const signer = getSigner();
-      await logAudit({
-        operationType: 'PROXY_PAUSE',
-        entityType: 'PROXY_CONTRACT',
-        entityId: contractName,
-        actorId: req.user.id,
-        actorWallet: signer.address,
-        actorRole: req.user.role,
-        action: 'PAUSE',
-        status: 'SUCCESS',
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent')
-      });
       
       res.json({
         success: true,
@@ -375,32 +271,11 @@ router.post(
 
 /**
  * POST /api/proxy/unpause/:contractName
- * Unpause/reactivate a proxy (Admin only)
  */
-router.post(
-  '/unpause/:contractName',
-  authenticateToken,
-  requireRole(['admin']),
-  async (req, res) => {
+router.post('/unpause/:contractName', authenticateToken, requireRole(['admin']), async (req, res) => {
     try {
       const { contractName } = req.params;
-      
       const result = await proxyService.unpauseProxy(contractName);
-      
-      // Log audit event
-      const signer = getSigner();
-      await logAudit({
-        operationType: 'PROXY_UNPAUSE',
-        entityType: 'PROXY_CONTRACT',
-        entityId: contractName,
-        actorId: req.user.id,
-        actorWallet: signer.address,
-        actorRole: req.user.role,
-        action: 'UNPAUSE',
-        status: 'SUCCESS',
-        ipAddress: req.ip,
-        userAgent: req.get('user-agent')
-      });
       
       res.json({
         success: true,
@@ -414,14 +289,44 @@ router.post(
   }
 );
 
+// ==========================================
+// 3. PARAMETERIZED ROUTES (Must be last)
+// ==========================================
+
+/**
+ * GET /api/proxy/:contractName/history
+ * Get upgrade history for a proxy
+ */
+router.get('/:contractName/history', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { contractName } = req.params;
+    const proxyInfo = await proxyService.getProxyInfo(contractName);
+    
+    if (!proxyInfo) {
+      return errorResponse(res, 'Proxy not found', 404);
+    }
+    
+    const history = await proxyService.getUpgradeHistory(proxyInfo.proxy_address);
+    
+    res.json({
+      success: true,
+      contractName,
+      proxyAddress: proxyInfo.proxy_address,
+      history
+    });
+  } catch (error) {
+    console.error('Error getting upgrade history:', error);
+    return errorResponse(res, error.message, 500);
+  }
+});
+
 /**
  * GET /api/proxy/:contractName/implementation
  * Get current implementation address from blockchain
  */
-router.get('/:contractName/implementation', async (req, res) => {
+router.get('/:contractName/implementation', authenticateToken, requireRole(['admin']), async (req, res) => {
   try {
     const { contractName } = req.params;
-    
     const proxyInfo = await proxyService.getProxyInfo(contractName);
     
     if (!proxyInfo) {
@@ -444,5 +349,33 @@ router.get('/:contractName/implementation', async (req, res) => {
   }
 });
 
-module.exports = router;
+/**
+ * GET /api/proxy/:contractName
+ * Get proxy information by contract name
+ */
+router.get('/:contractName', authenticateToken, requireRole(['admin']), async (req, res) => {
+  try {
+    const { contractName } = req.params;
+    const proxyInfo = await proxyService.getProxyInfo(contractName);
+    
+    if (!proxyInfo) {
+      return errorResponse(res, 'Proxy not found', 404);
+    }
+    
+    // Get on-chain implementation
+    const onChainImplementation = await proxyService.getCurrentImplementation(proxyInfo.proxy_address);
+    
+    res.json({
+      success: true,
+      proxy: {
+        ...proxyInfo,
+        onChainImplementation
+      }
+    });
+  } catch (error) {
+    console.error('Error getting proxy info:', error);
+    return errorResponse(res, error.message, 500);
+  }
+});
 
+module.exports = router;
