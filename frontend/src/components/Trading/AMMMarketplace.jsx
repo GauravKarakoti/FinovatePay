@@ -8,6 +8,7 @@ import {
   getAMMTrades,
   removeAMMLiquidity
 } from '../../utils/api';
+import contractAddresses from '../../../../deployed/contract-addresses.json';
 
 const formatNumber = (value, decimals = 4) => {
   const num = Number(value || 0);
@@ -26,8 +27,8 @@ const AMMMarketplace = () => {
 
   const [addForm, setAddForm] = useState({
     tokenId: '',
-    fractionTokenAddress: '',
-    stablecoinAddress: '',
+    fractionTokenAddress: contractAddresses.fractionToken,
+    stablecoinAddress: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
     fractionAmount: '',
     stableAmount: ''
   });
@@ -41,7 +42,7 @@ const AMMMarketplace = () => {
     pairId: '',
     side: 'BUY_FRACTIONS',
     amountIn: '',
-    minAmountOut: '0'
+    minAmountOut: ''
   });
 
   const selectedPair = useMemo(
@@ -230,20 +231,6 @@ const AMMMarketplace = () => {
             placeholder="Token ID"
             value={addForm.tokenId}
             onChange={(e) => setAddForm((prev) => ({ ...prev, tokenId: e.target.value }))}
-            required
-          />
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            placeholder="Fraction Token Address"
-            value={addForm.fractionTokenAddress}
-            onChange={(e) => setAddForm((prev) => ({ ...prev, fractionTokenAddress: e.target.value }))}
-            required
-          />
-          <input
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            placeholder="Stablecoin Address"
-            value={addForm.stablecoinAddress}
-            onChange={(e) => setAddForm((prev) => ({ ...prev, stablecoinAddress: e.target.value }))}
             required
           />
           <input

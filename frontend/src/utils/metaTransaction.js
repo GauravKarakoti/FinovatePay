@@ -1,7 +1,7 @@
-import { ethers } from 'ethers';
+import contractAddresses from '../../../deployed/contract-addresses.json'
 
 // Get forwarder address from environment
-const FORWARDER_ADDRESS = import.meta.env.VITE_FORWARDER_ADDRESS;
+const FORWARDER_ADDRESS = contractAddresses.MinimalForwarder;
 const GASLESS_ENABLED = import.meta.env.VITE_GASLESS_ENABLED === 'true';
 
 // EIP-712 Domain for MinimalForwarder

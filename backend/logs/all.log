@@ -8436,3 +8436,111 @@
 [2026-04-14 19:57:51:095] [info] [request]: [47db11ba-94c4-486f-8eee-4c6265e47c3f] GET /api/v1/amm/trades
 [2026-04-14 19:57:51:669] [info] [request]: [95472e13-ced0-4d5c-b8a7-a2b6d27adece] GET /api/v1/amm/trades
 [2026-04-14 19:58:19:992] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:11:23:577] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-14 20:11:23:593] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-14 20:11:23:584] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-14 20:11:23:585] [info] [server]: Invoice Sync Worker started
+[2026-04-14 20:11:23:586] [info] [server]: Transaction Recovery Worker started
+[2026-04-14 20:11:23:595] [info] [server]: Compliance listeners started
+[2026-04-14 20:11:23:597] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-14 20:11:23:602] [info] [server]: 🚀 Server running on port 3000
+[2026-04-14 20:11:26:331] [info] [server]: Database connection test completed successfully
+[2026-04-14 20:11:26:629] [info] [server]: Tokenization listener started
+[2026-04-14 20:11:32:174] [info] [request]: [6a27ca5f-0945-4e6a-b41d-376ba07f9c60] GET /api/v1/streaming
+[2026-04-14 20:11:33:367] [info] [request]: [82cd7d2b-ca02-4503-8834-ae86b86ff46a] GET /api/v1/streaming
+[2026-04-14 20:11:40:926] [info] [request]: [cad288c9-a531-48f2-915a-ef912940acb5] GET /api/v1/invoices/seller
+[2026-04-14 20:11:40:942] [info] [request]: [c8f45446-e7ca-4108-91b2-292166f77554] GET /api/v1/kyc/status
+[2026-04-14 20:11:40:954] [info] [request]: [d0ce11f4-bfad-402f-be9f-f870089d6056] GET /api/v1/quotations
+[2026-04-14 20:11:40:964] [info] [request]: [464cddc5-ffde-4bf4-89cc-74ffe2474094] GET /api/v1/produce/lots/seller
+[2026-04-14 20:11:40:969] [info] [request]: [a018b0fd-d021-459d-9b59-b3897aa1d666] GET /api/v1/notifications/subscriptions
+[2026-04-14 20:11:40:975] [info] [request]: [23709d09-8c6b-4cf2-bd46-54d0babc6c4d] GET /api/v1/notifications/push-preferences
+[2026-04-14 20:11:41:528] [info] [request]: [83e7a2ef-2cf8-4691-bc83-ca9e5ef7b7ac] GET /api/v1/invoices/seller
+[2026-04-14 20:11:41:762] [info] [request]: [f2c00a57-2c86-4677-96a3-d240a540ff55] GET /api/v1/kyc/status
+[2026-04-14 20:11:41:798] [info] [request]: [1bf9d6a1-f3e1-4e9e-b1b7-84a7c8bbf743] GET /api/v1/quotations
+[2026-04-14 20:11:43:785] [info] [request]: [69319547-8182-4ec1-9a01-0e545e2bfad2] GET /api/v1/notifications/subscriptions
+[2026-04-14 20:11:43:934] [info] [request]: [8e22912f-19d6-4183-9a30-cc1d9af501aa] GET /api/v1/notifications/push-preferences
+[2026-04-14 20:11:44:223] [info] [request]: [ac7e4622-9fe3-4f32-8f97-490e978a715d] GET /api/v1/produce/lots/seller
+[2026-04-14 20:11:48:768] [info] [request]: [d0a118ac-6550-41d9-af8c-84bee199f13d] GET /api/v1/amm/positions/me
+[2026-04-14 20:11:48:776] [info] [request]: [98854b40-5086-4eab-91ff-8ef4afa0b9df] GET /api/v1/amm/pairs
+[2026-04-14 20:11:49:118] [info] [request]: [b5f518be-3bd2-4cc7-93e6-ac7552ae2d2d] GET /api/v1/amm/pairs
+[2026-04-14 20:11:49:429] [info] [request]: [4981865d-5cda-4d1b-84de-643a27bfe679] GET /api/v1/amm/positions/me
+[2026-04-14 20:11:49:452] [info] [request]: [ac5e648f-fb08-4716-ac1d-a89159c3fb40] GET /api/v1/amm/trades
+[2026-04-14 20:11:50:024] [info] [request]: [e1575253-7246-4bec-891a-7f4985d257b4] GET /api/v1/amm/trades
+[2026-04-14 20:11:53:878] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:12:23:894] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:12:53:933] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:13:24:042] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:13:28:015] [info] [request]: [b8c05a1a-e132-4d08-8a14-be6f3849c3cd] GET /api/v1/amm/pairs
+[2026-04-14 20:13:28:022] [info] [request]: [c5592b10-ecca-447d-ab99-fcc750e56984] GET /api/v1/amm/positions/me
+[2026-04-14 20:13:28:346] [info] [request]: [5a97b99e-9209-4e49-859a-8798973d020c] GET /api/v1/amm/pairs
+[2026-04-14 20:13:28:646] [info] [request]: [75d48fbe-33f3-49e0-b9ac-6a93a68531c1] GET /api/v1/amm/positions/me
+[2026-04-14 20:13:28:658] [info] [request]: [0daddb04-3aff-4833-83a5-c9bde9a858a6] GET /api/v1/amm/trades
+[2026-04-14 20:13:29:248] [info] [request]: [9b2ef2d9-4911-4b33-9237-405a4d528b1b] GET /api/v1/amm/trades
+[2026-04-14 20:13:32:817] [info] [request]: [39af007f-9c10-4b52-b46b-2cca87e22434] GET /api/v1/amm/pairs
+[2026-04-14 20:13:32:821] [info] [request]: [483b27a6-3d49-4ee9-82ee-760a5acb198b] GET /api/v1/amm/positions/me
+[2026-04-14 20:13:33:456] [info] [request]: [2b68ec83-33c6-4339-8f4b-2695614f9c8d] GET /api/v1/amm/trades
+[2026-04-14 20:13:33:615] [info] [request]: [ff0d5562-45e1-4728-bc97-4244ce7998fd] GET /api/v1/lending/eligibility
+[2026-04-14 20:13:34:902] [info] [request]: [c7ca5b43-85bb-4723-b453-60e9145c8118] GET /api/v1/lending/eligibility
+[2026-04-14 20:13:34:914] [info] [request]: [7ac1dc89-9e2c-4e07-be93-c9daad98261f] GET /api/v1/lending/loans
+[2026-04-14 20:13:36:135] [info] [request]: [6b483410-fe75-4709-9615-20eec710704a] GET /api/v1/lending/loans
+[2026-04-14 20:13:53:943] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:13:54:752] [info] [request]: [42359d4f-c628-4da7-a18c-b128b24898e8] GET /api/v1/crosschain/marketplace
+[2026-04-14 20:13:55:988] [info] [request]: [18b8fbf2-538f-4fc6-828d-6e2c544f886c] GET /api/v1/crosschain/marketplace
+[2026-04-14 20:13:57:825] [info] [request]: [40b8d1dc-59a6-431d-9b3c-bc1e73199c32] GET /api/v1/auctions
+[2026-04-14 20:13:58:143] [info] [request]: [dcbd2055-aed4-4d9b-b9d2-5ef6dc59581e] GET /api/v1/auctions
+[2026-04-14 20:14:02:955] [info] [request]: [baeb9e80-9e07-4f43-b3b1-8310a3cb7acb] GET /api/v1/governance/parameters
+[2026-04-14 20:14:02:963] [info] [request]: [e05dee4c-af7c-442d-9994-c2b81b22f5ac] GET /api/v1/governance/stats
+[2026-04-14 20:14:03:881] [info] [request]: [804cd112-e5c6-4605-a73d-9751ab03bed6] GET /api/v1/governance/parameters
+[2026-04-14 20:14:03:890] [info] [request]: [b476b465-2a23-4bc3-b6db-8da66d30358e] GET /api/v1/governance/stats
+[2026-04-14 20:14:03:905] [info] [request]: [557a4b18-c7b2-4291-875b-975cb4a5b983] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-14 20:14:04:839] [info] [request]: [0a765d97-9fd0-41a8-8992-b40848568887] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-14 20:14:04:849] [info] [request]: [64b1c09b-a107-4118-9d95-90f43a39e882] GET /api/v1/governance/stats
+[2026-04-14 20:14:04:863] [info] [request]: [d7ce4bb6-e92c-4ff6-9f10-744dd0ce9cff] GET /api/v1/governance/proposals
+[2026-04-14 20:14:05:848] [info] [request]: [af6c972d-d420-4dec-bf98-53f438fe105e] GET /api/v1/governance/stats
+[2026-04-14 20:14:05:839] [info] [request]: [66ca03bf-3252-4d68-a72b-2f26c37818ba] GET /api/v1/governance/proposals
+[2026-04-14 20:14:08:071] [info] [request]: [cf4856bc-3bff-4dd1-bdf2-dc39b9a26fbd] GET /api/v1/governance/proposals
+[2026-04-14 20:14:08:082] [info] [request]: [81615843-f2e7-44f9-8c29-7386b07574bb] GET /api/v1/governance/stats
+[2026-04-14 20:14:09:749] [info] [request]: [21bf9d91-e67c-4c72-b9d2-b7df818a9b15] GET /api/v1/governance/stats
+[2026-04-14 20:14:09:752] [info] [request]: [61f1a9aa-b5cb-47d9-8fb5-bb93465f173e] GET /api/v1/governance/proposals
+[2026-04-14 20:14:11:247] [info] [request]: [83c233d6-93cc-4c78-87d7-864cafe9788c] GET /api/v1/governance/stats
+[2026-04-14 20:14:11:251] [info] [request]: [aaaff862-f5d9-4b9b-bcd0-7062603dda44] GET /api/v1/governance/proposals
+[2026-04-14 20:14:12:590] [info] [request]: [f54a0a2d-9b6d-40ce-b1ff-df0f06ee6960] GET /api/v1/governance/stats
+[2026-04-14 20:14:12:595] [info] [request]: [001850f1-4f74-40e7-a1f1-99f302fde946] GET /api/v1/governance/proposals
+[2026-04-14 20:14:13:842] [info] [request]: [2aeed456-3f8c-4781-886b-ad6d317b1852] GET /api/v1/governance/proposals
+[2026-04-14 20:14:13:850] [info] [request]: [72058c9c-e3df-4417-86ad-29d8c67270c2] GET /api/v1/governance/stats
+[2026-04-14 20:14:21:128] [info] [request]: [eddca9fe-a115-47ab-a7f4-2f144281440d] PUT /api/v1/auth/role
+[2026-04-14 20:14:22:254] [info] [request]: [8d07de9b-f239-4966-a046-643a5a5a1ec6] GET /api/v1/governance/parameters
+[2026-04-14 20:14:22:260] [info] [request]: [70595d20-d466-4dca-b3b8-91a17752c5c3] GET /api/v1/governance/stats
+[2026-04-14 20:14:22:268] [info] [request]: [e2de43c4-cc7d-4ace-a9d9-7d0ae639eecd] GET /api/v1/financing/marketplace
+[2026-04-14 20:14:22:273] [info] [request]: [e90de47c-d093-44dd-9514-4eced8e1f5ce] GET /api/v1/investor/portfolio
+[2026-04-14 20:14:22:792] [info] [request]: [bbbb546d-99f9-4694-ae8e-fcb3496d2175] GET /api/v1/financing/marketplace
+[2026-04-14 20:14:23:193] [info] [request]: [7cf6f433-d309-4eeb-ba14-e9765a918bca] GET /api/v1/governance/stats
+[2026-04-14 20:14:23:203] [info] [request]: [6146bcbf-5591-4db9-bf0a-32d1680e8e2a] GET /api/v1/governance/parameters
+[2026-04-14 20:14:23:231] [info] [request]: [81624470-1f02-4421-83e8-5b68631cdce7] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-14 20:14:24:875] [info] [server]: User connected: tmff2Xhl5nzTxi2NAAAC | User: 5 | Role: investor
+[2026-04-14 20:14:24:882] [info] [server]: User 5 joined marketplace
+[2026-04-14 20:14:24:871] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-14 20:14:25:172] [info] [request]: [4a55cf58-264a-433e-985b-c4dd86ea0f2d] GET /api/v1/investor/portfolio
+[2026-04-14 20:14:26:122] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:14:26:212] [info] [request]: [b681468a-8446-473e-9d9f-5c91f8bda24b] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-14 20:14:27:462] [info] [request]: [eb6768e8-2999-4762-92df-796a3747df0d] GET /api/v1/analytics/overview
+[2026-04-14 20:14:28:519] [info] [request]: [1090cb44-71bd-4511-b621-3500e33618ce] GET /api/v1/analytics/overview
+[2026-04-14 20:14:28:533] [info] [request]: [fe9b1680-10c9-428d-aa05-b418a0f46e2b] GET /api/v1/analytics/payments
+[2026-04-14 20:14:29:970] [info] [request]: [2eb69337-35d9-4896-b38f-32cb7926b0db] GET /api/v1/analytics/payments
+[2026-04-14 20:14:29:982] [info] [request]: [61718f7a-60c6-41c8-9887-ddedc94b0636] GET /api/v1/analytics/financing
+[2026-04-14 20:14:31:436] [info] [request]: [a70339c0-a175-4c0f-b1ca-9a06a086906c] GET /api/v1/analytics/financing
+[2026-04-14 20:14:42:685] [info] [request]: [abc9d37e-34f6-4f86-ae4e-52a01c996a5b] GET /api/v1/auctions
+[2026-04-14 20:14:42:997] [info] [request]: [b9c1d268-e0b8-4cf3-85c2-e3ca30ddbd36] GET /api/v1/auctions
+[2026-04-14 20:14:52:673] [info] [request]: [8cd25621-ce7f-498a-a67e-3a7f84b0a8f1] GET /api/v1/governance/parameters
+[2026-04-14 20:14:52:679] [info] [request]: [b1a49d98-8dc4-4007-acc3-790608b7e105] GET /api/v1/governance/stats
+[2026-04-14 20:14:53:499] [info] [request]: [6c29b0c7-a97e-48b2-b402-883c7ece79b2] GET /api/v1/governance/stats
+[2026-04-14 20:14:53:648] [info] [request]: [95837e77-0689-48f1-8ccc-618204ea40b1] GET /api/v1/governance/parameters
+[2026-04-14 20:14:53:666] [info] [request]: [bec426da-cc0b-48c1-a2a3-717abf5c27d6] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-14 20:14:53:950] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-14 20:14:54:524] [info] [request]: [d615513c-3e47-4cd0-ad6e-2c1d9978b719] GET /api/v1/governance/proposals
+[2026-04-14 20:14:54:554] [info] [request]: [24bfb6ac-99fa-498c-b611-53f50e971d91] GET /api/v1/governance/stats
+[2026-04-14 20:14:54:563] [info] [request]: [ed77bde3-02ef-4179-9227-413f7f1aa748] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-14 20:14:55:445] [info] [request]: [3f9b87d4-0b29-418c-8692-3231b5078d4b] GET /api/v1/governance/proposals
+[2026-04-14 20:14:55:468] [info] [request]: [11c4ccd2-b74d-4444-b29b-946e52c99dae] GET /api/v1/governance/stats
+[2026-04-14 20:14:56:958] [info] [request]: [8a481f95-f1ee-4e11-89ae-6747a45569b2] GET /api/v1/auctions
+[2026-04-14 20:14:57:252] [info] [request]: [56b4b7a5-8cb1-4471-bb01-49633aa76c15] GET /api/v1/auctions
