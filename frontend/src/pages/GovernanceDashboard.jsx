@@ -3,6 +3,9 @@ import { getGovernanceParameters, getVotingPower, getGovernanceStats } from '../
 import { toast } from 'sonner';
 import ProposalList from '../components/Governance/ProposalList';
 import ProposalDetail from '../components/Governance/ProposalDetail';
+// 1. Import the new component
+import { BuyFNToken } from '../components/TokenSale/BuyFNToken';
+import contractAddresses from '../../../deployed/contract-addresses.json';
 
 const GovernanceDashboard = () => {
   const [activeView, setActiveView] = useState('list');
@@ -12,6 +15,9 @@ const GovernanceDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState('user');
+  
+  // 2. Add state to toggle the Buy UI
+  const [showBuyToken, setShowBuyToken] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -133,59 +139,99 @@ const GovernanceDashboard = () => {
 
         {/* Eligibility Status Card */}
         {activeView === 'list' && !loading && (
-          <div className="bg-white p-6 rounded-lg shadow mb-6 border-l-4 border-blue-500">
-            <h2 className="text-xl font-semibold mb-4">Governance Eligibility</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-4 border border-gray-100 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-gray-800">Voting Rights</h3>
-                  {canVote ? (
-                    <span className="text-green-600 font-medium text-sm flex items-center">✅ Eligible</span>
-                  ) : (
-                    <span className="text-gray-500 font-medium text-sm flex items-center">❌ Not Eligible</span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  {canVote 
-                    ? "You have voting power and can participate in active proposals." 
-                    : "You need at least 1 FN token voting power to vote on proposals. Buy or stake tokens to participate."}
-                </p>
-              </div>
-              
-              <div className="p-4 border border-gray-100 bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-gray-800">Proposal Creation</h3>
-                  {canPropose ? (
-                    <span className="text-green-600 font-medium text-sm flex items-center">✅ Eligible</span>
-                  ) : (
-                    <span className="text-yellow-600 font-medium text-sm flex items-center">⚠️ Action Required</span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600 mt-2">
-                  {canPropose 
-                    ? "You have sufficient voting power and the correct role to create new governance proposals." 
-                    : "You do not meet the protocol requirements to submit a new proposal yet:"}
-                </p>
+          <>
+            <div className="bg-white p-6 rounded-lg shadow mb-6 border-l-4 border-blue-500">
+              <h2 className="text-xl font-semibold mb-4">Governance Eligibility</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {!canPropose && (
-                  <ul className="mt-3 space-y-2">
-                    {!hasRequiredRole && (
-                      <li className="text-xs text-red-500 flex items-start">
-                        <span className="mr-2">•</span> 
-                        <span>Role requirement: You must be an 'investor'. Your current role is '{userRole}'.</span>
-                      </li>
+                <div className="p-4 border border-gray-100 bg-gray-50 rounded-lg flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-medium text-gray-800">Voting Rights</h3>
+                      {canVote ? (
+                        <span className="text-green-600 font-medium text-sm flex items-center">✅ Eligible</span>
+                      ) : (
+                        <span className="text-gray-500 font-medium text-sm flex items-center">❌ Not Eligible</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">
+                      {canVote 
+                        ? "You have voting power and can participate in active proposals." 
+                        : "You need at least 1 FN token voting power to vote on proposals. Buy or stake tokens to participate."}
+                    </p>
+                  </div>
+                  {/* 3. Add CTA button if they cannot vote */}
+                  {!canVote && !showBuyToken && (
+                    <button
+                      onClick={() => setShowBuyToken(true)}
+                      className="mt-4 self-start px-4 py-2 bg-blue-100 text-blue-700 text-sm font-medium rounded-md hover:bg-blue-200 transition-colors"
+                    >
+                      Buy FN Tokens
+                    </button>
+                  )}
+                </div>
+                
+                <div className="p-4 border border-gray-100 bg-gray-50 rounded-lg flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-medium text-gray-800">Proposal Creation</h3>
+                      {canPropose ? (
+                        <span className="text-green-600 font-medium text-sm flex items-center">✅ Eligible</span>
+                      ) : (
+                        <span className="text-yellow-600 font-medium text-sm flex items-center">⚠️ Action Required</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">
+                      {canPropose 
+                        ? "You have sufficient voting power and the correct role to create new governance proposals." 
+                        : "You do not meet the protocol requirements to submit a new proposal yet:"}
+                    </p>
+                    
+                    {!canPropose && (
+                      <ul className="mt-3 space-y-2">
+                        {!hasRequiredRole && (
+                          <li className="text-xs text-red-500 flex items-start">
+                            <span className="mr-2">•</span> 
+                            <span>Role requirement: You must be an 'investor'. Your current role is '{userRole}'.</span>
+                          </li>
+                        )}
+                        {votingPower < proposalThreshold && (
+                          <li className="text-xs text-red-500 flex items-start">
+                            <span className="mr-2">•</span> 
+                            <span>Power requirement: You need {missingForProposal.toLocaleString()} more FN tokens to reach the {proposalThreshold.toLocaleString()} threshold.</span>
+                          </li>
+                        )}
+                      </ul>
                     )}
-                    {votingPower < proposalThreshold && (
-                      <li className="text-xs text-red-500 flex items-start">
-                        <span className="mr-2">•</span> 
-                        <span>Power requirement: You need {missingForProposal.toLocaleString()} more FN tokens to reach the {proposalThreshold.toLocaleString()} threshold.</span>
-                      </li>
-                    )}
-                  </ul>
-                )}
+                  </div>
+                  {/* 4. Add CTA button if they lack proposing power */}
+                  {!canPropose && votingPower < proposalThreshold && !showBuyToken && (
+                    <button
+                      onClick={() => setShowBuyToken(true)}
+                      className="mt-4 self-start px-4 py-2 bg-blue-100 text-blue-700 text-sm font-medium rounded-md hover:bg-blue-200 transition-colors"
+                    >
+                      Acquire More Tokens
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+
+            {/* 5. Render the Buy Token Component Inline when toggled */}
+            {showBuyToken && (
+              <div className="mb-6 relative animate-fade-in-down">
+                <button 
+                  onClick={() => setShowBuyToken(false)} 
+                  className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 z-10"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+                {/* Fallback to import.meta.env if you set your contract address in env vars */}
+                <BuyFNToken saleContractAddress={contractAddresses.FNSale} />
+              </div>
+            )}
+          </>
         )}
 
         {/* Main Content */}
