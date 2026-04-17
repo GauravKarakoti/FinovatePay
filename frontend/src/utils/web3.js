@@ -10,6 +10,7 @@ import FractionTokenArtifact from '../../../deployed/FractionToken.json';
 import contractAddresses from '../../../deployed/contract-addresses.json';
 import FinancingManagerArtifact from '../../../deployed/FinancingManager.json';
 import ERC20Artifact from '../../../deployed/ERC20.json';
+import FinovateTokenArtifact from '../../../deployed/FinovateToken.json';
 
 // Stablecoin addresses on Polygon Amoy
 export const stablecoinAddresses = {
@@ -104,6 +105,23 @@ export function getConnectedAddress() {
   } catch (error) {
     return null;
   }
+}
+
+export async function getFinovateTokenContract() {
+  const { signer } = await connectWallet();
+  return new Contract(contractAddresses.FinovateToken, FinovateTokenArtifact.abi, signer);
+}
+
+export async function delegateVotes(delegateeAddress) {
+  const contract = await getFinovateTokenContract();
+  
+  // 1. Fetch the enforced gas overrides for Amoy
+  const gasOverrides = await getAmoyGasOverrides();
+  
+  // 2. Pass the gasOverrides as the final argument to the contract call
+  const tx = await contract.delegate(delegateeAddress, gasOverrides);
+  
+  return await tx.wait();
 }
 
 // Ensure user is on Amoy network
