@@ -27,7 +27,6 @@ import {
   getProduceTrackingContract
 } from '../utils/web3';
 import { NATIVE_CURRENCY_ADDRESS } from '../utils/constants';
-import GovernanceDashboard from '../pages/GovernanceDashboard';
 import StatsCard from '../components/Dashboard/StatsCard';
 import InvoiceList from '../components/Invoice/InvoiceList';
 import KYCStatus from '../components/KYC/KYCStatus';
@@ -876,7 +875,6 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
             eligibleInvoices={invoices.filter(i => i.status === 'pending' || i.status === 'tokenized')} 
           />
         );
-      case 'governance': return <GovernanceDashboard />;
       default: return <OverviewTab />;
     }
   };

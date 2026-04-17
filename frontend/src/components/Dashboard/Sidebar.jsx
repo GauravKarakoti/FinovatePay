@@ -64,7 +64,9 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
     tabs.push({ id: 'auctions', label: 'Auctions', icon: '🏷️' });
   }
 
-  tabs.push({ id: 'governance', label: 'Governance', icon: '🏛️' });
+  if (['investor', 'admin'].includes(user?.role)) {
+    tabs.push({ id: 'governance', label: 'Governance', icon: '🏛️' });
+  }
 
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });

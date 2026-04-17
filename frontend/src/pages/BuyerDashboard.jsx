@@ -28,7 +28,6 @@ import KYCVerification from '../components/KYC/KYCVerification';
 import { useStatsActions } from '../context/StatsContext';
 import FiatOnRamp from '../components/FiatOnRamp';
 import FiatOnRampModal from '../components/Dashboard/FiatOnRampModal';
-import GovernanceDashboard from './GovernanceDashboard';
 import StreamingTab from '../components/Streaming/StreamingTab';
 
 // Loading Spinner Component
@@ -890,7 +889,6 @@ const BuyerDashboard = ({ activeTab = 'overview' }) => {
       case 'payments': return <PaymentsTab />;
       case 'escrow': return <EscrowTab />;
       case 'produce': return <ProduceTab />;
-      case 'governance': return <GovernanceDashboard />;
       case 'streaming': return <StreamingTab userRole="buyer" />;
       default: return <OverviewTab />;
     }

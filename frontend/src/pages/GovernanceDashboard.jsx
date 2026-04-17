@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getGovernanceParameters, getVotingPower, getGovernanceStats } from '../utils/api';
 import { toast } from 'sonner';
 import ProposalList from '../components/Governance/ProposalList';
@@ -11,6 +11,7 @@ const GovernanceDashboard = () => {
   const [votingPower, setVotingPower] = useState(0);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState('user');
 
   useEffect(() => {
     loadData();
@@ -28,14 +29,33 @@ const GovernanceDashboard = () => {
       setParameters(paramsRes.data.parameters || []);
       setStats(statsRes.data.stats);
       
-      // Get user's voting power
+      // Get user data
       const user = JSON.parse(localStorage.getItem('user'));
-      if (user?.wallet_address) {
-        const vpRes = await getVotingPower(user.wallet_address);
-        setVotingPower(Number(vpRes.data.votingPower?.votes || 0));
+      if (user) {
+        setUserRole(user.role || 'user');
+        
+        if (user.wallet_address) {
+          const vpRes = await getVotingPower(user.wallet_address);
+          let rawVotes = vpRes.data.votingPower?.votes || 0;
+          
+          // Normalize if the votes are returned in Wei (18 decimals)
+          let parsedVotes = 0;
+          try {
+            if (rawVotes.toString().length > 15) {
+              parsedVotes = Number(BigInt(rawVotes) / 1000000000000000000n);
+            } else {
+              parsedVotes = Number(rawVotes);
+            }
+          } catch (e) {
+            parsedVotes = Number(rawVotes);
+          }
+          
+          setVotingPower(parsedVotes);
+        }
       }
     } catch (error) {
       console.error('Error loading governance data:', error);
+      toast.error('Failed to load governance data');
     } finally {
       setLoading(false);
     }
@@ -50,6 +70,25 @@ const GovernanceDashboard = () => {
     setSelectedProposal(null);
     setActiveView('list');
   };
+
+  // Extract threshold and calculate eligibility
+  const getProposalThreshold = () => {
+    const param = parameters.find(p => p.parameter_name === 'proposalThreshold');
+    if (!param) return 100000; // Fallback
+    try {
+      // Normalize from Wei
+      return Number(BigInt(param.current_value) / 1000000000000000000n);
+    } catch (e) {
+      return 100000;
+    }
+  };
+
+  const proposalThreshold = getProposalThreshold();
+  const missingForProposal = Math.max(0, proposalThreshold - votingPower);
+  
+  const canVote = votingPower > 0;
+  const hasRequiredRole = ['admin', 'investor'].includes(userRole);
+  const canPropose = votingPower >= proposalThreshold && hasRequiredRole;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -92,6 +131,63 @@ const GovernanceDashboard = () => {
           </div>
         </div>
 
+        {/* Eligibility Status Card */}
+        {activeView === 'list' && !loading && (
+          <div className="bg-white p-6 rounded-lg shadow mb-6 border-l-4 border-blue-500">
+            <h2 className="text-xl font-semibold mb-4">Governance Eligibility</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 border border-gray-100 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-gray-800">Voting Rights</h3>
+                  {canVote ? (
+                    <span className="text-green-600 font-medium text-sm flex items-center">✅ Eligible</span>
+                  ) : (
+                    <span className="text-gray-500 font-medium text-sm flex items-center">❌ Not Eligible</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {canVote 
+                    ? "You have voting power and can participate in active proposals." 
+                    : "You need at least 1 FN token voting power to vote on proposals. Buy or stake tokens to participate."}
+                </p>
+              </div>
+              
+              <div className="p-4 border border-gray-100 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-gray-800">Proposal Creation</h3>
+                  {canPropose ? (
+                    <span className="text-green-600 font-medium text-sm flex items-center">✅ Eligible</span>
+                  ) : (
+                    <span className="text-yellow-600 font-medium text-sm flex items-center">⚠️ Action Required</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  {canPropose 
+                    ? "You have sufficient voting power and the correct role to create new governance proposals." 
+                    : "You do not meet the protocol requirements to submit a new proposal yet:"}
+                </p>
+                
+                {!canPropose && (
+                  <ul className="mt-3 space-y-2">
+                    {!hasRequiredRole && (
+                      <li className="text-xs text-red-500 flex items-start">
+                        <span className="mr-2">•</span> 
+                        <span>Role requirement: You must be an 'investor'. Your current role is '{userRole}'.</span>
+                      </li>
+                    )}
+                    {votingPower < proposalThreshold && (
+                      <li className="text-xs text-red-500 flex items-start">
+                        <span className="mr-2">•</span> 
+                        <span>Power requirement: You need {missingForProposal.toLocaleString()} more FN tokens to reach the {proposalThreshold.toLocaleString()} threshold.</span>
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Content */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
@@ -114,7 +210,12 @@ const GovernanceDashboard = () => {
               {parameters.map((param) => (
                 <div key={param.parameter_name} className="p-3 bg-gray-50 rounded-lg">
                   <div className="text-sm text-gray-500">{param.parameter_name.replace(/_/g, ' ')}</div>
-                  <div className="font-semibold text-lg">{param.current_value}</div>
+                  <div className="font-semibold text-lg">
+                    {/* Make extremely large WEI values readable */}
+                    {param.current_value.length > 15 
+                      ? Number(BigInt(param.current_value) / 1000000000000000000n).toLocaleString() 
+                      : param.current_value}
+                  </div>
                   {param.is_governable && (
                     <div className="text-xs text-green-600 mt-1">✓ Governable</div>
                   )}
@@ -129,4 +230,3 @@ const GovernanceDashboard = () => {
 };
 
 export default GovernanceDashboard;
-

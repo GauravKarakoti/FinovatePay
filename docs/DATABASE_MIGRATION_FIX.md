@@ -107,7 +107,7 @@ npm run migrate:target 010   # Run up to specific version
 23. Revolving credit lines
 24. Yield pool tables
 25. Multi-sig wallets
-26. Governance system
+26.  system
 27. Proxy tracking
 28. Multi-currency support
 29. Credit risk profiles

@@ -9624,3 +9624,107 @@
 [2026-04-17 20:10:25:699] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-17 20:10:55:656] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-17 20:11:25:707] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:25:41:088] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-17 20:25:41:105] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-17 20:25:41:094] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-17 20:25:41:095] [info] [server]: Invoice Sync Worker started
+[2026-04-17 20:25:41:096] [info] [server]: Transaction Recovery Worker started
+[2026-04-17 20:25:41:105] [info] [server]: Compliance listeners started
+[2026-04-17 20:25:41:110] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-17 20:25:41:115] [info] [server]: 🚀 Server running on port 3000
+[2026-04-17 20:25:43:798] [info] [server]: Database connection test completed successfully
+[2026-04-17 20:25:44:550] [info] [server]: Tokenization listener started
+[2026-04-17 20:25:56:320] [info] [request]: [7bfe61fc-2734-4146-bebb-b1128a177cdf] GET /api/v1/governance/parameters
+[2026-04-17 20:25:56:327] [info] [request]: [69b76833-0764-4560-82b8-52f640a46991] GET /api/v1/governance/stats
+[2026-04-17 20:25:57:582] [info] [request]: [88d6058b-f262-4317-903b-84c7c6098912] GET /api/v1/governance/parameters
+[2026-04-17 20:25:57:590] [info] [request]: [ad5b8d9d-01e8-486c-b717-d831b8fd792f] GET /api/v1/governance/stats
+[2026-04-17 20:25:57:605] [info] [request]: [072169a8-af61-4ae4-a548-fc29139de8cb] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:25:58:486] [info] [request]: [20bc8ef6-b38f-405b-b04e-dd2b47f13bf0] GET /api/v1/governance/stats
+[2026-04-17 20:25:58:491] [info] [request]: [b08707d2-eae9-4e16-b3f2-fdd0a2a26a5d] GET /api/v1/governance/proposals
+[2026-04-17 20:25:58:496] [info] [request]: [0ef8fcb5-bcff-48ce-820a-3a0debe74ae5] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:25:59:410] [info] [request]: [2aa2b325-4c35-4c2a-9e04-6098bd8cb027] GET /api/v1/governance/proposals
+[2026-04-17 20:25:59:420] [info] [request]: [43f6e5f8-f485-4247-a920-0d5b635aff84] GET /api/v1/governance/stats
+[2026-04-17 20:26:11:392] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:26:41:369] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:27:11:396] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:27:16:302] [info] [request]: [3068b278-e966-4bbb-9de5-df5ad231e1c3] POST /api/v1/auth/login
+[2026-04-17 20:27:17:295] [info] [request]: [a60ce985-0b10-44cd-9774-294e18d596fc] GET /api/v1/notifications/subscriptions
+[2026-04-17 20:27:17:302] [info] [request]: [7df12440-28f4-4675-8911-7070123357aa] GET /api/v1/notifications/push-preferences
+[2026-04-17 20:27:17:337] [info] [request]: [563dcb66-7fb8-4e41-8e96-0d2dc018e9e5] GET /api/v1/kyc/status
+[2026-04-17 20:27:17:843] [info] [request]: [f9cb0f00-2589-41e0-8430-27ff5c463dfb] GET /api/v1/notifications/push-preferences
+[2026-04-17 20:27:17:854] [info] [request]: [65beac34-239b-43e1-9187-a7053975fc0d] GET /api/v1/notifications/subscriptions
+[2026-04-17 20:27:18:117] [info] [request]: [fa1932ee-b9b9-4c19-8bf0-0e79e4af53d6] GET /api/v1/kyc/status
+[2026-04-17 20:27:18:147] [info] [request]: [bed5d70f-21cb-4db7-bf7e-2d2ad4daeb82] GET /api/v1/governance/parameters
+[2026-04-17 20:27:18:156] [info] [request]: [54db67fe-1d8a-4bd3-afec-fe026c594130] GET /api/v1/governance/stats
+[2026-04-17 20:27:20:976] [info] [request]: [d7780d3d-43e5-4c13-a06a-9b7b43e8dc44] GET /api/v1/governance/parameters
+[2026-04-17 20:27:21:897] [info] [request]: [a58c18e3-2d70-4061-bfd8-abfb3e890c3a] GET /api/v1/governance/stats
+[2026-04-17 20:27:21:916] [info] [request]: [023dbb22-fee9-476d-bb98-054c9ca0fb8e] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:27:22:800] [info] [request]: [9168d917-ec1d-41b5-b8eb-eb8ec43ea97e] GET /api/v1/governance/stats
+[2026-04-17 20:27:22:814] [info] [request]: [e04168d7-936e-4980-8606-cd936d989ba8] GET /api/v1/governance/proposals
+[2026-04-17 20:27:22:824] [info] [request]: [64ebf97d-07cb-468a-88d6-6b2b5e3e3687] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:27:23:697] [info] [request]: [acf848a6-c556-4852-85d0-36cd78141872] GET /api/v1/governance/proposals
+[2026-04-17 20:27:23:702] [info] [request]: [6c05d460-599f-453e-bcb7-20f4bf6cf17c] GET /api/v1/governance/stats
+[2026-04-17 20:27:41:405] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:28:11:386] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:28:41:414] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:29:11:411] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:29:41:426] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:29:47:268] [info] [request]: [deec54eb-35fe-4dac-81bc-ee573862f131] GET /api/v1/notifications/subscriptions
+[2026-04-17 20:29:47:277] [info] [request]: [a38a398c-145d-4c88-8130-9b725e7d892d] GET /api/v1/notifications/push-preferences
+[2026-04-17 20:29:47:309] [info] [request]: [287a327a-9198-461b-9f3a-4b8eaa9c3839] GET /api/v1/kyc/status
+[2026-04-17 20:29:47:791] [info] [request]: [9a919b69-7f7c-4a40-88cf-04e2cfbec33c] GET /api/v1/notifications/push-preferences
+[2026-04-17 20:29:47:812] [info] [request]: [b67065e7-4c24-469f-820a-fd9b3c0918a3] GET /api/v1/notifications/subscriptions
+[2026-04-17 20:29:48:085] [info] [request]: [41866db3-379f-43f8-8812-0c25e935201b] GET /api/v1/kyc/status
+[2026-04-17 20:30:11:447] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:30:35:366] [info] [request]: [e3490591-c93a-4839-9d07-4b05d65cbbf2] PUT /api/v1/auth/role
+[2026-04-17 20:30:36:509] [info] [request]: [c82306fc-b6d5-4d12-8692-82c817331e8a] GET /api/v1/governance/parameters
+[2026-04-17 20:30:36:515] [info] [request]: [44b384d5-f132-4076-bd89-6a19bbe0782f] GET /api/v1/governance/stats
+[2026-04-17 20:30:36:539] [info] [request]: [352765ae-4f05-43e9-a8cb-eedc9aac8b30] GET /api/v1/financing/marketplace
+[2026-04-17 20:30:36:544] [info] [request]: [081cc093-5552-4327-9c94-b2fad850e916] GET /api/v1/investor/portfolio
+[2026-04-17 20:30:36:836] [info] [server]: User connected: cvWSSVRXvzty0UX_AAAC | User: 5 | Role: investor
+[2026-04-17 20:30:36:841] [info] [server]: User 5 joined marketplace
+[2026-04-17 20:30:36:833] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-17 20:30:37:136] [info] [request]: [d3dea860-9b76-431a-bcc7-81c3ab134632] GET /api/v1/financing/marketplace
+[2026-04-17 20:30:37:377] [info] [request]: [fa20bac6-df51-4985-943c-4f1344b03925] GET /api/v1/governance/parameters
+[2026-04-17 20:30:37:384] [info] [request]: [a5bdc2cf-e589-49d9-8398-191082c410de] GET /api/v1/governance/stats
+[2026-04-17 20:30:37:406] [info] [request]: [9450f574-9827-42dd-915a-1dddab68a86a] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:30:38:317] [info] [request]: [d3a51c8a-6389-4a2e-a46b-7f4306e037b1] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:30:38:350] [info] [request]: [11446d38-d777-4c49-8e1b-0a5b28097b4b] GET /api/v1/governance/stats
+[2026-04-17 20:30:38:354] [info] [request]: [7894968c-836d-439b-b8f0-954346e5e1b1] GET /api/v1/governance/proposals
+[2026-04-17 20:30:39:188] [info] [request]: [3276b39c-3a79-4017-bbe2-5fd4c8261051] GET /api/v1/governance/proposals
+[2026-04-17 20:30:39:215] [info] [request]: [bbb4cab2-7a96-48a1-820a-3f6ba864e55f] GET /api/v1/governance/stats
+[2026-04-17 20:30:39:488] [info] [request]: [fc299e4a-939a-4f8c-a75e-9186707e5d81] GET /api/v1/investor/portfolio
+[2026-04-17 20:30:41:449] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:30:55:167] [info] [request]: [0dcd2b38-00c9-4413-8b76-148b2f32129a] PUT /api/v1/auth/role
+[2026-04-17 20:30:56:090] [info] [server]: User disconnected: cvWSSVRXvzty0UX_AAAC
+[2026-04-17 20:30:56:233] [info] [request]: [879608c8-b9c9-43a3-825e-b6990e7884e6] GET /api/v1/kyc/status
+[2026-04-17 20:30:57:102] [info] [request]: [1e87373e-972c-4ee3-acd2-0af3cd75156a] GET /api/v1/kyc/status
+[2026-04-17 20:31:00:731] [info] [request]: [44b81001-4c0d-4811-b877-51e74b2bda3b] GET /api/v1/quotations/pending-for-buyer
+[2026-04-17 20:31:06:396] [info] [request]: [7a106353-0338-427e-bf50-564b2f63d246] GET /api/v1/invoices/buyer
+[2026-04-17 20:31:07:134] [info] [request]: [2f8e52a9-e0ca-4ffc-abcc-c7644b94dc61] GET /api/v1/invoices/buyer
+[2026-04-17 20:31:07:141] [info] [request]: [c7478ba8-c8b6-4e43-a875-71c66443173a] GET /api/v1/kyc/status
+[2026-04-17 20:31:07:756] [info] [request]: [cf861cea-14f9-4d1f-b69c-aa4939ee745a] GET /api/v1/invoices/buyer
+[2026-04-17 20:31:08:060] [info] [request]: [34de58b6-5ba9-40db-8d4a-73351d1ddda0] GET /api/v1/kyc/status
+[2026-04-17 20:31:08:352] [info] [request]: [99abd77f-3823-4d0b-87af-e739de7a0a63] GET /api/v1/invoices/buyer
+[2026-04-17 20:31:09:702] [info] [request]: [241398ca-c0a7-4852-b3a2-5610be5a0442] GET /api/v1/invoices/buyer
+[2026-04-17 20:31:11:458] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:31:12:172] [info] [request]: [a75bb500-4e9d-4ce8-a01e-f7c9d9579599] PUT /api/v1/auth/role
+[2026-04-17 20:31:13:145] [info] [request]: [813fca05-5da9-441c-8e1f-08882a6341c4] GET /api/v1/financing/marketplace
+[2026-04-17 20:31:13:151] [info] [request]: [6f14746a-fa5b-4644-a462-4739703bc73f] GET /api/v1/investor/portfolio
+[2026-04-17 20:31:13:412] [info] [server]: User connected: apHl2t0ICNzygldhAAAF | User: 5 | Role: investor
+[2026-04-17 20:31:13:414] [info] [server]: User 5 joined marketplace
+[2026-04-17 20:31:13:411] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-17 20:31:13:664] [info] [request]: [c37af43b-c73f-44d0-8639-948d389a981c] GET /api/v1/investor/portfolio
+[2026-04-17 20:31:13:698] [info] [request]: [50b95a16-171c-4a1e-97ab-f9598fe4ab29] GET /api/v1/financing/marketplace
+[2026-04-17 20:31:16:739] [info] [request]: [b8d7fa2c-423e-4068-8f3b-c1dcfb94940d] GET /api/v1/auctions
+[2026-04-17 20:31:17:069] [info] [request]: [254bcf83-15da-45c0-9987-5ad5a9324622] GET /api/v1/auctions
+[2026-04-17 20:31:17:477] [info] [request]: [f80013ec-2f2b-4227-8114-8e359f24ae93] GET /api/v1/governance/parameters
+[2026-04-17 20:31:17:485] [info] [request]: [9cc5b73a-574b-4ed5-a49d-45420ecce52c] GET /api/v1/governance/stats
+[2026-04-17 20:31:18:403] [info] [request]: [3f83598f-8e8c-4144-b93e-8d2423e24c0a] GET /api/v1/governance/stats
+[2026-04-17 20:31:18:408] [info] [request]: [7cd6993e-c2b7-40ed-b7a5-39248e31b2ea] GET /api/v1/governance/parameters
+[2026-04-17 20:31:18:426] [info] [request]: [29175beb-7877-4895-b86c-c0f462f8afd1] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:31:19:375] [info] [request]: [222c6ab4-9149-4d63-b08b-0e04a19a571b] GET /api/v1/governance/stats
+[2026-04-17 20:31:19:382] [info] [request]: [b3fdfa60-ece2-4831-be5d-682dd0a124af] GET /api/v1/governance/proposals
+[2026-04-17 20:31:19:389] [info] [request]: [18b5a457-7a8e-47b8-83b0-ffe2000f918c] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:31:20:348] [info] [request]: [52ea5889-bd9f-43fa-bd9f-d3a1954e958f] GET /api/v1/governance/proposals
+[2026-04-17 20:31:20:353] [info] [request]: [3b1f5431-7b8a-4d40-a4c8-b2f2650317c6] GET /api/v1/governance/stats
