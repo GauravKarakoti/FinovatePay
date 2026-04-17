@@ -9520,3 +9520,107 @@
 [2026-04-17 19:52:58:010] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-17 19:53:27:986] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-17 19:53:57:975] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 19:58:55:160] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-17 19:58:55:174] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-17 19:58:55:165] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-17 19:58:55:166] [info] [server]: Invoice Sync Worker started
+[2026-04-17 19:58:55:167] [info] [server]: Transaction Recovery Worker started
+[2026-04-17 19:58:55:175] [info] [server]: Compliance listeners started
+[2026-04-17 19:58:55:177] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-17 19:58:55:182] [info] [server]: 🚀 Server running on port 3000
+[2026-04-17 19:58:57:788] [info] [server]: Database connection test completed successfully
+[2026-04-17 19:58:58:567] [info] [server]: Tokenization listener started
+[2026-04-17 19:59:03:959] [info] [request]: [54f96826-c819-4272-9675-45de623ddb0e] GET /api/v1/admin/users
+[2026-04-17 19:59:03:964] [info] [request]: [2ac205b0-b1b7-433c-82b9-74e9c17763bc] GET /api/v1/admin/invoices
+[2026-04-17 19:59:05:178] [info] [request]: [6a1d9062-895b-4d78-a48a-ffac8bc00b1e] GET /api/v1/admin/invoices
+[2026-04-17 19:59:05:428] [info] [request]: [1e00a713-be57-44ef-8808-5bb311a741f4] GET /api/v1/admin/users
+[2026-04-17 19:59:25:092] [info] [request]: [96cee44e-7a01-46ee-8993-2e661c06b608] GET /api/v1/admin/users
+[2026-04-17 19:59:25:098] [info] [request]: [f8135475-185a-4c2d-9801-30cf62d4fe80] GET /api/v1/admin/invoices
+[2026-04-17 19:59:25:987] [info] [request]: [eb9e62f7-0828-4d75-8501-ec040f3d24ea] GET /api/v1/admin/invoices
+[2026-04-17 19:59:26:275] [info] [request]: [e3c2b4d3-b239-4cfe-93ea-2de3ed8fec27] GET /api/v1/admin/users
+[2026-04-17 19:59:27:770] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 19:59:31:549] [info] [request]: [fbc61559-2d7f-40e7-9034-1ba2490357a5] GET /api/v1/admin/users
+[2026-04-17 19:59:31:556] [info] [request]: [2c42a3a0-3223-4616-8a13-2f7b7426a862] GET /api/v1/admin/invoices
+[2026-04-17 19:59:32:435] [info] [request]: [e486cc33-1a06-40cf-9db6-ea4cf8c7c9e1] GET /api/v1/admin/invoices
+[2026-04-17 19:59:32:780] [info] [request]: [f198cb89-9eac-4052-b6a8-79318c43418d] GET /api/v1/admin/users
+[2026-04-17 19:59:35:647] [info] [request]: [11c26cac-3233-4a7a-a5b8-b53ffd8257c5] GET /api/v1/analytics/overview
+[2026-04-17 19:59:36:751] [info] [request]: [5e9e03ed-d868-46cf-9dc0-eb770bce0c99] GET /api/v1/analytics/overview
+[2026-04-17 19:59:36:763] [info] [request]: [de69763e-e910-4cf1-89a7-df77d2b89639] GET /api/v1/analytics/payments
+[2026-04-17 19:59:38:125] [info] [request]: [08fa5bb4-7a76-4e30-982f-dabc24b150df] GET /api/v1/analytics/payments
+[2026-04-17 19:59:38:137] [info] [request]: [cce59247-55dc-4315-8d3d-4fa83b034a36] GET /api/v1/analytics/financing
+[2026-04-17 19:59:39:574] [info] [request]: [5a3594d2-7fd4-4e5d-b07c-4659a2b064a4] GET /api/v1/governance/parameters
+[2026-04-17 19:59:39:581] [info] [request]: [8a1d8448-3b20-479b-827e-eb64ab10563e] GET /api/v1/analytics/financing
+[2026-04-17 19:59:39:590] [info] [request]: [aec18300-55c5-4db8-95be-95eb2ae89201] GET /api/v1/governance/stats
+[2026-04-17 19:59:40:368] [info] [request]: [ddf7fd1c-06a5-4f2d-a3c7-7c0dd3ce9968] GET /api/v1/governance/stats
+[2026-04-17 19:59:40:400] [info] [request]: [4a308c83-f89a-438e-91b1-fb9691b250d3] GET /api/v1/governance/parameters
+[2026-04-17 19:59:40:423] [info] [request]: [f5afc59e-896f-4aaf-854f-fd915d078a8d] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 19:59:41:269] [info] [request]: [1defc47b-ac62-4962-a94c-2753d50c13fd] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 19:59:41:315] [info] [request]: [0a94ab92-47f9-434a-9efc-d3b74856400d] GET /api/v1/governance/stats
+[2026-04-17 19:59:41:323] [info] [request]: [9f4a752c-397b-4fea-ab23-de3cfca44994] GET /api/v1/governance/proposals
+[2026-04-17 19:59:41:970] [info] [request]: [493b17f4-13b6-4a39-9854-294dda9dde5d] GET /api/v1/fraud-detection/alerts
+[2026-04-17 19:59:41:976] [info] [request]: [30ac63a6-b656-40e0-903f-d4e964b72945] GET /api/v1/fraud-detection/summary
+[2026-04-17 19:59:42:201] [info] [request]: [df583e60-bdd3-4794-b0e5-44488d5ac197] GET /api/v1/governance/proposals
+[2026-04-17 19:59:42:207] [info] [request]: [959f67d1-625b-450a-a05e-23e974fb7501] GET /api/v1/governance/stats
+[2026-04-17 19:59:42:741] [info] [request]: [7022e6f3-2225-484c-8c0e-cb76f77b9c51] GET /api/v1/fraud-detection/alerts
+[2026-04-17 19:59:43:040] [info] [request]: [6f2ce5c4-e101-4ea3-9acd-b19220231d8c] GET /api/v1/fraud-detection/summary
+[2026-04-17 19:59:55:456] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:00:25:472] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:00:55:521] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:01:25:471] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:01:55:483] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:02:25:529] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:02:55:534] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:03:06:284] [info] [request]: [b64e015e-a450-4ef1-83ff-28a67f7990b3] GET /api/v1/admin/users
+[2026-04-17 20:03:06:290] [info] [request]: [41f44de7-8a2c-4852-84c7-0d0b4a3f49d9] GET /api/v1/admin/invoices
+[2026-04-17 20:03:19:262] [info] [request]: [6c2262f1-b7aa-4387-ae0a-e9fe4ab2c6ec] GET /api/v1/admin/users
+[2026-04-17 20:03:19:268] [info] [request]: [5f91d66d-c832-44ac-adbc-0869c2fc10c9] GET /api/v1/admin/invoices
+[2026-04-17 20:03:25:493] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:03:55:542] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:03:56:436] [info] [request]: [336fe076-d588-4176-b21b-a4f6b38f2112] POST /api/chatbot
+[2026-04-17 20:04:05:633] [info] [request]: [18f0aaa7-404b-4b33-aae6-55e7f07f4677] GET /api/v1/admin/users
+[2026-04-17 20:04:05:638] [info] [request]: [91d2199e-c152-4523-9652-2f772ed4d36f] GET /api/v1/admin/invoices
+[2026-04-17 20:04:06:771] [info] [request]: [9d8e6b13-8e47-4a71-8e50-df0025862be4] GET /api/v1/admin/invoices
+[2026-04-17 20:04:07:070] [info] [request]: [220181fd-3234-41be-83d7-2c6e0521453e] GET /api/v1/admin/users
+[2026-04-17 20:04:08:048] [info] [request]: [3a074581-8984-480f-9cd9-6b1da31088bf] GET /api/v1/fraud-detection/alerts
+[2026-04-17 20:04:08:062] [info] [request]: [3d614c52-a991-4930-9fa7-ac1da51bdeb5] GET /api/v1/fraud-detection/summary
+[2026-04-17 20:04:08:612] [info] [request]: [072c8616-53d1-4e34-afa0-ba75f53c964e] GET /api/v1/fraud-detection/alerts
+[2026-04-17 20:04:08:867] [info] [request]: [716422ee-8c9b-4a22-b011-d22fa003263a] GET /api/v1/fraud-detection/summary
+[2026-04-17 20:04:25:547] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:04:31:316] [info] [request]: [7b9b49d6-f684-4c81-bfdd-cc165ea3b7ac] GET /api/v1/analytics/overview
+[2026-04-17 20:04:32:515] [info] [request]: [626c2db4-ed3d-431f-bb6a-d4f7db1116f0] GET /api/v1/analytics/overview
+[2026-04-17 20:04:32:527] [info] [request]: [581e19c5-c647-48d8-892d-fb8e4d2dc2f3] GET /api/v1/analytics/payments
+[2026-04-17 20:04:34:049] [info] [request]: [2fa699dd-0ae4-49e7-a132-191870ae64ba] GET /api/v1/analytics/payments
+[2026-04-17 20:04:34:066] [info] [request]: [2970b951-55c2-4d0b-872a-be6450918ba6] GET /api/v1/analytics/financing
+[2026-04-17 20:04:35:489] [info] [request]: [78e4bd80-37da-4932-b7a3-4019f9e14bd5] GET /api/v1/analytics/financing
+[2026-04-17 20:04:55:551] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:05:25:518] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:05:44:868] [info] [request]: [3f1558e3-88d7-40c6-b677-90375c30914f] GET /api/v1/governance/parameters
+[2026-04-17 20:05:44:874] [info] [request]: [6487214f-9f3c-4f86-a8fb-22a65756615d] GET /api/v1/governance/stats
+[2026-04-17 20:05:45:834] [info] [request]: [3e5d493b-47ff-47d7-aee5-56c29667b7e9] GET /api/v1/governance/stats
+[2026-04-17 20:05:45:840] [info] [request]: [3fd2cbbb-70b3-439e-9040-d5216e297f18] GET /api/v1/governance/parameters
+[2026-04-17 20:05:45:867] [info] [request]: [dd5e9bde-5216-4d4b-a085-6f9f0f485f64] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:05:46:762] [info] [request]: [d9be0a0b-2c4f-4bef-863c-0ee3e3856883] GET /api/v1/governance/stats
+[2026-04-17 20:05:46:768] [info] [request]: [fd5b85ff-dd77-4d76-a633-4afa7bdd7c10] GET /api/v1/governance/proposals
+[2026-04-17 20:05:46:772] [info] [request]: [07474b72-79c5-4b69-8dc3-088078bea087] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-17 20:05:47:679] [info] [request]: [1d26cedd-858f-4d9b-b141-1789986c80eb] GET /api/v1/governance/proposals
+[2026-04-17 20:05:47:685] [info] [request]: [cecf4495-9ca5-4411-b183-929822a89177] GET /api/v1/governance/stats
+[2026-04-17 20:05:55:559] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:06:25:580] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:06:55:567] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:07:25:575] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:07:55:677] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:08:25:609] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:08:55:687] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:09:25:617] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:09:55:637] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:10:04:967] [info] [request]: [c0fc1ee2-0654-4e24-aa49-b54e426523a1] GET /api/v1/admin/users
+[2026-04-17 20:10:04:973] [info] [request]: [098a38ca-50f5-49ee-a68e-468d40d02b41] GET /api/v1/admin/invoices
+[2026-04-17 20:10:04:981] [info] [request]: [aa029f12-1d9b-4186-954f-c1927aa73d04] GET /api/v1/notifications/subscriptions
+[2026-04-17 20:10:04:986] [info] [request]: [412ba248-0b91-4ffc-be88-319b41ce0480] GET /api/v1/notifications/push-preferences
+[2026-04-17 20:10:05:735] [info] [request]: [028a9731-2c1c-490c-b2d1-07c541fca221] GET /api/v1/notifications/subscriptions
+[2026-04-17 20:10:06:045] [info] [request]: [8fa3dc39-bd2d-4995-962b-ce63060f1e0d] GET /api/v1/admin/invoices
+[2026-04-17 20:10:06:153] [info] [request]: [b6c684f4-b167-4f59-aa40-709865e2144e] GET /api/v1/admin/users
+[2026-04-17 20:10:07:850] [info] [request]: [248b6c9c-5c5f-4641-a6d7-3c3491648c29] GET /api/v1/notifications/push-preferences
+[2026-04-17 20:10:25:699] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:10:55:656] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 20:11:25:707] [info] [recoveryService]: Processing 0 operations from recovery queue

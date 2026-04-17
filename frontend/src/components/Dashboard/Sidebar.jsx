@@ -4,7 +4,7 @@ import { disconnectWallet } from '../../utils/web3';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onClose }) => {
-  const { stats } = useStats();
+  const stats = useStats();
   const navigate = useNavigate();
   const location = useLocation();
 

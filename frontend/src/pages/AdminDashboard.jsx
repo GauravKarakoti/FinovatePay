@@ -210,6 +210,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
             <InvoiceList
               invoices={invoices.slice(0, 10)}
               onSelectInvoice={setSelectedInvoice}
+              userRole="admin" // <-- Add this line
             />
           ) : (
             <EmptyState message="No recent invoices" />
@@ -230,6 +231,7 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
           <InvoiceList
             invoices={invoices}
             onSelectInvoice={setSelectedInvoice}
+            userRole="admin" // <-- Add this line
           />
         ) : (
           <EmptyState />

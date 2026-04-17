@@ -64,9 +64,12 @@ const InvoiceList = ({
             {userRole === 'buyer' && invoice.escrow_status === 'shipped' && (
                 <button onClick={(e) => { e.stopPropagation(); onConfirmRelease(invoice); }} className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-md text-xs">Release Funds</button>
             )}
-            {['deposited', 'shipped'].includes(invoice.escrow_status) && (
+            
+            {/* ADD userRole !== 'admin' CHECK HERE */}
+            {userRole !== 'admin' && ['deposited', 'shipped'].includes(invoice.escrow_status) && (
                 <button onClick={(e) => { e.stopPropagation(); onRaiseDispute(invoice); }} className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md text-xs">Raise Dispute</button>
             )}
+            
             <button 
                 onClick={(e) => { e.stopPropagation(); onShowQRCode(invoice); }} 
                 className="text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded-md text-xs flex items-center gap-1"
