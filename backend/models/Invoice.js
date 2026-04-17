@@ -159,11 +159,16 @@ class Invoice {
   }
 
   static async findByBuyer(address) {
+    // Perform a LEFT JOIN with produce_lots to get the produce details
     const query = `
-      SELECT *
-      FROM invoices
-      WHERE buyer_address = $1
-      ORDER BY created_at DESC
+      SELECT 
+        i.*, 
+        p.produce_type, 
+        p.origin 
+      FROM invoices i
+      LEFT JOIN produce_lots p ON i.lot_id = p.lot_id
+      WHERE i.buyer_address = $1
+      ORDER BY i.created_at DESC
     `;
     const { rows } = await pool.query(query, [address]);
     return rows;

@@ -19,6 +19,7 @@ import ShipmentDashboard from './pages/ShipmentDashboard';
 import ProduceHistory from './pages/ProduceHistory';
 import ContributorsPage from './pages/ContributorsPage';
 import './App.css';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
 import { setNavigateFunction } from './utils/api';

@@ -45,7 +45,6 @@ exports.register = async (req, res) => {
     );
 
 
-    // 5. Create Login Token
     const token = generateToken(newUser.rows[0]);
 
     // 7. Set HttpOnly cookie
@@ -56,7 +55,11 @@ exports.register = async (req, res) => {
       maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
     });
 
-    res.json({ user: sanitizeUser(newUser.rows[0]) });
+    // FIX: Include token in the JSON response
+    res.json({ 
+      user: sanitizeUser(newUser.rows[0]), 
+      token 
+    });
   } catch (err) {
     console.error('❌ Registration Error:', err.message);
     return errorResponse(res, 'Server error during registration', 500);
@@ -80,18 +83,21 @@ exports.login = async (req, res) => {
       return errorResponse(res, 'Invalid credentials', 400);
     }
 
-    // 3. Create and set token in HttpOnly cookie
     const token = generateToken(user.rows[0]);
 
     // Set HttpOnly cookie
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'strict', // Consider changing to 'lax' for local development if you want to rely on cookies
       maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
     });
 
-    res.json({ user: sanitizeUser(user.rows[0]) });
+    // FIX: Include token in the JSON response
+    res.json({ 
+      user: sanitizeUser(user.rows[0]), 
+      token 
+    });
   } catch (err) {
     console.error('❌ Login Error:', err.message);
     return errorResponse(res, 'Server error', 500);

@@ -39,3 +39,5 @@ ADD COLUMN discount_deadline TIMESTAMPTZ DEFAULT NULL;
 
 -- Optional: Add a comment to clarify that rate is in Basis Points (BPS)
 COMMENT ON COLUMN invoices.discount_rate IS 'Discount rate in basis points (100 = 1%)';
+
+ALTER TABLE invoices ALTER COLUMN token_id TYPE VARCHAR(255);

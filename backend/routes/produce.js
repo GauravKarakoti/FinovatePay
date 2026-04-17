@@ -70,7 +70,7 @@ router.get('/lots/producer', authenticateToken, requireRole(['seller', 'admin'])
 router.get('/lots/seller', authenticateToken, requireRole(['seller', 'admin']), produceController.getSellerLots);
 
 // Replaced validateProduceLotId with validateLotId here
-router.get('/lots/:lotId', authenticateToken, validateLotId, async (req, res) => {
+router.get('/lots/:lotId', validateLotId, async (req, res) => {
   try {
     const { lotId } = req.params;
     
