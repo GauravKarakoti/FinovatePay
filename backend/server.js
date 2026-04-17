@@ -239,10 +239,6 @@ app.use('/api/v1/governance', require('./routes/governance'));
 // Treasury endpoints
 app.use('/api/v1/treasury', require('./routes/treasury'));
 
-/* ---------------- PROXY / UPGRADEABLE CONTRACTS ---------------- */
-
-app.use('/api/v1/proxy', require('./routes/proxy'));
-
 /* ---------------- FIAT ON-RAMP ---------------- */
 
 app.use("/api/v1/fiat-ramp", require("./routes/fiatRamp"));

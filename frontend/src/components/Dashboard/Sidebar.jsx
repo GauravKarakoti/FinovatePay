@@ -68,7 +68,6 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
 
   if (user?.role === 'admin') {
     tabs.push({ id: 'admin', label: 'Admin', icon: '⚙️' });
-    tabs.push({ id: 'upgrade', label: 'Upgrade Manager', icon: '🔄' });
   }
 
   // 3. Filter irrelevant tabs for specific roles
@@ -93,9 +92,6 @@ const Sidebar = ({ activeTab, onTabChange, user, walletConnected, onLogout, onCl
     if (tabId === 'invoices') {
       navigate('/invoices');
       onTabChange('invoices');
-    } else if (tabId === 'upgrade') {
-      navigate('/admin/upgrade');
-      onTabChange('upgrade');
     } else {
       let dashboardPath = '/';
       if (user?.role === 'buyer') dashboardPath = '/buyer';

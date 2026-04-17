@@ -15,7 +15,6 @@ import InvoiceList from '../components/Invoice/InvoiceList';
 import FraudAlerts from '../components/Admin/FraudAlerts';
 import { toast } from 'sonner';
 import { useStatsActions } from '../context/StatsContext';
-import UpgradeManager from '../components/Admin/UpgradeManager';
 import GovernanceDashboard from './GovernanceDashboard';
 
 // Loading Spinner Component
@@ -471,7 +470,6 @@ const AdminDashboard = ({ activeTab = 'overview' }) => {
       case 'overview': return <OverviewTab />;
       case 'invoices': return <InvoicesTab />;
       case 'admin': return <AdminTab />;
-      case 'upgrade': return <UpgradeManager />;
       case 'analytics': return <AnalyticsPage activeTab={activeTab} />;
       case 'governance': return <GovernanceDashboard />; // <-- ADD THIS LINE
       default: return <PlaceholderTab />;

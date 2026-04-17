@@ -23,7 +23,6 @@ import { Toaster } from 'sonner';
 import { useStatsActions } from './context/StatsContext';
 import { setNavigateFunction } from './utils/api';
 import PermissionBanner from './components/Notifications/PermissionBanner';
-import UpgradeManager from './components/Admin/UpgradeManager';
 
 /* -------------------- Error Boundary Component -------------------- */
 class ErrorBoundary extends React.Component {
@@ -323,14 +322,6 @@ function App() {
                 element={
                   <RequireAuth allowedRoles={['admin']}>
                       {renderDashboard(<TreasuryDashboard />)}
-                  </RequireAuth>
-                }
-              />
-              <Route 
-                path="/admin/upgrade"
-                element={
-                  <RequireAuth allowedRoles={['admin']}>
-                      {renderDashboard(<UpgradeManager />)}
                   </RequireAuth>
                 }
               />
