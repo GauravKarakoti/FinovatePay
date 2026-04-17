@@ -28,7 +28,14 @@ async function main() {
   await finovateToken.waitForDeployment();
   const governanceTokenAddress = finovateToken.target;
   console.log("FinovateToken redeployed to:", governanceTokenAddress);
-  
+
+  const FNSale = await ethers.getContractFactory("FNSale");
+  const fnSale = await FNSale.deploy(governanceTokenAddress);
+  await fnSale.waitForDeployment();
+  console.log("FNSale deployed to:", fnSale.target);
+  const rewardControllerTx = await finovateToken.setRewardsController(fnSale.target);
+  await rewardControllerTx.wait();
+
   // 1. Deploy MinimalForwarder
   console.log("\n1. Deploying MinimalForwarder...");
   const MinimalForwarder = await ethers.getContractFactory("MinimalForwarder");
@@ -197,13 +204,15 @@ async function main() {
     LiquidityAdapter: liquidityAdapter.target,
     MockWaltBridge: actualWaltBridgeAddress,
     TreasuryManager: treasuryManager.target,
-    StreamingPayment: streamingPayment.target
+    StreamingPayment: streamingPayment.target,
+    FNSale: fnSale.target
   };
 
   fs.writeFileSync(addressPath, JSON.stringify(addressMap, null, 2));
 
   const contractNames = [
     "FinovateToken", 
+    "FNSale",
     "MinimalForwarder", "ComplianceManager", "TreasuryManager",
     "InvoiceFactory", "FractionToken", "Invoice", "ProduceTracking", 
     "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking", "MockWaltBridge",
