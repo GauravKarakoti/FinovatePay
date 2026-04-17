@@ -1,3 +1,6 @@
+// Import your pre-configured API instance (adjust the relative path if needed)
+import api from '../../utils/api';
+
 class ActionProvider {
   constructor(createChatBotMessage, setStateFunc) {
     this.createChatBotMessage = createChatBotMessage;
@@ -11,18 +14,27 @@ class ActionProvider {
         content: msg.message
     }));
 
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/chatbot`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      // Send both the new message and the conversation history
-      body: JSON.stringify({ message, history }),
-    });
-    const data = await response.json();
+    try {
+      // USE the custom 'api' instance instead of native fetch. 
+      // It automatically attaches the Authorization Bearer token!
+      const response = await api.post('/chatbot', { 
+        message, 
+        history 
+      });
+      
+      // Axios stores the JSON response inside the `.data` property
+      const data = response.data;
 
-    const botMessage = this.createChatBotMessage(data.reply);
-    this.addMessageToState(botMessage);
+      const botMessage = this.createChatBotMessage(data.reply);
+      this.addMessageToState(botMessage);
+
+    } catch (error) {
+      console.error("Chatbot API Error:", error);
+      const errorMessage = this.createChatBotMessage(
+        "Sorry, I encountered an error. Please try again."
+      );
+      this.addMessageToState(errorMessage);
+    }
   };
 
   addMessageToState = (message) => {

@@ -10327,3 +10327,112 @@
 [2026-04-17 22:51:17:414] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-17 22:51:47:420] [info] [recoveryService]: Processing 0 operations from recovery queue
 [2026-04-17 22:52:17:426] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 22:57:06:098] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-17 22:57:06:111] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-17 22:57:06:102] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-17 22:57:06:103] [info] [server]: Invoice Sync Worker started
+[2026-04-17 22:57:06:104] [info] [server]: Transaction Recovery Worker started
+[2026-04-17 22:57:06:112] [info] [server]: Compliance listeners started
+[2026-04-17 22:57:06:115] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-17 22:57:06:120] [info] [server]: 🚀 Server running on port 3000
+[2026-04-17 22:57:08:829] [info] [server]: Database connection test completed successfully
+[2026-04-17 22:57:09:598] [info] [server]: Tokenization listener started
+[2026-04-17 22:57:17:471] [info] [request]: [523135c1-4d43-446c-ae59-6446810cdf55] POST /api/chatbot
+[2026-04-17 22:57:36:409] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 22:58:06:416] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 22:58:15:086] [info] [request]: [2d427697-6b92-44e8-a787-7520b5724bb0] POST /api/v1/chatbot
+[2026-04-17 22:58:29:638] [info] [request]: [cb297c49-26dd-4f93-b59d-1684afd04c90] POST /api/v1/chatbot
+[2026-04-17 22:58:36:417] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 22:59:06:524] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 22:59:36:529] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:00:06:432] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:00:36:435] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:01:06:541] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:01:34:570] [info] [request]: [9403c202-0ba3-44d0-b319-f8de8a5df4ab] POST /api/v1/v1/chatbot
+[2026-04-17 23:01:35:937] [info] [request]: [358f23f7-aef3-4ca6-95e4-083873790956] GET /api/v1/invoices/seller
+[2026-04-17 23:01:35:949] [info] [request]: [93639f85-92f0-47e9-a3c7-5e9fce16d875] GET /api/v1/kyc/status
+[2026-04-17 23:01:35:964] [info] [request]: [e3ddbaea-9b4b-4f84-bfcb-f3c12de7bb24] GET /api/v1/quotations
+[2026-04-17 23:01:35:982] [info] [request]: [138b9703-9c5e-47a6-8bda-fe3a22c6d57d] GET /api/v1/produce/lots/seller
+[2026-04-17 23:01:35:988] [info] [request]: [5772d757-d92e-4cbd-a61f-bfe32e9dda40] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:01:35:995] [info] [request]: [f2f3b7b6-d4d9-428b-98ad-742582905a45] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:01:36:552] [info] [request]: [ffd4d403-08b3-4441-b5b5-225392f79968] GET /api/v1/invoices/seller
+[2026-04-17 23:01:36:861] [info] [request]: [327f0b6a-b63f-46ba-8dbf-0a05b37ade33] GET /api/v1/produce/lots/seller
+[2026-04-17 23:01:36:865] [info] [request]: [71db9fa8-0c80-489b-92f9-ec30447c9be6] GET /api/v1/kyc/status
+[2026-04-17 23:01:36:872] [info] [request]: [febd5816-47fc-4f8a-a552-2f06a514f561] GET /api/v1/quotations
+[2026-04-17 23:01:39:203] [info] [request]: [614ab663-20da-49f8-9a76-64619281a2c8] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:01:39:223] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:01:39:463] [info] [request]: [19f74479-63f1-454a-a4ae-e41835c40f2c] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:01:42:645] [info] [request]: [5ed239fe-2a0a-46d8-ae61-a04cf65119a5] POST /api/v1/v1/chatbot
+[2026-04-17 23:01:52:437] [info] [request]: [8c86e3aa-a62f-4c01-ae77-3a9f9d2d56a1] GET /api/v1/invoices/seller
+[2026-04-17 23:01:52:446] [info] [request]: [5b8e6aa8-d25b-4029-82de-98e469f30b96] GET /api/v1/kyc/status
+[2026-04-17 23:01:52:471] [info] [request]: [18f44fa9-5271-4186-9534-44d37cd602b0] GET /api/v1/quotations
+[2026-04-17 23:01:52:480] [info] [request]: [3d90e00c-b418-4a04-97d1-e5dfbca9a801] GET /api/v1/produce/lots/seller
+[2026-04-17 23:01:52:489] [info] [request]: [2ca6d930-e487-46ab-932e-cba737b6f84c] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:01:52:495] [info] [request]: [16c5638c-b589-49de-b13b-c1132dba86bf] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:01:52:982] [info] [request]: [c658765c-c223-4e2e-a5c8-83ad0945663c] GET /api/v1/invoices/seller
+[2026-04-17 23:01:53:007] [info] [request]: [29b43459-626e-4e8f-bdb3-79bcd2e035db] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:01:53:025] [info] [request]: [7d9a89d9-f58b-4896-986e-f7ea364407fd] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:01:53:220] [info] [request]: [fcfd50e3-62b7-4934-a943-b786a1c265ef] GET /api/v1/kyc/status
+[2026-04-17 23:01:53:283] [info] [request]: [443db973-608f-4275-bd0a-1bc804c37471] GET /api/v1/produce/lots/seller
+[2026-04-17 23:01:53:293] [info] [request]: [2a99b247-8966-4418-98c4-a47d9dbb84a4] GET /api/v1/quotations
+[2026-04-17 23:02:02:777] [info] [request]: [e20a65e4-e68c-4fe8-8e95-ef3f71048116] POST /api/v1/chatbot
+[2026-04-17 23:02:06:435] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:02:36:555] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:02:57:888] [info] [request]: [91662475-b6b7-45a9-b25a-b6cfd227465b] POST /api/v1/auth/login
+[2026-04-17 23:02:59:232] [info] [request]: [acb12d27-bfea-4d75-96a6-e82ab3dedfcb] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:02:59:240] [info] [request]: [ca3a150f-2c46-4c49-85ec-537dd78917bc] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:02:59:799] [info] [request]: [73aa55cd-73b2-4325-b579-5f2d70569a02] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:02:59:805] [info] [request]: [81ef3a9c-e264-443e-b50b-42665d443bf3] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:03:06:559] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:03:36:472] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:04:06:565] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:04:36:492] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:05:06:575] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:05:36:509] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:06:06:590] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:06:36:525] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:07:06:539] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:07:23:335] [info] [request]: [c1ba68d1-1c75-4515-929b-2b864abef899] POST /api/v1/shipment/location
+[2026-04-17 23:07:26:341] [info] [request]: [715770ac-0451-4a52-81ff-cc7b5646f7bd] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:07:26:346] [info] [request]: [c07566d8-db6a-435e-a0cf-30b06ee15609] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:07:26:930] [info] [request]: [fb4edaa7-1624-4c82-bc5c-ad2e965ffb5a] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:07:26:954] [info] [request]: [9f92f6db-6748-456b-974e-64c59c8b224b] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:07:36:559] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:07:49:238] [info] [request]: [deb9077b-44ac-4070-83a9-8f1c0bdfb584] POST /api/v1/shipment/location
+[2026-04-17 23:08:06:553] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:08:36:562] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:09:06:561] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:09:36:613] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:09:40:869] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-17 23:09:40:890] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-17 23:09:40:875] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-17 23:09:40:876] [info] [server]: Invoice Sync Worker started
+[2026-04-17 23:09:40:877] [info] [server]: Transaction Recovery Worker started
+[2026-04-17 23:09:40:891] [info] [server]: Compliance listeners started
+[2026-04-17 23:09:40:893] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-17 23:09:40:897] [info] [server]: 🚀 Server running on port 3000
+[2026-04-17 23:09:43:004] [info] [server]: Database connection test completed successfully
+[2026-04-17 23:09:43:699] [info] [request]: [c95fb4c6-e1d4-4dcf-96b9-fae926e106c6] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:09:43:704] [info] [request]: [bfeae1a6-8f09-4127-90d9-42e858a290d3] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:09:44:033] [info] [server]: Tokenization listener started
+[2026-04-17 23:09:44:472] [info] [request]: [f73fef26-e6d0-48eb-81a9-6599a62ecfcc] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:09:44:521] [info] [request]: [817de34f-8d27-44bb-a8df-9043f8eae529] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:10:02:953] [info] [request]: [f8b07cb4-da11-4348-ae85-426106181d8e] POST /api/v1/shipment/location
+[2026-04-17 23:10:11:224] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:10:19:107] [info] [request]: [e5d9e7c6-9e2d-4dd3-a056-e37702ced030] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:10:19:114] [info] [request]: [53baaefc-d7e8-494d-bd89-9835a023ccd4] GET /api/v1/produce/lots/4
+[2026-04-17 23:10:19:132] [info] [request]: [bb64928e-5688-4396-a281-b5d22cba0f40] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:10:19:140] [info] [request]: [e141b4e5-7b73-48fe-b6cc-a45f0c093d9a] GET /api/v1/notifications/subscriptions
+[2026-04-17 23:10:19:148] [info] [request]: [ec36cb56-cb3a-400c-90e4-b6df97215170] GET /api/v1/notifications/push-preferences
+[2026-04-17 23:10:19:159] [info] [request]: [fb8a33ad-d363-4bd6-9f70-bb4d3fe3d309] POST /api/v1/auth/logout
+[2026-04-17 23:10:19:170] [info] [request]: [5141bd89-9313-4182-9534-324127c65003] POST /api/v1/auth/logout
+[2026-04-17 23:10:19:180] [info] [request]: [14469faa-b6f5-4f67-890c-a27900b33b23] POST /api/v1/auth/logout
+[2026-04-17 23:10:19:203] [info] [request]: [9f1bc241-eb88-4d25-9421-b9fa7c03bc04] POST /api/v1/auth/logout
+[2026-04-17 23:10:19:925] [info] [request]: [b1232861-bffd-48b8-b84d-2f5ec5158810] GET /api/v1/produce/lots/4
+[2026-04-17 23:10:28:567] [info] [request]: [89e2371c-c7fb-493d-be48-bcc42e7ef5db] GET /api/v1/produce/lots/4
+[2026-04-17 23:10:29:461] [info] [request]: [3145cd28-1f01-4440-ab0c-c4ba5ab66920] GET /api/v1/produce/lots/4
+[2026-04-17 23:10:41:217] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-17 23:10:46:428] [info] [request]: [488f3220-4361-4199-b6d4-b72ec9bd3b74] GET /api/v1/produce/lots/4
+[2026-04-17 23:10:47:377] [info] [request]: [ca30b722-a799-42af-87c1-880ffcbeab50] GET /api/v1/produce/lots/4
+[2026-04-17 23:11:10:770] [info] [request]: [09e43ee0-eed6-4d76-804b-390ae02328e7] POST /api/v1/auth/login
+[2026-04-17 23:11:11:230] [info] [recoveryService]: Processing 0 operations from recovery queue

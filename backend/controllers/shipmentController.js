@@ -13,11 +13,13 @@ exports.updateLocation = asyncHandler(async (req, res) => {
     throw new AppError('Lot ID and location are required.', 400);
   }
 
-  lotId = lotId.slice(-1); // keep your existing logic
+  lotId = lotId.slice(-1);
 
   try {
     // 1. Blockchain interaction
-    const signer = getSigner();
+    // ADD AWAIT HERE:
+    const signer = await getSigner(); 
+    
     const produceTracking = new ethers.Contract(
       contractAddresses.produceTracking,
       ProduceTrackingArtifact.abi,
