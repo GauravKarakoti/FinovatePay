@@ -872,7 +872,7 @@ const SellerDashboard = ({ activeTab = 'overview' }) => {
         return (
           <AuctionList 
             userRole="seller" 
-            eligibleInvoices={invoices.filter(i => i.status === 'pending' || i.status === 'tokenized')} 
+            eligibleInvoices={invoices.filter(i => i.status === 'PAYMENT_PENDING' || i.financing_status === 'listed')} 
           />
         );
       default: return <OverviewTab />;
