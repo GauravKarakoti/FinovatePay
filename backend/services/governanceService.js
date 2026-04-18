@@ -376,20 +376,36 @@ class GovernanceService {
         return result.rows[0];
     }
 
-    /**
-     * Get voting power for a wallet
-     */
     async getVotingPower(walletAddress) {
-        const result = await pool.query(
-            `SELECT * FROM governance_token_holders WHERE wallet = $1`,
-            [walletAddress.toLowerCase()]
-        );
-        
-        if (result.rows.length === 0) {
-            return { wallet: walletAddress.toLowerCase(), votes: 0 };
+        try {
+            // ABI fragment just for the getVotes function inherited from ERC20Votes
+            const abi = ["function getVotes(address account) view returns (uint256)"];
+            const signer = getSigner(); // You are already importing this at the top of the file
+            
+            // Connect to the FinovateToken contract
+            const tokenContract = new ethers.Contract(contractAddresses.FinovateToken, abi, signer);
+            
+            // Fetch real-time on-chain voting power
+            const onChainVotes = await tokenContract.getVotes(walletAddress);
+            
+            return { 
+                wallet: walletAddress.toLowerCase(), 
+                votes: onChainVotes.toString() // Return as string to handle BigInt safely
+            };
+        } catch (error) {
+            console.error("Failed to fetch on-chain voting power:", error);
+            
+            // Fallback to database if RPC fails
+            const result = await pool.query(
+                `SELECT * FROM governance_token_holders WHERE wallet = $1`,
+                [walletAddress.toLowerCase()]
+            );
+            
+            if (result.rows.length === 0) {
+                return { wallet: walletAddress.toLowerCase(), votes: 0 };
+            }
+            return result.rows[0];
         }
-        
-        return result.rows[0];
     }
 
     /**

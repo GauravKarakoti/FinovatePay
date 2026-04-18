@@ -11494,3 +11494,42 @@
 [2026-04-18 12:39:36:269] [info] [request]: [93ac64c3-f833-4eb3-b0f9-2dd5d996ebad] GET /api/v1/auctions/0x40c6420dfa01f08916408608056aa698495cc8cf5617a500a7277544900100aa/bids
 [2026-04-18 12:39:39:550] [info] [request]: [0819bfde-d279-49f2-a709-9da6a155e5c2] POST /api/v1/auctions/0x40c6420dfa01f08916408608056aa698495cc8cf5617a500a7277544900100aa/bid
 [2026-04-18 12:39:48:764] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:42:51:323] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:42:51:344] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:42:51:328] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:42:51:329] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:42:51:331] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:42:51:345] [info] [server]: Compliance listeners started
+[2026-04-18 12:42:51:348] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:42:51:352] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:42:54:023] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:42:54:676] [info] [server]: Tokenization listener started
+[2026-04-18 12:43:02:956] [info] [request]: [d73fe1eb-6821-4b27-a988-e017b8f053a5] GET /api/v1/governance/stats
+[2026-04-18 12:43:02:965] [info] [request]: [7195f83d-016b-4f58-958c-a0c122517ff8] GET /api/v1/investor/portfolio
+[2026-04-18 12:43:02:971] [info] [request]: [47224c2c-74bc-4d25-9a39-acc2675e2e81] GET /api/v1/financing/marketplace
+[2026-04-18 12:43:02:982] [info] [request]: [ab5317ea-4f26-4666-ac26-a2b8c7725d99] GET /api/v1/governance/parameters
+[2026-04-18 12:43:03:922] [info] [request]: [a039aff0-94ad-4f88-871a-691d397fa3d4] GET /api/v1/financing/marketplace
+[2026-04-18 12:43:04:130] [info] [request]: [25d66f51-5dd7-4209-8182-e7fed62a6eaa] GET /api/v1/investor/portfolio
+[2026-04-18 12:43:04:187] [info] [request]: [73fb936a-6a16-4da4-a768-61e296832c93] GET /api/v1/governance/stats
+[2026-04-18 12:43:05:536] [info] [server]: User connected: ocpeQtcUJFnfoUGCAAAC | User: 5 | Role: investor
+[2026-04-18 12:43:05:541] [info] [server]: User 5 joined marketplace
+[2026-04-18 12:43:05:533] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-18 12:43:06:419] [info] [request]: [5c445a53-a660-48ba-ae18-d5a031973654] GET /api/v1/governance/parameters
+[2026-04-18 12:43:06:437] [info] [request]: [5fbb53ac-bb60-40e4-b038-df2188927413] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-18 12:43:07:264] [info] [request]: [4553ea43-1903-43ea-9010-a472ea0a42b5] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-18 12:43:07:358] [info] [request]: [6d0352d3-2a1f-40e3-b410-2c66e70e31bd] GET /api/v1/governance/stats
+[2026-04-18 12:43:07:364] [info] [request]: [6d045064-7b45-4a8b-acd8-2e30421d174c] GET /api/v1/governance/proposals
+[2026-04-18 12:43:08:219] [info] [request]: [e3654dad-20df-4c91-a831-1d6599814600] GET /api/v1/governance/proposals
+[2026-04-18 12:43:08:224] [info] [request]: [c9fb2871-ca70-4682-a869-c56cd59964c8] GET /api/v1/governance/stats
+[2026-04-18 12:43:21:617] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:43:34:699] [info] [request]: [bd5770fd-fe31-4793-926c-65015bcbca56] GET /api/v1/governance/parameters
+[2026-04-18 12:43:34:715] [info] [request]: [3e45fbd4-4d2c-4153-8f57-e948bc5c21ea] GET /api/v1/governance/stats
+[2026-04-18 12:43:35:674] [info] [request]: [7d0f2b24-7af8-4e71-bc78-5e6b09d30d66] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-18 12:43:36:650] [info] [request]: [f7e07c24-9158-4e63-8f4c-d83e11d10f68] GET /api/v1/governance/stats
+[2026-04-18 12:43:36:664] [info] [request]: [d08afcad-41c6-4245-8294-d6d60cf150c1] GET /api/v1/governance/proposals
+[2026-04-18 12:43:37:608] [info] [request]: [ccb6a798-75d4-4099-baf2-79e54bad3959] GET /api/v1/governance/proposals
+[2026-04-18 12:43:37:612] [info] [request]: [2868bc72-63d0-4d2a-b472-9a02d7459881] GET /api/v1/governance/stats
+[2026-04-18 12:43:51:632] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:44:21:707] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:44:51:652] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:45:21:747] [info] [recoveryService]: Processing 0 operations from recovery queue
