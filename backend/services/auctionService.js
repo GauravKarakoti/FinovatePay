@@ -253,6 +253,20 @@ const getAuctionFromChain = async (auctionId) => {
   }
 };
 
+const startAuction = async (auctionId) => {
+  // Get auction from database
+  const auction = await InvoiceAuction.findById(auctionId);
+
+  if (!auction) {
+    throw new Error('Auction not found');
+  }
+
+  // Update database status to active
+  await InvoiceAuction.updateStatus(auctionId, 'active');
+
+  return await InvoiceAuction.findById(auctionId);
+};
+
 /**
  * Get auction bids from chain
  */
@@ -469,5 +483,6 @@ module.exports = {
   getSellerStats,
   getBidderStats,
   generateAuctionId,
-  statusToString
+  statusToString,
+  startAuction
 };

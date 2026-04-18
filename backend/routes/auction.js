@@ -307,11 +307,10 @@ router.post('/:auctionId/start', authenticateToken, requireKYC, async (req, res)
       return res.status(400).json({ error: 'Auction cannot be started' });
     }
     
-    // Start on chain
     const chainResult = await auctionService.startAuctionOnChain(auctionId);
     
     // Update database
-    await auctionService.getAuction(auctionId); // This would need an update function
+    await auctionService.startAuction(auctionId);
 
     // Send email notifications to investors about new auction
     try {
