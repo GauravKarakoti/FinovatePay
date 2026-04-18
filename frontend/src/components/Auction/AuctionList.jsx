@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { 
   getAuctions, 
   getSellerAuctions, 
+  getBidderAuctions,
   startAuction,
   endAuction,
   settleAuction,
@@ -18,7 +19,7 @@ const AuctionList = ({ userRole = 'seller', eligibleInvoices, onAuctionUpdate })
   const [selectedAuction, setSelectedAuction] = useState(null);
   const [showBidModal, setShowBidModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
-  const [view, setView] = useState('all'); // 'all', 'mine', 'bids'
+  const [view, setView] = useState(userRole === 'seller' ? 'mine' : 'all');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ const AuctionList = ({ userRole = 'seller', eligibleInvoices, onAuctionUpdate })
       if (view === 'mine') {
         response = await getSellerAuctions();
       } else if (view === 'bids') {
-        response = await getSellerAuctions(); // This needs to be bidder auctions
+        response = await getBidderAuctions(); // <-- Fix: Was getSellerAuctions()
       } else {
         response = await getAuctions({ status: 'active' });
       }
@@ -196,7 +197,6 @@ const AuctionList = ({ userRole = 'seller', eligibleInvoices, onAuctionUpdate })
 
   return (
     <div className="space-y-4">
-      {/* ADDED HEADER WITH CREATE BUTTON */}
       {userRole === 'seller' && (
         <div className="flex justify-between items-center mb-4">
           <div>
@@ -211,6 +211,32 @@ const AuctionList = ({ userRole = 'seller', eligibleInvoices, onAuctionUpdate })
           </button>
         </div>
       )}
+
+      {/* ADD THESE TABS HERE */}
+      <div className="flex space-x-6 border-b border-gray-200 mb-4">
+        <button
+          onClick={() => setView('all')}
+          className={`pb-2 px-1 text-sm font-medium transition-colors ${view === 'all' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+        >
+          All Active Auctions
+        </button>
+        {userRole === 'seller' && (
+          <button
+            onClick={() => setView('mine')}
+            className={`pb-2 px-1 text-sm font-medium transition-colors ${view === 'mine' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            My Auctions
+          </button>
+        )}
+        {userRole === 'investor' && (
+          <button
+            onClick={() => setView('bids')}
+            className={`pb-2 px-1 text-sm font-medium transition-colors ${view === 'bids' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            My Bids
+          </button>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

@@ -11256,3 +11256,162 @@
 [2026-04-18 12:20:47:373] [info] [request]: [6a131f6a-4189-4512-b31a-16a21aa83709] GET /api/v1/auctions
 [2026-04-18 12:20:47:654] [info] [request]: [9740f4ce-c69f-47ac-893a-051532d80486] GET /api/v1/auctions
 [2026-04-18 12:21:04:051] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:27:19:131] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:27:19:158] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:27:19:137] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:27:19:139] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:27:19:140] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:27:19:160] [info] [server]: Compliance listeners started
+[2026-04-18 12:27:19:163] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:27:19:168] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:27:21:707] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:27:21:974] [info] [server]: Tokenization listener started
+[2026-04-18 12:27:25:938] [info] [request]: [98cd2436-d628-4c8f-b8b5-a12bec2e5a80] GET /api/v1/auctions
+[2026-04-18 12:27:26:527] [info] [request]: [43b9213e-33bf-4593-ab02-ac544f58a794] GET /api/v1/auctions
+[2026-04-18 12:27:34:399] [info] [request]: [bb09dd06-fccb-491f-a524-f99587845242] PUT /api/v1/auth/role
+[2026-04-18 12:27:35:538] [info] [request]: [7bbee2d9-a7f0-40e2-832f-cac32b255f17] GET /api/v1/financing/marketplace
+[2026-04-18 12:27:35:550] [info] [request]: [96e3ee2e-0a0d-4c38-9112-1d258211480d] GET /api/v1/auctions
+[2026-04-18 12:27:35:556] [info] [request]: [af269869-c825-4961-8334-2a0f9d8137cb] GET /api/v1/investor/portfolio
+[2026-04-18 12:27:35:842] [info] [request]: [e4de9578-401e-4c19-b98e-5607240f4e81] GET /api/v1/auctions
+[2026-04-18 12:27:36:117] [info] [request]: [417847cc-92fc-4490-85b5-406253df4aaa] GET /api/v1/financing/marketplace
+[2026-04-18 12:27:36:127] [info] [request]: [94ee8166-2eef-409a-a821-74602db396db] GET /api/v1/auctions
+[2026-04-18 12:27:36:415] [info] [request]: [ed5f2d9b-ea0d-48a2-9113-af384ba0f773] GET /api/v1/auctions
+[2026-04-18 12:27:36:438] [info] [request]: [be616294-c923-4cf8-a609-2522877e9723] GET /api/v1/investor/portfolio
+[2026-04-18 12:27:36:697] [info] [request]: [7599404c-319c-4fc1-9a52-c00307accb90] GET /api/v1/auctions
+[2026-04-18 12:27:36:967] [info] [request]: [93a6793f-c934-4868-9fec-e8c250666a50] GET /api/v1/auctions
+[2026-04-18 12:27:37:272] [info] [request]: [66902c5c-a53d-459d-b1a9-c88317c34a7c] GET /api/v1/auctions
+[2026-04-18 12:27:37:539] [info] [request]: [2abbe2ba-cf7f-46b7-9f29-580b38544dd8] GET /api/v1/auctions
+[2026-04-18 12:27:37:802] [info] [request]: [0477ce25-a5fb-4ee9-bc2f-6aebf71c6a91] GET /api/v1/auctions
+[2026-04-18 12:27:38:091] [info] [server]: User connected: jhCOtiGgmX4R_KfdAAAC | User: 5 | Role: investor
+[2026-04-18 12:27:38:097] [info] [server]: User 5 joined marketplace
+[2026-04-18 12:27:38:088] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-18 12:27:38:100] [info] [request]: [4a13b12d-aea6-4084-a637-7a87742bf9df] GET /api/v1/auctions
+[2026-04-18 12:27:38:396] [info] [request]: [cbd1a1d2-a04f-4069-aef1-cceb007a933c] GET /api/v1/auctions
+[2026-04-18 12:27:38:705] [info] [request]: [3dabcc22-12c8-4d8a-9273-12689988e32d] GET /api/v1/auctions
+[2026-04-18 12:27:39:012] [info] [request]: [928d44d5-a4e6-4ce8-9f7d-c3ec524ee80a] GET /api/v1/auctions
+[2026-04-18 12:27:39:278] [info] [request]: [7b22819a-f7d4-49e2-90fe-fc67e6cda514] GET /api/v1/auctions
+[2026-04-18 12:27:39:629] [info] [request]: [b0069fd8-5149-4026-9c34-45bf3d38ce05] GET /api/v1/auctions
+[2026-04-18 12:27:39:932] [info] [request]: [98fc960e-ddee-4f10-b3a5-b2a0cadcc2d8] GET /api/v1/auctions
+[2026-04-18 12:27:40:240] [info] [request]: [d4d648f5-1dba-41d0-848a-eae5d35940a8] GET /api/v1/auctions
+[2026-04-18 12:27:40:500] [info] [request]: [a41cd77f-a233-4f9b-8abe-1f3b88f0d827] GET /api/v1/auctions
+[2026-04-18 12:27:40:854] [info] [request]: [ba2600c8-b147-43b8-84d4-743e3fc63c8d] GET /api/v1/auctions
+[2026-04-18 12:27:41:162] [info] [request]: [5f0b7e6a-b289-40ce-903b-892b9547d09f] GET /api/v1/auctions
+[2026-04-18 12:27:43:700] [info] [request]: [3b920666-4d21-43fa-a88b-3117dd7b940c] GET /api/v1/governance/parameters
+[2026-04-18 12:27:43:707] [info] [request]: [a2689986-584a-46e9-86d7-db56268efd4f] GET /api/v1/governance/stats
+[2026-04-18 12:27:44:657] [info] [request]: [f88759d1-d499-4bd0-b205-e2e9686a3841] GET /api/v1/governance/parameters
+[2026-04-18 12:27:44:666] [info] [request]: [a475eec8-12b2-4851-b9f8-18e3d04309c7] GET /api/v1/governance/stats
+[2026-04-18 12:27:44:691] [info] [request]: [ac317c88-24ff-4a24-bdaf-277c515b3854] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-18 12:27:45:668] [info] [request]: [dfabda57-b77a-46ad-8e44-7ff997b5d4c1] GET /api/v1/governance/voting-power/0xeB4F0Cb1644FA1f6dd01Aa2F7c49099d2267F3A8
+[2026-04-18 12:27:45:750] [info] [request]: [10587755-2fac-4893-b2bb-2e6b8a066ae7] GET /api/v1/governance/stats
+[2026-04-18 12:27:45:755] [info] [request]: [c26b374e-f000-41ff-8fff-098f580c86a5] GET /api/v1/governance/proposals
+[2026-04-18 12:27:46:594] [info] [request]: [d2ed7a1b-377a-4d83-ae12-53568bbbcc9b] GET /api/v1/governance/proposals
+[2026-04-18 12:27:46:601] [info] [request]: [c13c1704-1141-4ced-be2e-109204e0c550] GET /api/v1/governance/stats
+[2026-04-18 12:27:49:452] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:27:55:559] [info] [request]: [9c909148-f01b-439e-86a1-fdc1556550e8] GET /api/v1/auctions
+[2026-04-18 12:27:55:909] [info] [request]: [c9a35bbe-e190-4bfa-8e1e-246db79bfdb5] GET /api/v1/auctions
+[2026-04-18 12:27:57:394] [info] [request]: [e5881b21-588e-48b6-8fdb-7c1a5f455836] PUT /api/v1/auth/role
+[2026-04-18 12:27:58:386] [info] [server]: User disconnected: jhCOtiGgmX4R_KfdAAAC
+[2026-04-18 12:27:58:466] [info] [request]: [ee83f1c9-d81d-402e-9f64-83e4b88134d4] GET /api/v1/invoices/seller
+[2026-04-18 12:27:58:495] [info] [request]: [101be9e9-3b7d-4fb0-94b8-fb8f2bf0a41d] GET /api/v1/kyc/status
+[2026-04-18 12:27:58:537] [info] [request]: [ed226b4d-a41d-4d37-87e5-f99ec770daea] GET /api/v1/quotations
+[2026-04-18 12:27:58:552] [info] [request]: [4d8a87f7-0e73-4101-8e4f-a5e2f3b97196] GET /api/v1/produce/lots/seller
+[2026-04-18 12:27:59:189] [info] [request]: [29cfa8c8-8484-4f99-824a-76f5bbe996e9] GET /api/v1/kyc/status
+[2026-04-18 12:27:59:492] [info] [request]: [c77327e4-ef1b-43cd-8ef7-c4689c5d0f2d] GET /api/v1/invoices/seller
+[2026-04-18 12:28:00:019] [info] [request]: [db9af7b7-8093-44fa-a15f-7da28c87638e] GET /api/v1/produce/lots/seller
+[2026-04-18 12:28:00:598] [info] [request]: [fe72403b-c2d8-40a0-b372-ffed7134b6a0] GET /api/v1/quotations
+[2026-04-18 12:28:00:618] [info] [request]: [6336c307-6858-4cd0-824e-447645ee6b34] GET /api/v1/auctions
+[2026-04-18 12:28:00:905] [info] [request]: [e93f2391-0c9c-4119-bb44-f3df1ea161da] GET /api/v1/auctions
+[2026-04-18 12:28:19:462] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:28:49:464] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:29:19:426] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:29:49:469] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:30:19:473] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:30:49:482] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:30:50:235] [info] [request]: [6beaae03-f5cd-4061-b45d-247af6aab533] GET /api/v1/invoices/seller
+[2026-04-18 12:30:50:245] [info] [request]: [044b0003-0b68-4630-b77f-f4505f885dc5] GET /api/v1/kyc/status
+[2026-04-18 12:30:50:251] [info] [request]: [cc4b991f-7f5b-4890-b187-e95639c350ac] GET /api/v1/quotations
+[2026-04-18 12:30:50:256] [info] [request]: [ebef8942-a07a-4c7b-99ea-315dfa962c0e] GET /api/v1/produce/lots/seller
+[2026-04-18 12:30:51:118] [info] [request]: [40fb5caa-5803-43df-9778-81e80fad8627] GET /api/v1/auctions
+[2026-04-18 12:30:51:188] [info] [request]: [0a718434-432b-4841-ba27-251cd50c15b5] GET /api/v1/invoices/seller
+[2026-04-18 12:30:51:193] [info] [request]: [081b3f06-6c2d-4e23-92f2-cb5c1d62f3df] GET /api/v1/kyc/status
+[2026-04-18 12:30:51:197] [info] [request]: [4104db2d-098b-40ad-aff0-8d483a24a1ed] GET /api/v1/quotations
+[2026-04-18 12:30:51:201] [info] [request]: [43066a4d-47e5-4d97-afa3-96b2e5e37cc5] GET /api/v1/produce/lots/seller
+[2026-04-18 12:30:51:402] [info] [request]: [066583b8-b7c3-4c21-917e-781b4b0ad49f] GET /api/v1/auctions
+[2026-04-18 12:30:52:080] [info] [request]: [d615ee6e-6e01-48fc-b6b2-811438eb386b] GET /api/v1/auctions
+[2026-04-18 12:30:52:178] [info] [request]: [0b2a79cd-57a9-4a46-b008-7ca98d9672ad] GET /api/v1/invoices/seller
+[2026-04-18 12:30:52:182] [info] [request]: [c3af7a24-20b2-439c-b4df-89a577db0026] GET /api/v1/kyc/status
+[2026-04-18 12:30:52:187] [info] [request]: [dee69bb1-b33b-4643-a1ff-f655bc71e64c] GET /api/v1/quotations
+[2026-04-18 12:30:52:191] [info] [request]: [23309407-1a2e-4c17-9dd4-eca109e178be] GET /api/v1/produce/lots/seller
+[2026-04-18 12:30:52:356] [info] [request]: [ad50e3d2-fa0a-4444-9e60-d6fc6152e8cf] GET /api/v1/auctions
+[2026-04-18 12:30:53:310] [info] [request]: [b914fe6c-3f06-4c7b-ba86-db834711c8e7] GET /api/v1/auctions
+[2026-04-18 12:30:53:597] [info] [request]: [f653aacf-6f59-42fe-838a-5b449f3bf60d] GET /api/v1/auctions
+[2026-04-18 12:30:54:194] [info] [request]: [fe74aa35-926c-4b6e-94d7-a951549e6aeb] GET /api/v1/invoices/seller
+[2026-04-18 12:30:54:199] [info] [request]: [7cb39efa-82b4-44d6-bb31-7d127c5c7a0a] GET /api/v1/kyc/status
+[2026-04-18 12:30:54:203] [info] [request]: [57035ce8-043b-4829-8ace-2a48c9b47436] GET /api/v1/quotations
+[2026-04-18 12:30:54:207] [info] [request]: [80067cab-d201-44b2-ae8e-2b508896c92e] GET /api/v1/produce/lots/seller
+[2026-04-18 12:30:55:063] [info] [request]: [5da01c38-11f9-4e57-bd6c-49d284950c79] GET /api/v1/auctions
+[2026-04-18 12:30:55:347] [info] [request]: [b61438b0-9933-4fc9-8b3b-3bb9381506f4] GET /api/v1/auctions
+[2026-04-18 12:31:19:461] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:31:49:486] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:32:19:489] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:32:49:478] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:33:19:498] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:33:34:201] [info] [request]: [b0edb9cc-867d-48d1-be9f-93c913377e53] GET /api/v1/auctions/seller
+[2026-04-18 12:33:35:041] [info] [request]: [c542e2d7-cca6-419c-b4a8-298a70bd9de0] GET /api/v1/auctions/seller
+[2026-04-18 12:33:42:220] [info] [request]: [251930ef-6faa-4587-9007-aa75105992f9] GET /api/v1/auctions/seller
+[2026-04-18 12:33:49:485] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:33:59:192] [info] [request]: [73392628-e3b2-40ff-ac52-0261efb1ae90] GET /api/v1/auctions/seller
+[2026-04-18 12:34:19:508] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:34:43:226] [info] [request]: [cc9133a9-ab22-437c-b867-df3826d1b8dd] GET /api/v1/auctions/seller
+[2026-04-18 12:34:49:514] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:34:51:565] [info] [request]: [ea018379-c804-437a-a7c2-274c26f4db0e] GET /api/v1/auctions
+[2026-04-18 12:34:52:596] [info] [request]: [1164ca3a-f2d2-4ca9-b6bc-58bec2d6778c] GET /api/v1/auctions/seller
+[2026-04-18 12:34:54:847] [info] [request]: [f8ddc3c8-ccac-4b04-810c-eea20777b51c] POST /api/v1/auctions/0x542213eb37399aabc7931e1957e42d1c8ea80dc6258c092672c571df0033d036/start
+[2026-04-18 12:34:58:770] [info] [request]: [79edab04-9da7-4618-9e4f-9e6f6ba662c8] GET /api/v1/auctions/seller
+[2026-04-18 12:35:01:294] [info] [request]: [311d94df-ea41-4986-96c5-773b278f5afe] GET /api/v1/auctions
+[2026-04-18 12:35:02:149] [info] [request]: [ae5488e6-43a1-4d1f-a373-76a6baaf39d4] GET /api/v1/auctions/seller
+[2026-04-18 12:35:03:922] [info] [request]: [66fe0bda-7a70-45bd-a5b6-6685e59ab1fb] GET /api/v1/auctions
+[2026-04-18 12:35:05:402] [info] [request]: [7446e111-4041-4c55-b33e-69f4e3bc516a] PUT /api/v1/auth/role
+[2026-04-18 12:35:06:527] [info] [request]: [e98c107c-1339-42a6-b8ae-d158551dbee8] GET /api/v1/auctions
+[2026-04-18 12:35:06:536] [info] [request]: [f4859170-090e-4199-a996-a7ec65bc3d01] GET /api/v1/financing/marketplace
+[2026-04-18 12:35:06:545] [info] [request]: [309dc797-908b-4329-b76b-3e77cb1fa149] GET /api/v1/investor/portfolio
+[2026-04-18 12:35:06:819] [info] [request]: [51e1e430-2256-4444-8ed1-9e34b3a9aa9b] GET /api/v1/auctions
+[2026-04-18 12:35:06:833] [info] [server]: User connected: PfbycEYlub5f1cClAAAF | User: 5 | Role: investor
+[2026-04-18 12:35:06:836] [info] [server]: User 5 joined marketplace
+[2026-04-18 12:35:06:832] [info] [socketAuth]: Socket authenticated: User 5 (karakotigaurav12@gmail.com) connected
+[2026-04-18 12:35:07:131] [info] [request]: [03f90f22-a5bf-437b-95ea-d4e485e93efa] GET /api/v1/financing/marketplace
+[2026-04-18 12:35:07:136] [info] [request]: [879cfbed-4299-4d3b-9a38-31315a89c5bb] GET /api/v1/auctions
+[2026-04-18 12:35:07:436] [info] [request]: [1309885f-5952-4e7c-ada7-964a6076f3f4] GET /api/v1/investor/portfolio
+[2026-04-18 12:35:07:441] [info] [request]: [c9effe18-144c-47d8-8a90-2af5d6a50d89] GET /api/v1/auctions
+[2026-04-18 12:35:07:748] [info] [request]: [5efacac9-7c74-4bc1-93c6-2710d5c56173] GET /api/v1/auctions
+[2026-04-18 12:35:08:049] [info] [request]: [b92bee3a-6c89-4ab7-bd07-4f2425eccd0f] GET /api/v1/auctions
+[2026-04-18 12:35:08:358] [info] [request]: [d9313648-e8ab-4f73-811a-da17ce85c691] GET /api/v1/auctions
+[2026-04-18 12:35:08:663] [info] [request]: [6d08f604-a638-4684-b110-c22e00dc0564] GET /api/v1/auctions
+[2026-04-18 12:35:08:972] [info] [request]: [21bc70fe-b282-4d66-a9ff-fc7ad60c89c6] GET /api/v1/auctions
+[2026-04-18 12:35:09:279] [info] [request]: [a8021346-3fec-416b-af2c-902c8bbf7580] GET /api/v1/auctions
+[2026-04-18 12:35:09:585] [info] [request]: [e0ebf744-a019-47c4-9b62-c69bf7d91716] GET /api/v1/auctions
+[2026-04-18 12:35:09:892] [info] [request]: [a595053b-d931-4695-a580-c311db0b3ef8] GET /api/v1/auctions
+[2026-04-18 12:35:10:200] [info] [request]: [a12e3a70-0806-433a-8558-d033b02eea6c] GET /api/v1/auctions
+[2026-04-18 12:35:10:506] [info] [request]: [f9dbedc6-5ad8-4af2-b34c-d77de1f58d05] GET /api/v1/auctions
+[2026-04-18 12:35:10:813] [info] [request]: [91301d1e-e4b4-4047-94ac-97fd958e51a3] GET /api/v1/auctions
+[2026-04-18 12:35:11:122] [info] [request]: [d978fa5c-4982-4694-aa20-bb06dccec38d] GET /api/v1/auctions
+[2026-04-18 12:35:11:428] [info] [request]: [60749143-618c-4fb8-82ee-e57ae5f7341b] GET /api/v1/auctions
+[2026-04-18 12:35:11:735] [info] [request]: [5584244b-b5f9-4086-9702-2d56dcc6d8ca] GET /api/v1/auctions
+[2026-04-18 12:35:12:043] [info] [request]: [9575e766-71b8-41a3-8bc9-c6e458f86763] GET /api/v1/auctions
+[2026-04-18 12:35:12:351] [info] [request]: [f860962b-4edd-4bb5-8bb9-5427ab1acdc1] GET /api/v1/auctions
+[2026-04-18 12:35:19:517] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:35:20:521] [info] [request]: [56de144d-df5f-48e5-954a-50dd998e873b] GET /api/v1/auctions/bidder
+[2026-04-18 12:35:21:724] [info] [request]: [d586f82a-8491-4e6d-9d8d-3f80c0e1da84] PUT /api/v1/auth/role
+[2026-04-18 12:35:22:601] [info] [server]: User disconnected: PfbycEYlub5f1cClAAAF
+[2026-04-18 12:35:22:640] [info] [request]: [eec6d758-5315-4175-bef6-b72b891c47cf] GET /api/v1/invoices/seller
+[2026-04-18 12:35:22:667] [info] [request]: [65f6c4a2-29f2-42fc-8073-1c40d712dec8] GET /api/v1/kyc/status
+[2026-04-18 12:35:22:675] [info] [request]: [61d44380-32b2-4724-8842-58c093415d12] GET /api/v1/quotations
+[2026-04-18 12:35:22:680] [info] [request]: [8f9783cf-d352-4813-9439-1171cdd1588d] GET /api/v1/produce/lots/seller
+[2026-04-18 12:35:23:722] [info] [request]: [7ce54db0-fc97-4d51-a156-c25f63933131] GET /api/v1/kyc/status
+[2026-04-18 12:35:23:730] [info] [request]: [7e689096-6aaa-4005-9888-ec523cbc534f] GET /api/v1/produce/lots/seller
+[2026-04-18 12:35:23:736] [info] [request]: [21c2a5fe-ce7a-49e9-a131-f836bca6cef9] GET /api/v1/invoices/seller
+[2026-04-18 12:35:23:743] [info] [request]: [21e89d8a-aa89-4627-9a46-46b0760969f2] GET /api/v1/quotations
+[2026-04-18 12:35:23:761] [info] [request]: [b58ffb98-dc71-45df-a570-e5ec31a4ce15] GET /api/v1/auctions/seller
+[2026-04-18 12:35:24:408] [info] [request]: [7c310a51-2077-448d-98f9-ad75b252ccb7] GET /api/v1/auctions/seller
+[2026-04-18 12:35:31:801] [info] [request]: [ab4ee4bb-ac8a-41f5-a8ff-68418409371d] POST /api/v1/auctions/0x542213eb37399aabc7931e1957e42d1c8ea80dc6258c092672c571df0033d036/start
+[2026-04-18 12:35:49:521] [info] [recoveryService]: Processing 0 operations from recovery queue
