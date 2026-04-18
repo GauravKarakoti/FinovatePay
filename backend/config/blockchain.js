@@ -132,7 +132,8 @@ const contractAddresses = {
   financingManager: deployedAddresses.FinancingManagerProxy,
   governanceToken: deployedAddresses.FinovateToken,
   treasuryManager: deployedAddresses.TreasuryManager,
-  streamingPayment: deployedAddresses.StreamingPayment
+  streamingPayment: deployedAddresses.StreamingPayment,
+  invoiceAuction: deployedAddresses.InvoiceAuction,
 };
 
 // --------------------------------------------------

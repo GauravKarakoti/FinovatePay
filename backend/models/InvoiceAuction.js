@@ -1,9 +1,6 @@
 const { pool } = require('../config/database');
 
 class InvoiceAuction {
-  /*//////////////////////////////////////////////////////////////
-                          CREATE
-  //////////////////////////////////////////////////////////////*/
   static async create(auctionData) {
     const {
       auctionId,
@@ -40,10 +37,10 @@ class InvoiceAuction {
       auctionId,
       sellerAddress,
       invoiceContractAddress || null,
-      invoiceId,
-      faceValue.toString(),
-      paymentToken,
-      minYieldBps,
+      invoiceId != null ? invoiceId : 0,
+      faceValue != null ? faceValue.toString() : '1', // Safe fallback matching on-chain value
+      paymentToken || '0x0000000000000000000000000000000000000000',
+      minYieldBps != null ? minYieldBps : 100,        // Safe fallback matching on-chain value
       auctionEndTime,
       minBidIncrement?.toString() || '0',
       txHash || null

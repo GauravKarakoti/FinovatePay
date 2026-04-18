@@ -10891,3 +10891,368 @@
 [2026-04-18 11:19:10:589] [info] [request]: [37257f1b-4ba4-4dda-9ef2-048c4465d54b] GET /api/v1/auctions
 [2026-04-18 11:19:19:914] [info] [request]: [4e2fd6c0-f942-4379-b839-473cb6a2abef] POST /api/v1/auctions
 [2026-04-18 11:19:31:160] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:22:12:376] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:22:12:397] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:22:12:386] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:22:12:387] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:22:12:388] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:22:12:398] [info] [server]: Compliance listeners started
+[2026-04-18 11:22:12:400] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:22:12:405] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:22:15:148] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:22:15:920] [info] [server]: Tokenization listener started
+[2026-04-18 11:22:17:847] [info] [request]: [0041d813-44b8-45ed-acac-46a505a284d8] POST /api/v1/auctions
+[2026-04-18 11:22:42:729] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:23:12:685] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:23:42:780] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:24:12:692] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:24:42:744] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:25:12:786] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:25:42:716] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:26:12:801] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:26:42:805] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:27:01:927] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:27:01:939] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:27:01:931] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:27:01:932] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:27:01:933] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:27:01:940] [info] [server]: Compliance listeners started
+[2026-04-18 11:27:01:942] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:27:01:945] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:27:04:331] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:27:04:525] [info] [server]: Tokenization listener started
+[2026-04-18 11:27:10:413] [info] [request]: [be30225c-b27f-4122-8422-26bc7b0ba05f] POST /api/v1/auctions
+[2026-04-18 11:27:32:193] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:28:02:270] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:28:32:227] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:29:02:278] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:29:32:282] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:30:02:253] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:30:32:284] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:34:08:739] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:34:08:753] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:34:08:745] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:34:08:745] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:34:08:747] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:34:08:754] [info] [server]: Compliance listeners started
+[2026-04-18 11:34:08:757] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:34:08:760] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:34:11:174] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:34:12:153] [info] [server]: Tokenization listener started
+[2026-04-18 11:34:21:222] [info] [request]: [1ff5c15e-8198-426a-9992-b0bd6f17bd22] POST /api/v1/auctions
+[2026-04-18 11:34:39:083] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:34:53:980] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:34:53:996] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:34:53:985] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:34:53:986] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:34:53:987] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:34:53:997] [info] [server]: Compliance listeners started
+[2026-04-18 11:34:54:004] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:34:54:009] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:35:01:213] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:35:01:232] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:35:01:218] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:35:01:219] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:35:01:220] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:35:01:233] [info] [server]: Compliance listeners started
+[2026-04-18 11:35:01:235] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:35:01:240] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:35:03:689] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:35:04:275] [info] [server]: Tokenization listener started
+[2026-04-18 11:35:07:238] [info] [request]: [25080ca3-be13-4d43-adaf-34d89c14cf5e] POST /api/v1/auctions
+[2026-04-18 11:35:31:499] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:36:01:516] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:36:31:537] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:37:01:583] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:37:23:186] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:37:23:198] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:37:23:191] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:37:23:191] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:37:23:192] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:37:23:199] [info] [server]: Compliance listeners started
+[2026-04-18 11:37:23:202] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:37:23:207] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:37:25:593] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:37:26:586] [info] [server]: Tokenization listener started
+[2026-04-18 11:37:53:546] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:38:05:954] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:38:05:970] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:38:05:960] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:38:05:961] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:38:05:962] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:38:05:970] [info] [server]: Compliance listeners started
+[2026-04-18 11:38:05:973] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:38:05:977] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:38:08:542] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:38:09:217] [info] [server]: Tokenization listener started
+[2026-04-18 11:38:21:326] [info] [request]: [d54c0523-b5cd-4834-bcf3-b20089581e47] POST /api/v1/auctions
+[2026-04-18 11:38:36:249] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:39:06:252] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:39:36:260] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:40:06:277] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:40:36:266] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:41:06:270] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:41:36:281] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:42:05:392] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:42:05:407] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:42:05:397] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:42:05:398] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:42:05:399] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:42:05:407] [info] [server]: Compliance listeners started
+[2026-04-18 11:42:05:410] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:42:05:414] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:42:07:807] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:42:08:668] [info] [server]: Tokenization listener started
+[2026-04-18 11:42:35:769] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:43:05:774] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:43:35:694] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:44:05:709] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:44:35:722] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:45:05:735] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:45:35:748] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:46:05:765] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:46:35:787] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:47:05:754] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:47:35:773] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:48:05:779] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:48:35:765] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:49:01:087] [info] [request]: [353a00e6-f5d1-434d-ab36-9e2cb68ad2fa] POST /api/v1/auctions
+[2026-04-18 11:49:05:822] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:49:35:826] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:49:36:448] [info] [request]: [46779673-50ed-4e96-9730-e48301abc04f] GET /api/v1/invoices/seller
+[2026-04-18 11:49:36:458] [info] [request]: [bd2218aa-163f-44c6-b4cf-145a30350dff] GET /api/v1/kyc/status
+[2026-04-18 11:49:36:462] [info] [request]: [e671d3ed-2ed6-48bc-8905-8168f1c4c164] GET /api/v1/quotations
+[2026-04-18 11:49:36:467] [info] [request]: [53d2987d-4048-4e45-9e81-019abbc2906d] GET /api/v1/produce/lots/seller
+[2026-04-18 11:49:37:388] [info] [request]: [d718bec9-ebda-4b94-8109-466ccdab0095] GET /api/v1/produce/lots/seller
+[2026-04-18 11:49:37:397] [info] [request]: [c7856aa3-0206-46c3-a3d7-eabe9628fb8b] GET /api/v1/invoices/seller
+[2026-04-18 11:49:37:403] [info] [request]: [f5f779b6-2b13-4578-8367-79ce90806c90] GET /api/v1/quotations
+[2026-04-18 11:49:37:410] [info] [request]: [3a59af9e-0fc0-439f-9df7-a096ce2d1112] GET /api/v1/kyc/status
+[2026-04-18 11:49:42:322] [info] [request]: [261440f8-03bd-4547-b8f5-8aabce90e436] GET /api/v1/auctions
+[2026-04-18 11:49:42:718] [info] [request]: [39986f2e-9447-4fe3-9ece-a4dd8988d275] GET /api/v1/auctions
+[2026-04-18 11:49:48:141] [info] [request]: [f290422a-a95b-416b-9a08-ce5b22071d66] POST /api/v1/auctions
+[2026-04-18 11:50:01:311] [info] [request]: [ceee09df-69ef-41e2-98b1-c74f30fc2d8c] GET /api/v1/auctions
+[2026-04-18 11:50:01:636] [info] [request]: [b6ebfaa1-95e3-42cb-a26a-c922cc85c495] GET /api/v1/auctions
+[2026-04-18 11:50:05:830] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:50:07:725] [info] [request]: [02cb61e6-397b-45c7-b798-34aefa09bb13] POST /api/v1/auctions
+[2026-04-18 11:50:35:836] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:51:05:798] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:51:35:847] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:52:05:847] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:52:35:957] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:53:05:856] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:53:16:245] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:53:16:263] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:53:16:250] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:53:16:251] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:53:16:252] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:53:16:264] [info] [server]: Compliance listeners started
+[2026-04-18 11:53:16:266] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:53:16:269] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:53:18:664] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:53:19:512] [info] [request]: [a01257a2-d150-436e-b7c6-ffa1c56fb7d7] POST /api/v1/auctions
+[2026-04-18 11:53:19:532] [info] [server]: Tokenization listener started
+[2026-04-18 11:53:46:612] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:54:16:617] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:54:46:620] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:55:16:625] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:55:46:602] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:56:16:588] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:56:46:596] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:57:16:602] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:57:46:610] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:58:16:648] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:58:46:652] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:59:16:657] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 11:59:30:457] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 11:59:30:472] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 11:59:30:463] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 11:59:30:463] [info] [server]: Invoice Sync Worker started
+[2026-04-18 11:59:30:464] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 11:59:30:473] [info] [server]: Compliance listeners started
+[2026-04-18 11:59:30:480] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 11:59:30:486] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 11:59:33:012] [info] [server]: Database connection test completed successfully
+[2026-04-18 11:59:33:765] [info] [server]: Tokenization listener started
+[2026-04-18 12:00:00:793] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:00:30:054] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:00:30:076] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:00:30:061] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:00:30:063] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:00:30:064] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:00:30:077] [info] [server]: Compliance listeners started
+[2026-04-18 12:00:30:081] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:00:30:088] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:00:32:647] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:00:35:153] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:00:35:178] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:00:35:161] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:00:35:162] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:00:35:164] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:00:35:179] [info] [server]: Compliance listeners started
+[2026-04-18 12:00:35:182] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:00:35:188] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:00:39:541] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:00:39:558] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:00:39:546] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:00:39:547] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:00:39:548] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:00:39:559] [info] [server]: Compliance listeners started
+[2026-04-18 12:00:39:561] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:00:39:566] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:00:41:422] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:00:42:836] [info] [server]: Tokenization listener started
+[2026-04-18 12:01:09:830] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:01:39:823] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:02:09:926] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:02:39:850] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:03:09:864] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:03:39:936] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:04:09:940] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:04:21:934] [info] [request]: [c7e3c91b-419e-4dff-9d53-939fcdbed3d6] POST /api/v1/auctions
+[2026-04-18 12:04:39:944] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:05:09:949] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:05:39:897] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:06:09:919] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:06:39:913] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:06:56:175] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:06:56:196] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:06:56:181] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:06:56:182] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:06:56:183] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:06:56:198] [info] [server]: Compliance listeners started
+[2026-04-18 12:06:56:201] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:06:56:210] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:06:56:832] [info] [request]: [c11dbe9f-bea8-4e19-b960-31e371779a6c] POST /api/v1/auctions
+[2026-04-18 12:06:58:780] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:06:59:537] [info] [server]: Tokenization listener started
+[2026-04-18 12:07:26:479] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:07:54:217] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:07:54:234] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:07:54:223] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:07:54:224] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:07:54:225] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:07:54:235] [info] [server]: Compliance listeners started
+[2026-04-18 12:07:54:237] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:07:54:242] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:07:57:042] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:07:57:056] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:07:57:047] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:07:57:048] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:07:57:049] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:07:57:057] [info] [server]: Compliance listeners started
+[2026-04-18 12:07:57:060] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:07:57:064] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:08:00:236] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:08:00:251] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:08:00:241] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:08:00:242] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:08:00:243] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:08:00:253] [info] [server]: Compliance listeners started
+[2026-04-18 12:08:00:256] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:08:00:263] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:08:02:797] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:08:03:622] [info] [server]: Tokenization listener started
+[2026-04-18 12:08:09:409] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:08:09:423] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:08:09:414] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:08:09:415] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:08:09:416] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:08:09:424] [info] [server]: Compliance listeners started
+[2026-04-18 12:08:09:426] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:08:09:429] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:08:12:643] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:08:12:660] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:08:12:650] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:08:12:650] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:08:12:652] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:08:12:661] [info] [server]: Compliance listeners started
+[2026-04-18 12:08:12:664] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:08:12:668] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:08:15:178] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:08:15:192] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:08:15:183] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:08:15:183] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:08:15:184] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:08:15:194] [info] [server]: Compliance listeners started
+[2026-04-18 12:08:15:198] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:08:15:205] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:08:17:675] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:08:18:518] [info] [server]: Tokenization listener started
+[2026-04-18 12:08:30:138] [info] [request]: [e3ea7386-9108-407f-b1dc-1edbad5a3784] POST /api/v1/auctions
+[2026-04-18 12:08:45:472] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:08:50:911] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:08:50:928] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:08:50:916] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:08:50:917] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:08:50:919] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:08:50:929] [info] [server]: Compliance listeners started
+[2026-04-18 12:08:50:932] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:08:50:936] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:08:52:852] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:08:55:461] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:08:55:481] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:08:55:469] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:08:55:470] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:08:55:471] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:08:55:481] [info] [server]: Compliance listeners started
+[2026-04-18 12:08:55:483] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:08:55:488] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:08:57:907] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:08:58:792] [info] [server]: Tokenization listener started
+[2026-04-18 12:08:59:432] [info] [request]: [e7d4c2ea-f546-442d-bf8a-f094b2552bd6] POST /api/v1/auctions
+[2026-04-18 12:09:25:742] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:09:55:859] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:10:25:759] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:10:55:775] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:11:25:792] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:11:55:805] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:12:25:878] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:12:55:884] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:13:25:989] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:13:55:902] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:14:25:834] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:14:55:899] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:15:25:903] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:15:55:907] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:16:25:871] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:16:45:239] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:16:45:252] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:16:45:244] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:16:45:244] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:16:45:245] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:16:45:253] [info] [server]: Compliance listeners started
+[2026-04-18 12:16:45:259] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:16:45:263] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:16:47:810] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:16:48:643] [info] [server]: Tokenization listener started
+[2026-04-18 12:16:53:460] [info] [request]: [ac03fd0c-b3ff-41de-94aa-826a0628c204] POST /api/v1/auctions
+[2026-04-18 12:17:15:583] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:17:45:523] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:18:15:541] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:18:45:576] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:19:15:550] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:19:45:685] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:20:15:602] [info] [recoveryService]: Processing 0 operations from recovery queue
+[2026-04-18 12:20:33:745] [info] [server]: [server] Blockchain transaction queue initialized
+[2026-04-18 12:20:33:773] [info] [complianceListener]: [complianceListener] Compliance event listeners started successfully
+[2026-04-18 12:20:33:758] [info] [escrowSyncService]: Starting Invoice Sync Worker...
+[2026-04-18 12:20:33:760] [info] [server]: Invoice Sync Worker started
+[2026-04-18 12:20:33:761] [info] [server]: Transaction Recovery Worker started
+[2026-04-18 12:20:33:774] [info] [server]: Compliance listeners started
+[2026-04-18 12:20:33:780] [info] [server]: [Server] Reconciliation scheduler started
+[2026-04-18 12:20:33:788] [info] [server]: 🚀 Server running on port 3000
+[2026-04-18 12:20:36:302] [info] [server]: Database connection test completed successfully
+[2026-04-18 12:20:37:041] [info] [request]: [1c446754-b6ba-4e18-aeac-8e9614627c3d] POST /api/v1/auctions
+[2026-04-18 12:20:37:063] [info] [server]: Tokenization listener started
+[2026-04-18 12:20:40:441] [info] [request]: [2beeb181-dbe2-4d13-be57-7ff5ed58b387] GET /api/v1/auctions
+[2026-04-18 12:20:44:723] [info] [request]: [493c1a1d-b88d-407d-912f-6bedf96f27c3] GET /api/v1/invoices/seller
+[2026-04-18 12:20:44:733] [info] [request]: [552ec854-71a8-4227-b57a-89b4fe26b990] GET /api/v1/kyc/status
+[2026-04-18 12:20:44:744] [info] [request]: [922913bc-1c5c-4308-b754-4cbf42a9aeea] GET /api/v1/quotations
+[2026-04-18 12:20:44:751] [info] [request]: [00664316-69f5-403c-aaec-bf37ed1a91f9] GET /api/v1/produce/lots/seller
+[2026-04-18 12:20:45:569] [info] [request]: [3b4c50d1-bff9-4d95-8dd6-d11a96a4986c] GET /api/v1/kyc/status
+[2026-04-18 12:20:45:587] [info] [request]: [4c919508-7822-4554-83b8-36e8b3f112d7] GET /api/v1/invoices/seller
+[2026-04-18 12:20:45:596] [info] [request]: [356bb7cc-8c17-40d6-815c-fedcdb6abc23] GET /api/v1/quotations
+[2026-04-18 12:20:47:353] [info] [request]: [5deca3c8-4ce0-419f-8312-67cd942ab114] GET /api/v1/produce/lots/seller
+[2026-04-18 12:20:47:373] [info] [request]: [6a131f6a-4189-4512-b31a-16a21aa83709] GET /api/v1/auctions
+[2026-04-18 12:20:47:654] [info] [request]: [9740f4ce-c69f-47ac-893a-051532d80486] GET /api/v1/auctions
+[2026-04-18 12:21:04:051] [info] [recoveryService]: Processing 0 operations from recovery queue

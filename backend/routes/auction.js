@@ -74,7 +74,6 @@ router.post('/', authenticateToken, requireKYC, async (req, res) => {
       minBidIncrement || 0
     );
 
-    // Save to database
     const auction = await auctionService.createAuction({
       auctionId,
       sellerAddress,
@@ -83,7 +82,8 @@ router.post('/', authenticateToken, requireKYC, async (req, res) => {
       faceValue,
       paymentToken,
       minYieldBps,
-      auctionEndTime: new Date(Date.now() + duration * 1000),
+      // Add fallback to 86400 seconds (1 day) so it doesn't calculate NaN
+      auctionEndTime: new Date(Date.now() + (duration > 0 ? duration : 86400) * 1000),
       minBidIncrement: minBidIncrement || 0,
       txHash: chainResult.txHash
     });

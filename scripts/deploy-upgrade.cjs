@@ -178,6 +178,11 @@ async function main() {
   await streamingPayment.waitForDeployment();
   console.log("Streaming Payment deployed to: ", streamingPayment.target);
 
+  const InvoiceAuction = await ethers.getContractFactory("InvoiceAuction");
+  const invoiceAuction = await InvoiceAuction.deploy();
+  await invoiceAuction.waitForDeployment();
+  console.log("Invoice Auction deployed to: ", invoiceAuction.target);
+
   // 👉 NEW: Update Financing Manager Dependencies
   console.log("\n🔗 Connecting new dependencies to Financing Manager Proxy...");
   updateTx = await financingProxyContract.setContracts(fractionToken.target, stablecoinAddress, feeWalletAddress);
@@ -205,18 +210,18 @@ async function main() {
     MockWaltBridge: actualWaltBridgeAddress,
     TreasuryManager: treasuryManager.target,
     StreamingPayment: streamingPayment.target,
-    FNSale: fnSale.target
+    FNSale: fnSale.target,
+    InvoiceAuction: invoiceAuction.target
   };
 
   fs.writeFileSync(addressPath, JSON.stringify(addressMap, null, 2));
 
   const contractNames = [
-    "FinovateToken", 
-    "FNSale",
+    "FinovateToken", "FNSale", "StreamingPayment",
     "MinimalForwarder", "ComplianceManager", "TreasuryManager",
     "InvoiceFactory", "FractionToken", "Invoice", "ProduceTracking", 
     "BridgeAdapter", "LiquidityAdapter", "InvoiceTokenStaking", "MockWaltBridge",
-    "StreamingPayment"
+    "InvoiceAuction"
   ];
 
   for (const name of contractNames) {

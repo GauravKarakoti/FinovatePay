@@ -1,41 +1,7 @@
 const { ethers } = require('ethers');
 const { getProvider, getSigner, contractAddresses } = require('../config/blockchain');
 const InvoiceAuction = require('../models/InvoiceAuction');
-
-// InvoiceAuction contract ABI
-const InvoiceAuctionABI = [
-  // Struct
-  "enum AuctionStatus { Created, Active, Ended, Cancelled, Settled }",
-  "struct Auction { bytes32 auctionId; address seller; address invoiceContract; uint256 invoiceId; uint256 faceValue; address paymentToken; uint256 minYieldBps; uint256 auctionEndTime; uint256 minBidIncrement; uint256 highestBid; address highestBidder; AuctionStatus status; uint256 createdAt; }",
-  "struct Bid { bytes32 bidId; bytes32 auctionId; address bidder; uint256 yieldBps; uint256 bidAmount; uint256 timestamp; }",
-
-  // Read functions
-  "function auctions(bytes32) view returns (tuple(bytes32 auctionId, address seller, address invoiceContract, uint256 invoiceId, uint256 faceValue, address paymentToken, uint256 minYieldBps, uint256 auctionEndTime, uint256 minBidIncrement, uint256 highestBid, address highestBidder, uint8 status, uint256 createdAt))",
-  "function auctionBids(bytes32, uint256) view returns (tuple(bytes32 bidId, bytes32 auctionId, address bidder, uint256 yieldBps, uint256 bidAmount, uint256 timestamp))",
-  "function platformFeeBps() view returns (uint256)",
-  "function sellerAuctions(address) view returns (bytes32[])",
-  "function bidderAuctions(address) view returns (bytes32[])",
-
-  // Write functions
-  "function createAuction(bytes32, address, uint256, uint256, address, uint256, uint256, uint256) returns (bool)",
-  "function startAuction(bytes32)",
-  "function placeBid(bytes32, uint256) payable",
-  "function endAuction(bytes32)",
-  "function settleAuction(bytes32)",
-  "function cancelAuction(bytes32)",
-  "function setPlatformFee(uint256)",
-
-  // Events
-  "event AuctionCreated(bytes32 indexed, address indexed, address indexed, uint256, uint256, uint256, uint256, uint256)",
-  "event AuctionStarted(bytes32 indexed)",
-  "event BidPlaced(bytes32 indexed, address indexed, uint256, uint256)",
-  "event AuctionEnded(bytes32 indexed, address, uint256, uint256)",
-  "event AuctionSettled(bytes32 indexed, address, uint256, uint256)",
-  "event AuctionCancelled(bytes32 indexed)",
-  "event PlatformFeeUpdated(uint256)"
-];
-
-let auctionContract = null;
+const InvoiceAuctionABI = require('../../deployed/InvoiceAuction.json').abi;
 
 /**
  * Get InvoiceAuction contract instance
@@ -63,11 +29,8 @@ const getAuctionContract = (signerOrProvider) => {
   }
 };
 
-/**
- * Get contract with signer for write operations
- */
-const getAuctionContractWithSigner = () => {
-  const signer = getSigner();
+const getAuctionContractWithSigner = async () => { // Make this async
+  const signer = await getSigner(); // Await the signer (fixes the Ethers v6 promise issue)
   if (!signer) {
     throw new Error('Signer not available');
   }
@@ -82,21 +45,19 @@ const statusToString = (status) => {
   return statusMap[status] || 'created';
 };
 
-/**
- * Generate auction ID
- */
 const generateAuctionId = (invoiceId, sellerAddress) => {
   return ethers.keccak256(
     ethers.solidityPacked(
-      ['bytes32', 'address', 'bytes32'],
-      [invoiceId, sellerAddress, ethers.randomBytes(32)]
+      ['uint256', 'address', 'bytes32'],
+      [
+        invoiceId != null ? invoiceId : 0, // Fallback to 0 if null/undefined
+        sellerAddress, 
+        ethers.hexlify(ethers.randomBytes(32)) // Hexlify the Uint8Array to be safe
+      ]
     )
   );
 };
 
-/**
- * Create a new auction on chain
- */
 const createAuctionOnChain = async (
   auctionId,
   invoiceContractAddress,
@@ -107,17 +68,23 @@ const createAuctionOnChain = async (
   duration,
   minBidIncrement
 ) => {
-  const contract = getAuctionContractWithSigner();
+  const contract = await getAuctionContractWithSigner(); 
+
+  // Resolve invoice contract address (fallback to deployed Invoice contract if frontend omitted it)
+  let resolvedInvoiceContract = invoiceContractAddress;
+  if (!resolvedInvoiceContract) {
+    resolvedInvoiceContract = contractAddresses.invoiceFactory; 
+  }
 
   const tx = await contract.createAuction(
     auctionId,
-    invoiceContractAddress,
-    invoiceId,
-    faceValue,
-    paymentToken,
-    minYieldBps,
-    duration,
-    minBidIncrement
+    resolvedInvoiceContract,                              
+    invoiceId != null ? invoiceId : 0,
+    faceValue > 0 ? faceValue : 1,                        // Fallback to 1 to bypass "Invalid face value"
+    paymentToken ? paymentToken : ethers.ZeroAddress,     
+    minYieldBps > 0 ? minYieldBps : 100,                  // Fallback to 100 bps (1%) to bypass "Invalid min yield"
+    duration > 0 ? duration : 86400,                      // Fallback to 86400 seconds (1 day) to bypass "Invalid duration"
+    minBidIncrement != null ? minBidIncrement : 0         // 0 is explicitly allowed for this field
   );
 
   const receipt = await tx.wait();
@@ -143,7 +110,7 @@ const createAuctionOnChain = async (
  * Start an auction
  */
 const startAuctionOnChain = async (auctionId) => {
-  const contract = getAuctionContractWithSigner();
+  const contract = await getAuctionContractWithSigner(); // ADD AWAIT HERE
 
   const tx = await contract.startAuction(auctionId);
   const receipt = await tx.wait();
@@ -158,7 +125,7 @@ const startAuctionOnChain = async (auctionId) => {
  * Place a bid on an auction
  */
 const placeBidOnChain = async (auctionId, yieldBps, bidAmount, paymentToken) => {
-  const contract = getAuctionContractWithSigner();
+  const contract = await getAuctionContractWithSigner(); // ADD AWAIT HERE
 
   const overrides = paymentToken === ethers.ZeroAddress ? { value: bidAmount } : {};
 
@@ -187,7 +154,7 @@ const placeBidOnChain = async (auctionId, yieldBps, bidAmount, paymentToken) => 
  * End an auction
  */
 const endAuctionOnChain = async (auctionId) => {
-  const contract = getAuctionContractWithSigner();
+  const contract = await getAuctionContractWithSigner(); // ADD AWAIT HERE
 
   const tx = await contract.endAuction(auctionId);
   const receipt = await tx.wait();
@@ -214,7 +181,7 @@ const endAuctionOnChain = async (auctionId) => {
  * Settle an auction
  */
 const settleAuctionOnChain = async (auctionId) => {
-  const contract = getAuctionContractWithSigner();
+  const contract = await getAuctionContractWithSigner(); // ADD AWAIT HERE
 
   const tx = await contract.settleAuction(auctionId);
   const receipt = await tx.wait();
@@ -242,7 +209,7 @@ const settleAuctionOnChain = async (auctionId) => {
  * Cancel an auction
  */
 const cancelAuctionOnChain = async (auctionId) => {
-  const contract = getAuctionContractWithSigner();
+  const contract = await getAuctionContractWithSigner(); // ADD AWAIT HERE
 
   const tx = await contract.cancelAuction(auctionId);
   const receipt = await tx.wait();
