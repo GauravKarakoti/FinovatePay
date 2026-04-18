@@ -27,7 +27,7 @@ const AMMMarketplace = () => {
 
   const [addForm, setAddForm] = useState({
     tokenId: '',
-    fractionTokenAddress: contractAddresses.fractionToken,
+    fractionTokenAddress: contractAddresses.FractionToken,
     stablecoinAddress: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
     fractionAmount: '',
     stableAmount: ''
@@ -106,7 +106,8 @@ const AMMMarketplace = () => {
       await refreshData();
     } catch (error) {
       console.error('Add liquidity failed:', error);
-      toast.error(error?.response?.data?.error?.message || error?.response?.data?.error || 'Add liquidity failed');
+      // FIX: Rely on the parsed message from the interceptor, or fallback safely to a string
+      toast.error(error?.message || 'Add liquidity failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -122,7 +123,7 @@ const AMMMarketplace = () => {
       await refreshData();
     } catch (error) {
       console.error('Remove liquidity failed:', error);
-      toast.error(error?.response?.data?.error?.message || error?.response?.data?.error || 'Remove liquidity failed');
+      toast.error(error?.message || 'Remove liquidity failed');
     } finally {
       setIsSubmitting(false);
     }
@@ -138,7 +139,7 @@ const AMMMarketplace = () => {
       await refreshData();
     } catch (error) {
       console.error('Swap failed:', error);
-      toast.error(error?.response?.data?.error?.message || error?.response?.data?.error || 'Swap failed');
+      toast.error(error?.message || 'Swap failed');
     } finally {
       setIsSubmitting(false);
     }

@@ -182,9 +182,17 @@ const addLiquidity = async ({
         const reserveStable = BigInt(pair.reserve_stable);
         const totalLpShares = BigInt(pair.total_lp_shares);
 
-        const sharesFromFractions = (inFractions * totalLpShares) / reserveFractions;
-        const sharesFromStable = (inStable * totalLpShares) / reserveStable;
-        const sharesMinted = sharesFromFractions < sharesFromStable ? sharesFromFractions : sharesFromStable;
+        let sharesMinted;
+
+        // If the pool was completely drained, treat it like initial liquidity
+        if (totalLpShares === 0n) {
+            sharesMinted = sqrtBigInt(inFractions * inStable);
+        } else {
+            // Normal proportional liquidity addition
+            const sharesFromFractions = (inFractions * totalLpShares) / reserveFractions;
+            const sharesFromStable = (inStable * totalLpShares) / reserveStable;
+            sharesMinted = sharesFromFractions < sharesFromStable ? sharesFromFractions : sharesFromStable;
+        }
 
         if (sharesMinted <= 0n) {
             throw new Error('Liquidity contribution too small');

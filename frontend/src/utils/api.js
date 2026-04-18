@@ -116,8 +116,8 @@ api.interceptors.response.use(
     switch (status) {
       case 400:
         console.error('Bad request:', errorData);
-        message =
-          errorData?.message || errorData?.error || 'Invalid request. Please check your input.';
+        // FIX: Use getErrorMessage instead of manual fallback
+        message = getErrorMessage(errorData, 'Invalid request. Please check your input.');
         toast.error(message);
         return Promise.reject({
           ...error,
@@ -156,10 +156,7 @@ api.interceptors.response.use(
 
       case 403:
         console.error('Forbidden:', errorData);
-        message =
-          errorData?.message ||
-          errorData?.error ||
-          'You do not have permission to perform this action.';
+        message = getErrorMessage(errorData, 'You do not have permission to perform this action.');
         toast.error(message);
         return Promise.reject({
           ...error,
